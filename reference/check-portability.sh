@@ -41,11 +41,11 @@ for d in "${SCAN[@]}"; do
   [ -d "$d" ] || { printf '  FAIL scan directory missing: %s\n' "$d"; fail=1; }
 done
 
-echo "1. No PCRE grep (-P) in shipped templates"
-hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])grep +[^|]*-[a-zA-Z]*P' \
+echo "1. No PCRE grep (-P) or long-form in shipped templates"
+hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
   "${SCAN[@]}")
 if [ -n "$hits" ]; then
-  red "grep -P found (exits 2 on BSD grep, silently yields 0):"
+  red "grep -P or --perl-regexp found (exits 2 on BSD grep, silently yields 0):"
   printf '%s\n' "$hits" | sed 's/^/       /'
 else
   ok "no grep -P"
@@ -54,7 +54,7 @@ fi
 echo "2. Wiki-link capture terminates at | and #"
 hits=$(scan_or_die "link capture scan" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}" \
   | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
-  | "$GREP" -v 'lib/link-extraction.sh')
+  | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
 if [ -n "$hits" ]; then
   red "link capture does not exclude | and # (counts [[a|b]] and [[a#c]] as dangling):"
   printf '%s\n' "$hits" | sed 's/^/       /'
@@ -62,23 +62,35 @@ else
   ok "link capture terminates correctly"
 fi
 
+echo "3. No PCRE via ripgrep (fails on rg builds without PCRE2)"
+hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+  -E '(^|[^a-zA-Z_-])rg +[^|]*(-P|--pcre2)' "${SCAN[@]}")
+if [ -n "$hits" ]; then
+  red "rg -P or --pcre2 found (fails on rg builds without PCRE2):"
+  printf '%s\n' "$hits" | sed 's/^/       /'
+else
+  ok "no rg PCRE"
+fi
+
 # KNOWN BLIND SPOT (matching direction):
 # This guard checks extraction direction only — it verifies that extracted links
 # terminate at | and #. It does NOT check matching direction — whether searches
 # for links correctly handle [[slug|alias]] and [[slug#heading]] patterns.
 #
-# The following 13 sites use rg -l or grep -rl with bare [[NAME]] patterns,
+# The following 9 sites use rg -l or grep -rl with bare [[NAME]] patterns,
 # which miss [[NAME|alias]] and [[NAME#heading]] variations. These cause false
 # positives in orphan detection and MOC coverage reports. The guard does not flag
 # these because checking would require recursive template evaluation (matching
 # direction requires parsing both link format AND file search scope simultaneously).
 #
-# Sites with matching direction blind spot:
-#   skills/health/SKILL.md:132, 175, 415, 468
-#   skills/architect/SKILL.md:175
-#   skill-sources/graph/SKILL.md:89, 106, 312, 446
-#   skill-sources/stats/SKILL.md:106, 133
-#   reference/testing-milestones.md:410
+# Sites with matching direction blind spot (by content type):
+#   Orphan detection in skill MOCs:
+#     skills/architect/SKILL.md (grep -rl, 1 instance)
+#     skills/health/SKILL.md (rg -l, 3 instances)
+#   Backlink counts in skill-sources:
+#     skill-sources/graph/SKILL.md (grep -rl, 4 instances)
+#   Milestone testing:
+#     reference/testing-milestones.md (grep -rl, 1 instance)
 #
 # Future work: Add a separate guard for matching direction or migrate to unified
 # pattern that captures variants at extraction time (not search time).
