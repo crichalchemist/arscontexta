@@ -247,7 +247,7 @@ Scan for friction patterns across multiple operational surfaces. Friction is the
 
 ```bash
 # Find all pending observations
-grep -rl '^status: pending' ops/observations/ 2>/dev/null
+grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null
 ```
 
 Read each pending observation. Categorize by type:

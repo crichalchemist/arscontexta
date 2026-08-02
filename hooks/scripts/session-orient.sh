@@ -114,16 +114,26 @@ for f in $(ls -t ops/methodology/*.md 2>/dev/null | head -5); do
 done
 
 # Condition-based maintenance signals
-OBS_COUNT=$(ls -1 ops/observations/*.md 2>/dev/null | wc -l | tr -d ' ')
-TENS_COUNT=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
+# Count only the items that are actually open. Counting every file and calling the
+# total "pending" nags forever on a vault whose observations are all resolved — the
+# field instance hit exactly this and patched its own copy of this hook rather than
+# the source. Reporting open-of-total makes the difference visible either way.
+#
+# Accept BOTH spellings: generated vaults write `status: open`, older templates
+# write `status: pending`. Matching one alone yields 0 on half the vaults in
+# existence, and a threshold that reads 0 can never fire.
+OBS_TOTAL=$(ls -1 ops/observations/*.md 2>/dev/null | wc -l | tr -d ' ')
+OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+TENS_TOTAL=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
+TENS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
 SESS_COUNT=$(ls -1 ops/sessions/*.json 2>/dev/null | grep -cv current 2>/dev/null || echo 0)
 INBOX_COUNT=$(ls -1 inbox/*.md 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$OBS_COUNT" -ge 10 ]; then
-  echo "CONDITION: $OBS_COUNT pending observations. Consider /rethink."
+  echo "CONDITION: $OBS_COUNT pending observations (of $OBS_TOTAL total). Consider /rethink."
 fi
 if [ "$TENS_COUNT" -ge 5 ]; then
-  echo "CONDITION: $TENS_COUNT unresolved tensions. Consider /rethink."
+  echo "CONDITION: $TENS_COUNT unresolved tensions (of $TENS_TOTAL total). Consider /rethink."
 fi
 if [ "$SESS_COUNT" -ge 5 ]; then
   echo "CONDITION: $SESS_COUNT unprocessed sessions. Consider /remember --mine-sessions."

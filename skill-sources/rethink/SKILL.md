@@ -157,7 +157,7 @@ If drift observations were created, they join the pool of pending observations f
 ### 1a. Gather Pending Evidence
 
 ```bash
-OBS_PENDING=$(grep -rl '^status: pending' ops/observations/ 2>/dev/null)
+OBS_PENDING=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null)
 OBS_COUNT=$(echo "$OBS_PENDING" | grep -c . 2>/dev/null || echo 0)
 TENSION_PENDING=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null)
 TENSION_COUNT=$(echo "$TENSION_PENDING" | grep -c . 2>/dev/null || echo 0)
@@ -315,7 +315,7 @@ Analyze remaining pending evidence (post-triage) plus promoted/implemented histo
 
 ### Evidence Sources
 
-1. **Still-pending observations** — items with `status: pending` after triage
+1. **Still-pending observations** — items with `status: pending` or `status: open` after triage
 2. **Still-pending tensions** — items with `status: open` or `status: pending` after triage
 3. **Recently promoted/implemented items** — may share themes with pending items
 4. **Methodology notes** — patterns in `ops/methodology/` by category

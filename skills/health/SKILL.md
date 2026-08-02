@@ -622,11 +622,14 @@ After running all applicable diagnostic categories, check these condition-based 
 **How to check condition counts:**
 
 ```bash
-# Pending observations
-OBS_COUNT=$(find ops/observations/ -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+# Pending observations. Filter by status — counting every file reports resolved and
+# archived items as pending, so the condition stays fired no matter how much triage
+# happens. Accept both spellings: vaults write `status: open`, older templates write
+# `status: pending`, and matching one alone reads 0 on half the vaults in existence.
+OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
 
 # Open tensions
-TENSION_COUNT=$(find ops/tensions/ -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+TENSION_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
 
 # Inbox items
 INBOX_COUNT=$(find {vocabulary.inbox}/ -name '*.md' -not -path '*/archive/*' 2>/dev/null | wc -l | tr -d ' ')

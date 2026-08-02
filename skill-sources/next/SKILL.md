@@ -61,7 +61,7 @@ Before collecting state, evaluate all maintenance conditions and reconcile the q
 | orphan_notes | For each note in {vocabulary.notes}/, count incoming [[links]]. Zero = orphan. |
 | dangling_links | Extract all [[links]], verify targets exist as files. Missing = dangling. |
 | inbox_pressure | Count *.md in {vocabulary.inbox}/. |
-| observation_accumulation | Count status: pending in ops/observations/. |
+| observation_accumulation | Count status: pending or open in ops/observations/. |
 | tension_accumulation | Count status: pending or open in ops/tensions/. |
 | pipeline_stalled | Queue tasks with status: pending unchanged across sessions. |
 | unprocessed_sessions | Count files in ops/sessions/ without mined: true. |
@@ -124,7 +124,7 @@ Gather all signals. Run independent checks in parallel where possible. Record ea
 | **Dangling links** | Extract all `[[links]]` from notes/, verify each target file exists | Count, first 5 targets |
 | **Stale notes** | Notes not modified recently AND with low link density (< 2 links) | Count |
 | **Goals** | Read `self/goals.md` or `ops/goals.md` — current priorities, active threads | Priority list, active research directions |
-| **Observations** | Count files with `status: pending` in `ops/observations/` | Count |
+| **Observations** | Count files with `status: pending` or `status: open` in `ops/observations/` | Count |
 | **Tensions** | Count files with `status: pending` or `status: open` in `ops/tensions/` | Count |
 | **Methodology** | Check `ops/methodology/` for recent captures (files modified in last 7 days) | Count of recent, total count |
 | **Health** | Read most recent report in `ops/health/` — note timestamp and issues | Last run date, issue count, any critical issues |
@@ -152,7 +152,7 @@ OLDEST_INBOX=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 -exec stat -c "
 NOTE_COUNT=$(ls -1 {vocabulary.notes}/*.md 2>/dev/null | wc -l | tr -d ' ')
 
 # Pending observations
-OBS_COUNT=$(grep -rl '^status: pending' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
 
 # Pending tensions
 TENSION_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')

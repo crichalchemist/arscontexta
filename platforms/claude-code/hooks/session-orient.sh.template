@@ -116,7 +116,7 @@ fi
 SIGNALS=""
 
 # Observation accumulation threshold (default: 10)
-OBS_COUNT=$(grep -rl '^status: pending' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
 if [ "$OBS_COUNT" -ge {{OBS_THRESHOLD:-10}} ]; then
   SIGNALS="${SIGNALS}CONDITION: ${OBS_COUNT} pending observations. Consider /{DOMAIN:rethink}.\n"
 fi
