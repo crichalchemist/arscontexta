@@ -84,7 +84,21 @@ else
   # number is always exactly what was removed.
   exempt_count=$(printf '%s\n' "$temp_a" | "$GREP" -c 'portability-exempt' 2>/dev/null || true)
   exempt_count=${exempt_count:-0}
-  hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v 'portability-exempt')  # Exempt shape matchers used with grep -v (not target extractors)
+  # SCOPE OF THE EXEMPTION MARKER — deliberately narrow, and verified so:
+  # `portability-exempt` is honoured HERE ONLY (check 2, part A). It is silently
+  # ignored by check 1 (grep -P) and by part B (greedy quantifiers). That is
+  # intentional: part A is a SHAPE HEURISTIC — it flags any line containing `[^`
+  # without `|#`, which false-positives on lines that merely match a shape rather
+  # than extract link targets (see skills/health/SKILL.md). The other two detect
+  # constructs with no legitimate use at all: `grep -P` exits 2 on BSD grep
+  # everywhere, and a greedy `[[.*]]` never terminates correctly. There is no
+  # such thing as a justified exemption for those, so the marker must not appear
+  # to offer one.
+  # The name reads as universal, so say plainly that it is not: a contributor who
+  # adds the marker to a check-1 hit will see it ignored, and the dangerous next
+  # move is widening an exclusion or deleting a check. If you hit a genuine false
+  # positive in check 1 or part B, fix the pattern — do not reach for the marker.
+  hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v 'portability-exempt')
   hits_b=$(printf '%s\n' "$raw_b" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
   hits="${hits_a}${hits_b:+
 }${hits_b}"
