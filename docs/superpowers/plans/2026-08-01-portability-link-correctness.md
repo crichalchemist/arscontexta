@@ -122,7 +122,12 @@ SCAN=("$ROOT/skills" "$ROOT/skill-sources" "$ROOT/reference")
 echo "=== Portability check: $ROOT ==="
 
 echo "1. No PCRE grep (-P) in shipped templates"
-hits=$("$GREP" -rn --include='*.md' --include='*.sh' -E '(^|[^a-zA-Z_-])grep +[^|]*-[a-zA-Z]*P' \
+# --exclude the guard's own source: its search pattern necessarily CONTAINS the
+# construct it searches for, so without this it self-flags 3 times (12 hits, not
+# the 9 real defects). Found during implementation; the count in an earlier draft
+# of this plan was computed before the guard existed and was therefore wrong.
+hits=$("$GREP" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+  -E '(^|[^a-zA-Z_-])grep +[^|]*-[a-zA-Z]*P' \
   "${SCAN[@]}" 2>/dev/null || true)
 if [ -n "$hits" ]; then
   red "grep -P found (exits 2 on BSD grep, silently yields 0):"
