@@ -82,7 +82,15 @@ else
     | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
   # Counted from the same input and marker as the filter below, so the reported
   # number is always exactly what was removed.
-  exempt_count=$(printf '%s\n' "$temp_a" | "$GREP" -c 'portability-exempt' 2>/dev/null || true)
+  # ANCHORED to the start of a comment, not matched anywhere in the line. An
+  # unanchored match reintroduced exactly the evasion this task was told to
+  # remove: the old library exclusion was content-based, so a trailing comment
+  # naming that path could hide a defect, and it was replaced with a path-based
+  # test. An unanchored `portability-exempt` had the same shape — verified, a
+  # line reading `rg -o "\[\[([^\]]+)\]\]" notes/  # TODO: is this
+  # portability-exempt?` was silently excluded and the guard reported PASS.
+  # Merely ASKING about the marker must not grant it.
+  exempt_count=$(printf '%s\n' "$temp_a" | "$GREP" -c '#[[:space:]]*portability-exempt' 2>/dev/null || true)
   exempt_count=${exempt_count:-0}
   # SCOPE OF THE EXEMPTION MARKER — deliberately narrow, and verified so:
   # `portability-exempt` is honoured HERE ONLY (check 2, part A). It is silently
@@ -98,7 +106,7 @@ else
   # adds the marker to a check-1 hit will see it ignored, and the dangerous next
   # move is widening an exclusion or deleting a check. If you hit a genuine false
   # positive in check 1 or part B, fix the pattern — do not reach for the marker.
-  hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v 'portability-exempt')
+  hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v '#[[:space:]]*portability-exempt')
   hits_b=$(printf '%s\n' "$raw_b" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
   hits="${hits_a}${hits_b:+
 }${hits_b}"
