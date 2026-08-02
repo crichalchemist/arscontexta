@@ -15,11 +15,23 @@
 
 # Strip fenced code blocks from one file, emit remaining lines.
 _strip_fences() {
+  if ! command -v awk >/dev/null 2>&1; then
+    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
+    return 1
+  fi
   awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$1"
 }
 
 # count_links <dir> -> integer
 count_links() {
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "error: link-extraction library requires 'rg', not found in PATH" >&2
+    return 1
+  fi
+  if ! command -v awk >/dev/null 2>&1; then
+    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
+    return 1
+  fi
   local dir="$1" f
   local n=0
   for f in "$dir"/*.md; do
@@ -31,6 +43,14 @@ count_links() {
 
 # extract_link_targets <dir> -> newline-separated folded unique targets
 extract_link_targets() {
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "error: link-extraction library requires 'rg', not found in PATH" >&2
+    return 1
+  fi
+  if ! command -v awk >/dev/null 2>&1; then
+    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
+    return 1
+  fi
   local dir="$1" f
   for f in "$dir"/*.md; do
     [ -e "$f" ] || continue
