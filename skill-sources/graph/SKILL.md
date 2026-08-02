@@ -594,6 +594,20 @@ N-hop backward traversal to a {vocabulary.note}. Default depth: 2.
 Find all notes that link TO this {vocabulary.note} (hop 1).
 
 ```bash
+# Each fenced block is a SEPARATE shell invocation: NOTES_DIR does not survive
+# from the blocks above. Left undefined, `find ""` scans nothing and the hop-1
+# set comes back empty — which reads exactly like a note nothing links to. The
+# `2>/dev/null` on the find below hides even the "No such file" line, so the
+# whole traversal reports "no backlinks" at exit 0 on a vault full of them.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate empty result; a MISSING directory is a failure
+# and must not render as one.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report backlinks" >&2
+  exit 1
+}
+
 NAME="[note name]"
 find "$NOTES_DIR" -type f -name '*.md' -exec grep -l "\[\[$NAME\]\]" {} + 2>/dev/null
 ```
@@ -644,6 +658,18 @@ Supported query patterns:
 **Step 2: Execute query**
 
 ```bash
+# Each fenced block is a SEPARATE shell invocation: NOTES_DIR does not survive
+# from the blocks above. Left undefined, `find ""` scans nothing and the query
+# returns no rows — which reads exactly like a query that matched nothing.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate empty result set; a MISSING directory is a
+# failure and must not render as one.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report query results" >&2
+  exit 1
+}
+
 # File list comes from `find`, not from rg's own directory walk. Handed a
 # directory, rg applies .gitignore/.ignore rules and skips hidden dirs, so a
 # gitignored subdirectory would silently return fewer notes here than /graph
