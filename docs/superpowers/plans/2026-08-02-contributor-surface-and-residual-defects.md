@@ -381,6 +381,43 @@ Any divergence is a defect in the upgrade skill's prose contract and needs its o
 
 ---
 
+## Queued to start after this plan completes
+
+Platform expansion, sequenced deliberately behind Spec C rather than run alongside it. Full research
+and sources in `.superpowers/platform-research.md` (git-ignored — promote to `reference/` when this
+work starts, or the detail is lost to `git clean`).
+
+**1. Antigravity CLI adapter — LOW cost, the right second target.** The only other platform whose
+extension model is *markdown skills with YAML frontmatter*, which is exactly what
+`skill-sources/*/SKILL.md` already is. Plugins bundle `skills/`, `agents/`, `hooks.json` and
+`mcp_config.json` — near 1:1 with this repo's layout, and `platforms/` already anticipates the
+adapter shape. Known work:
+
+- Root `plugin.json` is currently a byte-identical copy of `.claude-plugin/plugin.json` and would
+  **fail Antigravity's schema**: it is `additionalProperties: false` permitting only `name` and
+  `description`, and the copy carries six illegal keys (`version`, `author`, `homepage`,
+  `repository`, `license`, `keywords`). `name` must match `^[a-zA-Z0-9-_]+$`.
+- Translate `hooks/hooks.json` to Antigravity's hook schema; `.mcp.json` → `mcp_config.json`.
+- Generated vaults would place skills in `.agents/skills/` rather than `.claude/skills/`.
+- The README currently claims `| Antigravity CLI plugin | Available |`. Nothing is installable yet —
+  scope that claim before it ships, or it is exactly the status-that-lies defect this repo gates.
+
+**2. Pi — MEDIUM, but test before planning.** Skills are markdown, and Pi discovers **`CLAUDE.md`
+and `AGENTS.md` natively** (`--no-context-files` disables it), so a generated vault may already be
+partially usable with **no adapter at all**. Establish that first — it is a ten-minute experiment
+that decides whether this is a port or merely packaging. Costs if it becomes a port: hooks are
+TypeScript extensions (`pi.registerTool()`, `pi.registerCommand()`, event interception), so the
+seven bash hooks have no declarative equivalent, and packaging wants a `package.json`, which
+conflicts with this repo's deliberate no-runtime-dependency stance.
+
+> Target `@earendil-works/pi-coding-agent` (v0.83.0). The older `@mariozechner/pi-coding-agent`
+> (v0.73.1) **still resolves on npm** and installs ten minor versions behind with no error — the same
+> shape as the stale qmd and Exa tool names fixed in Spec B.
+
+**opencode is NOT queued.** No markdown skill primitive at all; a plugin is an async TS function
+returning hooks, with tools defined via Zod-style schemas. All 26 commands would become TypeScript.
+That is a rewrite, not an adapter, and it contradicts the no-new-runtime constraint.
+
 ## Not in this plan
 
 - Canonical `open` vs `pending` for new observations — readers accept both, so nothing is broken
