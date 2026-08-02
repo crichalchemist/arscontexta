@@ -1067,6 +1067,14 @@ processing:
 
 provenance: [full | minimal | off]
 
+# Thresholds for the operational learning loop (Kernel Primitive 12). /rethink,
+# /remember and /next all read these keys and document these exact defaults, so
+# they MUST be emitted here — a key that no generated config contains is a key
+# no user can discover or tune, and every consumer silently falls back forever.
+self_evolution:
+  observation_threshold: 10   # open observations before suggesting rethink
+  tension_threshold: 5        # open tensions before suggesting rethink
+
 personality:
   enabled: [true | false]
 
@@ -1582,7 +1590,14 @@ Run all 15 primitive checks against the generated system. Use `${CLAUDE_PLUGIN_R
 9. **self-space** -- self/ exists with identity.md, methodology.md, goals.md?
 10. **session-rhythm** -- Context file documents orient/work/persist cycle?
 11. **discovery-first** -- Context file contains Discovery-First Design section, notes optimized for findability?
-12. **operational-learning-loop** -- ops/observations/ and ops/tensions/ exist, review trigger documented in context file, /{DOMAIN:rethink} command exists?
+12. **operational-learning-loop** -- ops/observations/ and ops/tensions/ exist, review trigger documented in context file, /{DOMAIN:rethink} command exists? **`ops/config.yaml` contains a `self_evolution:` section with `observation_threshold` and `tension_threshold`?**
+
+    The thresholds are what make this loop *fire*; without them the directories fill up and nothing
+    ever triggers. `/{DOMAIN:rethink}`, `/{DOMAIN:remember}` and `/{DOMAIN:next}` all read
+    `self_evolution.observation_threshold` and `self_evolution.tension_threshold`, and all document
+    the same defaults (10 and 5). Emit them even at the defaults: a key absent from every generated
+    config is a key no user can find or tune, so every consumer falls back silently and forever, and
+    the loop looks configurable while being fixed.
 13. **task-stack** -- ops/tasks.md exists? Queue file (ops/queue/queue.json) exists with schema_version >= 3 and maintenance_conditions section? **`ops/queue/.locks/` directory exists?** Context file references both in session-orient phase? /{DOMAIN:next} command exists with condition reconciliation?
 
     `ops/queue/.locks/` must be created here, empty. It is the parent for the qmd mutex that

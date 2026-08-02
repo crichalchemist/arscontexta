@@ -345,6 +345,34 @@ nothing. It does not fail — it hangs.
 
 Report the outcome: `queue lock dir: absent → created [restored]`, or `present [current]`.
 
+### 5g. Seed the self-evolution thresholds
+
+`/{DOMAIN:rethink}`, `/{DOMAIN:remember}` and `/{DOMAIN:next}` all read
+`self_evolution.observation_threshold` and `self_evolution.tension_threshold` from `ops/config.yaml`,
+and all document the same defaults. No generator ever wrote those keys, so in every vault built
+before this step they are simply absent: each skill falls back to its built-in default, and a user
+who wants to tune the loop has nothing to edit and no way to discover the setting exists.
+
+1. Check whether `ops/config.yaml` contains a `self_evolution:` section.
+2. If absent, append it with the documented defaults, preserving the file's existing comment style:
+
+   ```yaml
+   self_evolution:
+     observation_threshold: 10   # open observations before suggesting rethink
+     tension_threshold: 5        # open tensions before suggesting rethink
+   ```
+
+3. If present, leave the user's values alone — this step seeds a missing section, it does not
+   reset a tuned one.
+
+Report the outcome: `self_evolution: absent → seeded (10/5) [restored]`, or `present [current]`.
+
+**Note a genuine split rather than bridging it silently.** The SessionStart hook does not read these
+keys — it carries its own hardcoded thresholds, and `read_config.sh` reads the top-level
+`.arscontexta` marker, so it cannot reach a nested `ops/config.yaml` key at all. Seeding the section
+therefore makes the loop tunable for the three skills that read it, and leaves the hook unaffected.
+Unifying the two configuration surfaces is a design change, not an upgrade step.
+
 ---
 
 ## Step 6: Validate
