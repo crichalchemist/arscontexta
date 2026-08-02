@@ -185,9 +185,26 @@ LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
 }
 . "$LINK_LIB"
 
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 # Find dangling links (folded both sides — reference/lib/link-extraction.sh)
-NOTE_INDEX=$(existing_note_index "{vocabulary.notes}")
-extract_link_targets "{vocabulary.notes}" | while read -r NAME; do
+NOTE_INDEX=$(existing_note_index "{vocabulary.notes}") || {
+  echo "error: note index build failed; refusing to report dangling links" >&2
+  exit 1
+}
+# Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
+# loop's status, so a failed extraction would read as "no dangling links" — and
+# this evidence feeds evolution proposals, so a false clean bill is worse here.
+LINK_TARGETS=$(extract_link_targets "{vocabulary.notes}") || {
+  echo "error: link extraction failed; refusing to report dangling links" >&2
+  exit 1
+}
+printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
 

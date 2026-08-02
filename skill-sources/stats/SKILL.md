@@ -68,13 +68,23 @@ LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
 }
 . "$LINK_LIB"
 
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 # Note count (excluding MOCs)
 TOTAL_FILES=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 MOC_COUNT=$(grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
 
 # Connection count (all wiki links across notes/)
-LINK_COUNT=$(count_links "$NOTES_DIR")
+LINK_COUNT=$(count_links "$NOTES_DIR") || {
+  echo "error: link counting failed; refusing to report a connection count" >&2
+  exit 1
+}
 
 # Average connections per note
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
@@ -83,8 +93,33 @@ else
   AVG_LINKS="0"
 fi
 
-# Topic count (unique values in topics: fields)
-TOPIC_COUNT=$(for f in "$NOTES_DIR"/*.md; do [ -e "$f" ] || continue; rg '^\s*-\s*"\[\[([^\]|#]+)' -o -r '$1' "$f" 2>/dev/null; done | sort -u | wc -l | tr -d ' ')
+# Topic count (unique values in topics: fields).
+# Trimmed and folded the same way the library folds link targets, so casing and
+# stray whitespace do not inflate the count. rg's OWN status is checked — a
+# pipeline's status is the last stage's, so an rg failure would otherwise render
+# as a plausible 0. `find` (not a glob) distinguishes the two states the report
+# must not conflate: missing directory aborts, empty directory is a legitimate 0.
+TOPIC_SRC=$(mktemp) || { echo "error: mktemp failed; refusing to report a topic count" >&2; exit 1; }
+find "$NOTES_DIR" -maxdepth 1 -type f -name '*.md' -exec cat {} + > "$TOPIC_SRC" || {
+  rm -f "$TOPIC_SRC"
+  echo "error: reading '$NOTES_DIR' failed; refusing to report a topic count" >&2
+  exit 1
+}
+TOPIC_RAW=$(rg -o -r '$1' '^\s*-\s*"\[\[([^\]|#]+)' "$TOPIC_SRC")
+RG_RC=$?
+rm -f "$TOPIC_SRC"
+if [ "$RG_RC" -gt 1 ]; then
+  echo "error: topic extraction failed (rg exit $RG_RC); refusing to report a topic count" >&2
+  exit 1
+fi
+if [ -z "$TOPIC_RAW" ]; then
+  TOPIC_COUNT=0
+else
+  TOPIC_COUNT=$(printf '%s\n' "$TOPIC_RAW" \
+    | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+    | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' \
+    | sort -u | wc -l | tr -d ' ')
+fi
 
 # Link density
 if [[ "$NOTE_COUNT" -gt 1 ]]; then
@@ -108,8 +143,18 @@ for f in "$NOTES_DIR"/*.md; do
 done
 
 # Dangling link count (folded on both — reference/lib/link-extraction.sh)
-NOTE_INDEX=$(existing_note_index "$NOTES_DIR")
-DANGLING_COUNT=$(extract_link_targets "$NOTES_DIR" | while read -r NAME; do
+NOTE_INDEX=$(existing_note_index "$NOTES_DIR") || {
+  echo "error: note index build failed; refusing to report a dangling-link count" >&2
+  exit 1
+}
+# Extraction is captured and CHECKED BEFORE the loop. Piping it straight into
+# `while` would yield the loop's status, not extraction's, so a failed extraction
+# would render as a plausible 0 (PIPESTATUS is bash-only and cannot be used here).
+LINK_TARGETS=$(extract_link_targets "$NOTES_DIR") || {
+  echo "error: link extraction failed; refusing to report a dangling-link count" >&2
+  exit 1
+}
+DANGLING_COUNT=$(printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "$NAME"
 done | wc -l | tr -d ' ')
 

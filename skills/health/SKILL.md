@@ -171,11 +171,27 @@ LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
 }
 . "$LINK_LIB"
 
-# Build folded index of all existing notes (recursive for vault with subdirs)
-NOTE_INDEX=$(existing_note_index_recursive "{vocabulary.notes}")
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
 
-# Extract all wiki links from all markdown files (folded both sides, fences stripped)
-extract_link_targets_recursive "{vocabulary.notes}" | while read -r target; do
+# Build folded index of all existing notes (recursive for vault with subdirs)
+NOTE_INDEX=$(existing_note_index_recursive "{vocabulary.notes}") || {
+  echo "error: note index build failed; refusing to report link health" >&2
+  exit 1
+}
+
+# Extract all wiki links from all markdown files (folded both sides, fences stripped).
+# Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
+# loop's status, so a failed extraction would render as a PASS on link health.
+LINK_TARGETS=$(extract_link_targets_recursive "{vocabulary.notes}") || {
+  echo "error: link extraction failed; refusing to report link health" >&2
+  exit 1
+}
+printf '%s\n' "$LINK_TARGETS" | while read -r target; do
   # Compare against index — both sides already folded by library
   if [ -n "$target" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$target"; then
     echo "FAIL: dangling link [[${target}]] — no file found"

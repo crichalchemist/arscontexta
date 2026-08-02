@@ -71,12 +71,22 @@ LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
 }
 . "$LINK_LIB"
 
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 TOTAL=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 MOC_COUNT=$(grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL - MOC_COUNT))
 
 # Count all wiki links
-LINK_COUNT=$(count_links "$NOTES_DIR")
+LINK_COUNT=$(count_links "$NOTES_DIR") || {
+  echo "error: link counting failed; refusing to report a density figure" >&2
+  exit 1
+}
 
 # Calculate link density
 # Density = actual_links / possible_links
@@ -91,8 +101,17 @@ for f in "$NOTES_DIR"/*.md; do
 done
 
 # Find dangling links (links to non-existent files)
-NOTE_INDEX=$(existing_note_index "$NOTES_DIR")
-extract_link_targets "$NOTES_DIR" | while read -r NAME; do
+NOTE_INDEX=$(existing_note_index "$NOTES_DIR") || {
+  echo "error: note index build failed; refusing to report dangling links" >&2
+  exit 1
+}
+# Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
+# loop's status, so a failed extraction would read as "no dangling links".
+LINK_TARGETS=$(extract_link_targets "$NOTES_DIR") || {
+  echo "error: link extraction failed; refusing to report dangling links" >&2
+  exit 1
+}
+printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
 
