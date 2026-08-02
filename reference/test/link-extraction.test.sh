@@ -13,6 +13,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 LIB="$HERE/../lib/link-extraction.sh"
 passed=0; failed=0
 
+# Every assertion that needs a fresh shell must spawn THIS harness's shell, not
+# `sh`. On macOS `sh` is bash 3.2 regardless of what launched the harness, so
+# `sh -c` sites silently ran the bash path even under `zsh …test.sh` — which
+# defeats the promise made at the top of this file. Verified: `sh -c 'echo
+# ${ZSH_VERSION:-unset}'` prints `unset` when invoked from zsh.
+if [ -n "${ZSH_VERSION:-}" ]; then SELF=zsh; else SELF=bash; fi
+
 ok()   { passed=$((passed+1)); }
 fail() { failed=$((failed+1)); printf 'FAIL: %s\n       expected [%s] got [%s]\n' "$1" "$2" "$3"; }
 eq()   { if [ "$2" = "$3" ]; then ok; else fail "$1" "$2" "$3"; fi; }
@@ -67,26 +74,45 @@ eq "count_links_recursive is shell-agnostic"  "10" "$(count_links_recursive "$N"
 
 # --- locale independence ----------------------------------------------------
 eq "fold handles non-ASCII under LC_ALL=C"    "yes" \
-   "$(LC_ALL=C sh -c ". '$LIB'; existing_note_index '$N'" | /usr/bin/grep -qx 'über' && echo yes || echo no)"
+   "$(LC_ALL=C "$SELF" -c ". '$LIB'; existing_note_index '$N'" | /usr/bin/grep -qx 'über' && echo yes || echo no)"
 
 # --- failure must never be a number ----------------------------------------
 eq "missing dir fails, emits no count"        "loud" \
    "$(out=$(count_links "$FIX/nope" 2>/dev/null); rc=$?; [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
 eq "missing rg fails, emits no count"         "loud" \
-   "$(out=$(PATH=/usr/bin:/bin sh -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
+   "$(out=$(PATH=/usr/bin:/bin "$SELF" -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
       [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
 BADRC=$(mktemp); printf -- '--nonexistent-flag-xyz\n' > "$BADRC"
 eq "rg runtime failure fails loud"            "loud" \
-   "$(out=$(RIPGREP_CONFIG_PATH="$BADRC" sh -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
+   "$(out=$(RIPGREP_CONFIG_PATH="$BADRC" "$SELF" -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
       [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
 rm -f "$BADRC"
 eq "library declares a contract version"      "yes" \
    "$([ "${LINK_EXTRACTION_VERSION:-0}" -ge 1 ] 2>/dev/null && echo yes || echo no)"
 
 # --- caller must survive failures (not exit under zsh) ----------------------------
+# An earlier version of these two assertions passed against the very library
+# that had the defect. It was vacuous three times over, and each fault is worth
+# naming because each is easy to write again:
+#   1. it spawned `sh`, which is bash on macOS, so the zsh-only defect was
+#      unreachable no matter which shell ran the harness;
+#   2. it called the library on a NONEXISTENT directory, which returns at the
+#      `[ -d ]` check and never reaches rg — so the rg failure path it claimed
+#      to test never executed;
+#   3. it ended in `|| echo survived`, which supplies the expected answer when
+#      the caller dies — the one outcome it existed to detect.
+# The form below was verified to discriminate before being written in: against
+# commit c5c159c it yields empty under zsh (the caller died) and `reached`
+# under bash; against the fix it yields `reached` under both.
 BADRC=$(mktemp); printf -- '--nonexistent-flag-xyz\n' > "$BADRC"
-eq "direct call: caller survives rg failure" "survived" \
-   "$(RIPGREP_CONFIG_PATH="$BADRC" sh -c ". '$LIB'; count_links /tmp/nonexistent 2>/dev/null; echo survived" 2>/dev/null || echo survived)"
+eq "direct call: caller survives rg failure"  "reached" \
+   "$(RIPGREP_CONFIG_PATH="$BADRC" "$SELF" -c ". '$LIB'; count_links '$N' >/dev/null 2>&1; printf reached" 2>/dev/null)"
+# `if` does NOT contain the exit: zsh runs the last pipeline stage in the
+# current shell, so an `exit` inside the library kills the caller from within
+# the condition. Measured before the fix — this form died exactly like the bare
+# call, which is why testing only the guarded form would have proved nothing.
+eq "guarded call: caller survives rg failure" "reached" \
+   "$(RIPGREP_CONFIG_PATH="$BADRC" "$SELF" -c ". '$LIB'; if count_links '$N' >/dev/null 2>&1; then :; fi; printf reached" 2>/dev/null)"
 rm -f "$BADRC"
 
 # --- empty vault (legitimate state, not a failure) ----------------------------
