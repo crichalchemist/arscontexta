@@ -59,13 +59,22 @@ Gather all metrics. Run these checks in parallel where possible to minimize late
 ```bash
 NOTES_DIR="{vocabulary.notes}"
 
+# Source link-extraction library (fails loud if missing)
+LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
+[ -r "$LINK_LIB" ] || {
+  echo "error: link-extraction library not found '$LINK_LIB'" >&2
+  echo " arscontexta plugin installed? CLAUDE_PLUGIN_ROOT set?" >&2
+  exit 1
+}
+. "$LINK_LIB"
+
 # Note count (excluding MOCs)
 TOTAL_FILES=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 MOC_COUNT=$(grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
 
 # Connection count (all wiki links across notes/)
-LINK_COUNT=$(grep -ohP '\[\[[^\]]+\]\]' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+LINK_COUNT=$(count_links "$NOTES_DIR")
 
 # Average connections per note
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
@@ -75,7 +84,7 @@ else
 fi
 
 # Topic count (unique values in topics: fields)
-TOPIC_COUNT=$(grep -ohP '^\s*-\s*"\[\[([^\]]+)\]\]"' "$NOTES_DIR"/*.md 2>/dev/null | sort -u | wc -l | tr -d ' ')
+TOPIC_COUNT=$(for f in "$NOTES_DIR"/*.md; do [ -e "$f" ] || continue; rg '^\s*-\s*"\[\[([^\]|#]+)' -o -r '$1' "$f" 2>/dev/null; done | sort -u | wc -l | tr -d ' ')
 
 # Link density
 if [[ "$NOTE_COUNT" -gt 1 ]]; then
@@ -98,10 +107,10 @@ for f in "$NOTES_DIR"/*.md; do
   [[ "$INCOMING" -eq 0 ]] && ORPHAN_COUNT=$((ORPHAN_COUNT + 1))
 done
 
-# Dangling link count
-DANGLING_COUNT=$(grep -ohP '\[\[([^\]]+)\]\]' "$NOTES_DIR"/*.md 2>/dev/null | sort -u | while read -r link; do
-  NAME=$(echo "$link" | sed 's/\[\[//;s/\]\]//')
-  [[ ! -f "$NOTES_DIR/$NAME.md" ]] && echo "$NAME"
+# Dangling link count (folded on both — reference/lib/link-extraction.sh)
+NOTE_INDEX=$(existing_note_index "$NOTES_DIR")
+DANGLING_COUNT=$(extract_link_targets "$NOTES_DIR" | while read -r NAME; do
+  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | /usr/bin/grep -qxF "$NAME" && echo "$NAME"
 done | wc -l | tr -d ' ')
 
 # Schema compliance (% of notes with required fields: description, topics)
@@ -180,7 +189,8 @@ fi
 if [[ "$THIS_WEEK_NOTES" -gt 0 && -n "$WEEK_AGO" ]]; then
   THIS_WEEK_LINKS=$(grep -rl "^created: " "$NOTES_DIR"/*.md 2>/dev/null | while read -r f; do
     CREATED=$(grep '^created:' "$f" | head -1 | awk '{print $2}')
-    [[ "$CREATED" > "$WEEK_AGO" || "$CREATED" == "$WEEK_AGO" ]] && grep -oP '\[\[[^\]]+\]\]' "$f" 2>/dev/null
+    [[ "$CREATED" > "$WEEK_AGO" || "$CREATED" == "$WEEK_AGO" ]] && \
+    awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" | rg -o '\[\['
   done | wc -l | tr -d ' ')
 else
   THIS_WEEK_LINKS="?"
