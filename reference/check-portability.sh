@@ -56,7 +56,7 @@ echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
 hits_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}" \
   | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
   | "$GREP" -v '^[^:]*lib/link-extraction\.sh:' \
-  | "$GREP" -v '^[^:]*skills/health/SKILL\.md:497:')
+  | "$GREP" -v 'portability-exempt')  # Exempt shape matchers used with grep -v (not target extractors)
 # Part B: Check for greedy/lazy dot quantifier patterns (vector 4 evasion: \[\[.*?\]\] or \[\[.*\]\] or \[\[.+\]\])
 # Match: \[\[ followed by .* or .+ or .? followed by \]\]
 # Use pattern: \\\[\\\[.*\.\*\?\\\]\\\] to match literal \[\[.*?\]\]

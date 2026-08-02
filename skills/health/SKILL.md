@@ -494,7 +494,7 @@ done
 for moc in {vocabulary.notes}/*.md; do
   rg -q '^type: moc' "$moc" || continue
   # Look for "- [[note]]" without " — " context
-  rg '^\s*- \[\[' "$moc" | grep -v ' — ' | grep -v '^\s*- \[\[[^]]*\]\].*—'
+  rg '^\s*- \[\[' "$moc" | grep -v ' — ' | grep -v '^\s*- \[\[[^]]*\]\].*—'  # portability-exempt: shape matcher
 done
 ```
 
