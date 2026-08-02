@@ -2,7 +2,7 @@
 name: learn
 description: Research a topic and grow your knowledge graph. Uses Exa deep researcher, web search, or basic search to investigate topics, files results with full provenance, and chains to processing pipeline. Triggers on "/learn", "/learn [topic]", "research this", "find out about".
 user-invocable: true
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__exa__web_search_exa, mcp__exa__deep_researcher_start, mcp__exa__deep_researcher_check, WebSearch
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__exa__web_search_exa, mcp__exa__web_fetch_exa, WebSearch
 context: fork
 ---
 
@@ -62,7 +62,7 @@ Priority: explicit flag > config default > `moderate`
 |-------|------|---------|----------|----------|
 | light | WebSearch | 2-3 | ~5s | Checking a specific fact |
 | moderate | mcp__exa__web_search_exa | 5-8 | ~10-30s | Exploring a subtopic |
-| deep | mcp__exa__deep_researcher_start | Comprehensive | 15s-3min | Major research direction |
+| deep | mcp__exa__web_search_exa → mcp__exa__web_fetch_exa | 5-8 full pages | ~30-90s | Major research direction |
 
 ---
 
@@ -90,16 +90,23 @@ FAIL: Research failed — no research tools available
 
 ### Tool Invocation Patterns
 
-**exa-deep-research:**
+**exa-deep-research** — search for breadth, then read the best results in full.
+
+Exa's `deep_researcher_start` / `deep_researcher_check` pair no longer exists; this tier is built
+from the two tools that do. The depth comes from reading full page text instead of search snippets,
+which is a real difference in evidence quality, not a rename.
+
 ```
-mcp__exa__deep_researcher_start
-  instructions: "Research comprehensively: [topic]. Focus on practical findings, key patterns, recent developments, and actionable insights."
-  model: "exa-research-fast" (moderate) | "exa-research" (deep)
+mcp__exa__web_search_exa  query: "[topic]"  numResults: 8
 ```
-Poll with `mcp__exa__deep_researcher_check` until `completed`. Output during wait:
+Pick the 3-5 most relevant results, then fetch their full text in ONE batched call — `urls` takes an
+array, so a single call reads them all:
 ```
-  Research ID: [id]
-  Waiting for results...
+mcp__exa__web_fetch_exa  urls: ["[url1]", "[url2]", "[url3]"]  maxCharacters: 8000
+```
+Synthesize across the fetched pages rather than across snippets. Output during the fetch:
+```
+  Reading [N] sources in full...
 ```
 
 **exa-web-search:**

@@ -1096,9 +1096,17 @@ research:
 - `automatic` -- Skills complete → next phase runs immediately via orchestration.
 
 **Research tool detection:** During generation, check for available research tools:
-1. If Exa MCP tools available (`mcp__exa__deep_researcher_start`): primary = exa-deep-research
-2. If Exa web search available (`mcp__exa__web_search_exa`): fallback = exa-web-search
+1. If Exa MCP tools are available (`mcp__exa__web_search_exa` **and** `mcp__exa__web_fetch_exa`):
+   primary = exa-deep-research — search for breadth, then fetch the best results in full
+2. If only Exa web search is available (`mcp__exa__web_search_exa`): fallback = exa-web-search
 3. Web search is always the last resort
+
+**Probe a tool that exists.** This detection previously keyed on
+`mcp__exa__deep_researcher_start`, which Exa removed. The probe therefore always failed, and every
+generated vault recorded `primary: web-search` even with Exa fully available — inverting the
+quality order, since `exa-web-search` is better than plain WebSearch but was being written as the
+fallback. Nothing errored; vaults just researched worse than they could. When a probe names a tool,
+confirm the tool is still in the MCP surface before trusting the result.
 
 **Relationship:** config.yaml is the live operational config. derivation.md is the historical record of WHY. Config can drift; `/architect` detects and documents the drift.
 

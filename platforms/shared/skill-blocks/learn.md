@@ -77,10 +77,13 @@ Every research result filed to inbox MUST include these YAML fields:
 
 | Exa Tool | source_type | Required Fields |
 |----------|-------------|-----------------|
-| deep_researcher | `exa-deep-research` | exa_prompt, exa_research_id, exa_model, generated |
-| web_search | `exa-web-search` | exa_prompt, exa_tool, generated |
-| get_code_context | `exa-web-search` | exa_prompt, exa_tool, generated |
+| web_search_exa → web_fetch_exa | `exa-deep-research` | exa_prompt, exa_urls, generated |
+| web_search_exa | `exa-web-search` | exa_prompt, exa_tool, generated |
 | WebSearch | `web-search` | search_query, generated |
+
+The deep row records `exa_urls` — the pages actually fetched and read — because the tool pair it
+replaced (`deep_researcher_start`/`_check`) is gone, and with it the `exa_research_id` and
+`exa_model` there is no longer anything to record. The fetched URLs are the provenance now.
 
 **The exa_prompt field is critical** — it captures the intellectual context that shaped what Exa returned. Without it, claims cannot be traced back to their research origin.
 
