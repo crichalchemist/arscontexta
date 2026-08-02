@@ -75,6 +75,11 @@ eq "missing dir fails, emits no count"        "loud" \
 eq "missing rg fails, emits no count"         "loud" \
    "$(out=$(PATH=/usr/bin:/bin sh -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
       [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
+BADRC=$(mktemp); printf -- '--nonexistent-flag-xyz\n' > "$BADRC"
+eq "rg runtime failure fails loud"            "loud" \
+   "$(out=$(RIPGREP_CONFIG_PATH="$BADRC" sh -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
+      [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
+rm -f "$BADRC"
 eq "library declares a contract version"      "yes" \
    "$([ "${LINK_EXTRACTION_VERSION:-0}" -ge 1 ] 2>/dev/null && echo yes || echo no)"
 
