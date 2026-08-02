@@ -93,7 +93,7 @@ done
 # Find dangling links (links to non-existent files)
 NOTE_INDEX=$(existing_note_index "$NOTES_DIR")
 extract_link_targets "$NOTES_DIR" | while read -r NAME; do
-  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | /usr/bin/grep -qxF "$NAME" && echo "DANGLING: $NAME"
+  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
 
 # MOC coverage: % of notes appearing in at least one MOC's Core Ideas

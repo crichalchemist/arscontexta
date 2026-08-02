@@ -69,19 +69,19 @@ existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | 
 dangling=0
 checked=0
 
-# Collect links from note directories only
+# Collect links from note directories only (using recursive variant to handle subdirs)
 link_candidates=""
 for d in "01_thinking" "notes" "00_inbox" "04_meta/logs"; do
     if [ -d "$VAULT/$d" ]; then
-        new_links=$(extract_link_targets "$VAULT/$d")
+        new_links=$(extract_link_targets_recursive "$VAULT/$d")
         if [ -n "$new_links" ]; then
             link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
         fi
     fi
 done
-# Also check parent self/ if it exists
+# Also check parent self/ if it exists (using recursive variant)
 [ -d "$VAULT/../self" ] && {
-    new_links=$(extract_link_targets "$VAULT/../self")
+    new_links=$(extract_link_targets_recursive "$VAULT/../self")
     [ -n "$new_links" ] && link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
 }
 

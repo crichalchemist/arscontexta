@@ -43,6 +43,27 @@ else
   ok "link capture terminates correctly"
 fi
 
+# KNOWN BLIND SPOT (matching direction):
+# This guard checks extraction direction only — it verifies that extracted links
+# terminate at | and #. It does NOT check matching direction — whether searches
+# for links correctly handle [[slug|alias]] and [[slug#heading]] patterns.
+#
+# The following 13 sites use rg -l or grep -rl with bare [[NAME]] patterns,
+# which miss [[NAME|alias]] and [[NAME#heading]] variations. These cause false
+# positives in orphan detection and MOC coverage reports. The guard does not flag
+# these because checking would require recursive template evaluation (matching
+# direction requires parsing both link format AND file search scope simultaneously).
+#
+# Sites with matching direction blind spot:
+#   skills/health/SKILL.md:132, 175, 415, 468
+#   skills/architect/SKILL.md:175
+#   skill-sources/graph/SKILL.md:89, 106, 312, 446
+#   skill-sources/stats/SKILL.md:106, 133
+#   reference/testing-milestones.md:410
+#
+# Future work: Add a separate guard for matching direction or migrate to unified
+# pattern that captures variants at extraction time (not search time).
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "PORTABILITY: PASS"; exit 0

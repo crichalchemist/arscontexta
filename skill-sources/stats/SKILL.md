@@ -110,7 +110,7 @@ done
 # Dangling link count (folded on both — reference/lib/link-extraction.sh)
 NOTE_INDEX=$(existing_note_index "$NOTES_DIR")
 DANGLING_COUNT=$(extract_link_targets "$NOTES_DIR" | while read -r NAME; do
-  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | /usr/bin/grep -qxF "$NAME" && echo "$NAME"
+  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "$NAME"
 done | wc -l | tr -d ' ')
 
 # Schema compliance (% of notes with required fields: description, topics)

@@ -162,17 +162,23 @@ done
 **How to check:**
 
 ```bash
-# Extract all wiki links from all markdown files
-# For each unique link target, verify a file with that name exists
-rg -oN '\[\[([^\]|#]+)' --glob '*.md' -r '$1' \
-  | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-  | tr '[:upper:]' '[:lower:]' | sort -u | while read -r target; do
-  # Search for file matching this name
-  found=$(find . -name "$target.md" -not -path "./.git/*" 2>/dev/null | head -1)
-  if [[ -z "$found" ]]; then
+# Source link-extraction library (folds both sides, strips fences, terminates at | #)
+LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
+[ -r "$LINK_LIB" ] || {
+  echo "error: link-extraction library not found '$LINK_LIB'" >&2
+  echo " arscontexta plugin installed? CLAUDE_PLUGIN_ROOT set?" >&2
+  exit 1
+}
+. "$LINK_LIB"
+
+# Build folded index of all existing notes (recursive for vault with subdirs)
+NOTE_INDEX=$(existing_note_index_recursive "{vocabulary.notes}")
+
+# Extract all wiki links from all markdown files (folded both sides, fences stripped)
+extract_link_targets_recursive "{vocabulary.notes}" | while read -r target; do
+  # Compare against index — both sides already folded by library
+  if [ -n "$target" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$target"; then
     echo "FAIL: dangling link [[${target}]] — no file found"
-    # Show which files contain this dangling link
-    rg -l "\[\[$target\]\]" --glob '*.md'
   fi
 done
 ```
