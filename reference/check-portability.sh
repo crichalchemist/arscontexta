@@ -18,13 +18,32 @@ fail=0
 red() { printf '  FAIL %s\n' "$1"; fail=1; }
 ok()  { printf '  PASS %s\n' "$1"; }
 
-SCAN=("$ROOT/skills" "$ROOT/skill-sources" "$ROOT/reference")
+scan_or_die() {            # scan_or_die <description> <grep-args...>
+  local desc="$1"; shift
+  local out rc
+  out=$("$GREP" "$@" 2>/dev/null); rc=$?
+  if [ "$rc" -gt 1 ]; then
+    printf '  FAIL %s: scan itself failed (grep rc=%s) — cannot conclude anything\n' "$desc" "$rc"
+    fail=1
+    return 2
+  fi
+  printf '%s' "$out"
+  return 0
+}
+
+SCAN=("$ROOT/skills" "$ROOT/skill-sources" "$ROOT/reference" \
+      "$ROOT/generators" "$ROOT/platforms" "$ROOT/presets" \
+      "$ROOT/hooks" "$ROOT/agents" "$ROOT/scripts")
 
 echo "=== Portability check: $ROOT ==="
 
+for d in "${SCAN[@]}"; do
+  [ -d "$d" ] || { printf '  FAIL scan directory missing: %s\n' "$d"; fail=1; }
+done
+
 echo "1. No PCRE grep (-P) in shipped templates"
-hits=$("$GREP" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])grep +[^|]*-[a-zA-Z]*P' \
-  "${SCAN[@]}" 2>/dev/null || true)
+hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])grep +[^|]*-[a-zA-Z]*P' \
+  "${SCAN[@]}")
 if [ -n "$hits" ]; then
   red "grep -P found (exits 2 on BSD grep, silently yields 0):"
   printf '%s\n' "$hits" | sed 's/^/       /'
@@ -33,9 +52,9 @@ else
 fi
 
 echo "2. Wiki-link capture terminates at | and #"
-hits=$("$GREP" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}" 2>/dev/null \
+hits=$(scan_or_die "link capture scan" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}" \
   | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
-  | "$GREP" -v 'lib/link-extraction.sh' || true)
+  | "$GREP" -v 'lib/link-extraction.sh')
 if [ -n "$hits" ]; then
   red "link capture does not exclude | and # (counts [[a|b]] and [[a#c]] as dangling):"
   printf '%s\n' "$hits" | sed 's/^/       /'

@@ -26,7 +26,7 @@ Every orphan is either a gap (needs connections) or stale (needs archiving).
 Wiki links pointing to non-existent {DOMAIN:notes} create confusion:
 ```bash
 # Find [[links]] to files that don't exist
-rg -o '\[\[([^\]]+)\]\]' {DOMAIN:notes/} -r '$1' --no-filename | sort -u | while read title; do
+rg -oNI '\[\[([^\]|#]+)' {DOMAIN:notes/} -r '$1' | sed 's/[[:space:]]*$//' | sort -u | while IFS= read -r title; do
   find . -name "$title.md" -not -path "./.git/*" | grep -q . || echo "Dangling: [[$title]]"
 done
 ```
