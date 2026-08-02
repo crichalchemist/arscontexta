@@ -53,10 +53,13 @@ fi
 
 echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
 # Part A: Check for negated character class patterns that don't exclude boundaries
-hits_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}" \
+# Count exemptions before filtering (for transparency accounting)
+temp_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}" \
   | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
-  | "$GREP" -v '^[^:]*lib/link-extraction\.sh:' \
-  | "$GREP" -v 'portability-exempt')  # Exempt shape matchers used with grep -v (not target extractors)
+  | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+exempt_count=$(printf '%s\n' "$temp_a" | "$GREP" -c 'portability-exempt' 2>/dev/null || true)
+exempt_count=${exempt_count:-0}
+hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v 'portability-exempt')  # Exempt shape matchers used with grep -v (not target extractors)
 # Part B: Check for greedy/lazy dot quantifier patterns (vector 4 evasion: \[\[.*?\]\] or \[\[.*\]\] or \[\[.+\]\])
 # Match: \[\[ followed by .* or .+ or .? followed by \]\]
 # Use pattern: \\\[\\\[.*\.\*\?\\\]\\\] to match literal \[\[.*?\]\]
@@ -69,6 +72,9 @@ if [ -n "$hits" ]; then
   printf '%s\n' "$hits" | sed 's/^/       /'
 else
   ok "link capture uses negated classes, terminates correctly"
+fi
+if [ "$exempt_count" -gt 0 ]; then
+  echo "  NOTE: $exempt_count site(s) exempt via portability-exempt marker"
 fi
 
 echo "3. No PCRE via ripgrep (fails on rg builds without PCRE2)"
