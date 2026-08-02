@@ -29,3 +29,13 @@ jobs:
         run: bash reference/test/guard-failure.test.sh
       - name: Guard failure-path tests (zsh)
         run: zsh reference/test/guard-failure.test.sh
+      # Executes every ```bash fence in every SKILL.md as its OWN shell
+      # invocation, which is how Claude runs them. The three gates above cannot
+      # see a fence reading a variable or sourced function defined in a
+      # DIFFERENT fence: two match text and one exercises a library in
+      # isolation, where it is correct. Four of the six blocking findings in the
+      # whole-branch review were that defect.
+      - name: Fence isolation (bash)
+        run: bash reference/test/fence-isolation.test.sh
+      - name: Fence isolation (zsh)
+        run: zsh reference/test/fence-isolation.test.sh
