@@ -22,6 +22,43 @@
 #      neither. Folding only one side (e.g., search via rg without -i over mixed-case
 #      filesystem) violates this and produces false positives.
 
+# Contract version. Bump on any BEHAVIOR change (fold rules, termination, recursion semantics).
+LINK_EXTRACTION_VERSION=1
+
+# Case folding needs UTF-8 locale. No single locale name exists on every platform
+# (C.UTF-8 absent on macOS; en_US.UTF-8 absent on Alpine), naming missing one
+# silently degrades ASCII folding exit 0.
+_LINK_FOLD_LOCALE=""
+for _c in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+  if locale -a 2>/dev/null | /usr/bin/grep -qx "$_c"; then
+    _LINK_FOLD_LOCALE="$_c"
+    break
+  fi
+done
+if [ -z "$_LINK_FOLD_LOCALE" ]; then
+  echo "error: link-extraction requires UTF-8 locale case folding; none found" >&2
+  echo " (looked for: C.UTF-8, C.utf8, en_US.UTF-8, en_US.utf8)" >&2
+  exit 1
+fi
+
+# Check dependencies and directory argument.
+_require_deps_and_dir() { # _require_deps_and_dir <dir>
+  local dir="$1"
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "error: link-extraction requires 'rg', not found in PATH" >&2
+    return 1
+  fi
+  if ! command -v awk >/dev/null 2>&1; then
+    echo "error: link-extraction requires 'awk', not found in PATH" >&2
+    return 1
+  fi
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    echo "error: link-extraction: not directory: '${dir:-<empty>}'" >&2
+    return 1
+  fi
+  return 0
+}
+
 # Strip fenced code blocks from one file, emit remaining lines.
 _strip_fences() {
   if ! command -v awk >/dev/null 2>&1; then
@@ -33,91 +70,85 @@ _strip_fences() {
 
 # count_links <dir> -> integer
 count_links() {
-  if ! command -v rg >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'rg', not found in PATH" >&2
-    return 1
-  fi
-  if ! command -v awk >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
-    return 1
-  fi
-  local dir="$1" f
-  local n=0
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" f n tmpf
+  n=0
+  tmpf="/tmp/link-extraction-$$.tmp"
   for f in "$dir"/*.md; do
     [ -e "$f" ] || continue
-    n=$(( n + $(_strip_fences "$f" | rg -o '\[\[' 2>/dev/null | wc -l | tr -d ' ') ))
+    _strip_fences "$f" > "$tmpf" || { rm -f "$tmpf"; return 1; }
+    rg -o '\[\[' "$tmpf" > "$tmpf.out" 2>&1
+    local rg_rc=$?
+    if [ "$rg_rc" -gt 1 ]; then
+      rm -f "$tmpf" "$tmpf.out"
+      return 1
+    fi
+    if [ "$rg_rc" -eq 0 ] && [ -s "$tmpf.out" ]; then
+      n=$(( n + $(wc -l < "$tmpf.out" | tr -d ' ') ))
+    fi
   done
+  rm -f "$tmpf" "$tmpf.out"
   printf '%s' "$n"
 }
 
 # extract_link_targets <dir> -> newline-separated folded unique targets
 extract_link_targets() {
-  if ! command -v rg >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'rg', not found in PATH" >&2
-    return 1
-  fi
-  if ! command -v awk >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
-    return 1
-  fi
+  _require_deps_and_dir "$1" || return 1
   local dir="$1" f
-  for f in "$dir"/*.md; do
+  local targets
+  targets=$(for f in "$dir"/*.md; do
     [ -e "$f" ] || continue
     _strip_fences "$f"
-  done | rg -o '\[\[([^\]|#]+)' -r '$1' 2>/dev/null \
+  done | rg -o '\[\[([^\]|#]+)' -r '$1')
+  local rg_rc=$?
+  if [ "$rg_rc" -gt 1 ]; then
+    return 1
+  fi
+  printf '%s\n' "$targets" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | tr '[:upper:]' '[:lower:]' | sort -u
+    | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
 }
 
 # existing_note_index <dir> -> newline-separated folded basenames
 existing_note_index() {
+  _require_deps_and_dir "$1" || return 1
   local dir="$1" p
   for p in "$dir"/*.md; do
     [ -e "$p" ] || continue
     basename "$p" .md
-  done | tr '[:upper:]' '[:lower:]' | sort -u
+  done | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
 }
 
 # count_links_recursive <dir> -> integer (scans directory tree)
 count_links_recursive() {
-  if ! command -v rg >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'rg', not found in PATH" >&2
-    return 1
-  fi
-  if ! command -v awk >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
-    return 1
-  fi
-  local dir="$1" f
-  local n=0
-  find "$dir" -type f -name '*.md' | while IFS= read -r f; do
-    n=$(( n + $(_strip_fences "$f" | rg -o '\[\[' 2>/dev/null | wc -l | tr -d ' ') ))
-  done
-  printf '%s' "$n"
+  _require_deps_and_dir "$1" || return 1
+  find "$1" -type f -name '*.md' | while IFS= read -r f; do
+    _strip_fences "$f" | rg -o '\[\['
+  done | wc -l | tr -d ' '
 }
 
 # extract_link_targets_recursive <dir> -> newline-separated folded unique targets (scans directory tree)
 extract_link_targets_recursive() {
-  if ! command -v rg >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'rg', not found in PATH" >&2
-    return 1
-  fi
-  if ! command -v awk >/dev/null 2>&1; then
-    echo "error: link-extraction library requires 'awk', not found in PATH" >&2
-    return 1
-  fi
+  _require_deps_and_dir "$1" || return 1
   local dir="$1" f
-  find "$dir" -type f -name '*.md' | while IFS= read -r f; do
+  local targets
+  targets=$(find "$dir" -type f -name '*.md' | while IFS= read -r f; do
     _strip_fences "$f"
-  done | rg -o '\[\[([^\]|#]+)' -r '$1' 2>/dev/null \
+  done | rg -o '\[\[([^\]|#]+)' -r '$1')
+  local rg_rc=$?
+  if [ "$rg_rc" -gt 1 ]; then
+    return 1
+  fi
+  printf '%s\n' "$targets" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | tr '[:upper:]' '[:lower:]' | sort -u
+    | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
 }
 
 # existing_note_index_recursive <dir> -> newline-separated folded basenames (scans directory tree)
 existing_note_index_recursive() {
+  _require_deps_and_dir "$1" || return 1
   local dir="$1" p
   find "$dir" -type f -name '*.md' | while IFS= read -r p; do
     basename "$p" .md
-  done | tr '[:upper:]' '[:lower:]' | sort -u
+  done | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
 }
