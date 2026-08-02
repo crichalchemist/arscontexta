@@ -38,7 +38,14 @@ if [ -n "${ZSH_VERSION:-}" ]; then SELF=zsh; else SELF=bash; fi
 # pinned. The shell name keeps the two CI jobs from colliding.
 WORK="/tmp/fence-isolation-gate-$SELF"
 rm -rf "$WORK"
-mkdir -p "$WORK/fences" "$WORK/out" || exit 1
+# Says WHY it died. An `|| exit 1` here exits 1 with an empty stdout and a
+# silent stderr — the exact shape this gate exists to eliminate, and it cost a
+# debugging cycle during development when a leftover process made the mkdir
+# fail and the gate reported nothing at all.
+mkdir -p "$WORK/fences" "$WORK/out" || {
+  printf 'harness: cannot create work directory %s — cannot conclude anything\n' "$WORK" >&2
+  exit 1
+}
 # FENCE_GATE_KEEP=1 preserves the extracted fences, the generated scripts and
 # every captured stdout/stderr. Diagnosing a failure means reading the exact
 # script that ran, and a gate whose evidence self-destructs invites guessing.
@@ -119,7 +126,10 @@ build_fixture() {
            "$v/ops/methodology" "$v/ops/sessions" "$v/self" "$v/self/memory" \
            "$v/.claude/skills/stats" || return 1
   : > "$v/.arscontexta"
-  cp "$LINK_LIB_SRC" "$v/ops/lib/link-extraction.sh" || return 1
+  cp "$LINK_LIB_SRC" "$v/ops/lib/link-extraction.sh" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$LINK_LIB_SRC" >&2
+    return 1
+  }
 
   printf 'description: an observation\nstatus: pending\ntitle: an observation\n' > "$v/ops/observations/obs-one.md"
   printf 'status: open\ntitle: a tension\n'              > "$v/ops/tensions/tension-one.md"

@@ -9,8 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install ripgrep and zsh
-        run: sudo apt-get update && sudo apt-get install -y ripgrep zsh
+      # jq and bc are used by fences in the SKILL.md corpus but are NOT in the
+      # README prerequisite table, so nothing guarantees them on the runner
+      # image. The fence-isolation gate asserts its tools are present and halts
+      # loudly if they are not — installing them here keeps that assertion from
+      # ever firing for an environment reason.
+      - name: Install ripgrep, zsh, jq and bc
+        run: sudo apt-get update && sudo apt-get install -y ripgrep zsh jq bc
       - name: Portability guard
         run: bash reference/check-portability.sh
       - name: Shell syntax check
