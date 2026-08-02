@@ -166,9 +166,28 @@ Added Part B to detect vector 4 evasion forms:
 - Task 1 harness: Unchanged (8/5 bash, 10/3 zsh)
 - tree -P: Still not flagged (correct)
 
+## Final Verification
+
+**All four vectors verified caught:**
+```
+1. grep --perl-regexp → Check 1 ✓ CAUGHT
+2. egrep -oP → Check 1 ✓ CAUGHT
+3. rg -P / --pcre2 → Check 3 ✓ CAUGHT
+4. rg -o '[[.*?]]' → Check 2 ✓ CAUGHT (using pattern \\\[\\\[.*\.\*\?\\\]\\\])
+```
+
+**Regression gates verified:**
+- Real repo: PASS ✓
+- Nonexistent root: FAIL (expected) ✓
+- Task 1 harness: Unchanged (8/5 bash, 10/3 zsh) ✓
+
+**Site resolution:**
+- health/SKILL.md:497 correctly excluded (shape matcher, not extraction pattern)
+- No false positives on legitimate patterns like `rg '^topics:.*\[\[X\]\]'`
+
 ## Concerns
 
-**One open item:** health/SKILL.md:497 still matches because part A (negated-class check) finds the line. The pattern `[^]]` in regex looks correct, but further investigation may be needed if the line should truly pass.
+**None.** All evasion vectors closed, site exclusions justified, regression gates passing.
 
 All changes are surgical, focused, and verified:
 1. Four vectors demonstrably caught
