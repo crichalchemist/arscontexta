@@ -180,14 +180,24 @@ find "{vocabulary.notes}" -type f -name '*.md' | while IFS= read -r f; do
   [[ "$LINKS" -eq 0 ]] && echo "ORPHAN: $NAME"
 done
 
-# Source link-extraction library (fails loud if missing)
-LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
-[ -r "$LINK_LIB" ] || {
-  echo "error: link-extraction library not found '$LINK_LIB'" >&2
-  echo " arscontexta plugin installed? CLAUDE_PLUGIN_ROOT set?" >&2
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20, and the same
+# expression /stats, /graph and /health Category 9 use.
+# The VAULT copy is loaded, not the plugin's: CLAUDE_PLUGIN_ROOT is unset in a
+# shell, so "${CLAUDE_PLUGIN_ROOT:-}/reference/..." resolves to an absolute
+# /reference/... that is never readable, and this block exited 1 on every vault
+# in every state — no proposal could ever cite link evidence.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
   exit 1
-}
-. "$LINK_LIB"
+fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
 if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
