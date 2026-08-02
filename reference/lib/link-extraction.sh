@@ -7,9 +7,19 @@
 # FLAT vs RECURSIVE:
 # Flat functions (count_links, extract_link_targets, existing_note_index) scan
 # a single directory only. Recursive variants (*_recursive) scan a directory
-# tree using find. Use recursive variants when scanning vault directories with
-# subdirectories (validate-kernel.sh, health). Use flat variants for single-level
-# dirs (stats, graph scanning {vocabulary.notes} as flat collection).
+# tree using find.
+#
+# THE RECURSIVE VARIANTS ARE THE DEFAULT. A vault directory that has no
+# subdirectories today may grow one tomorrow, and the flat scan will not say so
+# — it silently under-reports rather than failing. The flat variants remain for
+# callers that deliberately want a single directory; choosing flat where
+# recursive was meant produces a plausible wrong number, so prefer recursive
+# unless you can justify otherwise.
+#
+# A consumer that calls a _recursive variant MUST also enumerate its own files
+# recursively. Mixing the two is worse than either alone: counting links over a
+# nested tree while counting notes over one directory made graph's density read
+# 5.00, and density is links/possible-links, so it cannot exceed 1.
 #
 # Correctness requirements encoded here:
 #   1. No PCRE regex grep — absent from BSD grep, and it fails silently to 0.

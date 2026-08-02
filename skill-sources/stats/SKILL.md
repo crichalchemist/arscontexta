@@ -75,13 +75,19 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
   exit 1
 fi
 
-# Note count (excluding MOCs)
-TOTAL_FILES=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-MOC_COUNT=$(grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+# Note count (excluding MOCs).
+# `find`, not a glob, and recursive to match the link library below. Counting
+# links over the tree while counting notes over one directory is worse than
+# either scope alone: it made DENSITY (:127) read above 1, and density is
+# links/possible-links, so it cannot. AVG_LINKS, COMPLIANCE, COVERAGE and
+# PROCESSED_PCT all derive from these two counts and go wrong together.
+# A bare glob also aborts under zsh (NOMATCH) when the vault is empty.
+TOTAL_FILES=$(find "$NOTES_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+MOC_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
 
 # Connection count (all wiki links across notes/)
-LINK_COUNT=$(count_links "$NOTES_DIR") || {
+LINK_COUNT=$(count_links_recursive "$NOTES_DIR") || {
   echo "error: link counting failed; refusing to report a connection count" >&2
   exit 1
 }
@@ -100,7 +106,7 @@ fi
 # as a plausible 0. `find` (not a glob) distinguishes the two states the report
 # must not conflate: missing directory aborts, empty directory is a legitimate 0.
 TOPIC_SRC=$(mktemp) || { echo "error: mktemp failed; refusing to report a topic count" >&2; exit 1; }
-find "$NOTES_DIR" -maxdepth 1 -type f -name '*.md' -exec cat {} + > "$TOPIC_SRC" || {
+find "$NOTES_DIR" -type f -name '*.md' -exec cat {} + > "$TOPIC_SRC" || {
   rm -f "$TOPIC_SRC"
   echo "error: reading '$NOTES_DIR' failed; refusing to report a topic count" >&2
   exit 1
@@ -133,24 +139,26 @@ fi
 ### 1b. Health Metrics
 
 ```bash
-# Orphan count (notes with zero incoming links)
-ORPHAN_COUNT=0
-for f in "$NOTES_DIR"/*.md; do
+# Orphan count (notes with zero incoming links).
+# Counted through `wc -l` rather than by incrementing a variable: `find | while`
+# runs the loop body in a subshell, so an incremented ORPHAN_COUNT would be
+# discarded at the pipe and always render 0. Same shape as DANGLING_COUNT below.
+ORPHAN_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   grep -q '^type: moc' "$f" 2>/dev/null && continue
   INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
-  [[ "$INCOMING" -eq 0 ]] && ORPHAN_COUNT=$((ORPHAN_COUNT + 1))
-done
+  [[ "$INCOMING" -eq 0 ]] && echo "$NAME"
+done | wc -l | tr -d ' ')
 
 # Dangling link count (folded on both — reference/lib/link-extraction.sh)
-NOTE_INDEX=$(existing_note_index "$NOTES_DIR") || {
+NOTE_INDEX=$(existing_note_index_recursive "$NOTES_DIR") || {
   echo "error: note index build failed; refusing to report a dangling-link count" >&2
   exit 1
 }
 # Extraction is captured and CHECKED BEFORE the loop. Piping it straight into
 # `while` would yield the loop's status, not extraction's, so a failed extraction
 # would render as a plausible 0 (PIPESTATUS is bash-only and cannot be used here).
-LINK_TARGETS=$(extract_link_targets "$NOTES_DIR") || {
+LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
   echo "error: link extraction failed; refusing to report a dangling-link count" >&2
   exit 1
 }
@@ -159,8 +167,8 @@ DANGLING_COUNT=$(printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
 done | wc -l | tr -d ' ')
 
 # Schema compliance (% of notes with required fields: description, topics)
-MISSING_DESC=$(grep -rL '^description:' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-MISSING_TOPICS=$(grep -rL '^topics:' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+MISSING_DESC=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -L '^description:' {} + 2>/dev/null | wc -l | tr -d ' ')
+MISSING_TOPICS=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -L '^topics:' {} + 2>/dev/null | wc -l | tr -d ' ')
 SCHEMA_ISSUES=$((MISSING_DESC + MISSING_TOPICS))
 if [[ "$TOTAL_FILES" -gt 0 ]]; then
   # Notes with BOTH required fields
@@ -170,15 +178,20 @@ else
   COMPLIANCE="N/A"
 fi
 
-# MOC coverage
-COVERED=0
-for f in "$NOTES_DIR"/*.md; do
+# MOC coverage.
+# The MOC file list is built once, outside the loop. Two reasons: rebuilding it
+# per note re-scanned the whole vault n times, and an EMPTY list left `xargs`
+# with no file arguments — GNU xargs then runs grep against the loop's own
+# stdin and swallows the `find` stream, while BSD xargs skips the run entirely.
+# The -n test makes a vault with no MOCs behave the same on both platforms.
+MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
+COVERED=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   grep -q '^type: moc' "$f" 2>/dev/null && continue
-  if grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
-    COVERED=$((COVERED + 1))
+  if [ -n "$MOC_FILES" ] && printf '%s\n' "$MOC_FILES" | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
+    echo "$NAME"
   fi
-done
+done | wc -l | tr -d ' ')
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
   COVERAGE=$(echo "scale=0; $COVERED * 100 / $NOTE_COUNT" | bc)
 else
@@ -222,7 +235,7 @@ fi
 # This week's growth (notes with created: date within last 7 days)
 WEEK_AGO=$(date -v-7d +%Y-%m-%d 2>/dev/null || date -d '7 days ago' +%Y-%m-%d 2>/dev/null)
 if [[ -n "$WEEK_AGO" ]]; then
-  THIS_WEEK_NOTES=$(grep -rl "^created: " "$NOTES_DIR"/*.md 2>/dev/null | while read -r f; do
+  THIS_WEEK_NOTES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l "^created: " {} + 2>/dev/null | while read -r f; do
     CREATED=$(grep '^created:' "$f" | head -1 | awk '{print $2}')
     [[ "$CREATED" > "$WEEK_AGO" || "$CREATED" == "$WEEK_AGO" ]] && echo "$f"
   done | wc -l | tr -d ' ')
@@ -232,7 +245,7 @@ fi
 
 # This week's connections (approximate — count links in recently created notes)
 if [[ "$THIS_WEEK_NOTES" -gt 0 && -n "$WEEK_AGO" ]]; then
-  THIS_WEEK_LINKS=$(grep -rl "^created: " "$NOTES_DIR"/*.md 2>/dev/null | while read -r f; do
+  THIS_WEEK_LINKS=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l "^created: " {} + 2>/dev/null | while read -r f; do
     CREATED=$(grep '^created:' "$f" | head -1 | awk '{print $2}')
     [[ "$CREATED" > "$WEEK_AGO" || "$CREATED" == "$WEEK_AGO" ]] && \
     awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" | rg -o '\[\['

@@ -154,7 +154,7 @@ For each FAIL/WARN:
 
 | Category | How to Check | FAIL Threshold | WARN Threshold |
 |----------|-------------|---------------|----------------|
-| Schema compliance | `grep -rL '^description:' {vocabulary.notes}/*.md` | N/A | Any note missing required fields |
+| Schema compliance | `find {vocabulary.notes} -type f -name '*.md' -exec grep -L '^description:' {} +` | N/A | Any note missing required fields |
 | Orphan detection | Notes with zero incoming wiki-links (scan for `[[filename]]` across all notes) | N/A | Any orphan |
 | Link health | Wiki-links pointing to non-existent files | Any dangling link | N/A |
 | Three-space boundaries | Content in wrong space (notes in ops/, operational files in notes/) | N/A | Any violation |
@@ -166,13 +166,17 @@ For each FAIL/WARN:
 **Live check implementation:**
 
 ```bash
-# Count total notes
-NOTE_COUNT=$(ls -1 {vocabulary.notes}/*.md 2>/dev/null | wc -l | tr -d ' ')
+# Count total notes.
+# `find`, not a glob, and recursive to match the link library below — these
+# counts sit beside library-derived link evidence in the same proposal, so they
+# must cover the same files. A bare glob also aborts under zsh (NOMATCH) when
+# the directory is empty.
+NOTE_COUNT=$(find "{vocabulary.notes}" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
 
 # Find orphans (notes with no incoming links)
-for f in {vocabulary.notes}/*.md; do
+find "{vocabulary.notes}" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
-  LINKS=$(grep -rl "\[\[$NAME\]\]" {vocabulary.notes}/ 2>/dev/null | wc -l | tr -d ' ')
+  LINKS=$(grep -rl "\[\[$NAME\]\]" "{vocabulary.notes}"/ 2>/dev/null | wc -l | tr -d ' ')
   [[ "$LINKS" -eq 0 ]] && echo "ORPHAN: $NAME"
 done
 
@@ -193,14 +197,14 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
 fi
 
 # Find dangling links (folded both sides — reference/lib/link-extraction.sh)
-NOTE_INDEX=$(existing_note_index "{vocabulary.notes}") || {
+NOTE_INDEX=$(existing_note_index_recursive "{vocabulary.notes}") || {
   echo "error: note index build failed; refusing to report dangling links" >&2
   exit 1
 }
 # Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
 # loop's status, so a failed extraction would read as "no dangling links" — and
 # this evidence feeds evolution proposals, so a false clean bill is worse here.
-LINK_TARGETS=$(extract_link_targets "{vocabulary.notes}") || {
+LINK_TARGETS=$(extract_link_targets_recursive "{vocabulary.notes}") || {
   echo "error: link extraction failed; refusing to report dangling links" >&2
   exit 1
 }
@@ -212,13 +216,13 @@ done
 INBOX_COUNT=$(ls -1 {vocabulary.inbox}/ 2>/dev/null | wc -l | tr -d ' ')
 
 # MOC sizes
-grep -rl '^type: moc' {vocabulary.notes}/*.md 2>/dev/null | while read -r moc; do
+find "{vocabulary.notes}" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | while read -r moc; do
   COUNT=$(grep -c '^\- \[\[' "$moc" 2>/dev/null)
   echo "MOC: $(basename "$moc" .md) = $COUNT notes"
 done
 
 # Missing descriptions
-grep -rL '^description:' {vocabulary.notes}/*.md 2>/dev/null
+find "{vocabulary.notes}" -type f -name '*.md' -exec grep -L '^description:' {} + 2>/dev/null
 ```
 
 Record all findings as evidence for Phase 6. Every finding must include the specific notes, links, or fields affected — not just counts.

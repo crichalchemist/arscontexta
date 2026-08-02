@@ -78,12 +78,17 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
   exit 1
 fi
 
-TOTAL=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-MOC_COUNT=$(grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+# `find`, not a glob, and recursive to match the link library below. Counting
+# links over the tree while counting notes over one directory is worse than
+# either scope alone: density is links/possible-links, so a recursive LINK_COUNT
+# over a flat NOTE_COUNT pushes it above 1, which is impossible.
+# A bare glob also aborts under zsh (NOMATCH) when the vault is empty.
+TOTAL=$(find "$NOTES_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+MOC_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL - MOC_COUNT))
 
 # Count all wiki links
-LINK_COUNT=$(count_links "$NOTES_DIR") || {
+LINK_COUNT=$(count_links_recursive "$NOTES_DIR") || {
   echo "error: link counting failed; refusing to report a density figure" >&2
   exit 1
 }
@@ -94,20 +99,20 @@ LINK_COUNT=$(count_links "$NOTES_DIR") || {
 echo "Density: $LINK_COUNT / ($NOTE_COUNT * ($NOTE_COUNT - 1))"
 
 # Find orphan notes (zero incoming links)
-for f in "$NOTES_DIR"/*.md; do
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
   [[ "$INCOMING" -eq 0 ]] && echo "ORPHAN: $NAME"
 done
 
 # Find dangling links (links to non-existent files)
-NOTE_INDEX=$(existing_note_index "$NOTES_DIR") || {
+NOTE_INDEX=$(existing_note_index_recursive "$NOTES_DIR") || {
   echo "error: note index build failed; refusing to report dangling links" >&2
   exit 1
 }
 # Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
 # loop's status, so a failed extraction would read as "no dangling links".
-LINK_TARGETS=$(extract_link_targets "$NOTES_DIR") || {
+LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
   echo "error: link extraction failed; refusing to report dangling links" >&2
   exit 1
 }
@@ -115,17 +120,23 @@ printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
 
-# MOC coverage: % of notes appearing in at least one MOC's Core Ideas
-COVERED=0
-for f in "$NOTES_DIR"/*.md; do
+# MOC coverage: % of notes appearing in at least one MOC's Core Ideas.
+# The MOC file list is built once, outside the loop. Two reasons: rebuilding it
+# per note re-scanned the whole vault n times, and an EMPTY list left `xargs`
+# with no file arguments — GNU xargs then runs grep against the loop's own
+# stdin and swallows the `find` stream, while BSD xargs skips the run entirely.
+# COVERED is counted through `wc -l` because `find | while` bodies run in a
+# subshell, so an incremented variable would be discarded at the pipe.
+MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
+COVERED=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   # Skip MOCs themselves
   grep -q '^type: moc' "$f" 2>/dev/null && continue
   # Check if any MOC links to this note
-  if grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
-    COVERED=$((COVERED + 1))
+  if [ -n "$MOC_FILES" ] && printf '%s\n' "$MOC_FILES" | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
+    echo "$NAME"
   fi
-done
+done | wc -l | tr -d ' ')
 echo "Coverage: $COVERED / $NOTE_COUNT"
 ```
 
@@ -175,7 +186,7 @@ Find synthesis opportunities — open triadic closures where A links to B and A 
 
 ```bash
 # For each note, extract outgoing wiki links
-for f in "$NOTES_DIR"/*.md; do
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   LINKS=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" \
   | rg -o '\[\[([^\]|#]+)' -r '$1' | sort -u)
@@ -326,14 +337,14 @@ Rank {vocabulary.note_plural} by influence — most-linked-to (authorities) and 
 
 ```bash
 # Authority score: incoming links per note
-for f in "$NOTES_DIR"/*.md; do
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
   echo "AUTH:$INCOMING:$NAME"
 done | sort -t: -k2 -rn | head -10
 
 # Hub score: outgoing links per note
-for f in "$NOTES_DIR"/*.md; do
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   OUTGOING=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" \
   | rg -o '\[\[' | wc -l | tr -d ' ')
@@ -462,7 +473,7 @@ Find all notes that link TO this {vocabulary.note} (hop 1).
 
 ```bash
 NAME="[note name]"
-grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/*.md 2>/dev/null
+find "$NOTES_DIR" -type f -name '*.md' -exec grep -l "\[\[$NAME\]\]" {} + 2>/dev/null
 ```
 
 If `ops/scripts/graph/recursive-backlinks.sh` exists, use it with the note and depth arguments.
@@ -511,7 +522,11 @@ Supported query patterns:
 **Step 2: Execute query**
 
 ```bash
-rg "^{field}:.*{value}" "$NOTES_DIR"/*.md -l 2>/dev/null
+# File list comes from `find`, not from rg's own directory walk. Handed a
+# directory, rg applies .gitignore/.ignore rules and skips hidden dirs, so a
+# gitignored subdirectory would silently return fewer notes here than /graph
+# health counts. An explicit file list disables that filtering.
+find "$NOTES_DIR" -type f -name '*.md' -exec rg -l "^{field}:.*{value}" {} + 2>/dev/null
 ```
 
 For each matching file, extract the description for context.
@@ -593,6 +608,6 @@ Report: "No {vocabulary.note_plural} found in {vocabulary.notes}/. Start by capt
 ### Note Not Found (for forward/backward/siblings)
 
 If the specified {vocabulary.note} or {vocabulary.topic_map} does not exist:
-1. Search for partial matches: `ls "$NOTES_DIR"/*{query}*.md 2>/dev/null`
+1. Search for partial matches: `find "$NOTES_DIR" -type f -name '*{query}*.md' 2>/dev/null`
 2. If matches found: "Did you mean: [[match1]], [[match2]]?"
 3. If no matches: "{vocabulary.note} '[[name]]' not found. Check the name and try again."
