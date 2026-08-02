@@ -218,6 +218,17 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
   exit 1
 fi
 
+# An EMPTY vault is a legitimate empty adjacency set; a MISSING directory is a
+# failure and must not render as one. Nothing else in this block catches it:
+# the library is sourced but its recursive helpers are never called here, and
+# `find "$NOTES_DIR" | while` discards find's status at the pipe — measured, a
+# nonexistent directory gave exit 0, zero stdout, and only a `find: ... No such
+# file or directory` line on stderr that no caller reads.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report an empty triangle set" >&2
+  exit 1
+}
+
 # Trim and fold to match the dangling-link check in /graph health, which folds
 # both sides via the library. Comparing unfolded targets here against folded
 # ones there makes [[Zettelkasten]] and [[zettelkasten]] two distinct nodes, so
@@ -398,20 +409,69 @@ Rank {vocabulary.note_plural} by influence — most-linked-to (authorities) and 
 **Step 1: Count links**
 
 ```bash
-# Authority score: incoming links per note
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+# Each fenced block is a SEPARATE shell invocation: NOTES_DIR does not survive
+# from the blocks above. Left undefined, `find ""` scans nothing and the ranking
+# comes back empty — which reads exactly like a vault with no links.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate empty ranking; a MISSING directory is a failure
+# and must not render as one.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report an influence ranking" >&2
+  exit 1
+}
+
+# Authority score: incoming links per note.
+# Captured FIRST, then sorted. `done | sort | head` yields HEAD's status, so a
+# failed scan rendered as an empty ranking with exit 0 — indistinguishable from
+# a vault that genuinely has no links.
+AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
   echo "AUTH:$INCOMING:$NAME"
-done | sort -t: -k2 -rn | head -10
+done) || {
+  echo "error: authority scan failed; refusing to report an influence ranking" >&2
+  exit 1
+}
 
-# Hub score: outgoing links per note
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+# Hub score: outgoing links per note.
+# The failure flag is a FILE, not a variable: the loop body runs in a subshell
+# (find | while), so an assignment would be discarded at the pipe. PIPESTATUS is
+# bash-only and reads empty under zsh, so it is not the fix.
+# rg runs as its own statement rather than as a pipeline stage: piped into
+# `wc -l` its status was discarded, so a broken RIPGREP_CONFIG_PATH — or an rg
+# missing from PATH — scored every note 0 outgoing links.
+# rc 1 means "this file has no links" and is NORMAL; only rc >1 is a failure.
+TMP_STRIPPED=$(mktemp) || exit 1
+TMP_LINKS=$(mktemp) || { rm -f "$TMP_STRIPPED"; exit 1; }
+ERRF="/tmp/graph-hubs-err-$$"
+rm -f "$ERRF"
+HUB_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
-  OUTGOING=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" \
-  | rg -o '\[\[' | wc -l | tr -d ' ')
+  awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" > "$TMP_STRIPPED" || {
+    touch "$ERRF"; continue
+  }
+  rg -o '\[\[' "$TMP_STRIPPED" > "$TMP_LINKS"
+  if [ $? -gt 1 ]; then
+    touch "$ERRF"; continue
+  fi
+  OUTGOING=$(wc -l < "$TMP_LINKS" | tr -d ' ')
   echo "HUB:$OUTGOING:$NAME"
-done | sort -t: -k2 -rn | head -10
+done)
+if [ -e "$ERRF" ]; then
+  rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
+  echo "error: link scan failed; refusing to report a hub ranking" >&2
+  exit 1
+fi
+rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
+
+# Both rankings print together, AFTER both scans have been checked. Printing
+# authorities as soon as they were ready meant a failed hub scan still put a
+# full, correct-looking AUTH ranking on stdout with nothing where the hub
+# ranking should be — a partial render that reads as "this vault has no hubs".
+# Either the whole ranking is trustworthy or the block emits no figures at all.
+printf '%s\n' "$AUTH_RAW" | sort -t: -k2 -rn | head -10
+printf '%s\n' "$HUB_RAW" | sort -t: -k2 -rn | head -10
 ```
 
 If `ops/scripts/graph/influence-flow.sh` exists, use it directly.

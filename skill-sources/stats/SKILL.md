@@ -144,6 +144,50 @@ fi
 ### 1b. Health Metrics
 
 ```bash
+# Each fenced block is a SEPARATE shell invocation: no variable and no sourced
+# function survives from block 1a above. NOTES_DIR, the note counts and the
+# link-extraction library must all be re-established here. Relying on 1a leaves
+# $NOTES_DIR empty (so `find ""` scans nothing) and makes every library call a
+# 127 "command not found", which the `||` guards below turn into a hard exit —
+# so this whole section produced no counts at all on every run.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate 0; a MISSING directory is a failure and must
+# not render as one.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report health metrics" >&2
+  exit 1
+}
+
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# Note counts. Block 1a is the canonical copy — keep this stanza identical to
+# it. COMPLIANCE divides by TOTAL_FILES and COVERAGE divides by NOTE_COUNT, and
+# an empty $(( )) folds to 0, which reads as "0% compliant" rather than as an
+# error.
+TOTAL_FILES=$(find "$NOTES_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+MOC_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | wc -l | tr -d ' ')
+NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
+
 # Orphan count (notes with zero incoming links).
 # Counted through `wc -l` rather than by incrementing a variable: `find | while`
 # runs the loop body in a subshell, so an incremented ORPHAN_COUNT would be
@@ -207,6 +251,24 @@ fi
 ### 1c. Pipeline Metrics
 
 ```bash
+# Each fenced block is a SEPARATE shell invocation: NOTE_COUNT does not survive
+# from block 1a. Left undefined it expands to empty, and $(( )) folds empty to
+# 0 without a word of complaint — TOTAL_CONTENT then equals INBOX_COUNT alone
+# and PROCESSED_PCT renders 0%, which is a plausible number and a wrong one.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate 0; a MISSING directory is a failure and must
+# not render as one.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report a processed ratio" >&2
+  exit 1
+}
+
+# Note count. Block 1a is the canonical copy — keep this stanza identical to it.
+TOTAL_FILES=$(find "$NOTES_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+MOC_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | wc -l | tr -d ' ')
+NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
+
 # Inbox items
 INBOX_COUNT=$(find {vocabulary.inbox}/ -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
 
@@ -237,6 +299,19 @@ fi
 ### 1d. Growth Metrics
 
 ```bash
+# Each fenced block is a SEPARATE shell invocation: NOTES_DIR does not survive
+# from block 1a. Left undefined, `find ""` scans nothing and every growth figure
+# renders 0 — measured against a vault of 5 notes created this week, this block
+# reported THIS_WEEK_NOTES=0 with exit 0 and a clean stderr.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate 0; a MISSING directory is a failure and must
+# not render as one.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report growth metrics" >&2
+  exit 1
+}
+
 # This week's growth (notes with created: date within last 7 days)
 WEEK_AGO=$(date -v-7d +%Y-%m-%d 2>/dev/null || date -d '7 days ago' +%Y-%m-%d 2>/dev/null)
 if [[ -n "$WEEK_AGO" ]]; then
@@ -248,13 +323,38 @@ else
   THIS_WEEK_NOTES="?"
 fi
 
-# This week's connections (approximate — count links in recently created notes)
+# This week's connections (approximate — count links in recently created notes).
+# The failure flag is a FILE, not a variable: the loop body runs in a subshell
+# (find | while), so an assignment would be discarded at the pipe. PIPESTATUS is
+# bash-only and reads empty under zsh, so it is not the fix.
+# rg also runs as its own statement rather than as a pipeline stage: the loop
+# feeds `wc -l`, so the whole construct reported wc's status and a broken
+# RIPGREP_CONFIG_PATH — or an rg missing from PATH — rendered as 0 connections.
+# rc 1 means "this file has no links" and is NORMAL; only rc >1 is a failure.
 if [[ "$THIS_WEEK_NOTES" -gt 0 && -n "$WEEK_AGO" ]]; then
+  TMP_STRIPPED=$(mktemp) || {
+    echo "error: mktemp failed; refusing to report a weekly connection count" >&2
+    exit 1
+  }
+  ERRF="/tmp/stats-week-links-err-$$"
+  rm -f "$ERRF"
   THIS_WEEK_LINKS=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l "^created: " {} + 2>/dev/null | while read -r f; do
     CREATED=$(grep '^created:' "$f" | head -1 | awk '{print $2}')
-    [[ "$CREATED" > "$WEEK_AGO" || "$CREATED" == "$WEEK_AGO" ]] && \
-    awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" | rg -o '\[\['
+    [[ "$CREATED" > "$WEEK_AGO" || "$CREATED" == "$WEEK_AGO" ]] || continue
+    awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" > "$TMP_STRIPPED" || {
+      touch "$ERRF"; continue
+    }
+    rg -o '\[\[' "$TMP_STRIPPED"
+    if [ $? -gt 1 ]; then
+      touch "$ERRF"; continue
+    fi
   done | wc -l | tr -d ' ')
+  if [ -e "$ERRF" ]; then
+    rm -f "$TMP_STRIPPED" "$ERRF"
+    echo "error: link scan failed; refusing to report a weekly connection count" >&2
+    exit 1
+  fi
+  rm -f "$TMP_STRIPPED" "$ERRF"
 else
   THIS_WEEK_LINKS="?"
 fi
