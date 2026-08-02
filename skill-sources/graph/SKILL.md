@@ -61,12 +61,22 @@ Full graph health report: density, orphans, dangling links, coverage.
 ```bash
 # Count total notes (excluding MOCs)
 NOTES_DIR="{vocabulary.notes}"
+
+# Source link-extraction library (fails loud if missing)
+LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
+[ -r "$LINK_LIB" ] || {
+  echo "error: link-extraction library not found '$LINK_LIB'" >&2
+  echo " arscontexta plugin installed? CLAUDE_PLUGIN_ROOT set?" >&2
+  exit 1
+}
+. "$LINK_LIB"
+
 TOTAL=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 MOC_COUNT=$(grep -rl '^type: moc' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL - MOC_COUNT))
 
 # Count all wiki links
-LINK_COUNT=$(grep -ohP '\[\[[^\]]+\]\]' "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+LINK_COUNT=$(count_links "$NOTES_DIR")
 
 # Calculate link density
 # Density = actual_links / possible_links
@@ -81,9 +91,9 @@ for f in "$NOTES_DIR"/*.md; do
 done
 
 # Find dangling links (links to non-existent files)
-grep -ohP '\[\[([^\]]+)\]\]' "$NOTES_DIR"/*.md 2>/dev/null | sort -u | while read -r link; do
-  NAME=$(echo "$link" | sed 's/\[\[//;s/\]\]//')
-  [[ ! -f "$NOTES_DIR/$NAME.md" ]] && echo "DANGLING: $NAME"
+NOTE_INDEX=$(existing_note_index "$NOTES_DIR")
+extract_link_targets "$NOTES_DIR" | while read -r NAME; do
+  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | /usr/bin/grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
 
 # MOC coverage: % of notes appearing in at least one MOC's Core Ideas
@@ -148,7 +158,8 @@ Find synthesis opportunities — open triadic closures where A links to B and A 
 # For each note, extract outgoing wiki links
 for f in "$NOTES_DIR"/*.md; do
   NAME=$(basename "$f" .md)
-  LINKS=$(grep -oP '\[\[([^\]]+)\]\]' "$f" 2>/dev/null | sed 's/\[\[//;s/\]\]//' | sort -u)
+  LINKS=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" \
+  | rg -o '\[\[([^\]|#]+)' -r '$1' | sort -u)
   echo "FROM:$NAME"
   echo "$LINKS" | while read -r target; do
     [[ -n "$target" ]] && echo "  TO:$target"
@@ -305,7 +316,8 @@ done | sort -t: -k2 -rn | head -10
 # Hub score: outgoing links per note
 for f in "$NOTES_DIR"/*.md; do
   NAME=$(basename "$f" .md)
-  OUTGOING=$(grep -oP '\[\[[^\]]+\]\]' "$f" 2>/dev/null | wc -l | tr -d ' ')
+  OUTGOING=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" \
+  | rg -o '\[\[' | wc -l | tr -d ' ')
   echo "HUB:$OUTGOING:$NAME"
 done | sort -t: -k2 -rn | head -10
 ```
