@@ -10,6 +10,31 @@
 # where it becomes one nonexistent path — and with 2>/dev/null that is a silent 0,
 # i.e. the guard passes while every bug ships. Verified: bash 9 hits, zsh 0.
 
+# WHY TWO FILES ARE EXCLUDED FROM EVERY SCAN:
+# Both must CONTAIN the constructs this guard forbids in order to do their jobs —
+# this file states the patterns it searches for, and guard-failure.test.sh writes
+# `grep -P` / `rg -P` payloads into fixtures and greps for this guard's own output
+# text. Neither ever executes them. Excluding them by filename is narrower than
+# excluding a directory, and it keeps every other file under reference/ scanned.
+#
+# This is a genuine exemption for checks 1 and 3, which the exemption-marker
+# comment further down says cannot exist. Both statements hold: the marker is a
+# per-LINE mechanism for code that runs, and there is no line of running code
+# that needs `grep -P`. A whole file whose purpose is to test the guard is a
+# different category, handled at file level, exactly as this file always was.
+#
+# The cost is a real blind spot: a genuine defect inside guard-failure.test.sh
+# would not be caught. Accepted because that file ships no vault behaviour, but
+# do not extend this list without the same reasoning.
+#
+# WHY THE EXCLUSION IS A PATH FILTER AND NOT `--exclude`:
+# grep's --exclude matches BASENAMES anywhere in the tree, so `--exclude=
+# 'guard-failure.test.sh'` would also skip a file of that name dropped into
+# skill-sources/ — a one-rename evasion, and the same shape as the content-based
+# exclusions already removed from this guard twice. Verified before the change:
+# a `grep -P` planted in skill-sources/guard-failure.test.sh was not reported.
+# Filtering on the full path after the scan pins each exemption to one location.
+EXEMPT_PATHS='^[^:]*reference/(check-portability\.sh|test/guard-failure\.test\.sh):'
 set -u
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 GREP=/usr/bin/grep
@@ -50,8 +75,9 @@ for d in "${SCAN[@]}"; do
 done
 
 echo "1. No PCRE grep (-P) or long-form in shipped templates"
-if hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
+if hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
     "${SCAN[@]}"); then
+  hits=$(printf '%s\n' "$hits" | "$GREP" -Ev "$EXEMPT_PATHS")
   if [ -n "$hits" ]; then
     red "grep -P or --perl-regexp found (exits 2 on BSD grep, silently yields 0):"
     printf '%s\n' "$hits" | sed 's/^/       /'
@@ -68,10 +94,10 @@ echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
 # status instead; PIPESTATUS is bash-only (zsh spells it pipestatus) and this
 # file must run under both.
 # Part A: negated character classes that don't exclude the | and # boundaries.
-raw_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}")
+raw_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}")
 scan_a_ok=$?
 # Part B: greedy/lazy dot quantifiers — vector 4 evasion, e.g. \[\[.*?\]\].
-raw_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+raw_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' \
   '\\\[\\\[.*\.\*\?\\\]\\\]' "${SCAN[@]}")
 scan_b_ok=$?
 if [ "$scan_a_ok" -ne 0 ] || [ "$scan_b_ok" -ne 0 ]; then
@@ -79,7 +105,8 @@ if [ "$scan_a_ok" -ne 0 ] || [ "$scan_b_ok" -ne 0 ]; then
 else
   temp_a=$(printf '%s\n' "$raw_a" \
     | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
-    | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+    | "$GREP" -v '^[^:]*lib/link-extraction\.sh:' \
+    | "$GREP" -Ev "$EXEMPT_PATHS")
   # Counted from the same input and marker as the filter below, so the reported
   # number is always exactly what was removed.
   # ANCHORED to the start of a comment, not matched anywhere in the line. An
@@ -107,7 +134,8 @@ else
   # move is widening an exclusion or deleting a check. If you hit a genuine false
   # positive in check 1 or part B, fix the pattern — do not reach for the marker.
   hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v '#[[:space:]]*portability-exempt')
-  hits_b=$(printf '%s\n' "$raw_b" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+  hits_b=$(printf '%s\n' "$raw_b" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:' \
+    | "$GREP" -Ev "$EXEMPT_PATHS")
   hits="${hits_a}${hits_b:+
 }${hits_b}"
   if [ -n "$hits" ]; then
@@ -122,8 +150,9 @@ else
 fi
 
 echo "3. No PCRE via ripgrep (fails on rg builds without PCRE2)"
-if hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+if hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' \
     -E '(^|[^a-zA-Z_-])rg +[^|]*(-P|--pcre2)' "${SCAN[@]}"); then
+  hits=$(printf '%s\n' "$hits" | "$GREP" -Ev "$EXEMPT_PATHS")
   if [ -n "$hits" ]; then
     red "rg -P or --pcre2 found (fails on rg builds without PCRE2):"
     printf '%s\n' "$hits" | sed 's/^/       /'
