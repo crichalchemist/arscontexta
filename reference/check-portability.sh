@@ -51,15 +51,22 @@ else
   ok "no grep -P"
 fi
 
-echo "2. Wiki-link capture terminates at | and #"
-hits=$(scan_or_die "link capture scan" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}" \
+echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
+# Part A: Check for negated character class patterns that don't exclude boundaries
+hits_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}" \
   | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
   | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+# Part B: Check for greedy/lazy dot quantifier patterns (vector 4 evasion: [[.*?]] or [[.*]] or [[.+]])
+# Find lines with escaped wiki-link patterns and greedy/lazy quantifiers
+hits_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+  '(\[\[.*\.\*.*\]\])|(\[\[.*\.\+.*\]\])|(\[\[.*\.\?.*\]\])' "${SCAN[@]}" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+hits="${hits_a}${hits_b:+
+}${hits_b}"
 if [ -n "$hits" ]; then
-  red "link capture does not exclude | and # (counts [[a|b]] and [[a#c]] as dangling):"
+  red "link capture does not use negated classes or excludes | and # (greedy [[.*]] or no boundaries):"
   printf '%s\n' "$hits" | sed 's/^/       /'
 else
-  ok "link capture terminates correctly"
+  ok "link capture uses negated classes, terminates correctly"
 fi
 
 echo "3. No PCRE via ripgrep (fails on rg builds without PCRE2)"
