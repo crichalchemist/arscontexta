@@ -71,42 +71,54 @@ _strip_fences() {
 # count_links <dir> -> integer
 count_links() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" f n tmpf
-  n=0
-  tmpf="/tmp/link-extraction-$$.tmp"
-  for f in "$dir"/*.md; do
-    [ -e "$f" ] || continue
-    _strip_fences "$f" > "$tmpf" || { rm -f "$tmpf"; return 1; }
-    rg -o '\[\[' "$tmpf" > "$tmpf.out" 2>&1
-    local rg_rc=$?
-    if [ "$rg_rc" -gt 1 ]; then
-      rm -f "$tmpf" "$tmpf.out"
-      return 1
-    fi
-    if [ "$rg_rc" -eq 0 ] && [ -s "$tmpf.out" ]; then
-      n=$(( n + $(wc -l < "$tmpf.out" | tr -d ' ') ))
-    fi
+  local dir="$1" tmpf tmpcount
+  tmpf=$(mktemp) || return 1
+  tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
+
+  find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
+    _strip_fences "$f" > "$tmpf" || exit 1
+    rg -o '\[\[' "$tmpf" >> "$tmpcount" 2>/dev/null || [ $? -le 1 ] || exit 1
   done
-  rm -f "$tmpf" "$tmpf.out"
-  printf '%s' "$n"
+  local result=$?
+
+  if [ $result -ne 0 ]; then
+    rm -f "$tmpf" "$tmpcount"
+    return 1
+  fi
+
+  if [ -s "$tmpcount" ]; then
+    wc -l < "$tmpcount" | tr -d ' '
+  else
+    printf '0'
+  fi
+
+  rm -f "$tmpf" "$tmpcount"
 }
 
 # extract_link_targets <dir> -> newline-separated folded unique targets
 extract_link_targets() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" f
-  local targets
-  targets=$(for f in "$dir"/*.md; do
-    [ -e "$f" ] || continue
-    _strip_fences "$f"
-  done | rg -o '\[\[([^\]|#]+)' -r '$1')
+  local dir="$1" tmpf tmpdata
+  tmpf=$(mktemp) || return 1
+  tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
+
+  find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
+    _strip_fences "$f" >> "$tmpdata" || exit 1
+  done || { rm -f "$tmpf" "$tmpdata"; return 1; }
+
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$tmpdata" > "$tmpf" 2>/dev/null
   local rg_rc=$?
+
   if [ "$rg_rc" -gt 1 ]; then
+    rm -f "$tmpf" "$tmpdata"
     return 1
   fi
-  printf '%s\n' "$targets" \
+
+  cat "$tmpf" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
     | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
+
+  rm -f "$tmpf" "$tmpdata"
 }
 
 # existing_note_index <dir> -> newline-separated folded basenames
@@ -130,18 +142,27 @@ count_links_recursive() {
 # extract_link_targets_recursive <dir> -> newline-separated folded unique targets (scans directory tree)
 extract_link_targets_recursive() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" f
-  local targets
-  targets=$(find "$dir" -type f -name '*.md' | while IFS= read -r f; do
-    _strip_fences "$f"
-  done | rg -o '\[\[([^\]|#]+)' -r '$1')
+  local dir="$1" tmpf tmpdata
+  tmpf=$(mktemp) || return 1
+  tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
+
+  find "$dir" -type f -name '*.md' | while IFS= read -r f; do
+    _strip_fences "$f" >> "$tmpdata" || exit 1
+  done || { rm -f "$tmpf" "$tmpdata"; return 1; }
+
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$tmpdata" > "$tmpf" 2>/dev/null
   local rg_rc=$?
+
   if [ "$rg_rc" -gt 1 ]; then
+    rm -f "$tmpf" "$tmpdata"
     return 1
   fi
-  printf '%s\n' "$targets" \
+
+  cat "$tmpf" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
     | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
+
+  rm -f "$tmpf" "$tmpdata"
 }
 
 # existing_note_index_recursive <dir> -> newline-separated folded basenames (scans directory tree)

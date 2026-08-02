@@ -83,6 +83,18 @@ rm -f "$BADRC"
 eq "library declares a contract version"      "yes" \
    "$([ "${LINK_EXTRACTION_VERSION:-0}" -ge 1 ] 2>/dev/null && echo yes || echo no)"
 
+# --- empty vault (legitimate state, not a failure) ----------------------------
+EMPTY=$(mktemp -d); mkdir -p "$EMPTY/notes"
+eq "empty dir: count_links yields 0"          "zero" \
+   "$(out=$(count_links "$EMPTY/notes" 2>/dev/null); rc=$?; [ "$rc" -eq 0 ] && [ "$out" = "0" ] && echo zero || echo "failed:$out:rc=$rc")"
+eq "empty dir: count_links_recursive yields 0" "zero" \
+   "$(out=$(count_links_recursive "$EMPTY/notes" 2>/dev/null); rc=$?; [ "$rc" -eq 0 ] && [ "$out" = "0" ] && echo zero || echo "failed:$out:rc=$rc")"
+eq "empty dir: extract_link_targets empty"    "empty" \
+   "$(out=$(extract_link_targets "$EMPTY/notes" 2>/dev/null); rc=$?; [ "$rc" -eq 0 ] && [ -z "$out" ] && echo empty || echo "failed:$out:rc=$rc")"
+eq "empty dir: extract_link_targets_recursive empty" "empty" \
+   "$(out=$(extract_link_targets_recursive "$EMPTY/notes" 2>/dev/null); rc=$?; [ "$rc" -eq 0 ] && [ -z "$out" ] && echo empty || echo "failed:$out:rc=$rc")"
+rm -rf "$EMPTY"
+
 rm -rf "$FIX"
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
