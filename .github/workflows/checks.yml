@@ -3,6 +3,11 @@ name: checks
 on:
   push:
   pull_request:
+  # Manual trigger. Without it the only way to re-run these gates is to push
+  # another commit, which is exactly the wrong incentive when a gate is red and
+  # the fix can only be validated on a runner (GNU vs BSD userland differences
+  # are not reproducible on a maintainer's macOS machine).
+  workflow_dispatch:
 
 jobs:
   portability:

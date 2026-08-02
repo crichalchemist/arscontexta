@@ -79,8 +79,15 @@ eq "fold handles non-ASCII under LC_ALL=C"    "yes" \
 # --- failure must never be a number ----------------------------------------
 eq "missing dir fails, emits no count"        "loud" \
    "$(out=$(count_links "$FIX/nope" 2>/dev/null); rc=$?; [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
+# PATH must point at a directory that genuinely has no rg. /usr/bin:/bin does NOT
+# qualify everywhere: apt installs ripgrep to /usr/bin/rg, so on Linux this left rg
+# on PATH, count_links correctly returned a number, and the assertion failed against
+# a library that was behaving. An empty directory holds the precondition on every
+# platform. (The library's own deps check also needs awk, which is likewise absent
+# here -- either missing dep must fail loud, which is what this asserts.)
+NOBIN="$FIX/nobin"; mkdir -p "$NOBIN"
 eq "missing rg fails, emits no count"         "loud" \
-   "$(out=$(PATH=/usr/bin:/bin "$SELF" -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
+   "$(out=$(PATH="$NOBIN" "$SELF" -c ". '$LIB'; count_links '$N'" 2>/dev/null); rc=$?; \
       [ "$rc" -ne 0 ] && [ -z "$out" ] && echo loud || echo "silent:$out")"
 BADRC=$(mktemp); printf -- '--nonexistent-flag-xyz\n' > "$BADRC"
 eq "rg runtime failure fails loud"            "loud" \
