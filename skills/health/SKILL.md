@@ -571,6 +571,8 @@ fi
 
 There is no WARN band. The library is a precondition, not a quality measure: the skills that source it either run or do not.
 
+**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before the library shipped will report this FAIL at its next session-start quick check, through no fault of the user. Ranked below three other items it reads as noise; ranked first it reads as what it is — two broken commands with a one-command fix.
+
 **Example output:**
 
 ```

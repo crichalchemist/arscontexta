@@ -1433,7 +1433,7 @@ Create the directory `ops/lib/` in the vault, then copy `${CLAUDE_PLUGIN_ROOT}/r
 2. it contains a `LINK_EXTRACTION_VERSION=` assignment
 3. that version is `1` or greater
 
-If any check fails, **STOP generation and report it**. Do not continue to Step 11. Every generated `/stats` and `/graph` sources this file and exits 1 without it, so a silently skipped copy ships a vault whose link, connection, and density figures are unavailable from the first day.
+If any check fails, **report it prominently in the generation output and name `/arscontexta:upgrade` as the repair — then continue generating.** Do not abort the run: a half-built vault (hooks written, no Hub MOC, no templates) is a worse and less recoverable state than a complete vault missing one file, and `/arscontexta:upgrade` restores this library on demand. What must not happen is silence. Every generated `/stats` and `/graph` sources this file and exits 1 without it, so an unreported skipped copy ships a vault whose link, connection, and density figures are unavailable from the first day.
 
 ---
 
