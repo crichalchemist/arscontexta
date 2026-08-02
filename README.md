@@ -261,6 +261,7 @@ Keep qmd MCP configuration and tool preapproval in `.mcp.json`.
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) v1.0.33+ | Yes | Plugin host |
 | `tree` | Yes | Workspace structure injection |
 | `ripgrep` (`rg`) | Yes | YAML queries, schema validation |
+| `awk` | Yes | Code-fence stripping in link extraction (POSIX; preinstalled on macOS and Linux) |
 | [qmd](https://github.com/tobi/qmd) | Optional | Semantic search |
 
 ---
