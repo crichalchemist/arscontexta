@@ -65,9 +65,14 @@ echo "$FIX"
 
 | Metric | Correct value | Reasoning |
 |---|---|---|
-| `count_links notes` | `6` | 6 body links; fenced one excluded |
+| `count_links notes` | `8` | 2 frontmatter `topics:` links + 6 body links; the fenced one excluded (9 raw `[[` − 1) |
 | `extract_link_targets notes` | `alpha`, `nonexistent-note`, `real` | folded, terminated, fence-stripped |
 | Dangling | `1` | `nonexistent-note` only |
+
+**`topics:` links count toward link totals, and that is correct.** The original
+`grep -ohP '\[\[[^\]]+\]\]'` scanned whole files including YAML frontmatter, and `topics:`
+entries are real graph edges (note → hub). An earlier draft of this plan said `6`, having
+counted only body links; that expectation was wrong, not the code.
 
 ## File Structure
 
@@ -428,7 +433,7 @@ With:
 
 - [ ] **Step 7: Verify against the fixture**
 
-Extract each block and run with `NOTES_DIR=notes` inside `$FIX`, with `CLAUDE_PLUGIN_ROOT` set to the repo root. Assert `LINK_COUNT`=`6`, `TOPIC_COUNT`=`2`, `DANGLING_COUNT`=`1`, `THIS_WEEK_LINKS`=`6`. Then:
+Extract each block and run with `NOTES_DIR=notes` inside `$FIX`, with `CLAUDE_PLUGIN_ROOT` set to the repo root. Assert `LINK_COUNT`=`8`, `TOPIC_COUNT`=`2`, `DANGLING_COUNT`=`1`, `THIS_WEEK_LINKS`=`8`. Then:
 
 ```bash
 [ "$DANGLING_COUNT" -gt 0 ] && echo "numeric OK"
@@ -550,7 +555,7 @@ With:
 
 - [ ] **Step 6: Verify against the fixture**
 
-`LINK_COUNT`=`6`; dangling output exactly `DANGLING: nonexistent-note`; for `probe.md`, `LINKS` contains `real`, `alpha`, `nonexistent-note` and NOT `in-code-fence`; `OUTGOING` for `probe.md`=`6`.
+`LINK_COUNT`=`8`; dangling output exactly `DANGLING: nonexistent-note`; for `probe.md`, `LINKS` contains `real`, `alpha`, `nonexistent-note` and NOT `in-code-fence`; `OUTGOING` for `probe.md`=`8`.
 
 - [ ] **Step 7: Run the guard**
 
