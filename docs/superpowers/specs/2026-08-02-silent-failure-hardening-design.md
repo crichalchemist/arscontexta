@@ -135,21 +135,106 @@ was wrong twice: the precedent is prose rather than shell, and generated vaults 
 plugin at all. **A generator change IS required.** The cost estimate that informed the
 duplicate-vs-extract decision was therefore too low.
 
-**Corrected design direction** — follow the architecture that already exists for hooks:
+### 3.2a Reworked sourcing design
 
-- `skills/setup/SKILL.md` copies `reference/lib/link-extraction.sh` into the generated vault
-  (e.g. `.claude/skills/lib/link-extraction.sh`) alongside the hooks it already copies.
-- Generated skills source it by vault-relative path or `$CLAUDE_PROJECT_DIR`, matching the hook
-  config pattern at `setup:1382-1408`.
-- Plugin-tier consumers (`skills/architect`, `skills/health`) keep sourcing from the plugin, where
-  the file genuinely lives; only the `skill-sources/` templates need the copied path.
-- Decide explicitly how a vault's copy is refreshed when the plugin updates — `/arscontexta:upgrade`
-  is the natural owner, and a stale copy must be detectable rather than silent.
+Two tiers, because the two consumer classes genuinely differ. This is not a workaround; it is the
+architecture the plugin already uses for hooks.
 
-Related trust-boundary question, now sharper: the plugin cache is writable and drifts from the repo
-(observed: two installed skills carry mtimes months newer than their eight siblings, with content
-absent from git history — consistent with the vault's own documented "plugin skill patches"). Copying
-the library into the vault sidesteps that boundary entirely, which is a further argument for it.
+**Tier 1 — plugin-tier consumers keep sourcing from the plugin.**
+`skills/architect/SKILL.md` and `skills/health/SKILL.md` run from the plugin directory, where the
+library actually lives. They are unaffected by this rework and need no change. Keep the existing
+relative-path form used by `reference/validate-kernel.sh`:
+
+```bash
+LINK_LIB="$(cd "$(dirname "$0")" && pwd)/lib/link-extraction.sh"
+```
+
+**Tier 2 — generated vaults get a copy, like hooks.**
+
+*Placement:* `ops/lib/link-extraction.sh`.
+
+Verified: `ops/` is written **literally** throughout `skills/setup/SKILL.md` (`ops/config.yaml`,
+`ops/tasks.md`, `ops/queue/`, `ops/derivation.md`, `ops/methodology/`) — it is a fixed directory
+name, not vocabulary-templated, so the path is safe to hardcode in a template. `ops/` is also the
+right family: operational infrastructure, not knowledge content.
+
+Rejected: `.claude/skills/lib/` — every sibling under `.claude/skills/` is a skill directory
+containing `SKILL.md`, and a bare `lib/` invites exactly that ambiguity.
+Note `ops/lib/` exists in `~/second-brain` but is **user-created**; the plugin does not generate it
+today, so setup must create the directory as well as the file.
+
+*Lookup:* match `hooks/scripts/read_config.sh:20` exactly. Do not invent a third way to find the
+vault root.
+
+```bash
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+```
+
+**Stated precondition:** this resolves correctly only when the working directory is the vault root.
+That assumption is already load-bearing across the plugin — `vaultguard.sh` tests bare
+`[ -f ".arscontexta" ]`, and `read_config.sh` falls back to `$(pwd)`. Relying on it here keeps all
+three consistent. Do **not** add a walk-up in the library alone: it would resolve the vault root
+differently from the two scripts that already do it, which is a new inconsistency in a spec whose
+theme is that protections must actually protect. If a walk-up is wanted, see §3.2c.
+
+**Generator change (required):** `skills/setup/SKILL.md` must create `ops/lib/` and copy the library
+into it, in the same step that writes `.claude/hooks/`. This is the change Spec A wrongly costed at
+zero.
+
+### 3.2b Staleness must be loud, not aspirational
+
+A vault running an old copy of the library while the plugin has a fixed one is a wrong answer
+delivered confidently — this spec's own failure class, introduced by this spec's own mechanism.
+"Detectable rather than silent" is not a design; here is one.
+
+1. The library declares its contract version on the first line of the file:
+   `LINK_EXTRACTION_VERSION=1`. Bump it on any behavior change (fold rules, termination, recursion
+   semantics) — not on comment edits.
+2. Every generated consumer asserts the minimum it was written against, immediately after sourcing:
+
+```bash
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: ops/lib/link-extraction.sh is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+```
+
+3. `/arscontexta:upgrade` owns refreshing the vault's copy and must report when it replaces a file
+   whose version differs, rather than overwriting quietly.
+4. `/arscontexta:health` should surface a version mismatch as a FAIL, so drift is visible without
+   waiting for a skill to break.
+
+The runtime assertion is the load-bearing part: it fires whenever a skill runs, not only when
+someone remembers to upgrade.
+
+### 3.2c Deferred — unify vault-root discovery
+
+`read_config.sh:20` carries the comment "use CLAUDE_PROJECT_DIR if set, otherwise walk up" above
+code that does `$(pwd)` and never walks up. `vaultguard.sh` tests `[ -f ".arscontexta" ]` relative
+to cwd. Neither walks up; the comment is wrong.
+
+Unifying all three on a real walk-up (searching upward for the `.arscontexta` marker, which already
+exists as the canonical vault identifier) would make skills work from a subdirectory. **Deferred as
+its own item** — it must change `read_config.sh`, `vaultguard.sh`, and the library together, or the
+inconsistency it is meant to remove gets worse. Not a prerequisite for 3.2a.
+
+### 3.2d Side benefit — the plugin-cache trust boundary
+
+Copying the library into the vault removes a dependency on the plugin cache, which is writable and
+drifts from the repo. Observed during this work: two installed skills carry mtimes months newer than
+their eight siblings, with content absent from git history — consistent with the vault's own
+documented "plugin skill patches". A vault-local copy means generated skills execute shell that
+`/arscontexta:upgrade` placed there deliberately, not whatever currently sits in a mutable cache.
 
 Related trust-boundary question worth a deliberate decision: the plugin cache is writable and
 drifts from the repo (observed: two installed skills carry mtimes months newer than their eight
@@ -216,7 +301,9 @@ dependency. Run it in CI on both `bash` and `zsh` — two findings in this spec 
 5. A nonexistent `{vocabulary.notes}` fails loudly rather than reporting a healthy vault.
 6. `count_links_recursive` returns the same correct value under bash and zsh.
 7. Flat and recursive agree on a mixed-depth vault, or the wrong choice fails loudly.
-8. A real generated vault's `/stats` runs successfully — verified by generating one. (3.2 is RESOLVED: the current design fails; this criterion now tests the reworked design.)
+8. A real generated vault's `/stats` runs successfully — verified by generating a vault and running it, not by reasoning about environment variables.
+8a. `skills/setup` creates `ops/lib/` and copies the library; a freshly generated vault contains it.
+8b. A vault whose copied library is older than a skill requires FAILS LOUDLY at runtime, and `/arscontexta:health` reports the mismatch.
    reasoning about `CLAUDE_PLUGIN_ROOT`.
 9. `[[Über]]` resolves to `über.md` under `LC_ALL=C`.
 10. CI executes a fixture test of all six library functions, under both bash and zsh, and that
