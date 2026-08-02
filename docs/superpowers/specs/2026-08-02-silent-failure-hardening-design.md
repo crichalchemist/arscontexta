@@ -109,19 +109,47 @@ or make flat fail loudly on an unmatched glob. `skills/setup/SKILL.md:162,591` g
 notes folder by default, so a fresh vault is not broken — but nothing forbids subdirectories, and
 health's own use of `_recursive` on that path concedes that nesting happens.
 
-### 3.2 Verify generated skills can actually source the library
-Templates source `"${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"`. The `:-` makes an
-unset variable expand to empty → `/reference/lib/...` → not found → the loud-failure branch fires
-on **every** run.
+### 3.2 RESOLVED — the sourcing design is broken. Rework required.
 
-This was justified during Spec A planning from precedent at `skill-sources/refactor/SKILL.md:163`,
-but that precedent is **advisory** (reads a document, degrades quietly) while this is
-**load-bearing** (undefined function). The distinction was noted and not tested.
+**Verified 2026-08-02 against the real generated vault at `~/second-brain`. The design does not
+work.** This is now the largest item in this spec and should be done first.
 
-**This must be verified against a real generated vault**, not reasoned about. It could not be
-tested during Spec A because the installed 0.8.0 cache predates the branch. If `CLAUDE_PLUGIN_ROOT`
-is not set for vault-local skills, the sourcing design is wrong and Phase 3.2 becomes the largest
-item in this spec.
+Evidence:
+
+1. **`CLAUDE_PLUGIN_ROOT` is unset in a shell.** With `:-`, the path resolves to
+   `/reference/lib/link-extraction.sh` — absolute from filesystem root, not readable. The
+   loud-failure branch fires on **every** invocation of a generated `/stats` or `/graph`.
+2. **Generated vaults are self-contained by design.** `~/second-brain/.claude/hooks/` holds the
+   vault's *own copies* of `auto-commit.sh`, `session-orient.sh`, `validate-node-schema.py` and the
+   rest. `skills/setup/SKILL.md:1382-1408` writes hook commands as `bash .claude/hooks/*.sh` —
+   vault-relative paths. Nothing in a generated vault points back into the plugin.
+3. **The vault's live hook config uses `$CLAUDE_PROJECT_DIR`, never `CLAUDE_PLUGIN_ROOT`.**
+4. **There is no precedent for vault-local shell sourcing a plugin file.** The only
+   `CLAUDE_PLUGIN_ROOT` occurrences in the entire generated vault are two **prose** lines in
+   `refactor` (`:163`, `:247`) instructing an agent to *read a document*. That is not shell; it
+   never required the variable to be set in an environment.
+
+**The Spec A planning error, recorded so it is not repeated.** The extraction approach was chosen
+partly because it appeared to need no generator change, justified by the `refactor` precedent. That
+was wrong twice: the precedent is prose rather than shell, and generated vaults do not reference the
+plugin at all. **A generator change IS required.** The cost estimate that informed the
+duplicate-vs-extract decision was therefore too low.
+
+**Corrected design direction** — follow the architecture that already exists for hooks:
+
+- `skills/setup/SKILL.md` copies `reference/lib/link-extraction.sh` into the generated vault
+  (e.g. `.claude/skills/lib/link-extraction.sh`) alongside the hooks it already copies.
+- Generated skills source it by vault-relative path or `$CLAUDE_PROJECT_DIR`, matching the hook
+  config pattern at `setup:1382-1408`.
+- Plugin-tier consumers (`skills/architect`, `skills/health`) keep sourcing from the plugin, where
+  the file genuinely lives; only the `skill-sources/` templates need the copied path.
+- Decide explicitly how a vault's copy is refreshed when the plugin updates — `/arscontexta:upgrade`
+  is the natural owner, and a stale copy must be detectable rather than silent.
+
+Related trust-boundary question, now sharper: the plugin cache is writable and drifts from the repo
+(observed: two installed skills carry mtimes months newer than their eight siblings, with content
+absent from git history — consistent with the vault's own documented "plugin skill patches"). Copying
+the library into the vault sidesteps that boundary entirely, which is a further argument for it.
 
 Related trust-boundary question worth a deliberate decision: the plugin cache is writable and
 drifts from the repo (observed: two installed skills carry mtimes months newer than their eight
@@ -188,7 +216,7 @@ dependency. Run it in CI on both `bash` and `zsh` — two findings in this spec 
 5. A nonexistent `{vocabulary.notes}` fails loudly rather than reporting a healthy vault.
 6. `count_links_recursive` returns the same correct value under bash and zsh.
 7. Flat and recursive agree on a mixed-depth vault, or the wrong choice fails loudly.
-8. A real generated vault's `/stats` runs successfully — verified by generating one, not by
+8. A real generated vault's `/stats` runs successfully — verified by generating one. (3.2 is RESOLVED: the current design fails; this criterion now tests the reworked design.)
    reasoning about `CLAUDE_PLUGIN_ROOT`.
 9. `[[Über]]` resolves to `über.md` under `LC_ALL=C`.
 10. CI executes a fixture test of all six library functions, under both bash and zsh, and that
@@ -199,4 +227,4 @@ dependency. Run it in CI on both `bash` and `zsh` — two findings in this spec 
 Phases 1–2 are self-contained, close every open instance of the branch's own bug class, and could
 ship alone as the smallest defensible unit. Phase 3.2 is the wildcard: if `CLAUDE_PLUGIN_ROOT` is
 unset for vault-local skills, the sourcing design is wrong and that finding outgrows this spec.
-**Resolve 3.2 first** — it may change the shape of everything else.
+**3.2 is resolved and it did change the shape.** The sourcing design is broken and needs rework plus a generator change, so it is the largest item here and blocks the `skill-sources` half of Phases 1-3. The plugin-tier consumers (`skills/architect`, `skills/health`) are unaffected and can proceed independently.
