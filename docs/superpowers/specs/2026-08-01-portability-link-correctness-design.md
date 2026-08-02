@@ -59,7 +59,8 @@ diagnosis:
 | `reference/validate-kernel.sh` | 67, 75 | naive capture only (no `-P`) |
 | `skills/health/SKILL.md` | 167 | naive capture only (already uses `rg`) |
 
-Plus: one guard script, one CI workflow.
+Plus: one shared library (`reference/lib/link-extraction.sh`, see §0), one guard script, one CI
+workflow, and one README prerequisite row (`awk`, declared before first use).
 
 `skills/health/SKILL.md:167` was found by the guard's second detector, not by the original
 diagnosis. It already uses `rg -oN`, so it has no portability defect — but its capture is
@@ -83,6 +84,43 @@ argument for the guard existing at all.
 - **Spec B** (the `/rethink`, `setup`, and `/learn` defects) and **Spec C** (`CONTRIBUTING.md`).
 
 ## Design
+
+### 0. Shared library (supersedes per-site duplication)
+
+**Decision (2026-08-01, post-approval):** the canonical forms live **once**, in
+`reference/lib/link-extraction.sh`, and every consumer sources it. An earlier draft of this spec
+duplicated the block across four files; that was rejected in favour of real extraction.
+
+Feasibility rests on existing precedent: `skill-sources/refactor/SKILL.md:163,247` already
+references `${CLAUDE_PLUGIN_ROOT}` from a *generated* vault skill, so generated skills can reach
+plugin files at runtime. **No change to `skills/setup/` is required.**
+
+One difference from that precedent must be designed around. `refactor`'s use is advisory — it reads
+a document, and degrades gracefully if the plugin is absent. Sourcing a library is load-bearing: an
+absent plugin means an undefined function. Consumers must therefore **fail loud**, never silently:
+
+```bash
+LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       is the arscontexta plugin installed and CLAUDE_PLUGIN_ROOT set?" >&2
+  exit 1
+fi
+```
+
+A silent fallback to inline code would reintroduce exactly the failure class this spec removes.
+
+The library exposes two functions, matching the two forms below:
+
+- `count_links <dir>` → integer. Fence-aware occurrence count.
+- `extract_link_targets <dir>` → newline-separated, fence-stripped, `|`/`#`-terminated,
+  lowercase-folded, sorted-unique targets.
+- `existing_note_index <dir>` → newline-separated lowercase-folded basenames, for resolution.
+
+`reference/validate-kernel.sh` sources it by relative path (`$(dirname "$0")/lib/…`) since it runs
+from the plugin directory itself.
 
 ### 1. Canonical extraction form
 
