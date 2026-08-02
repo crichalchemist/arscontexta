@@ -124,6 +124,16 @@ probe "catches egrep -oP"          'egrep -oP "x" n/'
 probe "catches rg -P"              'rg -P "x" n/'
 probe "catches rg --pcre2"         'rg --pcre2 "x" n/'
 probe "catches greedy [[.*?]]"     "rg -o '\\[\\[.*?\\]\\]' n/"
+# The four spellings below all PASSED the guard before check 2 part B was
+# broadened: it matched the literal `.*?` text only. Each is an equally valid
+# way to write the same defect, and part A cannot catch any of them — it keys
+# on `[^` being present, and none of these contain a negated class. A probe
+# that passes both before and after the fix proves nothing, so these were
+# confirmed red against the pre-fix pattern.
+probe "catches greedy [[.*]]"      "rg -o '\\[\\[.*\\]\\]' n/"
+probe "catches lazy [[.+?]]"       "rg -o '\\[\\[.+?\\]\\]' n/"
+probe "catches grouped [[(.+)]]"   "rg -o '\\[\\[(.+)\\]\\]' n/"
+probe "catches grouped [[(.*)]]"   "rg -o '\\[\\[(.*)\\]\\]' n/"
 eq "empty root passes after probes" "0" "$(rc_of "$V")"
 
 # --- a missing scan directory -----------------------------------------------

@@ -96,9 +96,15 @@ echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
 # Part A: negated character classes that don't exclude the | and # boundaries.
 raw_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}")
 scan_a_ok=$?
-# Part B: greedy/lazy dot quantifiers — vector 4 evasion, e.g. \[\[.*?\]\].
+# Part B: greedy/lazy dot-or-plus quantifiers between \[\[ and \]\] — vector 4
+# evasion. This matched ONLY the literal `.*?` spelling; verified against a
+# planted fixture, `\[\[.*\]\]`, `\[\[.+?\]\]` and `\[\[(.+)\]\]` all passed.
+# Part A cannot cover them either: it keys on `[^` being PRESENT, and a dot
+# quantifier contains no negated class at all. `\.[*+]\??` spans greedy and
+# lazy forms of both quantifiers, with `.*` on each side so a capture group or
+# any other wrapping around the quantifier does not evade the match.
 raw_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' \
-  '\\\[\\\[.*\.\*\?\\\]\\\]' "${SCAN[@]}")
+  '\\\[\\\[.*\.[*+]\??.*\\\]\\\]' "${SCAN[@]}")
 scan_b_ok=$?
 if [ "$scan_a_ok" -ne 0 ] || [ "$scan_b_ok" -ne 0 ]; then
   red "link capture scan could not run (see stderr) — cannot conclude anything"
