@@ -176,10 +176,19 @@ for f in {vocabulary.notes}/*.md; do
   [[ "$LINKS" -eq 0 ]] && echo "ORPHAN: $NAME"
 done
 
-# Find dangling links
-grep -ohP '\[\[([^\]]+)\]\]' {vocabulary.notes}/*.md | sort -u | while read -r link; do
-  NAME=$(echo "$link" | sed 's/\[\[//;s/\]\]//')
-  [[ ! -f "{vocabulary.notes}/$NAME.md" ]] && echo "DANGLING: $NAME"
+# Source link-extraction library (fails loud if missing)
+LINK_LIB="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"
+[ -r "$LINK_LIB" ] || {
+  echo "error: link-extraction library not found '$LINK_LIB'" >&2
+  echo " arscontexta plugin installed? CLAUDE_PLUGIN_ROOT set?" >&2
+  exit 1
+}
+. "$LINK_LIB"
+
+# Find dangling links (folded both sides — reference/lib/link-extraction.sh)
+NOTE_INDEX=$(existing_note_index "{vocabulary.notes}")
+extract_link_targets "{vocabulary.notes}" | while read -r NAME; do
+  [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
 
 # Count inbox items

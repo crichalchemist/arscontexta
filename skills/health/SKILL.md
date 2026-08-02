@@ -164,7 +164,9 @@ done
 ```bash
 # Extract all wiki links from all markdown files
 # For each unique link target, verify a file with that name exists
-rg -oN '\[\[([^\]]+)\]\]' --glob '*.md' -r '$1' | sort -u | while read target; do
+rg -oN '\[\[([^\]|#]+)' --glob '*.md' -r '$1' \
+  | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+  | tr '[:upper:]' '[:lower:]' | sort -u | while read -r target; do
   # Search for file matching this name
   found=$(find . -name "$target.md" -not -path "./.git/*" 2>/dev/null | head -1)
   if [[ -z "$found" ]]; then

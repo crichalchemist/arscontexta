@@ -14,6 +14,15 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Source link-extraction library (fails loud if missing)
+LINK_LIB="$(cd "$(dirname "$0")" && pwd)/lib/link-extraction.sh"
+[ -r "$LINK_LIB" ] || {
+  echo "error: link-extraction library not found '$LINK_LIB'" >&2
+  echo " plugin structure broken or script moved?" >&2
+  exit 1
+}
+. "$LINK_LIB"
+
 pass() { echo -e "  ${GREEN}PASS${NC} $1"; PASS=$((PASS + 1)); }
 warn() { echo -e "  ${YELLOW}WARN${NC} $1"; WARN=$((WARN + 1)); }
 fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
@@ -54,7 +63,7 @@ else
 fi
 
 # Build index of existing filenames for dangling link check
-existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | xargs -I{} basename {} .md | sort -u)
+existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | xargs -I{} basename {} .md | tr '[:upper:]' '[:lower:]' | sort -u)
 
 # Extract wiki links from note content (scan known note directories)
 dangling=0
@@ -64,7 +73,7 @@ checked=0
 link_candidates=""
 for d in "01_thinking" "notes" "00_inbox" "04_meta/logs"; do
     if [ -d "$VAULT/$d" ]; then
-        new_links=$(grep -roh '\[\[[A-Za-z][^]]*\]\]' "$VAULT/$d" 2>/dev/null | sed 's/\[\[//g;s/\]\]//g' | sort -u)
+        new_links=$(extract_link_targets "$VAULT/$d")
         if [ -n "$new_links" ]; then
             link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
         fi
@@ -72,7 +81,7 @@ for d in "01_thinking" "notes" "00_inbox" "04_meta/logs"; do
 done
 # Also check parent self/ if it exists
 [ -d "$VAULT/../self" ] && {
-    new_links=$(grep -roh '\[\[[A-Za-z][^]]*\]\]' "$VAULT/../self" 2>/dev/null | sed 's/\[\[//g;s/\]\]//g' | sort -u)
+    new_links=$(extract_link_targets "$VAULT/../self")
     [ -n "$new_links" ] && link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
 }
 
@@ -82,7 +91,7 @@ link_candidates=$(echo "$link_candidates" | sort -u | head -100)
 while IFS= read -r link; do
     [ -z "$link" ] && continue
     checked=$((checked + 1))
-    if ! echo "$existing_files" | grep -qxF "$link"; then
+    if ! echo "$existing_files" | grep -qxF "$(printf '%s' "$link" | tr '[:upper:]' '[:lower:]')"; then
         dangling=$((dangling + 1))
     fi
 done <<< "$link_candidates"
