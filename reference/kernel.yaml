@@ -130,6 +130,8 @@ primitives:
       tier-3: "Periodic manual review guided by topic adjacency"
     validation:
       check: "Given a note, the mechanism returns related notes that share no significant keywords"
+      resolution_check: "Every mcp__qmd__* tool name declared on the vault's LIVE surface (.claude/, .agents/, .mcp.json) is one qmd actually exposes. Scoped to the live surface deliberately: ops/skills-archive/ holds dated historical copies of skills and ops/changelog.md records past migrations, both of which legitimately contain retired names — an archived skill is a record, not a declaration."
+      three_states: "qmd absent -> WARN (capability is optional). qmd present and names resolve -> PASS. qmd present and a name does not resolve -> FAIL. The middle and last were previously conflated: the check tested only that qmd was on PATH, so it reported PASS throughout the period when 62 call sites across 20 files named tools qmd had removed. Presence is a proxy; resolution is the property."
     cognitive_grounding: "Vocabulary divergence — same concept, different words. Structural graph traversal misses these connections."
 
   - id: unique-addresses

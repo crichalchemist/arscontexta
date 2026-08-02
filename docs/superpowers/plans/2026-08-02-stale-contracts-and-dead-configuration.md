@@ -91,113 +91,28 @@ narrow table beside a widened bash line is the same defect in a different font.
 
 ---
 
-### Task 5: Harden Kernel Primitive 10 so this cannot recur silently
+### Task 5: Harden Kernel Primitive 10 so this cannot recur silently — MOVED
 
-**Files:**
-- Modify: `reference/kernel.yaml` (primitive `semantic-search`, its `validation.check`)
-- Modify: `reference/validate-kernel.sh`
+**Superseded.** This task now lives as **Task 1** of
+`docs/superpowers/plans/2026-08-02-contributor-surface-and-residual-defects.md`, where Spec C owns
+it alongside the rest of the residual-defect work.
 
-**Interfaces:**
-- Consumes: nothing from Tasks 1-4.
-- Produces: a primitive-10 check that fails when qmd is present but its tools do not resolve.
+Moved rather than copied. Two plans carrying the same task would drift — the identical hazard as
+`skill-sources/` versus `platforms/shared/skill-blocks/`, which this repo already documents. The
+canonical copy is the one linked above.
 
-**Why this task exists.** Primitive 10 currently checks that **qmd is on `PATH`**. qmd was on PATH
-throughout the entire period when all 61 of its call sites named tools that had been removed. The
-validator reported the primitive satisfied while semantic search was silently degrading to keyword
-grep in every vault. A presence check cannot detect a surface change; only a resolution check can.
+Implementation notes that only emerged during execution, recorded here so this stub is not
+mistaken for "nothing happened":
 
-- [ ] **Step 1: Establish the control — confirm the current check passes on a broken config**
-
-```bash
-cd /Volumes/Containers/arscontexta
-rg -n -A6 'id: semantic-search' reference/kernel.yaml
-rg -n 'qmd' reference/validate-kernel.sh
-```
-
-Expected: the check tests for the qmd binary only. Record the exact lines — you are replacing them.
-
-- [ ] **Step 2: Write the failing assertion first**
-
-Add to `reference/validate-kernel.sh`, in the primitive-10 section. It must distinguish three
-states, because collapsing them is what caused the defect:
-
-```bash
-# Primitive 10 has three distinct states and they must not collapse into two.
-# qmd absent            -> WARN  (semantic search optional; documented in CLAUDE.md)
-# qmd present, resolves -> PASS
-# qmd present, does NOT -> FAIL  (the state that went undetected for 61 call sites)
-if ! command -v qmd >/dev/null 2>&1; then
-  warn "semantic-search: qmd not installed (optional)"
-else
-  # Every qmd MCP tool named anywhere in the repo must be one qmd actually exposes.
-  declared=$(rg -o 'mcp__qmd__[a-z_]+' --glob '!*.diff' . | sed 's/.*://' | sort -u)
-  exposed='mcp__qmd__query mcp__qmd__get mcp__qmd__multi_get mcp__qmd__status'
-  unknown=""
-  for t in $declared; do
-    case " $exposed " in *" $t "*) ;; *) unknown="$unknown $t" ;; esac
-  done
-  if [ -n "$unknown" ]; then
-    fail "semantic-search: repo names qmd tools that do not exist:$unknown"
-  else
-    pass "semantic-search: qmd present, all declared tools resolve"
-  fi
-fi
-```
-
-`$exposed` is a hardcoded list and that is a known cost — it must be updated when qmd's surface
-changes. That is the point: the update becomes a deliberate act with a failing test attached,
-instead of a silent divergence.
-
-- [ ] **Step 3: Prove it goes red — non-vacuity**
-
-A check never seen red is not known to work. Two verification steps on the predecessor branch were
-found to be vacuous, one because a `sed` silently matched nothing.
-
-```bash
-# Reintroduce one dead name, confirm FAIL, restore, confirm PASS
-perl -i -pe 's/mcp__qmd__query/mcp__qmd__deep_search/ if $. == 8' skills/ask/SKILL.md
-git diff --quiet -- skills/ask/SKILL.md && { echo "MUTATION DID NOT APPLY — vacuous"; exit 9; }
-./reference/validate-kernel.sh . 2>&1 | rg 'semantic-search'   # expect FAIL naming the tool
-git checkout -- skills/ask/SKILL.md
-./reference/validate-kernel.sh . 2>&1 | rg 'semantic-search'   # expect PASS
-```
-
-- [ ] **Step 4: Update `reference/kernel.yaml`**
-
-Change primitive 10's `validation.check` so the YAML and the script agree. A primitive in the YAML
-whose check does not exist in the script is aspirational, not enforced.
-
-- [ ] **Step 5: Gates**
-
-```bash
-bash reference/check-portability.sh                      # exit 0
-for s in bash zsh; do
-  $s reference/test/link-extraction.test.sh | tail -1    # 19/19
-  $s reference/test/guard-failure.test.sh   | tail -1    # 19/19
-  $s reference/test/fence-isolation.test.sh | tail -1    # PASS
-done
-./reference/validate-kernel.sh ~/second-brain            # 15/15, WARN only where documented
-```
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add reference/kernel.yaml reference/validate-kernel.sh
-git commit -m "Assert qmd tool names resolve, not merely that qmd is installed
-
-Primitive 10 checked for the qmd binary. qmd was installed throughout the
-entire period when all 61 of its call sites named tools that had been
-removed from the MCP surface, so the validator reported semantic search
-satisfied while it silently degraded to keyword grep in every vault.
-
-A presence check cannot detect a surface change. This asserts that every
-mcp__qmd__* name the repo declares is one qmd actually exposes, and keeps
-'qmd absent' (WARN) distinct from 'qmd present but broken' (FAIL).
-
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
-```
-
----
+- The check must scan the **live tool surface** (`.claude/`, `.agents/`, `.mcp.json`), NOT the whole
+  vault. Scanning everything flagged 24 files in the field vault whose live skills declare zero dead
+  names — all hits were `ops/skills-archive/` copies and changelog entries, which legitimately
+  record retired names.
+- It must scan `$VAULT`, not the working directory. This script validates a generated vault, not
+  the plugin repo.
+- `declared=$(rg … | sort -u); rc=$?` captures **`sort`'s** status, not `rg`'s. Capture rg's status
+  before sorting, or the check silently loses its own error branch — the pipeline-discard defect,
+  inside the check written to catch that class.
 
 ## Not in this plan
 

@@ -266,7 +266,7 @@ has_search_docs=false
 [ -f "$VAULT/.mcp.json" ] && grep -q '"qmd"' "$VAULT/.mcp.json" 2>/dev/null && grep -q '"mcp"' "$VAULT/.mcp.json" 2>/dev/null && has_search_mcp=true
 command -v qmd &>/dev/null && has_search_cli=true
 for ctx in "$VAULT/CLAUDE.md"; do
-    [ -f "$ctx" ] && grep -qi "semantic search\|qmd\|vector_search\|deep_search" "$ctx" 2>/dev/null && has_search_docs=true
+    [ -f "$ctx" ] && grep -qi "semantic search\|qmd" "$ctx" 2>/dev/null && has_search_docs=true
 done
 
 if $has_search_mcp || $has_search_cli; then
@@ -278,7 +278,61 @@ if $has_search; then
     $has_search_mcp && details="${details}.mcp.json qmd server, "
     $has_search_cli && details="${details}qmd executable, "
     details=$(echo "$details" | sed 's/, $//')
-    pass "Semantic search capability found (${details})"
+
+    # qmd being INSTALLED is not the same as its tools RESOLVING, and this primitive
+    # used to conflate them. qmd was on PATH throughout the entire period when 62 call
+    # sites across 20 files named tools qmd had removed from its MCP surface: every call
+    # failed, each skill's documented "fall back to rg" path silently stood in, semantic
+    # search degraded to keyword grep in every vault — and this check reported PASS.
+    #
+    # A presence check cannot detect a surface change. Three states, kept distinct:
+    #   qmd absent            -> the elif/else below (optional capability)
+    #   qmd present, resolves -> PASS
+    #   qmd present, does NOT -> FAIL
+    qmd_exposed='mcp__qmd__query mcp__qmd__get mcp__qmd__multi_get mcp__qmd__status'
+    qmd_hits=$(mktemp)
+    # Scan only the LIVE tool surface, and scan the VAULT rather than the working
+    # directory — this script validates a generated vault, not the plugin repo.
+    #
+    # ops/ is deliberately EXCLUDED. ops/skills-archive/ holds dated historical copies
+    # of skills and ops/changelog.md records past migrations; both legitimately contain
+    # retired tool names. An archived skill is a record, not a declaration — it is never
+    # executed. Scanning it found 24 files in the field vault whose live skills declare
+    # zero dead names, and would have made this check unfixable without rewriting history.
+    qmd_scan=()
+    [ -d "$VAULT/.claude" ] && qmd_scan+=("$VAULT/.claude")
+    [ -d "$VAULT/.agents" ] && qmd_scan+=("$VAULT/.agents")
+    [ -f "$VAULT/.mcp.json" ] && qmd_scan+=("$VAULT/.mcp.json")
+    if [ ${#qmd_scan[@]} -eq 0 ]; then
+        pass "Semantic search capability found (${details}); no live tool surface to verify"
+        rm -f "$qmd_hits"
+        qmd_rc=-1
+    else
+        rg -oIN 'mcp__qmd__[a-z_]+' "${qmd_scan[@]}" > "$qmd_hits" 2>/dev/null
+        qmd_rc=$?
+    fi
+    # rg: 0=match, 1=no-match (a vault may legitimately declare none), 2=error.
+    # Capture rg's status BEFORE sorting — `rg ... | sort` would yield sort's status,
+    # which is the pipeline-discard defect this very check exists to catch.
+    if [ "$qmd_rc" -lt 0 ]; then
+        :   # no live tool surface; already reported above
+    elif [ "$qmd_rc" -gt 1 ]; then
+        fail "Semantic search: scan for qmd tool names failed (rg rc=$qmd_rc); this result is not evidence"
+    else
+        qmd_unknown=""
+        for t in $(sort -u "$qmd_hits"); do
+            case " $qmd_exposed " in
+                *" $t "*) ;;
+                *) qmd_unknown="$qmd_unknown $t" ;;
+            esac
+        done
+        if [ -n "$qmd_unknown" ]; then
+            fail "Semantic search: vault declares qmd tools that do not exist:$qmd_unknown"
+        else
+            pass "Semantic search capability found (${details}); declared qmd tool names resolve"
+        fi
+    fi
+    rm -f "$qmd_hits"
 elif $has_search_docs; then
     warn "Semantic search mentioned in docs but no qmd executable or .mcp.json qmd server config detected"
 else

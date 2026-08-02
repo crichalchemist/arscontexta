@@ -12,9 +12,8 @@ open" item into either a fix or a stated decision.
 
 **Spec:** `docs/superpowers/specs/2026-08-02-contributor-surface-and-residual-defects-design.md`
 
-**Architecture:** Task 1 is mechanical and unblocked. Tasks 2-5 are gated on decisions D1-D3 below;
-each is written with **both branches fully specified**, so whichever is chosen is immediately
-executable and no task waits on a second round of design.
+**Architecture:** Task 1 is mechanical and was never gated. Tasks 2-5 depended on decisions D1-D3,
+which were **ruled before execution began** (see below) — all five tasks are now unblocked.
 
 **Tech Stack:** bash, markdown templates, YAML. No build. Gates are `reference/check-portability.sh`
 plus three harnesses under `reference/test/`, each run under **both bash and zsh**.
@@ -41,28 +40,32 @@ plus three harnesses under `reference/test/`, each run under **both bash and zsh
 - Use `rg`. Do not introduce `python3`.
 - `gh` on a fork queries upstream unless you pass `--repo crichalchemist/arscontexta`.
 
-## Decisions required before Tasks 3-5
+## Decisions D1-D3 — RULED 2026-08-02, before execution began
 
-Batched here rather than raised mid-execution. Each names the option this plan recommends and why.
+Batched and answered up front rather than raised mid-plan. These are settled; do not re-litigate
+them during implementation.
 
-**D1 — What should a missing vault directory mean?** (gates Task 2)
+**D1 — a missing vault directory FAILS LOUD.** (Task 2)
 Four sites render `0` when the notes directory is absent, so *"your vault is missing"* and *"your
 vault is empty"* are indistinguishable.
-→ **Recommended: fail loud.** Consistent with the branch's established rule that a failure must never
-be a number. Risk: `/help` and `/health` are diagnostic commands a user may run *precisely because*
-something is broken, and a hard failure removes their ability to see anything else. Mitigation in
-Task 2 is to report the absence inline rather than abort.
+→ **RULED: exit 1, emitting no digits.** Consistent with the standing rule that a failure must never
+be a number.
+> **Accepted risk, stated at decision time:** `/help` and `/health` are diagnostics a user may run
+> *precisely because* something is broken, and aborting removes their ability to see anything else.
+> Ruled anyway. The error message must therefore carry the remedy (`run /arscontexta:setup`), since
+> it is the only thing the user will see.
 
-**D2 — Where does `$FILE` come from in `skill-sources/seed`?** (gates Task 3)
+**D2 — each `seed` fence assigns `FILE="$ARGUMENTS"`.** (Task 3)
 Four fences read `$FILE`; no fence defines it. The skill's target is `$ARGUMENTS` (prose, line 15).
-→ **Recommended: each fence assigns `FILE="$ARGUMENTS"` on its first line.** Fences are separate
-shell invocations, so every fence that uses a value must establish it. The alternative — prose
-instructing Claude to substitute the path before running — is how it silently fails today.
+→ **RULED: per-fence assignment**, with a loud failure when empty. NOT a merge of the four fences.
+Every fence that uses a value must establish it — that is what fence isolation requires, and it
+keeps each block independently runnable and testable.
 
-**D3 — How should the stale lock be bounded?** (gates Task 4)
+**D3 — bounded retry, then fail loud. No auto-break.** (Task 4)
 `while ! mkdir "$LOCKDIR" 2>/dev/null; do sleep 2; done` never terminates against a stale lock.
-→ **Recommended: bounded retry, then fail loud with the lock's age and path.** Do NOT auto-break the
-lock; a lock older than the timeout may still be held by a live process.
+→ **RULED: wait up to 60s, then exit 1** naming the lock path and how to clear it. **Do NOT
+auto-break**, even on an old mtime — mtime is not proof the holder is dead, and breaking a live lock
+reintroduces the corruption the mutex exists to prevent.
 > **`mkdir -p` is NOT the fix.** It returns 0 when the directory already exists, destroying the
 > mutex — trading a visible hang for concurrent qmd runs corrupting each other.
 
@@ -88,7 +91,7 @@ This task supersedes Task 5 of
 `docs/superpowers/plans/2026-08-02-stale-contracts-and-dead-configuration.md`, which now points here.
 Two copies would drift — the same hazard as `skill-sources/` vs `platforms/shared/skill-blocks/`.
 
-- [ ] **Step 1: Establish the control — confirm the current check passes while broken**
+- [x] **Step 1: Establish the control — confirm the current check passes while broken**
 
 ```bash
 cd /Volumes/Containers/arscontexta
@@ -98,66 +101,91 @@ rg -n 'qmd' reference/validate-kernel.sh
 
 Record the exact lines; you are replacing them. Expected: the check tests for the binary only.
 
-- [ ] **Step 2: Write the three-state check**
+- [x] **Step 2: Write the three-state check**
 
 Collapsing the last two states into "not PASS" is what hid this. Add to the primitive-10 section of
 `reference/validate-kernel.sh`:
 
+**As implemented** (this block replaces the draft that was here; the draft had two defects, both
+found during execution and both recorded below — the shipped form is in
+`reference/validate-kernel.sh`):
+
 ```bash
-# Primitive 10 has THREE states. Collapsing the last two is the defect this replaces.
-#   qmd absent            -> WARN  (semantic search is optional)
-#   qmd present, resolves -> PASS
-#   qmd present, does NOT -> FAIL  (undetected for 62 call sites across 20 files)
-if ! command -v qmd >/dev/null 2>&1; then
-  warn "semantic-search: qmd not installed (optional)"
+qmd_exposed='mcp__qmd__query mcp__qmd__get mcp__qmd__multi_get mcp__qmd__status'
+qmd_hits=$(mktemp)
+qmd_scan=()
+[ -d "$VAULT/.claude" ]  && qmd_scan+=("$VAULT/.claude")
+[ -d "$VAULT/.agents" ]  && qmd_scan+=("$VAULT/.agents")
+[ -f "$VAULT/.mcp.json" ] && qmd_scan+=("$VAULT/.mcp.json")
+if [ ${#qmd_scan[@]} -eq 0 ]; then
+    pass "Semantic search capability found (${details}); no live tool surface to verify"
+    rm -f "$qmd_hits"; qmd_rc=-1
 else
-  # rg: 0=match 1=no-match 2=error. Do not let an error read as "nothing declared".
-  declared=$(rg -oN 'mcp__qmd__[a-z_]+' --glob '!*.diff' . | sort -u); rc=$?
-  if [ "$rc" -gt 1 ]; then
-    fail "semantic-search: scan for qmd tool names failed (rc=$rc); result is not evidence"
-  else
-    exposed='mcp__qmd__query mcp__qmd__get mcp__qmd__multi_get mcp__qmd__status'
-    unknown=""
-    for t in $declared; do
-      case " $exposed " in *" $t "*) ;; *) unknown="$unknown $t" ;; esac
-    done
-    if [ -n "$unknown" ]; then
-      fail "semantic-search: repo names qmd tools that do not exist:$unknown"
-    else
-      pass "semantic-search: qmd present, all declared tool names resolve"
-    fi
-  fi
+    rg -oIN 'mcp__qmd__[a-z_]+' "${qmd_scan[@]}" > "$qmd_hits" 2>/dev/null
+    qmd_rc=$?
 fi
+# then: -1 -> already reported; >1 -> fail (scan broke); else compare `sort -u "$qmd_hits"`
 ```
 
-`$exposed` is a hardcoded list, and that is a deliberate cost: updating it becomes a explicit act
-with a failing test attached, rather than a silent divergence.
+**Two defects in the draft, both of the class this check exists to catch:**
 
-- [ ] **Step 3: Prove it goes red — non-vacuity, both directions**
+1. It scanned `.` — the working directory. This script validates a **`$VAULT`**, not the plugin
+   repo, so the draft checked an entirely different tree.
+2. `declared=$(rg … | sort -u); rc=$?` captures **`sort`'s** status, not `rg`'s. The pipeline
+   discards the producer's status and `sort` essentially always succeeds, so the error branch was
+   unreachable — inside the check written to detect exactly that.
+
+**And one scoping error found only by running it:** scanning the whole vault FAILED the live
+instance, flagging 24 files. Every hit was in `ops/skills-archive/` (dated historical copies of
+skills) or `ops/changelog.md`. The live surface declares **zero** dead names. An archived skill is a
+record, not a declaration — failing on it would make the check unfixable without rewriting history.
+Hence the `.claude/`, `.agents/`, `.mcp.json` scoping above.
+
+`$qmd_exposed` is a hardcoded list, and that is a deliberate cost: updating it becomes an explicit
+act with a failing test attached, rather than a silent divergence.
+
+- [x] **Step 3: Prove it goes red — non-vacuity, both directions**
 
 A check never seen red is not known to work. Two verification steps on a predecessor branch were
 found vacuous, one because a `sed` silently matched nothing.
 
+**As executed.** The draft mutated a file in this repo and validated `.`, which is the wrong tree
+(see Step 2). Replaced with two throwaway fixture vaults — identical but for one dead name — which
+also avoids mutating the user's live vault:
+
 ```bash
-perl -i -pe 's/mcp__qmd__query/mcp__qmd__deep_search/ if $. == 8' skills/ask/SKILL.md
-git diff --quiet -- skills/ask/SKILL.md && { echo "MUTATION DID NOT APPLY — vacuous"; exit 9; }
-./reference/validate-kernel.sh . 2>&1 | rg 'semantic-search'    # expect FAIL naming the tool
-git checkout -- skills/ask/SKILL.md
-./reference/validate-kernel.sh . 2>&1 | rg 'semantic-search'    # expect PASS
-git diff --quiet -- skills/ask/SKILL.md && echo "restored CLEAN"
+A=$SCRATCH/vaultA; mkdir -p "$A/.claude/skills/ask"
+printf 'allowed-tools: mcp__qmd__query, mcp__qmd__get\n' > "$A/.claude/skills/ask/SKILL.md"
+B=$SCRATCH/vaultB; cp -R "$A" "$B"
+printf 'allowed-tools: mcp__qmd__deep_search\n' >> "$B/.claude/skills/ask/SKILL.md"
+
+for v in "$A" "$B"; do
+  ./reference/validate-kernel.sh "$v" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | rg -A1 '^10\. Semantic'
+done
 ```
 
-- [ ] **Step 4: Sync `reference/kernel.yaml`**
+Measured:
+
+```
+vaultA -> PASS Semantic search capability found (qmd executable); declared qmd tool names resolve
+vaultB -> FAIL Semantic search: vault declares qmd tools that do not exist: mcp__qmd__deep_search
+```
+
+One dead name flips PASS to FAIL and the message names the offending tool. **Strip ANSI before
+grepping** — the colour codes sit between `PASS` and the message, and a pattern like
+`rg 'PASS Semantic'` silently matches nothing, which reads exactly like a check that did not fire.
+
+- [x] **Step 4: Sync `reference/kernel.yaml`**
 
 Update primitive 10's `validation.check` so YAML and script agree. A primitive whose check does not
 exist in the script is aspirational, not enforced.
 
-- [ ] **Step 5: Point the superseded task here**
+- [x] **Step 5: Point the superseded task here**
 
 In `docs/superpowers/plans/2026-08-02-stale-contracts-and-dead-configuration.md`, replace Task 5's
 steps with a one-line pointer to this task.
 
-- [ ] **Step 6: Gates and commit**
+- [x] **Step 6: Gates and commit**
 
 ```bash
 bash reference/check-portability.sh                        # rc 0
@@ -188,7 +216,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 2: A missing vault must not render as an empty one — GATED ON D1
+### Task 2: A missing vault must not render as an empty one — D1 RULED: fail loud
 
 **Files:**
 - Modify: `skills/help/SKILL.md` (fence 1, ~line 47)
@@ -266,7 +294,7 @@ both shells; expect `known-open=4`.
 
 ---
 
-### Task 3: `skill-sources/seed` — four fences read an undefined `$FILE` — GATED ON D2
+### Task 3: `skill-sources/seed` — four fences read an undefined `$FILE` — D2 RULED: per-fence FILE="$ARGUMENTS"
 
 **Files:** `skill-sources/seed/SKILL.md` (fences 1, 3, 4, 5), `platforms/shared/skill-blocks/seed.md`
 (check for drift), `reference/test/fence-isolation.test.sh`
@@ -302,7 +330,7 @@ case the gate will report it `STALE` and it must be removed too.
 
 ---
 
-### Task 4: Bound the stale-lock retry — GATED ON D3
+### Task 4: Bound the stale-lock retry — D3 RULED: bounded retry, no auto-break
 
 **Files:** `skill-sources/reflect/SKILL.md` (2 sites), `skill-sources/reweave/SKILL.md` (1 site),
 plus the `platforms/shared/skill-blocks/` twins
