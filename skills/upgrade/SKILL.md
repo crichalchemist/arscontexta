@@ -328,6 +328,23 @@ Generated vaults carry their own copy of the link-extraction library at `ops/lib
 
 **Report the replacement; never overwrite silently.** Name both versions and the outcome in the Final Report, e.g. `link-extraction.sh: v0 (absent) → v1 [restored]` or `v1 → v2 [refreshed]`. When the versions already match, say so: `link-extraction.sh: v1 [current]`. A library swapped in without a line in the report is a change the user cannot audit — and this file decides what every link count in the vault reports.
 
+### 5f. Restore the queue lock directory
+
+`/{DOMAIN:reflect}` and `/{DOMAIN:reweave}` serialize their qmd calls with
+`while ! mkdir "ops/queue/.locks/qmd.lock" 2>/dev/null; do sleep 2; done`. The `mkdir` deliberately
+omits `-p`, because creating that directory atomically *is* the mutex — with `-p` it would return 0
+while another run holds the lock. So the **parent** `ops/queue/.locks/` must already exist.
+
+Vaults generated before this was part of setup do not have it. In those vaults the `mkdir` can never
+succeed, `2>/dev/null` swallows the reason, and the skill loops every 2 seconds forever, printing
+nothing. It does not fail — it hangs.
+
+1. Check whether `ops/queue/.locks/` exists.
+2. If absent, create it (the directory only — leave it empty).
+3. Never add `-p` to the lock `mkdir` itself in any generated skill; that silently removes the mutex.
+
+Report the outcome: `queue lock dir: absent → created [restored]`, or `present [current]`.
+
 ---
 
 ## Step 6: Validate

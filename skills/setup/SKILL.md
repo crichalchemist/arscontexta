@@ -432,7 +432,7 @@ All generated systems ship with full automation from day one. There are no tiers
 | 16 processing skills + 10 plugin commands | Always | Processing skills vocabulary-transformed with full quality gates |
 | All hooks | Always | Orient, capture, validate, commit |
 | Link library | Always | ops/lib/link-extraction.sh |
-| Queue system | Always | ops/tasks.md + ops/queue/ |
+| Queue system | Always | ops/tasks.md + ops/queue/ + ops/queue/.locks/ |
 | Templates | Always | With _schema blocks |
 | Self space | If opted in | self/ or ops/ fallback |
 | Semantic search | If opted in | qmd setup |
@@ -1583,7 +1583,14 @@ Run all 15 primitive checks against the generated system. Use `${CLAUDE_PLUGIN_R
 10. **session-rhythm** -- Context file documents orient/work/persist cycle?
 11. **discovery-first** -- Context file contains Discovery-First Design section, notes optimized for findability?
 12. **operational-learning-loop** -- ops/observations/ and ops/tensions/ exist, review trigger documented in context file, /{DOMAIN:rethink} command exists?
-13. **task-stack** -- ops/tasks.md exists? Queue file (ops/queue/queue.json) exists with schema_version >= 3 and maintenance_conditions section? Context file references both in session-orient phase? /{DOMAIN:next} command exists with condition reconciliation?
+13. **task-stack** -- ops/tasks.md exists? Queue file (ops/queue/queue.json) exists with schema_version >= 3 and maintenance_conditions section? **`ops/queue/.locks/` directory exists?** Context file references both in session-orient phase? /{DOMAIN:next} command exists with condition reconciliation?
+
+    `ops/queue/.locks/` must be created here, empty. It is the parent for the qmd mutex that
+    `/{DOMAIN:reflect}` and `/{DOMAIN:reweave}` take: `while ! mkdir "ops/queue/.locks/qmd.lock"; do sleep 2; done`.
+    That `mkdir` deliberately omits `-p` — creating the lock directory atomically IS the mutex, and
+    `-p` would return 0 when the lock is already held, destroying it. So the *parent* must already
+    exist. If it does not, the `mkdir` can never succeed, `2>/dev/null` hides the reason, and the
+    skill loops forever with no output. Create the parent; never add `-p` to the lock itself.
 14. **methodology-folder** -- ops/methodology/ exists with methodology.md MOC? At least one derivation-rationale note exists? Context file references ops/methodology/ for meta-skill context?
 15. **session-capture** -- ops/sessions/ directory exists? Session-end hook template installed? Condition-based mining trigger exists for unprocessed sessions?
 
