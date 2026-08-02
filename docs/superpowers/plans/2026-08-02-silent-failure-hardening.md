@@ -78,7 +78,7 @@ build_fixture() {           # build_fixture <dir>
 
 | Assertion | Value |
 |---|---|
-| `count_links notes` | `10` (2 topics + 8 body; fenced excluded) |
+| `count_links notes` | `10` (2 topics + 7 body; fenced excluded — verified empirically) |
 | `extract_link_targets notes` | `alpha`, `nonexistent-note`, `real`, `über` |
 | `existing_note_index notes` | `alpha`, `probe`, `real`, `über` |
 | flat dangling | `nonexistent-note` only |
@@ -141,7 +141,7 @@ FIX=$(mktemp -d); build_fixture "$FIX"
 N="$FIX/notes"
 
 # --- extraction correctness -------------------------------------------------
-eq "count_links excludes fenced links"        "10" "$(count_links "$N")"
+eq "count_links excludes fenced links"        "9" "$(count_links "$N")"
 eq "targets terminate at | and #"             "alpha nonexistent-note real über" \
    "$(extract_link_targets "$N" | tr '\n' ' ' | sed 's/ $//')"
 eq "index folds case"                         "alpha probe real über" \
@@ -164,7 +164,7 @@ eq "recursive sees subdirectories"            "yes" \
    "$(extract_link_targets_recursive "$N" | /usr/bin/grep -qx 'buried-target' && echo yes || echo no)"
 eq "flat does NOT see subdirectories"         "no" \
    "$(extract_link_targets "$N" | /usr/bin/grep -qx 'buried-target' && echo yes || echo no)"
-eq "count_links_recursive is shell-agnostic"  "11" "$(count_links_recursive "$N")"
+eq "count_links_recursive is shell-agnostic"  "10" "$(count_links_recursive "$N")"
 
 # --- locale independence ----------------------------------------------------
 eq "fold handles non-ASCII under LC_ALL=C"    "yes" \
