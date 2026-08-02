@@ -190,16 +190,73 @@ Find synthesis opportunities — open triadic closures where A links to B and A 
 **Step 1: Build adjacency data**
 
 ```bash
+# Each fenced block is a SEPARATE shell invocation: no variable and no sourced
+# function survives from the /graph health block above. NOTES_DIR and the
+# link-extraction library must both be re-established here. Relying on the
+# earlier block leaves $_LINK_FOLD_LOCALE empty, which is not an error — it is
+# the caller's default locale, so folding silently degrades on a C-locale host.
+NOTES_DIR="{vocabulary.notes}"
+
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# Trim and fold to match the dangling-link check in /graph health, which folds
+# both sides via the library. Comparing unfolded targets here against folded
+# ones there makes [[Zettelkasten]] and [[zettelkasten]] two distinct nodes, so
+# closure detection misses triangles rather than reporting an error.
+TMP_STRIPPED=$(mktemp) || exit 1
+TMP_LINKS=$(mktemp) || { rm -f "$TMP_STRIPPED"; exit 1; }
+# The failure flag is a FILE, not a variable: this loop body runs in a subshell
+# (find | while), so an assignment would be discarded at the pipe and a broken
+# scan would read as "no triangles". PIPESTATUS is bash-only — empty under zsh.
+ERRF="/tmp/graph-triangles-err-$$"
+rm -f "$ERRF"
+
 # For each note, extract outgoing wiki links
 find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
-  LINKS=$(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" \
-  | rg -o '\[\[([^\]|#]+)' -r '$1' | sort -u)
+  awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" > "$TMP_STRIPPED" || {
+    touch "$ERRF"; continue
+  }
+  # rg runs as its own statement, not as a pipeline stage: $? would otherwise be
+  # sort's status and a broken RIPGREP_CONFIG_PATH would yield an empty set.
+  # rc 1 means "this file has no links" and is normal; only rc >1 is a failure.
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$TMP_STRIPPED" > "$TMP_LINKS"
+  if [ $? -gt 1 ]; then
+    touch "$ERRF"; continue
+  fi
+  LINKS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$TMP_LINKS" \
+    | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u)
   echo "FROM:$NAME"
-  echo "$LINKS" | while read -r target; do
-    [[ -n "$target" ]] && echo "  TO:$target"
+  printf '%s\n' "$LINKS" | while read -r target; do
+    [ -n "$target" ] && echo "  TO:$target"
   done
 done
+
+if [ -e "$ERRF" ]; then
+  rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
+  echo "error: link extraction failed; refusing to report an empty triangle set" >&2
+  exit 1
+fi
+rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
 ```
 
 If `ops/scripts/graph/find-triangles.sh` exists, use it directly.

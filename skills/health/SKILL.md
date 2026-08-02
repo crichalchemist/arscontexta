@@ -157,7 +157,11 @@ done
 
 ### Category 3: Link Health (quick, full)
 
-**What it checks:** Every wiki link `[[target]]` in every file resolves to an existing file.
+**What it checks:** Every wiki link `[[target]]` in `{vocabulary.notes}` resolves to an existing file.
+
+Scope: wiki links within {vocabulary.notes}. Links in other spaces
+({vocabulary.inbox}, self/) are not checked, and links pointing outside
+{vocabulary.notes} will report dangling.
 
 **How to check:**
 

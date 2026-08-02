@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install ripgrep
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Install ripgrep and zsh
+        run: sudo apt-get update && sudo apt-get install -y ripgrep zsh
       - name: Portability guard
         run: bash reference/check-portability.sh
       - name: Shell syntax check
@@ -18,3 +18,14 @@ jobs:
           bash -n reference/validate-kernel.sh
           bash -n reference/check-portability.sh
           bash -n reference/lib/link-extraction.sh
+      # Both harnesses run under BOTH shells. Two defects closed by this plan
+      # were bash/zsh forks (unquoted array word-splitting, PIPESTATUS reading
+      # empty under zsh); a bash-only run could not have seen either.
+      - name: Behavioral tests (bash)
+        run: bash reference/test/link-extraction.test.sh
+      - name: Behavioral tests (zsh)
+        run: zsh reference/test/link-extraction.test.sh
+      - name: Guard failure-path tests (bash)
+        run: bash reference/test/guard-failure.test.sh
+      - name: Guard failure-path tests (zsh)
+        run: zsh reference/test/guard-failure.test.sh
