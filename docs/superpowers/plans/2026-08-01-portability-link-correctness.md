@@ -40,11 +40,12 @@ Every task uses this. Throwaway — create in a temp dir, never commit.
 
 ```bash
 FIX=$(mktemp -d); mkdir -p "$FIX/notes"
-printf -- '---\ntitle: real\n---\nbody\n' > "$FIX/notes/real.md"
-printf -- '---\ntitle: alpha\n---\nbody\n' > "$FIX/notes/alpha.md"
+printf -- '---\ntitle: real\ncreated: 2026-08-01\n---\nbody\n' > "$FIX/notes/real.md"
+printf -- '---\ntitle: alpha\ncreated: 2026-08-01\n---\nbody\n' > "$FIX/notes/alpha.md"
 cat > "$FIX/notes/probe.md" <<'EOF'
 ---
 title: probe
+created: 2026-08-01
 topics:
   - "[[real]]"
   - "[[Alpha|display name]]"
