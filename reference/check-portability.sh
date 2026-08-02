@@ -117,7 +117,7 @@ fi
 # terminate at | and #. It does NOT check matching direction — whether searches
 # for links correctly handle [[slug|alias]] and [[slug#heading]] patterns.
 #
-# The following 9 sites use rg -l or grep -rl with bare [[NAME]] patterns,
+# The following 11 sites use rg -l or grep -rl with bare [[NAME]] patterns,
 # which miss [[NAME|alias]] and [[NAME#heading]] variations. These cause false
 # positives in orphan detection and MOC coverage reports. The guard does not flag
 # these because checking would require recursive template evaluation (matching
@@ -129,8 +129,19 @@ fi
 #     skills/health/SKILL.md (rg -l, 3 instances)
 #   Backlink counts in skill-sources:
 #     skill-sources/graph/SKILL.md (grep -rl, 4 instances)
+#     skill-sources/stats/SKILL.md (grep -rl, 2 instances)
 #   Milestone testing:
 #     reference/testing-milestones.md (grep -rl, 1 instance)
+#
+# Count this by enumeration, not from memory — it has been wrong twice. It read
+# "13 sites" (stale from the predecessor branch, citing line numbers that had
+# since moved or been deleted), then "9 sites" after a correction that dropped
+# skill-sources/stats entirely. Both undercounts made the blind spot look
+# smaller than it is, which defeats the only purpose this comment has. To
+# re-derive:
+#   /usr/bin/grep -nE '(rg -l|grep -rl|grep -l)[^|]*\\\[\\\[\$' <file>
+# across the five files above. Deliberately no line numbers here: they drift on
+# every edit, and a stale number is what produced both wrong counts.
 #
 # Future work: Add a separate guard for matching direction or migrate to unified
 # pattern that captures variants at extraction time (not search time).
