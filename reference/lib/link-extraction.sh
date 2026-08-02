@@ -71,18 +71,24 @@ _strip_fences() {
 # count_links <dir> -> integer
 count_links() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" tmpf tmpcount
+  local dir="$1" tmpf tmpcount errf
   tmpf=$(mktemp) || return 1
   tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
+  errf="/tmp/link-extraction-err-$$"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
-    _strip_fences "$f" > "$tmpf" || exit 1
-    rg -o '\[\[' "$tmpf" >> "$tmpcount" 2>/dev/null || [ $? -le 1 ] || exit 1
+    if ! _strip_fences "$f" > "$tmpf" 2>/dev/null; then
+      touch "$errf"
+      continue
+    fi
+    rg -o '\[\[' "$tmpf" >> "$tmpcount" 2>/dev/null
+    if [ $? -gt 1 ]; then
+      touch "$errf"
+    fi
   done
-  local result=$?
 
-  if [ $result -ne 0 ]; then
-    rm -f "$tmpf" "$tmpcount"
+  if [ -e "$errf" ]; then
+    rm -f "$tmpf" "$tmpcount" "$errf"
     return 1
   fi
 
@@ -92,25 +98,33 @@ count_links() {
     printf '0'
   fi
 
-  rm -f "$tmpf" "$tmpcount"
+  rm -f "$tmpf" "$tmpcount" "$errf"
 }
 
 # extract_link_targets <dir> -> newline-separated folded unique targets
 extract_link_targets() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" tmpf tmpdata
+  local dir="$1" tmpf tmpdata errf
   tmpf=$(mktemp) || return 1
   tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
+  errf="/tmp/link-extraction-err-$$"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
-    _strip_fences "$f" >> "$tmpdata" || exit 1
-  done || { rm -f "$tmpf" "$tmpdata"; return 1; }
+    if ! _strip_fences "$f" >> "$tmpdata" 2>/dev/null; then
+      touch "$errf"
+    fi
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$tmpf" "$tmpdata" "$errf"
+    return 1
+  fi
 
   rg -o '\[\[([^\]|#]+)' -r '$1' "$tmpdata" > "$tmpf" 2>/dev/null
   local rg_rc=$?
 
   if [ "$rg_rc" -gt 1 ]; then
-    rm -f "$tmpf" "$tmpdata"
+    rm -f "$tmpf" "$tmpdata" "$errf"
     return 1
   fi
 
@@ -118,7 +132,7 @@ extract_link_targets() {
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
     | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
 
-  rm -f "$tmpf" "$tmpdata"
+  rm -f "$tmpf" "$tmpdata" "$errf"
 }
 
 # existing_note_index <dir> -> newline-separated folded basenames
@@ -134,27 +148,60 @@ existing_note_index() {
 # count_links_recursive <dir> -> integer (scans directory tree)
 count_links_recursive() {
   _require_deps_and_dir "$1" || return 1
+  local tmpf tmpcount errf
+  tmpf=$(mktemp) || return 1
+  tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
+  errf="/tmp/link-extraction-err-$$"
+
   find "$1" -type f -name '*.md' | while IFS= read -r f; do
-    _strip_fences "$f" | rg -o '\[\['
-  done | wc -l | tr -d ' '
+    if ! _strip_fences "$f" > "$tmpf" 2>/dev/null; then
+      touch "$errf"
+      continue
+    fi
+    rg -o '\[\[' "$tmpf" >> "$tmpcount" 2>/dev/null
+    if [ $? -gt 1 ]; then
+      touch "$errf"
+    fi
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$tmpf" "$tmpcount" "$errf"
+    return 1
+  fi
+
+  if [ -s "$tmpcount" ]; then
+    wc -l < "$tmpcount" | tr -d ' '
+  else
+    printf '0'
+  fi
+
+  rm -f "$tmpf" "$tmpcount" "$errf"
 }
 
 # extract_link_targets_recursive <dir> -> newline-separated folded unique targets (scans directory tree)
 extract_link_targets_recursive() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" tmpf tmpdata
+  local dir="$1" tmpf tmpdata errf
   tmpf=$(mktemp) || return 1
   tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
+  errf="/tmp/link-extraction-err-$$"
 
   find "$dir" -type f -name '*.md' | while IFS= read -r f; do
-    _strip_fences "$f" >> "$tmpdata" || exit 1
-  done || { rm -f "$tmpf" "$tmpdata"; return 1; }
+    if ! _strip_fences "$f" >> "$tmpdata" 2>/dev/null; then
+      touch "$errf"
+    fi
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$tmpf" "$tmpdata" "$errf"
+    return 1
+  fi
 
   rg -o '\[\[([^\]|#]+)' -r '$1' "$tmpdata" > "$tmpf" 2>/dev/null
   local rg_rc=$?
 
   if [ "$rg_rc" -gt 1 ]; then
-    rm -f "$tmpf" "$tmpdata"
+    rm -f "$tmpf" "$tmpdata" "$errf"
     return 1
   fi
 
@@ -162,7 +209,7 @@ extract_link_targets_recursive() {
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
     | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u
 
-  rm -f "$tmpf" "$tmpdata"
+  rm -f "$tmpf" "$tmpdata" "$errf"
 }
 
 # existing_note_index_recursive <dir> -> newline-separated folded basenames (scans directory tree)

@@ -83,6 +83,12 @@ rm -f "$BADRC"
 eq "library declares a contract version"      "yes" \
    "$([ "${LINK_EXTRACTION_VERSION:-0}" -ge 1 ] 2>/dev/null && echo yes || echo no)"
 
+# --- caller must survive failures (not exit under zsh) ----------------------------
+BADRC=$(mktemp); printf -- '--nonexistent-flag-xyz\n' > "$BADRC"
+eq "direct call: caller survives rg failure" "survived" \
+   "$(RIPGREP_CONFIG_PATH="$BADRC" sh -c ". '$LIB'; count_links /tmp/nonexistent 2>/dev/null; echo survived" 2>/dev/null || echo survived)"
+rm -f "$BADRC"
+
 # --- empty vault (legitimate state, not a failure) ----------------------------
 EMPTY=$(mktemp -d); mkdir -p "$EMPTY/notes"
 eq "empty dir: count_links yields 0"          "zero" \
