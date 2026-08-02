@@ -49,7 +49,7 @@ diagnosis:
 
 ## Scope
 
-### In scope — 11 edits to live code
+### In scope — 12 edits to live code
 
 | File | Lines | Defect |
 |---|---|---|
@@ -57,8 +57,15 @@ diagnosis:
 | `skill-sources/stats/SKILL.md` | 68, 78, 102, 183 | `grep -P` + naive capture |
 | `skills/architect/SKILL.md` | 180 | `grep -P` + naive capture |
 | `reference/validate-kernel.sh` | 67, 75 | naive capture only (no `-P`) |
+| `skills/health/SKILL.md` | 167 | naive capture only (already uses `rg`) |
 
 Plus: one guard script, one CI workflow.
+
+`skills/health/SKILL.md:167` was found by the guard's second detector, not by the original
+diagnosis. It already uses `rg -oN`, so it has no portability defect — but its capture is
+`[^\]]+`, identical to the broken sites, so `/health` reports false dangling links. That the
+command users run *specifically to check vault health* was itself miscounting is the strongest
+argument for the guard existing at all.
 
 ### Explicitly out of scope
 
@@ -79,8 +86,22 @@ Plus: one guard script, one CI workflow.
 
 ### 1. Canonical extraction form
 
-The nine `grep -P` sites share one shape — extract wiki-link targets, then count or test them. One
-form replaces all nine:
+The nine `grep -P` sites divide into **two** shapes. Reading the code closely (rather than assuming
+one form) shows the distinction matters:
+
+**Form A — count occurrences** (`stats:68`, `stats:183`, `graph:69`, `graph:308`). These count how
+many `[[...]]` appear. Terminating capture at `|` or `#` is irrelevant to a count — one link is one
+link either way. Only fence-stripping and dropping `-P` matter. This matches the house style
+already used at `platforms/shared/skill-blocks/stats.md:81` (`rg -o '\[\[' | wc -l`).
+
+```bash
+LINK_COUNT=$(for f in "$NOTES_DIR"/*.md; do
+  awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f"
+done | rg -o '\[\[' | wc -l | tr -d ' ')
+```
+
+**Form B — resolve targets** (`stats:78`, `stats:102`, `graph:84`, `graph:151`, `architect:180`).
+These extract a target and test whether it exists. Termination, case, and fences all matter:
 
 ```bash
 for f in "$NOTES_DIR"/*.md; do
@@ -106,11 +127,21 @@ verbatim; it will not work there.
 
 ### 2. Case folding
 
-Wiki-link resolution must fold case explicitly on both sides:
+Wiki-link resolution must fold case on **both** sides, comparing against a folded index of existing
+basenames. Folding only the link and then using `[ -f "$NOTES_DIR/$NAME.md" ]` is **not sufficient**
+— that test delegates the second half of the comparison back to the filesystem, which is the bug.
 
 ```bash
-| tr '[:upper:]' '[:lower:]'
+EXISTING=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | while read -r p; do basename "$p" .md; done \
+  | tr '[:upper:]' '[:lower:]' | sort -u)
+
+# ...extract targets, folded to lowercase, then:
+[ -n "$NAME" ] && ! printf '%s\n' "$EXISTING" | grep -qxF "$NAME" && echo "$NAME"
 ```
+
+This distinction is easy to get wrong and easy to "verify" wrongly: on a case-insensitive volume the
+one-sided `-f` form returns the correct answer for the wrong reason, and only diverges on the Linux
+CI runner. Any verification of this behavior performed on macOS must use the index form, not `-f`.
 
 **Rationale.** The current test `[[ -f "$NOTES_DIR/$NAME.md" ]]` delegates case semantics to the
 filesystem. Default macOS APFS is case-insensitive; Linux is case-sensitive. So `[[Alpha]]` →
@@ -158,12 +189,16 @@ ripgrep 15.2.0:
 
 - Extraction returned exactly `Alpha`, `nonexistent-note`, `real` — alias and anchor forms both
   resolved to `real`, and the fenced link was excluded.
-- With case folding, the dangling count was `1` (`nonexistent-note` only), and the value passed a
-  numeric `-gt` comparison, confirming the bare-integer requirement.
+- With both-sides folding against the index, the dangling count was `1` (`nonexistent-note` only),
+  and the value passed a numeric `-gt` comparison, confirming the bare-integer requirement.
 - The platform fork in §2 was confirmed on the filesystem, not merely predicted: `[ -f
   notes/Alpha.md ]` returns true on this macOS APFS volume although the file on disk is `alpha.md`.
   Unfolded, that same code reports "clean" on macOS and "dangling" on the Ubuntu runner from
   identical content.
+- **A first verification pass of this spec was itself wrong and is recorded here as a caution.** It
+  folded only the link and kept `[ -f ... ]`, and reported PASS — but only because APFS resolved the
+  case difference. Re-run with the file renamed to `Alpha.md`, the index form still resolved while
+  `-f` still returned true for the wrong reason. Verify case behavior with the index form only.
 
 Implementation must re-verify per site; this establishes only that the canonical form and the case
 decision are sound.
