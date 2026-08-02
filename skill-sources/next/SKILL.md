@@ -141,7 +141,12 @@ Gather all signals. Run independent checks in parallel where possible. Record ea
 ```bash
 # Inbox pressure (adapt path to vocabulary)
 INBOX_COUNT=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 2>/dev/null | wc -l | tr -d ' ')
-OLDEST_INBOX=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 -exec stat -f "%m %N" {} \; 2>/dev/null | sort -n | head -1)
+# GNU stat first, BSD second. Order is load-bearing: GNU reads `-f` as "filesystem
+# status", so `stat -f %m FILE` prints Namelen/Type and EXITS 0 — a `-f`-first chain
+# never falls through on Linux, it just yields filesystem text. BSD has no `-c` and
+# fails cleanly, so `-c` first is the order that works on both.
+OLDEST_INBOX=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 -exec stat -c "%Y %n" {} \; 2>/dev/null | sort -n | head -1)
+[ -z "$OLDEST_INBOX" ] && OLDEST_INBOX=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 -exec stat -f "%m %N" {} \; 2>/dev/null | sort -n | head -1)
 
 # Note count
 NOTE_COUNT=$(ls -1 {vocabulary.notes}/*.md 2>/dev/null | wc -l | tr -d ' ')

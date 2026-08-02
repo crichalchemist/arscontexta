@@ -86,9 +86,11 @@ Read:
 
 ```bash
 # Compare config.yaml modification time vs newest methodology note
-CONFIG_MTIME=$(stat -f %m ops/config.yaml 2>/dev/null || stat -c %Y ops/config.yaml 2>/dev/null || echo 0)
+# GNU `-c` first, BSD `-f` second: GNU reads `-f` as "filesystem status" and
+# exits 0 with Namelen/Type, so a `-f`-first chain never falls through on Linux.
+CONFIG_MTIME=$(stat -c %Y ops/config.yaml 2>/dev/null || stat -f %m ops/config.yaml 2>/dev/null || echo 0)
 NEWEST_METH=$(ls -t ops/methodology/*.md 2>/dev/null | head -1)
-METH_MTIME=$(stat -f %m "$NEWEST_METH" 2>/dev/null || stat -c %Y "$NEWEST_METH" 2>/dev/null || echo 0)
+METH_MTIME=$(stat -c %Y "$NEWEST_METH" 2>/dev/null || stat -f %m "$NEWEST_METH" 2>/dev/null || echo 0)
 ```
 
 If `CONFIG_MTIME > METH_MTIME`: config has changed since methodology was last updated. Flag as staleness drift.

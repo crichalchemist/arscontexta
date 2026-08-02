@@ -445,8 +445,11 @@ for f in {vocabulary.notes}/*.md; do
   [[ -f "$f" ]] || continue
   basename=$(basename "$f" .md)
 
-  # Last modified (days ago)
-  mod_days=$(( ($(date +%s) - $(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)) / 86400 ))
+  # Last modified (days ago). GNU `-c` first, BSD `-f` second — the order is
+  # load-bearing. GNU reads `-f` as "filesystem status" and treats `%m` as a
+  # filename, so `stat -f %m FILE` prints Namelen/Type and EXITS 0; a `-f`-first
+  # chain never falls through, it feeds filesystem text into this arithmetic.
+  mod_days=$(( ($(date +%s) - $(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)) / 86400 ))
 
   # Incoming link count
   incoming=$(rg -l "\[\[$basename\]\]" --glob '*.md' | grep -v "$f" | wc -l | tr -d ' ')
