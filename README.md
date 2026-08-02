@@ -238,9 +238,7 @@ Create or merge `.mcp.json` in the vault root:
       "command": "qmd",
       "args": ["mcp"],
       "autoapprove": [
-        "mcp__qmd__search",
-        "mcp__qmd__vector_search",
-        "mcp__qmd__deep_search",
+        "mcp__qmd__query",
         "mcp__qmd__get",
         "mcp__qmd__multi_get",
         "mcp__qmd__status"

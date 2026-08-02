@@ -65,7 +65,7 @@ ls -d ops/queue/archive/*-${SOURCE_NAME}* 2>/dev/null
 If semantic search is available (qmd MCP tools or CLI), check for content overlap:
 
 ```
-mcp__qmd__search query="claims from {source filename}" limit=5
+mcp__qmd__query searches=[{type:"lex", query:"claims from {source filename}"}] rerank=false limit=5
 ```
 
 Or via keyword search in the {DOMAIN:notes}/ directory:

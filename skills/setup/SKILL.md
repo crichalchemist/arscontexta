@@ -1191,11 +1191,9 @@ vocabulary:
 platform_hints:
   context: [fork | single]
   allowed_tools: [tool list based on platform tier]
-  semantic_search_tool: [mcp__qmd__deep_search | null]
+  semantic_search_tool: [mcp__qmd__query | null]
   semantic_search_autoapprove:
-    - mcp__qmd__search
-    - mcp__qmd__vector_search
-    - mcp__qmd__deep_search
+    - mcp__qmd__query
     - mcp__qmd__get
     - mcp__qmd__multi_get
     - mcp__qmd__status
@@ -1492,7 +1490,7 @@ Welcome to your [domain] system.
    - Run `qmd init` in the generated vault root
    - Configure or update the qmd collection for `{vocabulary.notes_collection}` so it points at the generated notes directory
    - Create or merge `.mcp.json` in the vault root with this qmd MCP server contract:
-     - `{"mcpServers":{"qmd":{"command":"qmd","args":["mcp"],"autoapprove":["mcp__qmd__search","mcp__qmd__vector_search","mcp__qmd__deep_search","mcp__qmd__get","mcp__qmd__multi_get","mcp__qmd__status"]}}}`
+     - `{"mcpServers":{"qmd":{"command":"qmd","args":["mcp"],"autoapprove":["mcp__qmd__query","mcp__qmd__get","mcp__qmd__multi_get","mcp__qmd__status"]}}}`
    - Run `qmd update && qmd embed` to build the initial index
 3. If NOT installed:
    - Add a "Next Steps" section to the Phase 6 summary telling the user to install qmd

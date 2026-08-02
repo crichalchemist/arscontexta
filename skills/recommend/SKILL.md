@@ -6,7 +6,7 @@ generated_from: "arscontexta-v1.6"
 user-invocable: true
 context: fork
 model: opus
-allowed-tools: Read, Grep, Glob, mcp__qmd__search, mcp__qmd__vector_search, mcp__qmd__deep_search, mcp__qmd__get, mcp__qmd__multi_get
+allowed-tools: Read, Grep, Glob, mcp__qmd__query, mcp__qmd__get, mcp__qmd__multi_get
 argument-hint: "[use case description and constraints] — describe what you want to build"
 ---
 
@@ -172,12 +172,12 @@ Use `${CLAUDE_PLUGIN_ROOT}/reference/claim-map.md` to identify which research to
 Use qmd tools to find research claims that apply to the user's specific constraints:
 
 ```
-mcp__qmd__deep_search  query="[user's domain] knowledge management patterns"
-mcp__qmd__vector_search  query="[user's specific concern or goal]"
+mcp__qmd__query  searches=[{type:"lex",query:"[user's domain] knowledge management patterns"},{type:"vec",query:"[user's domain] knowledge management patterns"}]
+mcp__qmd__query  searches=[{type:"vec",query:"[user's specific concern or goal]"}]  rerank=false
 ```
 
 Fallback chain:
-- MCP tools (`mcp__qmd__deep_search`, `mcp__qmd__vector_search`, `mcp__qmd__search`)
+- MCP tool (`mcp__qmd__query`, with lex/vec/hyde sub-queries)
 - qmd CLI (`qmd query`, `qmd vsearch`, `qmd search`)
 
 Run 2-4 targeted searches based on the user's signals. Focus on:

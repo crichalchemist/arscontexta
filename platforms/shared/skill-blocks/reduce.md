@@ -17,7 +17,7 @@ description: Extract structured knowledge from source material. Comprehensive ex
 version: "1.0"
 generated_from: "arscontexta-{plugin_version}"
 user-invocable: true
-allowed-tools: Read, Write, Grep, Glob, mcp__qmd__vector_search
+allowed-tools: Read, Write, Grep, Glob, mcp__qmd__query
 context: fork
 model: opus
 ---
@@ -128,7 +128,7 @@ Parse immediately:
 3. Hunt for insights that serve the domain (see extraction categories below)
 4. For each candidate:
 {if config.semantic_search}
-   - (preferred): use `mcp__qmd__vector_search` with query "[claim as sentence]", collection="{vocabulary.notes_collection}", limit=5
+   - (preferred): use `mcp__qmd__query` with searches=[{type:"vec", query:"[claim as sentence]"}], collections=["{vocabulary.notes_collection}"], rerank=false, limit=5
    - (CLI fallback): `qmd vsearch "[claim as sentence]" --collection {vocabulary.notes_collection} -n 5`
 {endif}
 {if !config.semantic_search}
@@ -372,14 +372,14 @@ For each candidate, run duplicate detection:
 
 {if config.semantic_search}
 ```
-mcp__qmd__vector_search  query="[proposed claim as sentence]"  collection="{vocabulary.notes_collection}"  limit=5
+mcp__qmd__query  searches=[{type:"vec", query:"[proposed claim as sentence]"}]  collections=["{vocabulary.notes_collection}"]  rerank=false  limit=5
 ```
 If MCP is unavailable, run:
 ```bash
 qmd vsearch "[proposed claim as sentence]" --collection {vocabulary.notes_collection} -n 5
 ```
 
-**Why `vector_search` (vector semantic) instead of keyword search:** Duplicate detection is where keyword search fails hardest. A claim about "friction in systems" will not find "resistance to change" via keyword matching even though they may be semantic duplicates. Vector search (~5s) catches same-concept-different-words duplicates that keyword search misses entirely. For a batch of 30-50 candidates, this adds ~3 minutes total — worth it to catch duplicates early rather than discovering them during {vocabulary.cmd_reflect}.
+**Why vector search (`rerank=false`) instead of keyword search:** Duplicate detection is where keyword search fails hardest. A claim about "friction in systems" will not find "resistance to change" via keyword matching even though they may be semantic duplicates. Vector search (~5s) catches same-concept-different-words duplicates that keyword search misses entirely. For a batch of 30-50 candidates, this adds ~3 minutes total — worth it to catch duplicates early rather than discovering them during {vocabulary.cmd_reflect}.
 {endif}
 
 {if !config.semantic_search}

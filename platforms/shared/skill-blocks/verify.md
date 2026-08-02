@@ -14,7 +14,7 @@ platform: shared
 name: {vocabulary.verify}
 description: Combined verification — description quality (cold-read prediction) + schema compliance + health checks. Use as a quality gate after creating {vocabulary.note_plural} or as periodic maintenance. Triggers on "/{vocabulary.verify}", "/{vocabulary.verify} [{vocabulary.note}]", "verify {vocabulary.note} quality", "check {vocabulary.note} health".
 user-invocable: true
-allowed-tools: Read, Write, Edit, Grep, Glob, mcp__qmd__vector_search
+allowed-tools: Read, Write, Edit, Grep, Glob, mcp__qmd__query
 context: fork
 model: opus
 generated_from: "arscontexta-{plugin_version}"
@@ -87,7 +87,7 @@ ALL FOUR must pass.
 Before any retrieval tests, verify the semantic search index is current:
 
 {if config.semantic_search}
-1. Try `mcp__qmd__vector_search` with a simple test query to confirm MCP availability
+1. Try `mcp__qmd__query` with a simple test query to confirm MCP availability
 2. If MCP is unavailable (tool fails or returns error), try qmd CLI (`qmd status`) to confirm local CLI availability
 3. If either MCP or qmd CLI is available, proceed to Step 1
 4. If neither MCP nor qmd CLI is available: note "retrieval test will be deferred" and proceed — do NOT let index issues block verification
@@ -145,7 +145,7 @@ NOW read the complete {vocabulary.note}. Compare against your prediction.
 Test whether the description enables semantic retrieval:
 
 {if config.semantic_search}
-- (preferred): `mcp__qmd__vector_search` with query = "[the {vocabulary.note}'s description text]", collection = "{vocabulary.notes_collection}", limit = 10
+- (preferred): `mcp__qmd__query` with searches = [{type: "vec", query: "[the {vocabulary.note}'s description text]"}], collections = ["{vocabulary.notes_collection}"], limit = 10, rerank = false
 - (CLI fallback): `qmd vsearch "[the {vocabulary.note}'s description text]" --collection {vocabulary.notes_collection} -n 10`
 - if both MCP and qmd CLI are unavailable, report "retrieval test deferred (semantic search unavailable)" — do NOT skip silently
 

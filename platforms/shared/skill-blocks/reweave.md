@@ -14,7 +14,7 @@ platform: shared
 name: {vocabulary.reweave}
 description: Update old {vocabulary.note_plural} with new connections. The backward pass that /{vocabulary.reflect} doesn't do. Revisit existing {vocabulary.note_plural} that predate newer related content, add connections, sharpen claims, consider splits. Triggers on "/{vocabulary.reweave}", "/{vocabulary.reweave} [{vocabulary.note}]", "update old {vocabulary.note_plural}", "backward connections", "revisit {vocabulary.note_plural}".
 user-invocable: true
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__search, mcp__qmd__vector_search, mcp__qmd__deep_search, mcp__qmd__status
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__query, mcp__qmd__status
 context: fork
 model: opus
 generated_from: "arscontexta-{plugin_version}"
@@ -189,8 +189,8 @@ From the {vocabulary.note}'s Topics footer, identify which {vocabulary.topic_map
 
 **Three-tier fallback for semantic search:**
 
-**Tier 1 — MCP tools (preferred):** Use `mcp__qmd__deep_search` (hybrid search with expansion + reranking):
-- query: "[{vocabulary.note}'s core concepts and mechanisms]"
+**Tier 1 — MCP tools (preferred):** Use `mcp__qmd__query` (hybrid search with expansion + reranking):
+- searches: [{type:"lex", query:"[{vocabulary.note}'s core concepts and mechanisms]"}, {type:"vec", query:"[{vocabulary.note}'s core concepts and mechanisms]"}]
 - limit: 15
 
 **Tier 2 — bash qmd with lock serialization:** If MCP tools fail or are unavailable:

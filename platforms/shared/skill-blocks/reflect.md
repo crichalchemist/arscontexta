@@ -14,7 +14,7 @@ platform: shared
 name: {vocabulary.reflect}
 description: Find connections between {vocabulary.note_plural} and update {vocabulary.topic_map_plural}. Requires semantic judgment to identify genuine relationships. Use after /{vocabulary.reduce} creates {vocabulary.note_plural}, when exploring connections, or when a topic needs synthesis. Triggers on "/{vocabulary.reflect}", "/{vocabulary.reflect} [{vocabulary.note}]", "find connections", "update {vocabulary.topic_map_plural}", "connect these {vocabulary.note_plural}".
 user-invocable: true
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__search, mcp__qmd__vector_search, mcp__qmd__deep_search, mcp__qmd__status
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__query, mcp__qmd__status
 context: fork
 model: opus
 generated_from: "arscontexta-{plugin_version}"
@@ -193,8 +193,8 @@ If you know the topic (check the {vocabulary.note}'s Topics footer), start with 
 
 **Three-tier fallback for semantic search:**
 
-**Tier 1 — MCP tools (preferred):** Use `mcp__qmd__deep_search` (hybrid search with expansion + reranking):
-- query: "[{vocabulary.note}'s core concepts and mechanisms]"
+**Tier 1 — MCP tools (preferred):** Use `mcp__qmd__query` (hybrid search with expansion + reranking):
+- searches: [{type:"lex", query:"[{vocabulary.note}'s core concepts and mechanisms]"}, {type:"vec", query:"[{vocabulary.note}'s core concepts and mechanisms]"}]
 - limit: 15
 
 **Tier 2 — bash qmd with lock serialization:** If MCP tools fail or are unavailable:

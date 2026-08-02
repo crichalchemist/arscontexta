@@ -4,7 +4,7 @@ description: Extract structured knowledge from source material. Comprehensive ex
 version: "1.0"
 generated_from: "arscontexta-v1.6"
 user-invocable: true
-allowed-tools: Read, Write, Grep, Glob, mcp__qmd__vector_search
+allowed-tools: Read, Write, Grep, Glob, mcp__qmd__query
 context: fork
 ---
 
@@ -113,7 +113,7 @@ Parse immediately:
 2. **Source size check:** If source exceeds 2500 lines, STOP. Plan chunks of 350-1200 lines. Process each chunk with fresh context. See "Large Source Handling" section below.
 3. Hunt for insights that serve the domain (see extraction categories below)
 4. For each candidate:
-   - Tier 1 (preferred): use `mcp__qmd__vector_search` with query "[claim as sentence]", collection="{vocabulary.notes_collection}", limit=5
+   - Tier 1 (preferred): use `mcp__qmd__query` with searches=[{type:"vec", query:"[claim as sentence]"}], collections=["{vocabulary.notes_collection}"], rerank=false, limit=5
    - Tier 2 (CLI fallback): `qmd vsearch "[claim as sentence]" --collection {vocabulary.notes_collection} -n 5`
    - Tier 3 fallback if qmd is unavailable: use keyword grep duplicate checks
    - If duplicate exists: evaluate for enrichment or skip
@@ -353,7 +353,7 @@ This is the critical step that prevents over-rejection. Categorize FIRST, then r
 For each candidate, run duplicate detection:
 
 ```
-mcp__qmd__vector_search  query="[proposed claim as sentence]"  collection="{vocabulary.notes_collection}"  limit=5
+mcp__qmd__query  searches=[{type:"vec", query:"[proposed claim as sentence]"}]  collections=["{vocabulary.notes_collection}"]  rerank=false  limit=5
 ```
 If MCP is unavailable, run:
 ```bash
@@ -361,7 +361,7 @@ qmd vsearch "[proposed claim as sentence]" --collection {vocabulary.notes_collec
 ```
 If qmd CLI is unavailable, fall back to keyword grep duplicate checks.
 
-**Why `vector_search` (vector semantic) instead of keyword search:** Duplicate detection is where keyword search fails hardest. A claim about "friction in systems" will not find "resistance to change" via keyword matching even though they may be semantic duplicates. Vector search (~5s) catches same-concept-different-words duplicates that keyword search misses entirely. For a batch of 30-50 candidates, this adds ~3 minutes total — worth it to catch duplicates early rather than discovering them during {vocabulary.cmd_reflect}.
+**Why vector search (`rerank=false`) instead of keyword search:** Duplicate detection is where keyword search fails hardest. A claim about "friction in systems" will not find "resistance to change" via keyword matching even though they may be semantic duplicates. Vector search (~5s) catches same-concept-different-words duplicates that keyword search misses entirely. For a batch of 30-50 candidates, this adds ~3 minutes total — worth it to catch duplicates early rather than discovering them during {vocabulary.cmd_reflect}.
 
 **Scores are signals, not decisions.** For ANY result with a relevant title or snippet:
 

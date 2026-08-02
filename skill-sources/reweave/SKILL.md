@@ -2,7 +2,7 @@
 name: reweave
 description: Update old notes with new connections. The backward pass that /reflect doesn't do. Revisit existing notes that predate newer related content, add connections, sharpen claims, consider splits. Triggers on "/reweave", "/reweave [note]", "update old notes", "backward connections", "revisit notes".
 user-invocable: true
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__search, mcp__qmd__vector_search, mcp__qmd__deep_search, mcp__qmd__status
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__query, mcp__qmd__status
 context: fork
 ---
 
@@ -174,8 +174,8 @@ From the {vocabulary.note}'s Topics footer, identify which {vocabulary.topic_map
 
 **Three-tier fallback for semantic search:**
 
-**Tier 1 — MCP tools (preferred):** Use `mcp__qmd__deep_search` (hybrid search with expansion + reranking):
-- query: "[{vocabulary.note}'s core concepts and mechanisms]"
+**Tier 1 — MCP tools (preferred):** Use `mcp__qmd__query` (hybrid search with expansion + reranking):
+- searches: [{type:"lex", query:"[{vocabulary.note}'s core concepts and mechanisms]"}, {type:"vec", query:"[{vocabulary.note}'s core concepts and mechanisms]"}]
 - limit: 15
 
 **Tier 2 — bash qmd with lock serialization:** If MCP tools fail or are unavailable:
