@@ -18,13 +18,21 @@ fail=0
 red() { printf '  FAIL %s\n' "$1"; fail=1; }
 ok()  { printf '  PASS %s\n' "$1"; }
 
+# WHY scan_or_die REPORTS ON STDERR AND NEVER SETS `fail` ITSELF:
+# Every caller runs this inside $( ), which is a subshell — a `fail=1` set here
+# is discarded before the parent sees it (`fail=0; f(){ fail=1; }; x=$(f)` leaves
+# fail=0). The guard previously appeared to fail on a broken scan only because
+# this diagnostic went to STDOUT and got captured as a "hit", so the guard
+# reported `grep -P found` when the real problem was an unreadable directory —
+# a false defect — and routing the message to stderr would have made the guard
+# report PASS on a failed scan. Diagnostics go to stderr; results go to stdout;
+# the caller checks the return code in the PARENT shell and calls red().
 scan_or_die() {            # scan_or_die <description> <grep-args...>
   local desc="$1"; shift
   local out rc
   out=$("$GREP" "$@" 2>/dev/null); rc=$?
   if [ "$rc" -gt 1 ]; then
-    printf '  FAIL %s: scan itself failed (grep rc=%s) — cannot conclude anything\n' "$desc" "$rc"
-    fail=1
+    printf 'scan failed: %s (grep rc=%s) — cannot conclude anything\n' "$desc" "$rc" >&2
     return 2
   fi
   printf '%s' "$out"
@@ -42,49 +50,66 @@ for d in "${SCAN[@]}"; do
 done
 
 echo "1. No PCRE grep (-P) or long-form in shipped templates"
-hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
-  "${SCAN[@]}")
-if [ -n "$hits" ]; then
-  red "grep -P or --perl-regexp found (exits 2 on BSD grep, silently yields 0):"
-  printf '%s\n' "$hits" | sed 's/^/       /'
+if hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
+    "${SCAN[@]}"); then
+  if [ -n "$hits" ]; then
+    red "grep -P or --perl-regexp found (exits 2 on BSD grep, silently yields 0):"
+    printf '%s\n' "$hits" | sed 's/^/       /'
+  else
+    ok "no grep -P"
+  fi
 else
-  ok "no grep -P"
+  red "grep -P scan could not run (see stderr) — cannot conclude anything"
 fi
 
 echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
-# Part A: Check for negated character class patterns that don't exclude boundaries
-# Count exemptions before filtering (for transparency accounting)
-temp_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}" \
-  | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
-  | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
-exempt_count=$(printf '%s\n' "$temp_a" | "$GREP" -c 'portability-exempt' 2>/dev/null || true)
-exempt_count=${exempt_count:-0}
-hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v 'portability-exempt')  # Exempt shape matchers used with grep -v (not target extractors)
-# Part B: Check for greedy/lazy dot quantifier patterns (vector 4 evasion: \[\[.*?\]\] or \[\[.*\]\] or \[\[.+\]\])
-# Match: \[\[ followed by .* or .+ or .? followed by \]\]
-# Use pattern: \\\[\\\[.*\.\*\?\\\]\\\] to match literal \[\[.*?\]\]
-hits_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
-  '\\\[\\\[.*\.\*\?\\\]\\\]' "${SCAN[@]}" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
-hits="${hits_a}${hits_b:+
-}${hits_b}"
-if [ -n "$hits" ]; then
-  red "link capture does not use negated classes or excludes | and # (greedy [[.*]] or no boundaries):"
-  printf '%s\n' "$hits" | sed 's/^/       /'
+# Both scans run BEFORE any filtering so their return codes reach this shell.
+# Filtering inside the command substitution would give us the last filter's
+# status instead; PIPESTATUS is bash-only (zsh spells it pipestatus) and this
+# file must run under both.
+# Part A: negated character classes that don't exclude the | and # boundaries.
+raw_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' -F '\[\[' "${SCAN[@]}")
+scan_a_ok=$?
+# Part B: greedy/lazy dot quantifiers — vector 4 evasion, e.g. \[\[.*?\]\].
+raw_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+  '\\\[\\\[.*\.\*\?\\\]\\\]' "${SCAN[@]}")
+scan_b_ok=$?
+if [ "$scan_a_ok" -ne 0 ] || [ "$scan_b_ok" -ne 0 ]; then
+  red "link capture scan could not run (see stderr) — cannot conclude anything"
 else
-  ok "link capture uses negated classes, terminates correctly"
-fi
-if [ "$exempt_count" -gt 0 ]; then
-  echo "  NOTE: $exempt_count site(s) exempt via portability-exempt marker"
+  temp_a=$(printf '%s\n' "$raw_a" \
+    | "$GREP" -F '[^' | "$GREP" -v -F '|#' \
+    | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+  # Counted from the same input and marker as the filter below, so the reported
+  # number is always exactly what was removed.
+  exempt_count=$(printf '%s\n' "$temp_a" | "$GREP" -c 'portability-exempt' 2>/dev/null || true)
+  exempt_count=${exempt_count:-0}
+  hits_a=$(printf '%s\n' "$temp_a" | "$GREP" -v 'portability-exempt')  # Exempt shape matchers used with grep -v (not target extractors)
+  hits_b=$(printf '%s\n' "$raw_b" | "$GREP" -v '^[^:]*lib/link-extraction\.sh:')
+  hits="${hits_a}${hits_b:+
+}${hits_b}"
+  if [ -n "$hits" ]; then
+    red "link capture does not use negated classes or excludes | and # (greedy [[.*]] or no boundaries):"
+    printf '%s\n' "$hits" | sed 's/^/       /'
+  else
+    ok "link capture uses negated classes, terminates correctly"
+  fi
+  if [ "$exempt_count" -gt 0 ]; then
+    echo "  NOTE: $exempt_count site(s) exempt via portability-exempt marker"
+  fi
 fi
 
 echo "3. No PCRE via ripgrep (fails on rg builds without PCRE2)"
-hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
-  -E '(^|[^a-zA-Z_-])rg +[^|]*(-P|--pcre2)' "${SCAN[@]}")
-if [ -n "$hits" ]; then
-  red "rg -P or --pcre2 found (fails on rg builds without PCRE2):"
-  printf '%s\n' "$hits" | sed 's/^/       /'
+if hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' --exclude='check-portability.sh' \
+    -E '(^|[^a-zA-Z_-])rg +[^|]*(-P|--pcre2)' "${SCAN[@]}"); then
+  if [ -n "$hits" ]; then
+    red "rg -P or --pcre2 found (fails on rg builds without PCRE2):"
+    printf '%s\n' "$hits" | sed 's/^/       /'
+  else
+    ok "no rg PCRE"
+  fi
 else
-  ok "no rg PCRE"
+  red "rg PCRE scan could not run (see stderr) — cannot conclude anything"
 fi
 
 # KNOWN BLIND SPOT (matching direction):
