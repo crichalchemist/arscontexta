@@ -78,7 +78,8 @@ build_fixture() {           # build_fixture <dir>
 
 | Assertion | Value |
 |---|---|
-| `count_links notes` | `10` (2 topics + 7 body; fenced excluded — verified empirically) |
+| `count_links notes` | `9` (2 topics + 7 body; the fenced one excluded — verified empirically, not derived) |
+| `count_links_recursive notes` | `10` (flat 9 + the nested link) |
 | `extract_link_targets notes` | `alpha`, `nonexistent-note`, `real`, `über` |
 | `existing_note_index notes` | `alpha`, `probe`, `real`, `über` |
 | flat dangling | `nonexistent-note` only |
