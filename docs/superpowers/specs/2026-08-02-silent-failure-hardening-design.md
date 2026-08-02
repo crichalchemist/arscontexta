@@ -1,7 +1,7 @@
 # Spec A2 — Silent-failure hardening
 
 **Date:** 2026-08-02
-**Status:** draft, not yet approved
+**Status:** APPROVED 2026-08-02
 **Predecessor:** `2026-08-01-portability-link-correctness-design.md` (branch `fix/portability-link-correctness`, 14 commits, **unmerged**)
 **Evidence:** `.superpowers/sdd/2026-08-01-portability-link-correctness/FINAL-REVIEWS-CONSOLIDATED.md` — three independent whole-branch reviews (opus ×1, fable ×2), all blocking
 
