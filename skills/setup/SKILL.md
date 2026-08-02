@@ -431,6 +431,7 @@ All generated systems ship with full automation from day one. There are no tiers
 | Context file | Always | Comprehensive, all sections |
 | 16 processing skills + 10 plugin commands | Always | Processing skills vocabulary-transformed with full quality gates |
 | All hooks | Always | Orient, capture, validate, commit |
+| Link library | Always | ops/lib/link-extraction.sh |
 | Queue system | Always | ops/tasks.md + ops/queue/ |
 | Templates | Always | With _schema blocks |
 | Self space | If opted in | self/ or ops/ fallback |
@@ -1417,6 +1418,22 @@ For Claude Code, add to `.claude/settings.json` (using additive merge).
 **Critical:** The old flat format (`"type": "command"` at the matcher level) is rejected by Claude Code. Each event must use the nested structure: `"EventName": [{ "matcher": "...", "hooks": [{ "type": "command", "command": "..." }] }]`.
 
 Generate all four hook scripts: session-orient.sh, session-capture.sh, validate-note.sh, auto-commit.sh.
+
+##### Shared Library (ops/lib/)
+
+Generated systems are self-contained. A vault's own skills never read from the plugin directory, because the plugin can be uninstalled, moved, or upgraded independently of any vault it produced. The link-extraction library is therefore **copied into** the vault rather than referenced from it.
+
+Create the directory `ops/lib/` in the vault, then copy `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` into it as `ops/lib/link-extraction.sh`, preserving its executable bit.
+
+**Perform this copy yourself — do not emit it as a shell command.** `${CLAUDE_PLUGIN_ROOT}` resolves for you, who knows where the plugin is installed; it is *unset* inside a bash block, so a shell copy would silently read from `/reference/lib/link-extraction.sh`, fail, and leave `ops/lib/` empty. The generated vault would then look like it needs an upgrade rather than a repaired copy.
+
+**Verify the file landed — not that the copy step ran.** Confirm all three:
+
+1. `ops/lib/link-extraction.sh` exists in the vault and is readable
+2. it contains a `LINK_EXTRACTION_VERSION=` assignment
+3. that version is `1` or greater
+
+If any check fails, **STOP generation and report it**. Do not continue to Step 11. Every generated `/stats` and `/graph` sources this file and exits 1 without it, so a silently skipped copy ships a vault whose link, connection, and density figures are unavailable from the first day.
 
 ---
 

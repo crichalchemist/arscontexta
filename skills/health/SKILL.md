@@ -1,6 +1,6 @@
 ---
 name: health
-description: Run condition-based vault health diagnostics. 8 categories — schema compliance, orphan detection, link health, description quality, three-space boundaries, processing throughput, stale notes, MOC coherence. 3 modes — quick (schema+orphans+links), full (all 8), three-space (boundary violations only). Returns actionable FAIL/WARN/PASS report with specific fixes ranked by impact. Triggers on "/health", "check vault health", "maintenance report", "what needs fixing".
+description: Run condition-based vault health diagnostics. 9 categories — schema compliance, orphan detection, link health, description quality, three-space boundaries, processing throughput, stale notes, MOC coherence, shared library integrity. 3 modes — quick (schema+orphans+links+library), full (all 9), three-space (boundary violations only). Returns actionable FAIL/WARN/PASS report with specific fixes ranked by impact. Triggers on "/health", "check vault health", "maintenance report", "what needs fixing".
 version: "1.0"
 generated_from: "arscontexta-v1.6"
 context: fork
@@ -41,15 +41,15 @@ Parse the invocation mode immediately:
 
 | Input | Mode | Categories Run |
 |-------|------|---------------|
-| empty or `quick` | Quick | 1 (Schema), 2 (Orphans), 3 (Links) |
-| `full` | Full | All 8 categories |
+| empty or `quick` | Quick | 1 (Schema), 2 (Orphans), 3 (Links), 9 (Shared Library) |
+| `full` | Full | All 9 categories |
 | `three-space` | Three-Space | 5 (Three-Space Boundaries) only |
 
 **Execute these steps:**
 
 1. **Detect mode** from arguments
 2. **Scan the vault** — inventory all note files, {vocabulary.topic_map} files, inbox items, ops files
-3. **Run each applicable diagnostic category** in order (1-8)
+3. **Run each applicable diagnostic category** in order (1-9)
 4. **Classify each result** as PASS, WARN, or FAIL using the thresholds below
 5. **Surface condition-based maintenance signals** (check against threshold table)
 6. **Generate the health report** with specific file paths, counts, and recommended actions
@@ -68,7 +68,7 @@ Checks adapt to what the platform supports:
 
 ---
 
-## The 8 Diagnostic Categories
+## The 9 Diagnostic Categories
 
 ### Category 1: Schema Compliance (quick, full)
 
@@ -529,9 +529,62 @@ Bare links without context phrases are address book entries, not navigation. Eve
 
 ---
 
+### Category 9: Shared Library Integrity (quick, full)
+
+**What it checks:** The vault's own copy of the link-extraction library exists and is new enough for the skills that source it.
+
+**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh` and exit 1 when it is missing or older than version 1. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. This is the *vault* copy — the same file those skills load — not the plugin's.
+
+**How to check:**
+
+```bash
+# Vault root: same expression the consuming skills use, so a FAIL here means
+# exactly what a FAIL in /stats means.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+
+# Report, never exit: health is a report generator, and exiting here would
+# suppress every category that follows.
+if [ ! -r "$LINK_LIB" ]; then
+  echo "FAIL: link-extraction library missing or unreadable at '$LINK_LIB'"
+  echo "      run /arscontexta:upgrade to restore it"
+else
+  # Sourced in the SAME fence as the guard above — state does not cross fences.
+  . "$LINK_LIB"
+  : "${LINK_EXTRACTION_VERSION:=0}"
+  if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+    echo "FAIL: link-extraction library is version $LINK_EXTRACTION_VERSION; skills need >= 1"
+    echo "      run /arscontexta:upgrade to refresh it"
+  else
+    echo "PASS: link-extraction library v$LINK_EXTRACTION_VERSION"
+  fi
+fi
+```
+
+**Thresholds:**
+
+| Condition | Result |
+|-----------|--------|
+| File present, readable, version >= 1 | PASS |
+| File present, version < 1 or unset | FAIL |
+| File missing or unreadable | FAIL |
+
+There is no WARN band. The library is a precondition, not a quality measure: the skills that source it either run or do not.
+
+**Example output:**
+
+```
+[9] Shared Library ............... FAIL
+    ops/lib/link-extraction.sh missing
+    /stats and /graph will exit 1 until restored
+    Recommendation: run /arscontexta:upgrade
+```
+
+---
+
 ## Condition-Based Maintenance Signals
 
-After running all applicable diagnostic categories, check these condition-based triggers. These are NOT the 8 categories above — they are cross-cutting signals that suggest specific skill invocations.
+After running all applicable diagnostic categories, check these condition-based triggers. These are NOT the 9 categories above — they are cross-cutting signals that suggest specific skill invocations.
 
 | Condition | Threshold | Recommendation |
 |-----------|-----------|---------------|
@@ -618,6 +671,9 @@ PASS:
 [8] MOC Coherence ................ PASS | WARN | FAIL  (full mode only)
     [details — note count per topic map, coverage gaps, bare links]
 
+[9] Shared Library ............... PASS | FAIL
+    [ops/lib/link-extraction.sh presence and version]
+
 ---
 
 Maintenance Signals:
@@ -692,7 +748,7 @@ Not all issues are equal. The recommended actions section ranks by impact:
 
 ### Quick Mode (default)
 
-Runs categories 1-3 only: Schema, Orphans, Links.
+Runs categories 1-3 and 9: Schema, Orphans, Links, Shared Library.
 
 **Use when:**
 - Session start health check
@@ -703,7 +759,7 @@ Runs categories 1-3 only: Schema, Orphans, Links.
 
 ### Full Mode
 
-Runs all 8 categories plus maintenance signals.
+Runs all 9 categories plus maintenance signals.
 
 **Use when:**
 - Periodic comprehensive health review

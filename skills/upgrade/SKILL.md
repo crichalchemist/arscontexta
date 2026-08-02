@@ -315,6 +315,19 @@ skills:
     changes: "{brief description of what changed}"
 ```
 
+### 5e. Refresh the Shared Library
+
+Generated vaults carry their own copy of the link-extraction library at `ops/lib/link-extraction.sh`; every vault-tier skill that counts links, connections, or density sources it from there. Vaults generated before that copy existed have no `ops/lib/` at all, and their `/stats` and `/graph` exit 1 until this step repairs them.
+
+**Do this as instructions you carry out, not as a bash block.** `${CLAUDE_PLUGIN_ROOT}` resolves for you; it is unset in a shell, so a shell copy would read from `/reference/lib/...` and silently do nothing.
+
+1. Read `LINK_EXTRACTION_VERSION` from the plugin's `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh`.
+2. Read `LINK_EXTRACTION_VERSION` from the vault's `ops/lib/link-extraction.sh`. Treat a missing file or a missing assignment as version `0`.
+3. If the two versions differ, create `ops/lib/` if absent and copy the plugin's file over the vault's, preserving the executable bit.
+4. Confirm the copy landed: the vault file must now exist, be readable, and report the plugin's version. If it does not, report the failure — do not record the refresh as applied.
+
+**Report the replacement; never overwrite silently.** Name both versions and the outcome in the Final Report, e.g. `link-extraction.sh: v0 (absent) → v1 [restored]` or `v1 → v2 [refreshed]`. When the versions already match, say so: `link-extraction.sh: v1 [current]`. A library swapped in without a line in the report is a change the user cannot audit — and this file decides what every link count in the vault reports.
+
 ---
 
 ## Step 6: Validate
@@ -354,6 +367,9 @@ Skipped: {N} (user-modified, kept as-is)
 Changes:
   - /{skill}: {what changed} (Research: "{claim}")
   - /{skill}: {what changed} (Research: "{claim}")
+
+Shared library:
+  - link-extraction.sh: v{vault} → v{plugin} [restored | refreshed | current]
 
 Validation: {PASS | FAIL with details}
 
