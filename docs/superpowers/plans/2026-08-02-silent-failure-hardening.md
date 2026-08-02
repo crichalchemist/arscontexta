@@ -1,5 +1,12 @@
 # Silent-Failure Hardening Implementation Plan
 
+> **Checkboxes ticked retroactively on 2026-08-02**, against the commit record in the
+> execution ledger under `.superpowers/sdd/`. This plan was fully executed and merged while
+> showing 0 steps complete — a status file that lied about status, which is precisely the defect
+> class this project exists to remove. The ledger was accurate throughout because it was written
+> as a side effect of the work; the checkboxes needed a separate deliberate act, and did not get
+> one. Tick as you go.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close every open path where a failure produces a plausible-looking number instead of an error, and make that property testable rather than asserted.
@@ -97,7 +104,7 @@ build_fixture() {           # build_fixture <dir>
 - Consumes: `reference/lib/link-extraction.sh`.
 - Produces: executable `reference/test/link-extraction.test.sh`. Exit `0` all pass, `1` any fail. Prints `FAIL: <name>` per failure and a `passed/failed` summary. Tasks 2–9 run it; Task 10 wires it into CI.
 
-- [ ] **Step 1: Write the harness**
+- [x] **Step 1: Write the harness**
 
 ```bash
 #!/bin/bash
@@ -185,7 +192,7 @@ printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
 ```
 
-- [ ] **Step 2: Make executable and run under BOTH shells — verify it FAILS**
+- [x] **Step 2: Make executable and run under BOTH shells — verify it FAILS**
 
 ```bash
 chmod +x reference/test/link-extraction.test.sh
@@ -199,7 +206,7 @@ Expected: both exit 1, with failures including `count_links_recursive is shell-a
 
 Record the exact failing set for both shells in your report; later tasks are measured against it shrinking.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add reference/test/link-extraction.test.sh
@@ -225,13 +232,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: nothing.
 - Produces: guard that exits non-zero on scan failure and covers all nine shipped directories.
 
-- [ ] **Step 1: Confirm the defect**
+- [x] **Step 1: Confirm the defect**
 
 ```bash
 bash reference/check-portability.sh /nonexistent-root-xyz; echo "exit=$? (currently 0 — the bug)"
 ```
 
-- [ ] **Step 2: Make scan failure fatal**
+- [x] **Step 2: Make scan failure fatal**
 
 Replace the check-1 and check-2 `hits=$(...)` assignments so grep's return code is inspected. grep returns `0` = matches, `1` = no matches, `>1` = error.
 
@@ -258,7 +265,7 @@ for d in "${SCAN[@]}"; do
 done
 ```
 
-- [ ] **Step 3: Extend SCAN to all nine shipped directories**
+- [x] **Step 3: Extend SCAN to all nine shipped directories**
 
 Replace line 21:
 
@@ -268,7 +275,7 @@ SCAN=("$ROOT/skills" "$ROOT/skill-sources" "$ROOT/reference" \
       "$ROOT/hooks" "$ROOT/agents" "$ROOT/scripts")
 ```
 
-- [ ] **Step 4: Run the guard — expect it to go RED on real findings**
+- [x] **Step 4: Run the guard — expect it to go RED on real findings**
 
 ```bash
 bash reference/check-portability.sh; echo "exit=$?"
@@ -276,7 +283,7 @@ bash reference/check-portability.sh; echo "exit=$?"
 
 Expected: FAIL, listing at minimum `generators/features/maintenance.md:29`. Record every hit. Any hit outside that file is pre-existing in a newly-scanned directory — triage it in your report; do not fix beyond scope without saying so.
 
-- [ ] **Step 5: Fix the live defect**
+- [x] **Step 5: Fix the live defect**
 
 `generators/features/maintenance.md:29`. Replace:
 
@@ -292,7 +299,7 @@ rg -oNI '\[\[([^\]|#]+)' {DOMAIN:notes/} -r '$1' | sed 's/[[:space:]]*$//' | sor
 
 Note `-I` (no filename; `-N` alone is no-line-number and leaves `path:` prefixes), `|#` termination, trailing-space trim, and `read -r`.
 
-- [ ] **Step 6: Verify the guard is clean and the fixture harness is unaffected**
+- [x] **Step 6: Verify the guard is clean and the fixture harness is unaffected**
 
 ```bash
 bash reference/check-portability.sh; echo "exit=$? (expect 0)"
@@ -301,7 +308,7 @@ bash reference/check-portability.sh /nonexistent-root-xyz; echo "exit=$? (expect
 
 Both must hold. The second is the whole point of this task.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add reference/check-portability.sh generators/features/maintenance.md
@@ -326,7 +333,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: Task 2's guard.
 - Produces: guard that catches `grep --perl-regexp`, `egrep -oP`, `rg -P`/`--pcre2`, and non-negated-class naive captures.
 
-- [ ] **Step 1: Write failing probes**
+- [x] **Step 1: Write failing probes**
 
 ```bash
 T=$(mktemp -d); mkdir -p "$T/skills" "$T/skill-sources" "$T/reference" "$T/generators" \
@@ -338,7 +345,7 @@ printf "w=\$(rg -o '\\\\[\\\\[.*?\\\\]\\\\]' f)\n" > "$T/skills/d.md"
 bash reference/check-portability.sh "$T"; echo "exit=$? (currently 0 — all four evade)"
 ```
 
-- [ ] **Step 2: Widen check 1**
+- [x] **Step 2: Widen check 1**
 
 ```bash
 -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)'
@@ -352,7 +359,7 @@ hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' \
   -E '(^|[^a-zA-Z_-])rg +[^|]*(-P|--pcre2)' "${SCAN[@]}") || true
 ```
 
-- [ ] **Step 3: Widen check 2 to non-negated captures**
+- [x] **Step 3: Widen check 2 to non-negated captures**
 
 Add a second pattern catching lazy/greedy dot captures between `[[` and `]]`:
 
@@ -366,7 +373,7 @@ Replace the content-based exclusion (`grep -v 'lib/link-extraction.sh'`) with a 
 | "$GREP" -v '^[^:]*lib/link-extraction\.sh:'
 ```
 
-- [ ] **Step 4: Verify all four probes now caught, real tree still clean**
+- [x] **Step 4: Verify all four probes now caught, real tree still clean**
 
 ```bash
 bash reference/check-portability.sh "$T"; echo "exit=$? (expect non-zero)"
@@ -374,7 +381,7 @@ bash reference/check-portability.sh;     echo "exit=$? (expect 0)"
 rm -rf "$T"
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add reference/check-portability.sh
@@ -399,13 +406,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: Task 1's harness.
 - Produces: `LINK_EXTRACTION_VERSION=1`; all six functions validate their directory argument, surface rg runtime failures, fold locale-independently, and emit nothing on failure. `count_links_recursive` returns the same value under bash and zsh.
 
-- [ ] **Step 1: Run the harness, record which assertions fail**
+- [x] **Step 1: Run the harness, record which assertions fail**
 
 ```bash
 bash reference/test/link-extraction.test.sh 2>&1 | tail -20
 ```
 
-- [ ] **Step 2: Add the contract version as the first executable line**
+- [x] **Step 2: Add the contract version as the first executable line**
 
 ```bash
 # Contract version. Bump on any BEHAVIOR change (fold rules, termination,
@@ -413,7 +420,7 @@ bash reference/test/link-extraction.test.sh 2>&1 | tail -20
 LINK_EXTRACTION_VERSION=1
 ```
 
-- [ ] **Step 3: Add a shared precondition helper and use it in all six functions**
+- [x] **Step 3: Add a shared precondition helper and use it in all six functions**
 
 ```bash
 _require_deps_and_dir() {   # _require_deps_and_dir <dir>
@@ -433,11 +440,11 @@ _require_deps_and_dir() {   # _require_deps_and_dir <dir>
 
 Each function begins `_require_deps_and_dir "$1" || return 1` and emits **nothing** on that path. A nonexistent directory must no longer be indistinguishable from an empty vault.
 
-- [ ] **Step 4: Remove `2>/dev/null` from every rg call**
+- [x] **Step 4: Remove `2>/dev/null` from every rg call**
 
 Lines 48, 67, 94, 112. `command -v rg` proves existence, not health — a broken `RIPGREP_CONFIG_PATH` makes rg exit 2 on every call, and the redirect converted that to `0`. rg's no-match exit 1 is already silent, so the redirect protects nothing.
 
-- [ ] **Step 5: Fix `count_links_recursive` — mirror its working siblings**
+- [x] **Step 5: Fix `count_links_recursive` — mirror its working siblings**
 
 Replace the accumulator loop (the `while` is the last stage of a pipe, so bash discards `n` in a subshell; zsh does not, hence bash `0` / zsh `9`):
 
@@ -450,7 +457,7 @@ count_links_recursive() {
 }
 ```
 
-- [ ] **Step 6: Make folding locale-independent**
+- [x] **Step 6: Make folding locale-independent**
 
 `tr '[:upper:]' '[:lower:]'` does not fold non-ASCII under `LC_ALL=C`. Set the locale for the fold at each of the four sites:
 
@@ -460,7 +467,7 @@ count_links_recursive() {
 
 If that locale may be absent, prefer `awk '{print tolower($0)}'` under the same `LC_ALL`. Verify with the harness's non-ASCII assertion, which runs under `LC_ALL=C` deliberately.
 
-- [ ] **Step 7: Run the harness under BOTH shells**
+- [x] **Step 7: Run the harness under BOTH shells**
 
 ```bash
 bash reference/test/link-extraction.test.sh; echo "bash exit=$?"
@@ -469,7 +476,7 @@ zsh  reference/test/link-extraction.test.sh; echo "zsh exit=$?"
 
 Expected: both exit 0, `failed=0`. Report the actual summary lines.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add reference/lib/link-extraction.sh
@@ -497,7 +504,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: `LINK_EXTRACTION_VERSION`, `_require_deps_and_dir` behavior from Task 4.
 - Produces: every consumer aborts on library failure instead of rendering a number.
 
-- [ ] **Step 1: Add the version assertion immediately after each library source**
+- [x] **Step 1: Add the version assertion immediately after each library source**
 
 ```bash
 : "${LINK_EXTRACTION_VERSION:=0}"
@@ -508,7 +515,7 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
 fi
 ```
 
-- [ ] **Step 2: Propagate errors past command substitution**
+- [x] **Step 2: Propagate errors past command substitution**
 
 `VAR=$(count_links "$D")` discards the function's `return 1`. Every counter assignment becomes:
 
@@ -519,7 +526,7 @@ LINK_COUNT=$(count_links "$NOTES_DIR") || {
 
 Apply to every counter in all four files.
 
-- [ ] **Step 3: Route `stats:87` through the library**
+- [x] **Step 3: Route `stats:87` through the library**
 
 Replace the inline `rg ... 2>/dev/null` TOPIC_COUNT block — it bypasses the library's dependency check and dropped trim + fold, so `[[Hub-Topic]]` and `[[hub-topic]]` counted as two topics:
 
@@ -530,7 +537,7 @@ TOPIC_COUNT=$(rg -oNI '^\s*-\s*"\[\[([^\]|#]+)' -r '$1' "$NOTES_DIR"/*.md \
   echo "error: topic counting failed; refusing to report a number" >&2; exit 1; }
 ```
 
-- [ ] **Step 4: Verify no consumer renders a number after a dependency failure**
+- [x] **Step 4: Verify no consumer renders a number after a dependency failure**
 
 ```bash
 FIX=$(mktemp -d); mkdir -p "$FIX/notes"; printf 'A: [[one]]\n' > "$FIX/notes/a.md"
@@ -542,14 +549,14 @@ echo "LEAKED A NUMBER: $LINK_COUNT"'
 
 Expected: `aborted correctly`. Any output containing a number is a failure of this task.
 
-- [ ] **Step 5: Guard + harness still clean**
+- [x] **Step 5: Guard + harness still clean**
 
 ```bash
 bash reference/check-portability.sh; echo "exit=$?"
 bash reference/test/link-extraction.test.sh; echo "exit=$?"
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skill-sources/stats/SKILL.md skill-sources/graph/SKILL.md skills/architect/SKILL.md skills/health/SKILL.md
@@ -574,7 +581,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: Task 4's library.
 - Produces: all five consumers agree on the same vault.
 
-- [ ] **Step 1: Demonstrate the disagreement**
+- [x] **Step 1: Demonstrate the disagreement**
 
 ```bash
 V=$(mktemp -d); mkdir -p "$V/notes/sub"
@@ -588,11 +595,11 @@ echo "recursive: $(extract_link_targets_recursive '"$V"'/notes | while read -r n
 
 Expected today: flat reports `DANGLING:buried`, recursive reports nothing.
 
-- [ ] **Step 2: Switch the three flat consumers to the recursive variants**
+- [x] **Step 2: Switch the three flat consumers to the recursive variants**
 
 Recursive is correct: `health` and `validate-kernel` already use it, nothing forbids subdirectories, and a vault that nests notes gets false FAILs from the flat consumers. In `stats`, `graph`, and `architect`, replace `count_links` → `count_links_recursive`, `extract_link_targets` → `extract_link_targets_recursive`, `existing_note_index` → `existing_note_index_recursive`.
 
-- [ ] **Step 3: Record the decision in the library header**
+- [x] **Step 3: Record the decision in the library header**
 
 Replace the "FLAT vs RECURSIVE" block with:
 
@@ -604,11 +611,11 @@ Replace the "FLAT vs RECURSIVE" block with:
 # plausible wrong number, so prefer recursive unless you can justify otherwise.
 ```
 
-- [ ] **Step 4: Verify agreement**
+- [x] **Step 4: Verify agreement**
 
 Re-run Step 1. Both lines must now be empty. Then guard + harness clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add skill-sources/stats/SKILL.md skill-sources/graph/SKILL.md skills/architect/SKILL.md reference/lib/link-extraction.sh
@@ -634,7 +641,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: `LINK_EXTRACTION_VERSION` from Task 4.
 - Produces: templates that source `$VAULT_ROOT/ops/lib/link-extraction.sh`. Task 8 makes setup put the file there.
 
-- [ ] **Step 1: Prove the current design is broken**
+- [x] **Step 1: Prove the current design is broken**
 
 ```bash
 cd /Users/controlroom/second-brain && bash -c 'echo "CLAUDE_PLUGIN_ROOT=[${CLAUDE_PLUGIN_ROOT:-UNSET}]"
@@ -642,7 +649,7 @@ L="${CLAUDE_PLUGIN_ROOT:-}/reference/lib/link-extraction.sh"; echo "resolves to:
 [ -r "$L" ] && echo READABLE || echo "NOT READABLE — every /stats run fails"'
 ```
 
-- [ ] **Step 2: Replace the source block in both templates**
+- [x] **Step 2: Replace the source block in both templates**
 
 `ops/` is a fixed directory name (written literally throughout `skills/setup/SKILL.md`), so this path is safe to hardcode. The lookup matches `hooks/scripts/read_config.sh:20` exactly — do not invent a third mechanism.
 
@@ -669,7 +676,7 @@ fi
 
 Leave `skills/architect/SKILL.md` and `skills/health/SKILL.md` alone — they are plugin-tier and source from the plugin, where the file genuinely lives.
 
-- [ ] **Step 3: Simulate a generated vault end-to-end**
+- [x] **Step 3: Simulate a generated vault end-to-end**
 
 ```bash
 V=$(mktemp -d); mkdir -p "$V/notes" "$V/ops/lib"
@@ -682,7 +689,7 @@ echo "sourced ok, version=$LINK_EXTRACTION_VERSION, count=$(count_links_recursiv
 
 Expected: `sourced ok, version=1, count=2`.
 
-- [ ] **Step 4: Verify the missing-library path is loud**
+- [x] **Step 4: Verify the missing-library path is loud**
 
 ```bash
 rm "$V/ops/lib/link-extraction.sh"
@@ -692,7 +699,7 @@ if [ -r "$LINK_LIB" ]; then . "$LINK_LIB"; else echo "error: not found at $LINK_
 echo "exit=$? (expect non-zero)"
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add skill-sources/stats/SKILL.md skill-sources/graph/SKILL.md
@@ -718,27 +725,27 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: Task 7's expected path.
 - Produces: freshly generated vaults contain `ops/lib/link-extraction.sh`.
 
-- [ ] **Step 1: Locate the hook-writing step**
+- [x] **Step 1: Locate the hook-writing step**
 
 ```bash
 /usr/bin/grep -n '\.claude/hooks' skills/setup/SKILL.md | head -5
 ```
 
-- [ ] **Step 2: Add the library copy alongside it**
+- [x] **Step 2: Add the library copy alongside it**
 
 In the same generation step, instruct: create `ops/lib/` and copy `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` into it. Setup is a plugin-tier skill, so `${CLAUDE_PLUGIN_ROOT}` is available to it — this is the one place that reference is correct.
 
 Add to the generated-artifacts table (near line 434) a row: `| Link library | Always | ops/lib/link-extraction.sh |`.
 
-- [ ] **Step 3: Make `/arscontexta:upgrade` refresh the copy**
+- [x] **Step 3: Make `/arscontexta:upgrade` refresh the copy**
 
 In `skills/upgrade/SKILL.md`, add a step that compares the vault's `ops/lib/link-extraction.sh` `LINK_EXTRACTION_VERSION` against the plugin's, refreshes when they differ, and **reports the replacement** rather than overwriting silently.
 
-- [ ] **Step 4: Make `/arscontexta:health` surface drift**
+- [x] **Step 4: Make `/arscontexta:health` surface drift**
 
 In `skills/health/SKILL.md`, add a check that reads both versions and FAILs on mismatch or a missing vault copy, so drift is visible without waiting for a skill to break.
 
-- [ ] **Step 5: Verify against the real vault**
+- [x] **Step 5: Verify against the real vault**
 
 ```bash
 ls -la /Users/controlroom/second-brain/ops/lib/link-extraction.sh 2>&1
@@ -746,7 +753,7 @@ ls -la /Users/controlroom/second-brain/ops/lib/link-extraction.sh 2>&1
 
 Expected: absent (that vault predates this change). Record it — it is what `/arscontexta:upgrade` must repair, and confirms the upgrade path is needed rather than theoretical.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skills/setup/SKILL.md skills/upgrade/SKILL.md skills/health/SKILL.md
@@ -773,7 +780,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: everything above.
 - Produces: CI that executes the library under bash and zsh.
 
-- [ ] **Step 1: Reconcile health's scope contract**
+- [x] **Step 1: Reconcile health's scope contract**
 
 `:160` says "Every wiki link in every file" while the code now scans only `{vocabulary.notes}`. Links in `inbox/` and `self/` go unchecked; links *to* files outside notes/ false-FAIL. Change the documented contract to match the code — narrower and symmetric — and state the limitation explicitly:
 
@@ -783,7 +790,7 @@ Scope: wiki links within {vocabulary.notes}. Links in other spaces
 {vocabulary.notes} will report as dangling.
 ```
 
-- [ ] **Step 2: Restore trim + fold at graph's triangles block**
+- [x] **Step 2: Restore trim + fold at graph's triangles block**
 
 `:161-162` dropped both, so closure detection miscomputes on case variants while the dangling check in the same file folds:
 
@@ -794,7 +801,7 @@ Scope: wiki links within {vocabulary.notes}. Links in other spaces
     | LC_ALL=en_US.UTF-8 tr '[:upper:]' '[:lower:]' | sort -u)
 ```
 
-- [ ] **Step 3: Wire the harness into CI under both shells**
+- [x] **Step 3: Wire the harness into CI under both shells**
 
 ```yaml
       - name: Install ripgrep and zsh
@@ -807,7 +814,7 @@ Scope: wiki links within {vocabulary.notes}. Links in other spaces
 
 The zsh job is not redundant: two defects closed by this plan were bash/zsh forks, and CI running only bash would not have seen either.
 
-- [ ] **Step 4: Full verification sweep**
+- [x] **Step 4: Full verification sweep**
 
 ```bash
 bash reference/check-portability.sh; echo "guard=$?"
@@ -819,7 +826,7 @@ for f in reference/validate-kernel.sh reference/check-portability.sh reference/l
 
 Expected: `0`, non-zero, `0`, `0`, no syntax failures.
 
-- [ ] **Step 5: Prove the harness catches a reintroduction**
+- [x] **Step 5: Prove the harness catches a reintroduction**
 
 ```bash
 cp reference/lib/link-extraction.sh /tmp/lib.bak
@@ -832,7 +839,7 @@ git diff --quiet reference/lib/link-extraction.sh && echo "byte-clean"
 
 A harness never seen red after the fixes is not known to work.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skills/health/SKILL.md skill-sources/graph/SKILL.md .github/workflows/checks.yml

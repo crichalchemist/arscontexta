@@ -1,5 +1,12 @@
 # Portability and Link Correctness Implementation Plan
 
+> **Checkboxes ticked retroactively on 2026-08-02**, against the commit record in the
+> execution ledger under `.superpowers/sdd/`. This plan was fully executed and merged while
+> showing 0 steps complete — a status file that lied about status, which is precisely the defect
+> class this project exists to remove. The ledger was accurate throughout because it was written
+> as a side effect of the work; the checkboxes needed a separate deliberate act, and did not get
+> one. Tick as you go.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove all nine `grep -P` invocations from shipped skill templates, correct wiki-link target extraction at all twelve sites, and add a shared library, guard, and CI so the bug class cannot silently return.
@@ -100,7 +107,7 @@ counted only body links; that expectation was wrong, not the code.
 - Consumes: nothing.
 - Produces: executable `reference/check-portability.sh [root]`. Exit `0` clean, `1` violations. Tasks 3–5 run it to confirm progress; Task 6 wires it into CI.
 
-- [ ] **Step 1: Write the guard**
+- [x] **Step 1: Write the guard**
 
 ```bash
 #!/bin/bash
@@ -161,7 +168,7 @@ else
 fi
 ```
 
-- [ ] **Step 2: Make executable and run — verify it FAILS**
+- [x] **Step 2: Make executable and run — verify it FAILS**
 
 ```bash
 chmod +x reference/check-portability.sh
@@ -176,7 +183,7 @@ Expected: `PORTABILITY: FAIL`, `exit=1`, with **exactly**:
 
 **If check 1 reports 0**, you hit the word-splitting trap: run with `bash` explicitly and compare. This exact failure occurred during planning.
 
-- [ ] **Step 3: Verify it does NOT flag `tree -P`**
+- [x] **Step 3: Verify it does NOT flag `tree -P`**
 
 ```bash
 bash reference/check-portability.sh 2>&1 | /usr/bin/grep -c 'session-orient'
@@ -184,7 +191,7 @@ bash reference/check-portability.sh 2>&1 | /usr/bin/grep -c 'session-orient'
 
 Expected: `0`. Non-zero means check 1's regex is over-broad and would break working code.
 
-- [ ] **Step 4: Declare the `awk` prerequisite**
+- [x] **Step 4: Declare the `awk` prerequisite**
 
 Add to the README prerequisite table, alongside `tree` and `ripgrep`:
 
@@ -194,7 +201,7 @@ Add to the README prerequisite table, alongside `tree` and `ripgrep`:
 
 Declared here, before Task 2 introduces the dependency.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add reference/check-portability.sh README.md
@@ -221,7 +228,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
   - `extract_link_targets <dir>` → newline-separated targets: fence-stripped, terminated at `|`/`#`, trimmed, lowercase-folded, sorted-unique.
   - `existing_note_index <dir>` → newline-separated lowercase-folded basenames of `*.md`.
 
-- [ ] **Step 1: Write the library**
+- [x] **Step 1: Write the library**
 
 ```bash
 #!/bin/bash
@@ -276,7 +283,7 @@ existing_note_index() {
 }
 ```
 
-- [ ] **Step 2: Build the fixture and test all three functions**
+- [x] **Step 2: Build the fixture and test all three functions**
 
 Create the fixture from **Shared Test Fixture**, then:
 
@@ -290,7 +297,7 @@ echo "existing_index    -> $(existing_note_index notes | tr '\n' ' ')   [expect:
 
 All three must match. If `count_links` returns `0`, `rg` is missing or the fence stripper is wrong.
 
-- [ ] **Step 3: Test the dangling composition and the empty-dir edge case**
+- [x] **Step 3: Test the dangling composition and the empty-dir edge case**
 
 ```bash
 IDX=$(existing_note_index notes)
@@ -306,7 +313,7 @@ echo "empty count -> $(count_links /tmp/emptyvault)   [expect 0, no error]"
 
 The empty case must return `0` and must not emit a glob-literal error.
 
-- [ ] **Step 4: Verify case folding is filesystem-independent**
+- [x] **Step 4: Verify case folding is filesystem-independent**
 
 ```bash
 mv notes/alpha.md notes/Alpha.md
@@ -316,7 +323,7 @@ mv notes/Alpha.md notes/alpha.md
 
 Expected: `PASS`. This is the check the one-sided `[ -f ]` form fails on Linux while appearing to pass on macOS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add reference/lib/link-extraction.sh
@@ -339,7 +346,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: `count_links`, `extract_link_targets`, `existing_note_index` from Task 2.
 - Produces: `LINK_COUNT`, `TOPIC_COUNT`, `DANGLING_COUNT`, `THIS_WEEK_LINKS` — all bare integers. `DANGLING_COUNT` is consumed at `:276` by a numeric `-gt` and rendered at `:244`.
 
-- [ ] **Step 1: Confirm the current failure**
+- [x] **Step 1: Confirm the current failure**
 
 ```bash
 cd "$FIX" && /usr/bin/grep -ohP '\[\[[^\]]+\]\]' notes/*.md 2>/dev/null | wc -l | tr -d ' '
@@ -347,7 +354,7 @@ cd "$FIX" && /usr/bin/grep -ohP '\[\[[^\]]+\]\]' notes/*.md 2>/dev/null | wc -l 
 
 Expected: `0` — the silent failure being fixed.
 
-- [ ] **Step 2: Add the loud library source at the top of the first bash block**
+- [x] **Step 2: Add the loud library source at the top of the first bash block**
 
 Insert immediately after `NOTES_DIR="{vocabulary.notes}"` at `:60`:
 
@@ -364,7 +371,7 @@ fi
 
 Do not add a silent fallback. Absent library must stop the block.
 
-- [ ] **Step 3: Fix `:68` — LINK_COUNT**
+- [x] **Step 3: Fix `:68` — LINK_COUNT**
 
 Replace:
 
@@ -378,7 +385,7 @@ With:
 LINK_COUNT=$(count_links "$NOTES_DIR")
 ```
 
-- [ ] **Step 4: Fix `:78` — TOPIC_COUNT**
+- [x] **Step 4: Fix `:78` — TOPIC_COUNT**
 
 Topics live in YAML frontmatter, never inside fences, and need the quoted-list pattern. Replace:
 
@@ -394,7 +401,7 @@ TOPIC_COUNT=$(rg -oN --no-filename '^\s*-\s*"\[\[([^\]|#]+)' -r '$1' "$NOTES_DIR
   | tr '[:upper:]' '[:lower:]' | sort -u | wc -l | tr -d ' ')
 ```
 
-- [ ] **Step 5: Fix `:102` — DANGLING_COUNT**
+- [x] **Step 5: Fix `:102` — DANGLING_COUNT**
 
 Replace lines 101–105:
 
@@ -416,7 +423,7 @@ DANGLING_COUNT=$(extract_link_targets "$NOTES_DIR" | while read -r NAME; do
 done | wc -l | tr -d ' ')
 ```
 
-- [ ] **Step 6: Fix `:183` — THIS_WEEK_LINKS**
+- [x] **Step 6: Fix `:183` — THIS_WEEK_LINKS**
 
 This counts links in one file at a time, so it uses the fence stripper directly. Replace:
 
@@ -431,7 +438,7 @@ With:
       awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" | rg -o '\[\['
 ```
 
-- [ ] **Step 7: Verify against the fixture**
+- [x] **Step 7: Verify against the fixture**
 
 Extract each block and run with `NOTES_DIR=notes` inside `$FIX`, with `CLAUDE_PLUGIN_ROOT` set to the repo root. Assert `LINK_COUNT`=`8`, `TOPIC_COUNT`=`2`, `DANGLING_COUNT`=`1`, `THIS_WEEK_LINKS`=`8`. Then:
 
@@ -441,7 +448,7 @@ Extract each block and run with `NOTES_DIR=notes` inside `$FIX`, with `CLAUDE_PL
 
 Expected `numeric OK`, no `integer expression expected`.
 
-- [ ] **Step 8: Verify the loud failure path**
+- [x] **Step 8: Verify the loud failure path**
 
 ```bash
 ( unset CLAUDE_PLUGIN_ROOT; bash -c '<paste the source guard>' ) 2>&1 | head -2
@@ -449,7 +456,7 @@ Expected `numeric OK`, no `integer expression expected`.
 
 Expected: the two-line error, non-zero exit. Silence or a `0` count means the guard is wrong.
 
-- [ ] **Step 9: Run the portability guard**
+- [x] **Step 9: Run the portability guard**
 
 ```bash
 bash reference/check-portability.sh 2>&1 | /usr/bin/grep -c 'stats/SKILL.md'
@@ -457,7 +464,7 @@ bash reference/check-portability.sh 2>&1 | /usr/bin/grep -c 'stats/SKILL.md'
 
 Expected `0`. Guard still exits 1 overall (graph, architect, validate-kernel, health remain).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add skill-sources/stats/SKILL.md
@@ -481,11 +488,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: library functions from Task 2; the loud source block from Task 3 Step 2 (same text).
 - Produces: `LINK_COUNT` (integer), `DANGLING:` lines, `LINKS` (folded targets), `OUTGOING` (integer).
 
-- [ ] **Step 1: Add the loud library source**
+- [x] **Step 1: Add the loud library source**
 
 Insert after `NOTES_DIR="{vocabulary.notes}"` at `:63`, using the same block as Task 3 Step 2.
 
-- [ ] **Step 2: Fix `:69` — LINK_COUNT**
+- [x] **Step 2: Fix `:69` — LINK_COUNT**
 
 Replace:
 
@@ -499,7 +506,7 @@ With:
 LINK_COUNT=$(count_links "$NOTES_DIR")
 ```
 
-- [ ] **Step 3: Fix `:84` — dangling report**
+- [x] **Step 3: Fix `:84` — dangling report**
 
 Replace lines 83–87:
 
@@ -521,7 +528,7 @@ extract_link_targets "$NOTES_DIR" | while read -r NAME; do
 done
 ```
 
-- [ ] **Step 4: Fix `:151` — per-note outgoing targets**
+- [x] **Step 4: Fix `:151` — per-note outgoing targets**
 
 Single file, so use the fence stripper directly. Replace:
 
@@ -538,7 +545,7 @@ With:
     | tr '[:upper:]' '[:lower:]' | sort -u)
 ```
 
-- [ ] **Step 5: Fix `:308` — OUTGOING**
+- [x] **Step 5: Fix `:308` — OUTGOING**
 
 Replace:
 
@@ -553,11 +560,11 @@ With:
     | rg -o '\[\[' | wc -l | tr -d ' ')
 ```
 
-- [ ] **Step 6: Verify against the fixture**
+- [x] **Step 6: Verify against the fixture**
 
 `LINK_COUNT`=`8`; dangling output exactly `DANGLING: nonexistent-note`; for `probe.md`, `LINKS` contains `real`, `alpha`, `nonexistent-note` and NOT `in-code-fence`; `OUTGOING` for `probe.md`=`8`.
 
-- [ ] **Step 7: Run the guard**
+- [x] **Step 7: Run the guard**
 
 ```bash
 bash reference/check-portability.sh 2>&1 | /usr/bin/grep -c 'graph/SKILL.md'
@@ -565,7 +572,7 @@ bash reference/check-portability.sh 2>&1 | /usr/bin/grep -c 'graph/SKILL.md'
 
 Expected `0`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add skill-sources/graph/SKILL.md
@@ -590,7 +597,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: library functions from Task 2.
 - Produces: guard checks 1 and 2 both clean — the GREEN moment for the plan.
 
-- [ ] **Step 1: Fix `architect:180`**
+- [x] **Step 1: Fix `architect:180`**
 
 Widest blast radius — bad link data here feeds architecture *proposals*. Uses the `{vocabulary.notes}` placeholder, not `$NOTES_DIR`. Add the loud source block (Task 3 Step 2) at the top of this bash block, then replace lines 179–183:
 
@@ -612,7 +619,7 @@ extract_link_targets "{vocabulary.notes}" | while read -r NAME; do
 done
 ```
 
-- [ ] **Step 2: Source the library in `validate-kernel.sh`**
+- [x] **Step 2: Source the library in `validate-kernel.sh`**
 
 It runs from the plugin directory, so use a relative path. Add near the top, after the colour definitions:
 
@@ -626,7 +633,7 @@ else
 fi
 ```
 
-- [ ] **Step 3: Fix `validate-kernel.sh:57` — fold the index**
+- [x] **Step 3: Fix `validate-kernel.sh:57` — fold the index**
 
 Replace:
 
@@ -641,7 +648,7 @@ existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | 
     | tr '[:upper:]' '[:lower:]' | sort -u)
 ```
 
-- [ ] **Step 4: Fix `:67` and `:75` — use the library**
+- [x] **Step 4: Fix `:67` and `:75` — use the library**
 
 This scans several candidate directories rather than one `$NOTES_DIR`, so call the library per directory. Replace at `:67`:
 
@@ -661,7 +668,7 @@ Replace the identical line at `:75` (the `$VAULT/../self` branch) with:
     new_links=$(extract_link_targets "$VAULT/../self")
 ```
 
-- [ ] **Step 5: Fix `:85` — fold the comparison**
+- [x] **Step 5: Fix `:85` — fold the comparison**
 
 Targets from `extract_link_targets` are already folded; `existing_files` is folded by Step 3. Replace:
 
@@ -677,7 +684,7 @@ With:
 
 The explicit fold is belt-and-braces: `$link` also arrives from `head -100` sampling, so do not assume provenance.
 
-- [ ] **Step 6: Fix `health:167`**
+- [x] **Step 6: Fix `health:167`**
 
 Already uses `rg`, so no portability defect — but the same naive capture, meaning `/health`, the command users run to check vault health, reports false dangling links. Read lines 160–180 first. Replace:
 
@@ -695,7 +702,7 @@ rg -oN '\[\[([^\]|#]+)' --glob '*.md' -r '$1' \
 
 Note `read -r` (was bare `read`), preventing backslash mangling. If the loop body resolves with `[ -f ]`, convert it to the folded-index comparison.
 
-- [ ] **Step 7: Verify validate-kernel still runs**
+- [x] **Step 7: Verify validate-kernel still runs**
 
 ```bash
 bash reference/validate-kernel.sh ~/second-brain
@@ -703,7 +710,7 @@ bash reference/validate-kernel.sh ~/second-brain
 
 Expected: completes, reports primitive 2. The dangling warn count should be **lower** than before (alias and anchor links no longer miscounted). Record before/after in the commit message.
 
-- [ ] **Step 8: Run the guard — expect PASS**
+- [x] **Step 8: Run the guard — expect PASS**
 
 ```bash
 bash reference/check-portability.sh; echo "exit=$?"
@@ -711,7 +718,7 @@ bash reference/check-portability.sh; echo "exit=$?"
 
 Expected: `PORTABILITY: PASS`, `exit=0`. GREEN moment.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add skills/architect/SKILL.md reference/validate-kernel.sh skills/health/SKILL.md
@@ -737,7 +744,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: passing guard from Task 5.
 - Produces: CI enforcement. Does NOT open the PR.
 
-- [ ] **Step 1: Add the workflow**
+- [x] **Step 1: Add the workflow**
 
 ```yaml
 name: checks
@@ -764,7 +771,7 @@ jobs:
 
 The syntax check replaces running `validate-kernel.sh` itself: this repo is a generator, not a vault, so it cannot satisfy all 15 primitives, and a step gated with `|| true` would assert nothing. `bash -n` asserts something real — the scripts parse.
 
-- [ ] **Step 2: Prove the guard catches a regression**
+- [x] **Step 2: Prove the guard catches a regression**
 
 A guard never seen red *after* the fix is not known to still work.
 
@@ -779,7 +786,7 @@ git diff --quiet skill-sources/stats/SKILL.md && echo "restored cleanly"
 
 Expected `exit=1`, then `exit=0`, then `restored cleanly`. If the first is `0`, the guard does not work — stop.
 
-- [ ] **Step 3: Prove the guard catches inline duplication**
+- [x] **Step 3: Prove the guard catches inline duplication**
 
 The library must stay the single definition.
 
@@ -790,7 +797,7 @@ bash reference/check-portability.sh; echo "exit=$? (expect 1 — check 2 catches
 cp /tmp/graph.bak skill-sources/graph/SKILL.md
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/checks.yml
@@ -802,7 +809,7 @@ case-folding in earlier commits is a prerequisite for green CI.
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 5: STOP — do not open the PR**
+- [x] **Step 5: STOP — do not open the PR**
 
 Push the branch if asked, but **do not open a PR against `upstream`**. That is outward-facing and requires the repository owner's explicit confirmation. Report completion and let the controller surface the PR decision.
 

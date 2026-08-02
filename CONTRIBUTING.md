@@ -1,0 +1,261 @@
+# Contributing to arscontexta
+
+**This document is executable.** Agents read it and act on it, the same way they act on a
+`SKILL.md`. Every claim below is stated as a command with an expected result, or as an invariant
+with its failure mode. Do not soften a rule here into advice — advice is not enforceable, and
+unenforceable guidance is how every defect in `docs/superpowers/specs/` shipped.
+
+Agent-facing repository architecture lives in [`CLAUDE.md`](CLAUDE.md). Read it first.
+
+---
+
+## INVARIANT 0 — this repo is a generator
+
+Editing a file here changes what *future* generated vaults look like. It does not change any vault
+that already exists. A wrong flag in a template is not one broken call; it is one broken call in
+every vault generated from it, on machines you will never see.
+
+There is no build, no test runner, no dependency manifest. "Compiling" means Claude reading a
+template and writing files. **Do not add** `package.json`, a `Makefile`, or `python3` — `python3`
+appears in zero files under `skill-sources/` and in no prerequisite table. `rg` is the blessed
+instrument.
+
+---
+
+## Step 0 — verify your environment before you trust any result
+
+Run this first. Every line has an expected result; a mismatch invalidates verification you do later.
+
+```bash
+/usr/bin/grep -P . /dev/null 2>&1 | head -1   # macOS: "invalid option -- P"  <- EXPECTED
+command -v rg tree jq bc zsh                  # all five must resolve
+qmd --version 2>/dev/null || echo "qmd absent (semantic checks will WARN)"
+git remote -v | rg -c 'upstream'              # expect >= 1 if you forked
+```
+
+| Observation | Meaning | Action |
+|---|---|---|
+| `grep -P` works in the Claude Code Bash tool | you are seeing **ugrep**, not `/usr/bin/grep` | never verify portability from this shell |
+| `/usr/bin/grep -P` exits 2 | BSD grep 2.6.0 — what end users have | this is the real target |
+| any of `rg`/`tree`/`jq`/`bc`/`zsh` missing | gates will fail or halt | install before proceeding |
+
+---
+
+## The three traps
+
+Each has already produced a confident wrong answer in this repo. Each will do it to you.
+
+### Trap 1 — there is no hot reload
+
+After **any** edit to `skills/`, `skill-sources/`, `hooks/` or `generators/`:
+
+```bash
+/plugin uninstall arscontexta@agenticnotetaking
+/plugin install arscontexta@agenticnotetaking
+```
+
+**Failure mode:** you edit a skill, re-run it, observe no change, and conclude the edit was wrong.
+Claude served the cached copy. This is the most common false negative in the repo.
+
+### Trap 2 — `grep` in this session is ugrep
+
+| Where | `grep` resolves to | `grep -P` |
+|---|---|---|
+| Claude Code Bash tool | ugrep (shell function) | works, exit 1 |
+| Any other shell / any end-user machine | `/usr/bin/grep`, BSD 2.6.0 | `invalid option`, exit 2 |
+
+Eight sites shipped with `-P`, each piping into `wc -l`, so the failure rendered as **0 — never as
+an error**. It tested clean for everyone who checked from inside a session.
+
+**Rule:** verify with `/usr/bin/grep` explicitly, or from a shell outside Claude Code. Use `rg`.
+
+### Trap 3 — `gh` on a fork silently queries upstream
+
+```bash
+gh run list --branch my-branch                              # EMPTY — reads as "never ran"
+gh api repos/<you>/arscontexta/actions/runs --jq .total_count   # the truth
+```
+
+**Failure mode:** the empty listing is indistinguishable from a clean one. CI was red for two pushes
+behind exactly this. **Always pass `--repo <you>/arscontexta`.**
+
+---
+
+## Verification — run all five, expect exactly these results
+
+Four run in CI on every push, **each under both bash and zsh**. Two shipped defects were bash/zsh
+forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
+either.
+
+```bash
+bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
+
+for s in bash zsh; do
+  $s reference/test/link-extraction.test.sh | tail -1   # expect: passed=19 failed=0
+  $s reference/test/guard-failure.test.sh   | tail -1   # expect: passed=19 failed=0
+  $s reference/test/fence-isolation.test.sh | tail -1   # expect: FENCE ISOLATION: PASS
+done
+
+./reference/validate-kernel.sh ~/second-brain           # expect 15/15
+```
+
+`validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
+disabled). Any other WARN or FAIL is a regression.
+
+**"Green" means all eleven CI steps ran and passed** — not that the previously-red step turned.
+Verify per-step; a skipped step is not a passing step:
+
+```bash
+RID=$(gh api repos/<you>/arscontexta/actions/runs --jq '.workflow_runs[0].id')
+gh api repos/<you>/arscontexta/actions/runs/$RID/jobs \
+  --jq '[.jobs[].steps[]|select(.conclusion!="success")]|length'   # expect 0
+```
+
+---
+
+## INVARIANT 1 — fenced bash blocks are separate shell invocations
+
+Claude runs each ```bash fence in a `SKILL.md` as its own shell. **Nothing crosses a fence
+boundary.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
+it to 0, and the block exits 0 with a plausible number.
+
+Four of six blocking findings in one review were this single cause.
+
+- Each fence must define every variable it reads and source every library it calls.
+- `reference/test/fence-isolation.test.sh` is the gate. **Do not defeat it** by concatenating fences
+  when testing locally — a concatenated harness is more permissive than the runtime.
+- A fence that legitimately cannot pass goes in that harness's allowlist **with a stated reason**.
+  The allowlist is checked in both directions: an entry that starts passing, or whose fence no
+  longer exists, fails the gate. It drains rather than rots.
+
+---
+
+## INVARIANT 2 — a failure must never be a number
+
+The house failure mode is **silence**: exit 0, empty output, a plausible-looking result. Every bash
+block you add is presumed guilty of it.
+
+**Required of every block:** on failure it exits non-zero AND emits no digits on stdout.
+
+| Trap | Why it bites | Correct form |
+|---|---|---|
+| `cmd \| wc -l` | pipeline yields the **last** stage's status, and `wc` always succeeds | check the producer's status separately |
+| `[ -d "$d" ] \|\| { echo err; exit 1; } \| head -10` | `\|\|` binds looser than `\|`; the guard body runs in a subshell and `exit` exits nothing | never pipe a guarded block |
+| `stat -f %m f \|\| stat -c %Y f` | GNU reads `-f` as *filesystem* status, succeeds, prints `Namelen: 255` — the `\|\|` never fires | put `-c` first; BSD has no `-c` and fails cleanly |
+| probing a locale *name* to prove folding works | GNU `tr` is byte-oriented in **every** locale | probe the behavior: fold `U+00DC`, require `U+00FC` |
+| checking a binary is on `PATH` to prove its tools resolve | qmd was on `PATH` while all 62 of its call sites named removed tools | assert the names resolve |
+
+**The generalisation, and the one rule to carry:** *verify the property, not a proxy for it.* A check
+that passes while the capability is broken is worse than no check — it manufactures confidence.
+
+A fallback only works if its first branch fails **loudly**. If branch one can succeed while being
+wrong, the fallback is decorative.
+
+---
+
+## Backporting from the field vault
+
+`~/second-brain` runs this plugin's output daily and finds defects this repo cannot find by
+inspection. **Nothing flows back automatically.** `ops/observations/` there is the richest source.
+
+**Two reverse-transforms are mandatory.** Copy-pasting a vault fix into `skill-sources/` is almost
+always wrong:
+
+1. **Vocabulary → canonical.** The vault speaks its derived dialect (`extract`, `node`); templates
+   speak canonical (`reduce`), per `reference/vocabulary-transforms.md`.
+2. **Concrete paths → placeholders.** `nodes/` must become `{vocabulary.notes}`.
+
+Verify you did not hardcode a placeholder — the count must not decrease:
+
+```bash
+git diff --name-only -z main..HEAD | while IFS= read -r -d '' f; do
+  case "$f" in skill-sources/*|platforms/shared/skill-blocks/*) ;; *) continue ;; esac
+  now=$(grep -o '{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}' "$f" 2>/dev/null | wc -l | tr -d ' ')
+  was=$(git show "main:$f" 2>/dev/null | grep -o '{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}' | wc -l | tr -d ' ')
+  [ "$now" -ge "$was" ] || echo "HARDCODED A PLACEHOLDER: $f ($was -> $now)"
+done
+```
+
+Only `skill-sources/` and `platforms/shared/skill-blocks/` carry placeholders; `skills/` are the
+plugin's own commands and legitimately have none, so scanning them produces `0 -> 0` noise. A count
+that *rises* is normal — the hybrid qmd query form repeats its query string into both `lex` and
+`vec` sub-queries, so one placeholder legitimately becomes two.
+
+**Failure mode:** a backport that skips these passes every gate and silently ships one user's
+vocabulary to everyone.
+
+---
+
+## Prose is a contract
+
+When you change a bash block, change the prose table that describes it **in the same commit**.
+Claude reads those tables and follows them, so a narrow table beside a widened bash line is the same
+defect in a different font. Six code sites and four prose contracts had to move together to make one
+threshold fire.
+
+---
+
+## Specs, plans, commits
+
+Substantial work goes **spec → plan → execution** in `docs/superpowers/`. Execution ledgers live
+under `.superpowers/sdd/` (git-ignored) and are the authoritative record.
+
+**Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
+executed and merged. A status file that lies about status is this project's own defect class wearing
+a different hat. Tick as you go, or delete the checkboxes and point at the ledger.
+
+Commit messages state **what the failure looked like**, not just what changed. "Fixed grep" is
+useless; "the failure surfaced as 0, never as an error, because every site piped into `wc -l`" tells
+the next reader how to recognise it.
+
+### Before opening a PR
+
+```bash
+bash reference/check-portability.sh && echo OK                       # rc 0
+for s in bash zsh; do
+  $s reference/test/link-extraction.test.sh | tail -1
+  $s reference/test/guard-failure.test.sh   | tail -1
+  $s reference/test/fence-isolation.test.sh | tail -1
+done
+git diff --stat main..HEAD                                           # review every line
+
+# Scan changed files for PCRE. Three separate hazards are handled here; removing
+# any one of them makes this silently report "clean" while having scanned nothing.
+#   1. NUL-delimited — one tracked filename contains spaces, and
+#      $(git diff --name-only) word-splits it into nine phantom paths.
+#   2. Per-file, NOT piped through xargs — xargs COLLAPSES rg's exit 2 (error)
+#      into 1 (no match), so a failed scan becomes indistinguishable from a clean one.
+#   3. worst-status tracking — one bad file must not be masked by later good ones.
+worst=1
+while IFS= read -r -d '' f; do
+  [ -f "$f" ] || continue                    # deleted file is not an error
+  rg -n 'grep -[a-zA-Z]*P' "$f"; rc=$?
+  [ "$rc" -eq 0 ] && worst=0
+  [ "$rc" -gt 1 ] && worst=2
+done < <(git diff --name-only -z main..HEAD)
+case $worst in
+  0) echo "PCRE FOUND — fix before PR" ;;
+  1) echo "no PCRE introduced" ;;
+  2) echo "SCAN FAILED — this result is NOT evidence" ;;
+esac
+```
+
+**Why this shape, and what it cost to get right.** `rg` exits 0 on match, **1 on no-match (which is
+normal)**, and 2 on error. The first draft of this block was `rg … $(git diff --name-only) || echo
+"no PCRE introduced"` — it word-split the one filename containing spaces, rg failed to open nine
+phantom paths, and the `||` printed the all-clear **having scanned nothing.** The second draft piped
+through `xargs -0`, which fixed the splitting and then collapsed exit 2 into exit 1, so the error
+branch became unreachable. Measured, on this machine:
+
+| | rg direct | through `xargs -0` |
+|---|---|---|
+| match | 0 | 0 |
+| no match | 1 | 1 |
+| **missing file** | **2** | **1** ← the distinction is destroyed |
+
+Any check you add here must distinguish those three states, and you must *verify* it can reach each
+one. A scan that cannot report failure will eventually tell you the repo is clean because it
+crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
+
+Branch from `main`. All eleven CI steps must pass. State in the PR what is **not** claimed —
+deferred items belong in the description so a reviewer meets them as decisions, not omissions.
