@@ -412,6 +412,63 @@ that matched nothing and reported green.
 
 The human diff of the two trees at release remains the only check on the full §4 rule.
 
+**6. `graph`'s authority loop still inlines the naive matcher.**
+`skill-sources/graph/SKILL.md:434` runs `grep -rl "\[\[$NAME\]\]"` — counting matches inside fenced
+code blocks, no case folding. Base had two such sites in that file; the branch fixed the orphan loop
+and left this one, while commit `741b2b7` claimed the spelling was "gone from executable code in both
+files". Detail is in the closed entry below, where it was first written down — but an *open* defect
+recorded only inside a **Closed** section is invisible to anyone scanning this list, which is why it
+also appears here. `check-portability.sh` check 2 does not catch it (it matches greedy-dot capture
+patterns, not a fixed-name `grep -rl`) and it carries no `portability-exempt` marker.
+
+```bash
+grep -cF 'grep -rl "\[\[' skill-sources/graph/SKILL.md          # 1
+git show 5a4ab28:skill-sources/graph/SKILL.md | grep -cF 'grep -rl "\[\['   # 2
+```
+
+**7. The `status` enum disagrees between its two generator sources.**
+`generators/features/schema.md:30` and `:137` both give `preliminary, open, active, archived`;
+`generators/features/atomic-notes.md:94` gives `preliminary | active | archived` — no `open`. Notes
+are generated from the template, so a vault can emit a value one document calls valid and the other
+rejects. Adjacent to the Spec B status-vocabulary work (`open` vs `pending`) and **not on its list**,
+which is the point: that spec's enumeration was incomplete.
+
+```bash
+grep -n 'preliminary' generators/features/schema.md generators/features/atomic-notes.md
+```
+
+**8. No shared frontmatter-field parser, so three sites re-implement it with the naive form.**
+`check-portability.sh` forbids inlining copies of the *link* library and `reference/skill-authoring.md`
+§3 says to source it — there is no equivalent for frontmatter extraction. `OBS_COUNT`, `TENSION_COUNT`
+and `skills/health` each use `grep -rl '^status:'`, which matches body text as well as frontmatter.
+**Currently latent, measured:** all 14 matching files in the field vault carry that line inside the
+frontmatter block, zero body-text matches. A note quoting frontmatter in a fenced block would inflate
+the count, and the field vault holds notes of exactly that shape.
+
+**9. The fence gate cannot falsify a fence that counts a missing frontmatter field in notes.**
+`reference/test/fence-isolation.test.sh:170-172` builds five notes carrying `type/title/description/created/topics`
+and no `status:`. A correct parser, one that never fires, and one reading the wrong field all return
+the same number. **Narrower than it first looks:** where the branch's threshold counts actually read
+`status:` — observations, tensions, queue — the fixture *does* carry it, and no fence in
+`skill-sources/` or `skills/` scans the notes directory for `status:`. So the gap has no live subject
+today, and `schema.md` marks `status` optional for notes, making the fixture realistic rather than
+deficient. Revisit the moment a note-level status fence is added.
+
+**10. A ticked plan step for a check that was built and never shipped.**
+`docs/superpowers/plans/2026-08-03-fourteen-open-items.md` Task 2 Step 4 is `[x]` for an assertion —
+"every `[A-Z_]*` field named in an output-format contract must have an assignment in the same file" —
+that mis-fired on three healthy templates (`graph`, `next`, `remember`) and was deliberately dropped.
+Commit `741b2b7` says it was "recorded in the ledger"; the ledger is `.superpowers/`, which is
+**gitignored**, so nothing shipped. Precise detection needs an explicit contract marker in the
+templates; without one the check cannot distinguish a documented-but-computed-elsewhere field from a
+stale one.
+
+**This entry is the reason to distrust the phrase "recorded" in this repo's commit messages.** The
+same mistake was made twice: once by `741b2b7`, and again by the commit that fixed it, whose message
+said three review findings were "recorded for the whole-branch review" when they had been written
+only to that same gitignored ledger. Entries 6–10 exist because that was caught on re-reading this
+list, not because the earlier claims were true. **A record that does not ship is not a record.**
+
 ### Closed on `fix/spec-e-fourteen-items`
 
 - **The fence-gate allowlist could hide an unrelated failure** — was divergence 1. Absorption keyed
