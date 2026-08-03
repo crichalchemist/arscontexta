@@ -236,7 +236,7 @@ are indistinguishable. `skills/health` additionally computes `Ratio: 0%` from it
 **If D1 = fail loud (recommended):** each block asserts its directory before counting.
 **If D1 = report inline:** each block prints `absent` instead of a number and continues.
 
-- [ ] **Step 1: Add the precondition to `skills/help` fence 1**
+- [x] **Step 1: Add the precondition to `skills/help` fence 1**
 
 Current:
 ```bash
@@ -255,7 +255,7 @@ fi
 note_count=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 ```
 
-- [ ] **Step 2: Same guard in `skills/health` before the ratio**
+- [x] **Step 2: Same guard in `skills/health` before the ratio**
 
 ```bash
 NOTES_DIR="{vocabulary.notes}"
@@ -268,7 +268,7 @@ fi
 Place it **above** the `find` calls at ~line 400, in the same fence — a guard in an earlier fence
 does not carry (INVARIANT 1).
 
-- [ ] **Step 3: Same treatment for `skill-sources/next` and `skill-sources/reflect`**
+- [x] **Step 3: Same treatment for `skill-sources/next` and `skill-sources/reflect`**
 
 `next` fence 4 guards `{vocabulary.inbox}` and `{vocabulary.notes}` before its counts. `reflect`
 fence 3 currently reads:
@@ -278,7 +278,7 @@ grep -r '\[\[note name\]\]' {vocabulary.notes}/*.md | wc -l
 `grep | wc -l` discards grep's status, so a missing directory renders 0. Guard the directory, and
 capture grep's status separately rather than piping it into `wc`.
 
-- [ ] **Step 4: Verify each fence individually, with a missing-vault fixture**
+- [x] **Step 4: Verify each fence individually, with a missing-vault fixture**
 
 ```bash
 for s in bash zsh; do $s reference/test/fence-isolation.test.sh | tail -1; done
@@ -287,12 +287,25 @@ Expect: the four `N` entries no longer appear under KNOWN-OPEN. **The gate will 
 until you remove them from the allowlist** — the list is checked in both directions, which is the
 mechanism working, not a regression.
 
-- [ ] **Step 5: Drain the allowlist and commit**
+- [x] **Step 5: Drain the allowlist and commit**
 
 Remove the four `N` entries from `KNOWN_OPEN` in `reference/test/fence-isolation.test.sh`. Re-run
 both shells; expect `known-open=4`.
 
 ---
+
+**As implemented (`bb219d0`).** Three deviations from the steps above, each found by executing them:
+
+- **Step 1's `NOTES_DIR` guard is right, but the message in the draft was not.** D1 requires the
+  message to carry the remedy, since it is the only thing the user sees. Three of the four sites
+  need *two* directories checked, so each loops and names the one that is absent.
+- **Step 3's `reflect` fix could not keep the `*.md` glob.** Replacing `grep -r … | wc -l` with
+  `cat "$DIR"/*.md | grep -c …` reintroduces the zsh non-matching-glob abort that two allowlist
+  entries already exist for. The shipped form greps the *directory*, captures grep's status into
+  `rc` on its own line, and distinguishes rc 1 ("no matches", a real answer) from rc >= 2.
+- **Step 1's guard placement is load-bearing in `next`.** That fence holds five counts, and the
+  allowlist entry says *every* count folds to 0. Guards sit at the top of the fence, above all five;
+  placed beside their own counts they would not have drained the entry.
 
 ### Task 3: `skill-sources/seed` — four fences read an undefined `$FILE` — D2 RULED: per-fence FILE="$ARGUMENTS"
 
@@ -302,7 +315,7 @@ both shells; expect `known-open=4`.
 **Interfaces:** Produces four fences that define every variable they read. Allowlist drops to 0
 `U` entries.
 
-- [ ] **Step 1: Apply D2's chosen form to fence 1**
+- [x] **Step 1: Apply D2's chosen form to fence 1**
 
 If D2 = per-fence assignment (recommended):
 ```bash
@@ -316,19 +329,44 @@ if [ -z "$FILE" ]; then
 fi
 ```
 
-- [ ] **Step 2: Repeat for fences 3, 4, 5.** Fence 4 also reads `$ARCHIVE_DIR`; define it in the
+- [x] **Step 2: Repeat for fences 3, 4, 5.** Fence 4 also reads `$ARCHIVE_DIR`; define it in the
       same fence or derive it from `$FILE`.
 
-- [ ] **Step 3: Check `platforms/shared/skill-blocks/seed.md` for the same defect** — that directory
+- [x] **Step 3: Check `platforms/shared/skill-blocks/seed.md` for the same defect** — that directory
       can drift from `skill-sources/`; fix both or neither.
 
-- [ ] **Step 4: Verify, drain the four `U` entries from the allowlist, commit**
+- [x] **Step 4: Verify, drain the four `U` entries from the allowlist, commit**
 
 Also re-check the zsh-only entry `skill-sources/seed f01 ~H~ ops/queue*.yaml` — a non-matching glob
 aborts under zsh where bash passes the pattern through. It may resolve with this change, in which
 case the gate will report it `STALE` and it must be removed too.
 
 ---
+
+**As implemented (`a5e1795`).** The draft's `FILE="$ARGUMENTS"` had to become `FILE="${ARGUMENTS:-}"`:
+the gate runs every fence under `set -u`, so an unguarded read of an unset `ARGUMENTS` aborts — which
+would have relocated the defect into the fix rather than removing it.
+
+**Step 4 required a change to the gate, which was ruled by the user before it was made.** D2's guard
+exits 1 with a message on stderr when no argument is given, and that is precisely what assertion H
+cannot forgive on the healthy fixture. The fixture modelled a healthy *vault* but never a healthy
+*invocation* — it set `CLAUDE_PROJECT_DIR` and nothing else. `run_fence` now also supplies
+`ARGUMENTS="inbox/raw-capture.md"`, a file that really exists in the full fixture and whose path
+contains the inbox name, so seed's archive-and-move branch is exercised rather than skipped.
+
+Measured before deciding: applying D2 to f03/f04/f05 took H from 0 to 3 failing. f01's identical
+failure did **not** appear — it was absorbed by an unrelated `~H~` allowlist entry. That is a defect
+in the gate, recorded as divergence 1 in `CLAUDE.md` and deliberately not fixed here.
+
+The trade is stated rather than hidden: H no longer covers the empty-argument path, so it is
+verified directly. With `ARGUMENTS` unset, under bash and zsh, the shipped guard gives rc=1, empty
+stdout, zero digits, and the message on stderr.
+
+Fence 4 re-derives `$ARCHIVE_DIR` and re-creates it with the same idempotent `mkdir -p` rather than
+asserting it exists — an assertion would have failed H on the healthy fixture for the same reason.
+
+The zsh-only `seed f01 ~H~` entry did **not** resolve with this change; it still fires, and is not
+stale. Allowlist: 4 -> 0 under bash, 2 under zsh.
 
 ### Task 4: Bound the stale-lock retry — D3 RULED: bounded retry, no auto-break
 
@@ -337,7 +375,7 @@ plus the `platforms/shared/skill-blocks/` twins
 
 **Interfaces:** Produces a lock acquisition that terminates. No other task depends on it.
 
-- [ ] **Step 1: Replace the unbounded loop at each of the 3 sites**
+- [x] **Step 1: Replace the unbounded loop at each of the 3 sites**
 
 ```bash
 LOCKDIR="ops/queue/.locks/qmd.lock"
@@ -361,16 +399,45 @@ trap 'rm -rf "$LOCKDIR"' EXIT
 **Do not auto-break the lock.** A lock older than the timeout may still be held by a live process;
 breaking it reintroduces the corruption the mutex prevents. Fail and tell the user.
 
-- [ ] **Step 2: Verify termination against a pre-held lock**
+- [x] **Step 2: Verify termination against a pre-held lock**
 
 ```bash
 V=$(mktemp -d); mkdir -p "$V/ops/queue/.locks/qmd.lock"    # simulate a stale lock
 # extract the fence and run it in $V; expect exit 1 within ~60s, not a hang
 ```
 
-- [ ] **Step 3: Gates and commit**
+- [x] **Step 3: Gates and commit**
 
 ---
+
+**As implemented (`7765504`).** The header said 3 sites. There are **6 code sites plus 2 prose
+contracts**, all converted:
+
+| File | Sites | `LOCKDIR` preserved as |
+|---|---|---|
+| `skill-sources/reflect/SKILL.md` | 2 | `"ops/queue/.locks/qmd.lock"` |
+| `skill-sources/reweave/SKILL.md` | 1 | `"ops/queue/.locks/qmd.lock"` |
+| `platforms/shared/skill-blocks/reflect.md` | 2 | `"{config.ops_dir}/queue/.locks/qmd.lock"` |
+| `platforms/shared/skill-blocks/reweave.md` | 1 | `"{config.ops_dir}/queue/.locks/qmd.lock"` |
+
+**Step 1's literal block collides with Global Constraint 1** and was not pasted verbatim. It
+hardcodes `ops/`, while the three shared twins carry `{config.ops_dir}`. Each file keeps its own
+existing `LOCKDIR=` line; only the `while` line beneath it was replaced. Substituting the
+placeholder would have shipped one user's layout to every generated system.
+
+Prose contracts moved with the code, since Claude executes these tables: `skills/setup:1610` and
+`skills/upgrade` §5f both quoted the unbounded loop and its "loops forever" consequence, and two
+comments in `fence-isolation.test.sh` justified the fixture's lock parent and the fence timeout by
+that same hang. §5f now distinguishes vaults whose skills predate the bound (where the repair
+matters) from those carrying it (where it is a no-op).
+
+Because the block now runs `mkdir -p "$(dirname "$LOCKDIR")"` itself, the missing-parent hang cannot
+recur even in a vault whose setup predates that directory.
+
+**Step 2's verification was replaced.** Extracting a fence into a temp vault and waiting 60s per
+site is slow and fiddly; the loop was verified directly with the threshold lowered to 4s. All three
+paths, both shells: lock held -> rc=1 at the bound, empty stdout, two-line stderr; lock free -> rc=0,
+acquired, released by the trap; parent absent -> rc=0, no hang.
 
 ### Task 5: Run `/arscontexta:upgrade` against the live vault
 
