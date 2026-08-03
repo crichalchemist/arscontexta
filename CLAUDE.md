@@ -69,7 +69,7 @@ done
 | `check-portability.sh` | five checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
-| `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence |
+| `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
@@ -126,6 +126,12 @@ missing-vault fixture. It supplies `ARGUMENTS` so the healthy fixture models a h
 and not merely a healthy vault. It carries an allowlist of known-open defects — now 2, both
 zsh-only, down from 8 — **checked in both directions**: a listed entry that starts passing, or whose
 fence no longer exists, fails the gate, so the list drains rather than rots.
+
+It also carries one assertion that is **not** about fences: **F**, which runs once against a
+four-note discriminating set and pins `reference/lib/frontmatter.sh` three ways — correct parser 2,
+naive `grep -rl '^status:'` 1, wrong-field parser 4. It lives here rather than in a
+`reference/test/frontmatter.test.sh` of its own because a suite wired into neither CI nor the table
+above is a green-looking nothing, and this gate is already wired into both.
 
 That two-directional check had a hole in it, now closed: absorption matched on `(letter, label)`
 alone and ignored the entry's `ZSH ONLY:` / `BASH ONLY:` scope, while the staleness half honoured it.
@@ -425,33 +431,30 @@ these numbers and work is in flight; renumbering would invalidate those referenc
 entry's title implied — that the naive-matcher class is gone — is still false, and the search string
 this entry shipped as its own reproduce command is what made that hard to see.
 
-**7. The `status` enum disagrees between its two generator sources.**
-`generators/features/schema.md:30` and `:137` both give `preliminary, open, active, archived`;
-`generators/features/atomic-notes.md:94` gives `preliminary | active | archived` — no `open`. Notes
-are generated from the template, so a vault can emit a value one document calls valid and the other
-rejects. Adjacent to the Spec B status-vocabulary work (`open` vs `pending`) and **not on its list**,
-which is the point: that spec's enumeration was incomplete.
+**7, 8 and 9 — the `status` enum split, the missing frontmatter parser, and the fence gate that
+could not falsify either — FIXED on `fix/spec-f-divergence-drain`.** Kept in place and kept numbered,
+because entries below reference these numbers and work is in flight; renumbering would invalidate
+those references. Full record in
+[Closed on `fix/spec-f-divergence-drain`](#closed-on-fixspec-f-divergence-drain).
+
+They are collapsed into one entry because they were one defect wearing three hats: no shared parser
+(8), so no single place for the vocabulary to be right (7), and a fixture that could not tell a
+correct parser from a broken one (9), which is why 7 and 8 survived every gate.
+
+**What is still open, and was never in these three entries:** `generators/features/graph-analysis.md:39,141`
+and `generators/features/schema.md:74` emit `rg -l '^type: tension' … | xargs rg '^status: pending'`
+as *recipes into a generated vault's documentation*. That is the same line-anchored form, in the same
+defect class, and it is not converted here — a recipe cannot source a library the way a fence can, so
+fixing it is a design change to what generation emits, not a substitution. Re-derive with:
 
 ```bash
-grep -n 'preliminary' generators/features/schema.md generators/features/atomic-notes.md
+grep -rn 'status' generators/ --include='*.md'
 ```
 
-**8. No shared frontmatter-field parser, so three sites re-implement it with the naive form.**
-`check-portability.sh` forbids inlining copies of the *link* library and `reference/skill-authoring.md`
-§3 says to source it — there is no equivalent for frontmatter extraction. `OBS_COUNT`, `TENSION_COUNT`
-and `skills/health` each use `grep -rl '^status:'`, which matches body text as well as frontmatter.
-**Currently latent, measured:** all 14 matching files in the field vault carry that line inside the
-frontmatter block, zero body-text matches. A note quoting frontmatter in a fenced block would inflate
-the count, and the field vault holds notes of exactly that shape.
-
-**9. The fence gate cannot falsify a fence that counts a missing frontmatter field in notes.**
-`reference/test/fence-isolation.test.sh:170-172` builds five notes carrying `type/title/description/created/topics`
-and no `status:`. A correct parser, one that never fires, and one reading the wrong field all return
-the same number. **Narrower than it first looks:** where the branch's threshold counts actually read
-`status:` — observations, tensions, queue — the fixture *does* carry it, and no fence in
-`skill-sources/` or `skills/` scans the notes directory for `status:`. So the gap has no live subject
-today, and `schema.md` marks `status` optional for notes, making the fixture realistic rather than
-deficient. Revisit the moment a note-level status fence is added.
+The field vault also carries `status: implemented` on observations — a value declared in no generator
+enum at all. Reported, not fixed: this task reconciled the generators *with each other*, which is what
+its evidence supports; reconciling them with one vault's practice is a separate decision with a
+different owner.
 
 **10. A ticked plan step for a check that was built and never shipped.**
 `docs/superpowers/plans/2026-08-03-fourteen-open-items.md` Task 2 Step 4 is `[x]` for an assertion —
@@ -595,6 +598,75 @@ closing `\]\]`, the class-wide matcher pattern correctly does **not** flag them.
 defect, not a residue of the same one.
 
 ### Closed on `fix/spec-f-divergence-drain`
+
+- **No shared frontmatter parser, a split `status` enum, and a fixture blind to both** — divergences
+  7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1`) is now the single definition,
+  alongside `link-extraction.sh` and versioned the same way. Frontmatter is **strictly** the block
+  between a `---` on line 1 and the next `---`; keys must start at column 0; the field name is matched
+  with `index()`, never a regex.
+
+  **Eleven live sites converted**, not the three the entry named — the count was taken by hand and was
+  low. Re-derive the live set (comments describing the old form are excluded, which is why a check
+  keyed on the literal string returns 5 and means nothing):
+
+  ```bash
+  for f in $(find skill-sources skills -name SKILL.md) hooks/scripts/session-orient.sh; do
+    sed 's/#.*$//' "$f" | grep -q "grep -r[lLc]* *['\"]\^status" && echo "LIVE: $f"
+  done                                   # prints nothing; injecting one site makes it print
+  ```
+
+  **The enum was resolved toward `schema.md`, not away from it:** `open` was added to
+  `generators/features/atomic-notes.md:94`, because `schema.md` declares the `_schema` block "the
+  single source of truth for field validation" and both `_schema` blocks list `open`. The reasoning is
+  written into the file that changed, together with the note that `ops/tensions/` (`pending | resolved
+  | dissolved`) and queue entries (`pending`, `done`) are *different fields that share a name* — the
+  ambiguity that let one `status` vocabulary be mistaken for three.
+
+  **D8 was latent in the scope the converted sites scan, and manifest just outside it.** Measured on
+  the field vault: `ops/observations/` has 38 files matching `^status:` and `ops/tensions/` 27, and
+  **zero** of those 65 carry the match outside frontmatter — so no shipped observation or tension
+  count was ever wrong, and "this was producing wrong numbers" would have been the wrong claim.
+  Vault-wide, though, 15 files *do* match only in the body, and 2 of them are in `ops/methodology/` —
+  a directory `generators/features/methodology-knowledge.md:31` tells vaults to scan with
+  `rg '^status: active'`. The class is live there; that recipe is among the unconverted ones noted in
+  the open list above. Re-derive both halves:
+
+  ```bash
+  . reference/lib/frontmatter.sh
+  for d in ~/second-brain/ops/observations ~/second-brain/ops/tensions ~/second-brain; do
+    n=0; t=0
+    for f in $(grep -rl '^status:' "$d" --include='*.md' 2>/dev/null); do
+      t=$((t+1)); frontmatter_field "$f" status >/dev/null 2>&1 || n=$((n+1))
+    done
+    printf '%-46s %4s matching, %2s body-only\n' "$d" "$t" "$n"
+  done                                  # 38/0, 27/0, 2476/15
+  ```
+
+  The earlier entry's "14 matching files" is not reproducible against this vault at any scope and has
+  been replaced by the measurement above rather than carried forward.
+
+  **The fixture is why 7 and 8 could survive.** `reference/test/fence-isolation.test.sh` now builds a
+  four-note discriminating set under `notes/status-probe/` — frontmatter `status`, a body-fenced
+  `status: pending` at **column 0**, a nested one, and one with no frontmatter at all — and asserts
+  three ways as gate assertion **F**: correct parser **2**, naive `grep -rl` **1**, wrong-field parser
+  **4**. The two wrong answers test *different* properties (body discrimination; field-name
+  discrimination), so neither arm is redundant. Both arms were verified live by mutation: removing the
+  frontmatter guard drops the correct arm to 1, hardcoding the field drops the wrong-field arm to 2,
+  and each turns the gate red.
+
+  **The remedy message is backed by a step that performs it.** `/next`, `/rethink`, `/stats`,
+  `/architect` and `/health` exit 1 naming `/arscontexta:upgrade`, so `skills/upgrade` Step 6a is now
+  table-driven over **both** libraries — reading each one's own version constant, reporting one line
+  per file — and `skills/setup` copies both. `skills/health` Category 9 checks both, which it must:
+  it sources `frontmatter.sh` for its own condition counts and would otherwise vouch for a library it
+  had just failed to use. `hooks/scripts/session-orient.sh` is the one converted site that does **not**
+  exit: it is a SessionStart hook, so it warns on stderr and omits the two signals, because an omitted
+  line is visible and a substituted `0` is exactly the value that stops a threshold from ever firing.
+
+  `platforms/shared/skill-blocks/rethink.md:75,77` still carries the naive form and was deliberately
+  not touched — that tree is frozen by `check-portability.sh` check 4's cksum manifest. The queue-file
+  greps (`skill-sources/stats:329-330`, `tasks:86-87`, `next:215`) are also unconverted and are a
+  different subject: a queue file is a list of entries, not per-note frontmatter.
 
 - **`graph`'s authority loop inlined the naive matcher** — divergence 6, and one more site than that
   entry knew about: the identical loop also drove `stats`' orphan count

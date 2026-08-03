@@ -431,7 +431,7 @@ All generated systems ship with full automation from day one. There are no tiers
 | Context file | Always | Comprehensive, all sections |
 | 16 processing skills + 10 plugin commands | Always | Processing skills vocabulary-transformed with full quality gates |
 | All hooks | Always | Orient, capture, validate, commit |
-| Link library | Always | ops/lib/link-extraction.sh |
+| Shared libraries | Always | ops/lib/link-extraction.sh + ops/lib/frontmatter.sh |
 | Queue system | Always | ops/tasks.md + ops/queue/ + ops/queue/.locks/ |
 | Templates | Always | With _schema blocks |
 | Self space | If opted in | self/ or ops/ fallback |
@@ -1435,19 +1435,24 @@ Generate all four hook scripts: session-orient.sh, session-capture.sh, validate-
 
 ##### Shared Library (ops/lib/)
 
-Generated systems are self-contained. A vault's own skills never read from the plugin directory, because the plugin can be uninstalled, moved, or upgraded independently of any vault it produced. The link-extraction library is therefore **copied into** the vault rather than referenced from it.
+Generated systems are self-contained. A vault's own skills never read from the plugin directory, because the plugin can be uninstalled, moved, or upgraded independently of any vault it produced. The shared libraries are therefore **copied into** the vault rather than referenced from it.
 
-Create the directory `ops/lib/` in the vault, then copy `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` into it as `ops/lib/link-extraction.sh`, preserving its executable bit.
+Create the directory `ops/lib/` in the vault, then copy **both** of these into it, preserving the executable bit:
 
-**Perform this copy yourself — do not emit it as a shell command.** `${CLAUDE_PLUGIN_ROOT}` resolves for you, who knows where the plugin is installed; it is *unset* inside a bash block, so a shell copy would silently read from `/reference/lib/link-extraction.sh`, fail, and leave `ops/lib/` empty. The generated vault would then look like it needs an upgrade rather than a repaired copy.
+| From | To | Version constant |
+|---|---|---|
+| `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` | `ops/lib/link-extraction.sh` | `LINK_EXTRACTION_VERSION` |
+| `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `ops/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
 
-**Verify the file landed — not that the copy step ran.** Confirm all three:
+**Perform these copies yourself — do not emit them as shell commands.** `${CLAUDE_PLUGIN_ROOT}` resolves for you, who knows where the plugin is installed; it is *unset* inside a bash block, so a shell copy would silently read from `/reference/lib/…`, fail, and leave `ops/lib/` empty. The generated vault would then look like it needs an upgrade rather than a repaired copy. This applies identically to both files.
 
-1. `ops/lib/link-extraction.sh` exists in the vault and is readable
-2. it contains a `LINK_EXTRACTION_VERSION=` assignment
+**Verify each file landed — not that the copy step ran.** For *each* row above, confirm all three:
+
+1. the destination exists in the vault and is readable
+2. it contains that row's version constant as an assignment
 3. that version is `1` or greater
 
-If any check fails, **report it prominently in the generation output and name `/arscontexta:upgrade` as the repair — then continue generating.** Do not abort the run: a half-built vault (hooks written, no Hub MOC, no templates) is a worse and less recoverable state than a complete vault missing one file, and `/arscontexta:upgrade` restores this library on demand. What must not happen is silence. Every generated `/stats` and `/graph` sources this file and exits 1 without it, so an unreported skipped copy ships a vault whose link, connection, and density figures are unavailable from the first day.
+If any check fails, **report it prominently in the generation output and name `/arscontexta:upgrade` as the repair — then continue generating.** Do not abort the run: a half-built vault (hooks written, no Hub MOC, no templates) is a worse and less recoverable state than a complete vault missing one file, and `/arscontexta:upgrade` restores both libraries on demand. What must not happen is silence. Every generated `/stats` and `/graph` sources the link library and exits 1 without it; `/next`, `/rethink` and `/stats` source the frontmatter library and exit 1 without it. An unreported skipped copy ships a vault whose link and density figures — or whose observation and tension counts — are unavailable from the first day.
 
 ---
 

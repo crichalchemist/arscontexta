@@ -1,0 +1,191 @@
+#!/bin/bash
+# frontmatter.sh — the single definition of reading a YAML frontmatter field.
+#
+# Sourced by skill templates and by the plugin's own skills. Do NOT inline copies
+# of these functions anywhere.
+#
+# NOTHING ENFORCES THAT SENTENCE, for the same reason it enforces nothing for
+# reference/lib/link-extraction.sh: check-portability.sh runs five checks — PCRE
+# grep, wiki-link capture using negated classes, PCRE via ripgrep, the frozen
+# skill-blocks manifest, and AGENTS.md being a symlink — and none of them detects
+# an inlined copy of anything. The rule is real and still binding; the enforcement
+# is convention. Owner of the gap: the CI-hardening spec.
+#
+# Writing or editing a SKILL.md? Read reference/skill-authoring.md first.
+#
+# WHY THIS EXISTS
+# ---------------
+# Three sites each spelled frontmatter extraction as `grep -rl '^status: pending'`
+# over a directory of notes. That form answers a DIFFERENT question than the one
+# its callers ask: it matches a line-anchored `status:` ANYWHERE in the file,
+# including inside a fenced code block in the body. A note documenting the schema
+# by showing `status: pending` in a ```yaml example counts as a pending note.
+#
+# Measured on a four-note fixture (one frontmatter `status`, one body-fenced
+# `status` at column 0, one nested with frontmatter `status`, one with no
+# frontmatter at all), the true count of notes MISSING the field is 2 and the
+# naive form yields 1. That fixture lives in reference/test/fence-isolation.test.sh
+# and is asserted three ways on every run.
+#
+# WHAT COUNTS AS FRONTMATTER HERE — the rules, all deliberate:
+#   1. STRICT DELIMITERS. Frontmatter is the block between a `---` on line 1 and
+#      the next `---`. A file whose first line is not `---` has no frontmatter, and
+#      neither does one that opens a block and never closes it. Leniency (treating
+#      a leading run of `key: value` lines as frontmatter) would reintroduce exactly
+#      the ambiguity this library removes, and it would misclassify the "no
+#      frontmatter at all" case that the fixture depends on.
+#   2. TOP-LEVEL KEYS ONLY. The key must start at column 0. An indented `status:`
+#      is a member of some parent mapping, not the note's own field.
+#   3. NO REGEX ON THE FIELD NAME. Matching uses index(), so a field name
+#      containing regex metacharacters cannot silently change what is matched.
+#   4. LAST DECLARATION WINS if a key appears twice. YAML calls duplicate keys an
+#      error; this library does not fail on them, it resolves them, and says so
+#      rather than leaving the behavior undiscovered.
+#   5. RECURSIVE BY DEFAULT. The directory helpers scan a tree, because a vault
+#      directory with no subdirectories today may grow one tomorrow and a flat scan
+#      under-reports silently rather than failing. This is the lesson already
+#      written into link-extraction.sh; it applies here unchanged.
+#
+# NOT HANDLED, on purpose: trailing YAML comments (`status: open # why`) are part
+# of the value, and multi-line/flow values are returned verbatim. No caller needs
+# either, and guessing at them would add failure modes without adding a user.
+
+# Contract version. Bump on any BEHAVIOR change (delimiter rules, key matching,
+# quote stripping, recursion semantics). Callers and /arscontexta:upgrade read it.
+FRONTMATTER_VERSION=1
+
+# Check dependencies and directory argument.
+_fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
+  local dir="$1"
+  if ! command -v awk >/dev/null 2>&1; then
+    echo "error: frontmatter: requires 'awk', not found in PATH" >&2
+    return 1
+  fi
+  if ! command -v find >/dev/null 2>&1; then
+    echo "error: frontmatter: requires 'find', not found in PATH" >&2
+    return 1
+  fi
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    echo "error: frontmatter: not a directory: '${dir:-<empty>}'" >&2
+    return 1
+  fi
+  return 0
+}
+
+# frontmatter_field <file> <field> -> value on stdout
+#   rc 0  field present in frontmatter (value may be the empty string)
+#   rc 1  no frontmatter, unclosed frontmatter, or field absent
+#
+# The three rc-1 cases are deliberately NOT distinguished: every caller so far asks
+# "does this file declare <field> as <value>", for which all three answer no.
+frontmatter_field() {
+  local file="$1" field="$2"
+  if [ -z "$field" ]; then
+    echo "error: frontmatter: frontmatter_field requires a field name" >&2
+    return 1
+  fi
+  if [ -z "$file" ] || [ ! -r "$file" ]; then
+    echo "error: frontmatter: not a readable file: '${file:-<empty>}'" >&2
+    return 1
+  fi
+  awk -v key="$field" '
+    BEGIN { sq = sprintf("%c", 39) }          # single quote, unquotable in this program
+    NR == 1 { if ($0 !~ /^---[[:space:]]*$/) exit 1; in_fm = 1; next }
+    in_fm && /^---[[:space:]]*$/ { in_fm = 0; closed = 1; exit }
+    in_fm && index($0, key ":") == 1 {
+      v = substr($0, length(key) + 2)
+      sub(/^[[:space:]]+/, "", v)
+      sub(/[[:space:]]+$/, "", v)
+      q = substr(v, 1, 1)
+      if (length(v) > 1 && (q == "\"" || q == sq) && substr(v, length(v), 1) == q)
+        v = substr(v, 2, length(v) - 2)
+      val = v; found = 1
+    }
+    END { if (!closed || !found) exit 1; print val }
+  ' "$file"
+}
+
+# list_notes_by_field <dir> <field> <value>... -> matching file paths, one per line
+# Recursive. Emits nothing and returns 0 when the tree holds no match.
+list_notes_by_field() {
+  _fm_require_deps_and_dir "$1" || return 1
+  local dir="$1" field="$2" errf p fm_val want
+  shift 2
+  if [ -z "$field" ] || [ $# -eq 0 ]; then
+    echo "error: frontmatter: list_notes_by_field needs <dir> <field> <value>..." >&2
+    return 1
+  fi
+  errf="/tmp/frontmatter-err-$$"
+  rm -f "$errf"
+
+  # The loop runs in a subshell, so it cannot set a variable the caller reads --
+  # a failure signalled by a flag inside it would be discarded and the caller would
+  # see a short list as a legitimately short list. The touch-file is how
+  # link-extraction.sh solves the same problem; the alternative is silence.
+  find "$dir" -type f -name '*.md' | while IFS= read -r p; do
+    if [ ! -r "$p" ]; then
+      touch "$errf"
+      continue
+    fi
+    fm_val=$(frontmatter_field "$p" "$field" 2>/dev/null) || continue
+    for want in "$@"; do
+      if [ "$fm_val" = "$want" ]; then
+        printf '%s\n' "$p"
+        break
+      fi
+    done
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$errf"
+    echo "error: frontmatter: unreadable file under '$dir'; refusing to report a count" >&2
+    return 1
+  fi
+  return 0
+}
+
+# count_notes_by_field <dir> <field> <value>... -> integer
+count_notes_by_field() {
+  local out
+  # Declared first, assigned second, ON PURPOSE. `local out=$(f)` yields `local`'s
+  # exit status, which is 0 even when f failed -- so a failed scan would be read as
+  # a count of zero, the exact silent failure this library exists to remove.
+  out=$(list_notes_by_field "$@") || return 1
+  if [ -z "$out" ]; then
+    printf '0'
+  else
+    printf '%s\n' "$out" | wc -l | tr -d ' '
+  fi
+}
+
+# count_notes_missing_field <dir> <field> -> integer
+# Files under <dir> that do NOT declare <field> in frontmatter -- which includes
+# files with no frontmatter at all. This is the dual of count_notes_by_field, and
+# it is the function the three-way fixture assertion keys on: only a parser that
+# actually reads the requested FIELD NAME can distinguish "missing status" from
+# "missing some-field-nothing-declares".
+count_notes_missing_field() {
+  _fm_require_deps_and_dir "$1" || return 1
+  local dir="$1" field="$2" errf missing p
+  if [ -z "$field" ]; then
+    echo "error: frontmatter: count_notes_missing_field needs <dir> <field>" >&2
+    return 1
+  fi
+  errf="/tmp/frontmatter-err-$$"
+  rm -f "$errf"
+
+  missing=$(find "$dir" -type f -name '*.md' | while IFS= read -r p; do
+    if [ ! -r "$p" ]; then
+      touch "$errf"
+      continue
+    fi
+    frontmatter_field "$p" "$field" >/dev/null 2>&1 || printf 'x\n'
+  done | wc -l | tr -d ' ')
+
+  if [ -e "$errf" ]; then
+    rm -f "$errf"
+    echo "error: frontmatter: unreadable file under '$dir'; refusing to report a count" >&2
+    return 1
+  fi
+  printf '%s' "$missing"
+}

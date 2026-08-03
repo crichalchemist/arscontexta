@@ -23,6 +23,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 LINK_LIB_SRC="$ROOT/reference/lib/link-extraction.sh"
+FM_LIB_SRC="$ROOT/reference/lib/frontmatter.sh"
 
 # Every spawned shell must be THIS harness's shell, not `sh`. On macOS `sh` is
 # bash 3.2 regardless of what launched the harness, so an `sh` site silently
@@ -52,7 +53,7 @@ mkdir -p "$WORK/fences" "$WORK/out" || {
 [ -n "${FENCE_GATE_KEEP:-}" ] || trap 'rm -rf "$WORK"' EXIT INT TERM
 
 fences=0; run=0; skipped=0
-h_fail=0; n_fail=0; setu_fail=0; known=0; stale=0
+h_fail=0; n_fail=0; setu_fail=0; known=0; stale=0; f_fail=0
 SKIP_LOG="$WORK/skips.txt"; : > "$SKIP_LOG"
 FAIL_LOG="$WORK/fails.txt"; : > "$FAIL_LOG"
 SETU_LOG="$WORK/setu.txt"; : > "$SETU_LOG"
@@ -135,9 +136,21 @@ build_fixture() {
     printf 'harness: cannot copy %s into the fixture\n' "$LINK_LIB_SRC" >&2
     return 1
   }
+  cp "$FM_LIB_SRC" "$v/ops/lib/frontmatter.sh" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$FM_LIB_SRC" >&2
+    return 1
+  }
 
-  printf 'description: an observation\nstatus: pending\ntitle: an observation\n' > "$v/ops/observations/obs-one.md"
-  printf 'status: open\ntitle: a tension\n'              > "$v/ops/tensions/tension-one.md"
+  # THE `---` DELIMITERS ARE LOAD-BEARING, not decoration. These two files had none,
+  # which was fine while the counting fences matched `^status:` line-anchored anywhere
+  # in the file. They read the field out of FRONTMATTER now, and frontmatter is defined
+  # strictly: a `---` on line 1 and a closing `---`. Without them these files declare no
+  # status at all, every converted fence would count 0 on a HEALTHY fixture, and every
+  # assertion would still pass — vacuously. Real generated observations carry the
+  # delimiters (generators/features/self-evolution.md:85), so this is fixture fidelity,
+  # not a concession to the parser.
+  printf -- '---\ndescription: an observation\nstatus: pending\ntitle: an observation\n---\nBody.\n' > "$v/ops/observations/obs-one.md"
+  printf -- '---\nstatus: open\ntitle: a tension\n---\nBody.\n'  > "$v/ops/tensions/tension-one.md"
   printf 'description: a learned rule\ntitle: a learned rule\n' > "$v/ops/methodology/method-one.md"
   printf 'title: a session\n'                            > "$v/ops/sessions/session-one.md"
   printf -- '- id: one\n  status: pending\n- id: two\n  status: done\n' > "$v/ops/queue/queue.yaml"
@@ -178,12 +191,83 @@ build_fixture() {
   printf -- '---\ntype: moc\ntitle: delta-moc\ndescription: the map\ncreated: %s\ntopics:\n  - "[[delta-moc]]"\n---\nCovers [[alpha]], [[beta]], [[gamma]].\n' "$TODAY" > "$v/notes/delta-moc.md"
   printf -- '---\ntype: note\ntitle: nested\ndescription: nested note\ncreated: %s\ntopics:\n  - "[[delta-moc]]"\n---\nLinks to [[alpha]].\n' "$TODAY" > "$v/notes/sub/nested.md"
   printf -- '---\ntitle: raw capture\n---\nUnprocessed material.\n' > "$v/inbox/raw-capture.md"
+
+  # --- the frontmatter discriminating set -----------------------------------
+  # Four notes under one subtree, so the answer can be counted in ISOLATION. Mixed
+  # in with alpha..nested the numbers below would be sums over unrelated files and
+  # would drift every time someone adds a fixture note.
+  #
+  # It lives under notes/ rather than beside it because that is where a real vault's
+  # status fields live, and because a probe kept in a private directory would stop
+  # being exposed to whatever the notes tree grows into.
+  mkdir -p "$v/notes/status-probe/deep" || return 1
+  printf -- '---\ntitle: one active\nstatus: active\n---\nBody.\n' \
+    > "$v/notes/status-probe/one-active.md"
+  # COLUMN 0 IS THE WHOLE POINT of this file. Indent the fenced `status: pending`
+  # by even one space and `grep -rl '^status:'` stops matching it, the naive arm
+  # below returns 2 instead of 1, and the discriminator quietly becomes a tautology
+  # that passes whatever the parser does.
+  printf -- '---\ntitle: two fenced\n---\nExample of the schema:\n```yaml\nstatus: pending\n```\nEnd.\n' \
+    > "$v/notes/status-probe/two-fenced.md"
+  printf -- '---\ntitle: three archived\nstatus: archived\n---\nBody.\n' \
+    > "$v/notes/status-probe/deep/three-archived.md"
+  printf -- 'Just a body. No frontmatter at all.\n' \
+    > "$v/notes/status-probe/four-bare.md"
   return 0
+}
+
+# --- assertion F: the frontmatter parser, three ways ------------------------
+# Not a fence assertion — a library one, kept in this harness rather than in a new
+# reference/test/frontmatter.test.sh because an unwired suite is a green-looking
+# nothing, and this gate is already wired into CI and CLAUDE.md's table.
+#
+# THE THREE ARMS TEST DIFFERENT PROPERTIES. Do not delete either as redundant:
+#   correct(status)    = 2  the parser reads the FRONTMATTER field
+#   naive(grep -rl)    = 1  ...and the body-fenced `status: pending` is why the old
+#                           spelling disagreed. This arm tests FENCE/BODY discrimination.
+#   wrong-field        = 4  asking for a field NO note declares must return all four.
+#                           This arm tests FIELD-NAME discrimination: a parser that
+#                           merely detected "has frontmatter" would return 1 here and
+#                           the first arm alone would never notice.
+# `reviewed` is the wrong-field name because it appears in none of the four
+# frontmatters. `type` or `title` would NOT work — two-fenced.md needs some
+# frontmatter to distinguish it from four-bare.md, so a field it happens to carry
+# would return 3 and the arm would silently stop discriminating.
+assert_frontmatter_three_ways() {           # assert_frontmatter_three_ways <vault>
+  probe="$1/notes/status-probe"
+  f_fail=0
+  if [ ! -d "$probe" ]; then
+    printf 'F  discriminating set missing at %s — cannot conclude anything\n' "$probe" >> "$FAIL_LOG"
+    return 1
+  fi
+  # Loaded from the FIXTURE copy, not $ROOT: that is the file a generated vault
+  # actually sources, so a broken cp is a failure rather than an invisible fallback.
+  . "$1/ops/lib/frontmatter.sh" || {
+    printf 'F  cannot source the fixture copy of frontmatter.sh\n' >> "$FAIL_LOG"
+    return 1
+  }
+  f_total=$(find "$probe" -type f -name '*.md' | wc -l | tr -d ' ')
+  f_naive_has=$(/usr/bin/grep -rl '^status:' "$probe" 2>/dev/null | wc -l | tr -d ' ')
+  f_correct=$(count_notes_missing_field "$probe" status) || f_correct=ERR
+  f_naive=$((f_total - f_naive_has))
+  f_wrong=$(count_notes_missing_field "$probe" reviewed) || f_wrong=ERR
+
+  [ "$f_total" = 4 ] || { printf 'F  discriminating set holds %s notes, expected 4\n' "$f_total" >> "$FAIL_LOG"; f_fail=1; }
+  [ "$f_correct" = 2 ] || { printf 'F  correct parser returned %s missing-status, expected 2\n' "$f_correct" >> "$FAIL_LOG"; f_fail=1; }
+  [ "$f_naive" = 1 ] || { printf 'F  naive grep -rl returned %s missing-status, expected 1 (fixture no longer discriminates)\n' "$f_naive" >> "$FAIL_LOG"; f_fail=1; }
+  [ "$f_wrong" = 4 ] || { printf 'F  wrong-field parser returned %s missing-reviewed, expected 4\n' "$f_wrong" >> "$FAIL_LOG"; f_fail=1; }
+  return "$f_fail"
 }
 
 VAULT_FULL="$WORK/vault-full"
 VAULT_HOLLOW="$WORK/vault-hollow"
 build_fixture "$VAULT_HOLLOW" hollow || { echo "harness: cannot build hollow fixture" >&2; exit 1; }
+
+# Assertion F runs ONCE, here, against its own build of the full fixture. It is not
+# per-fence, and the fence loop rebuilds VAULT_FULL on every iteration, so running it
+# there would repeat the same check ~72 times and report the last one.
+build_fixture "$VAULT_FULL" full || { echo "harness: cannot build full fixture" >&2; exit 1; }
+assert_frontmatter_three_ways "$VAULT_FULL" || f_fail=1
 
 # --- preconditions ----------------------------------------------------------
 # Asserted, not assumed. A missing tool makes a fence exit 127, which this gate
@@ -673,11 +757,13 @@ printf 'H (healthy: no failure with stderr/digits): %s failing\n' "$h_fail"
 printf 'N (no notes dir: never rc 0 with digits):   %s failing\n' "$n_fail"
 printf 'U (set -u: no read of an undefined var):    %s failing\n' "$setu_fail"
 printf 'S (no stale entry in either table):        %s failing\n' "$stale"
+printf 'F (frontmatter parser, three ways 2/1/4):   %s failing\n' "$f_fail"
 if [ -s "$FAIL_LOG" ]; then echo; echo "FAILURES:"; cat "$FAIL_LOG"; fi
 if [ -s "$WORK/stale.txt" ]; then echo; echo "STALE TABLE ENTRIES:"; cat "$WORK/stale.txt"; fi
 
 echo
-if [ "$h_fail" -eq 0 ] && [ "$n_fail" -eq 0 ] && [ "$setu_fail" -eq 0 ] && [ "$stale" -eq 0 ]; then
+if [ "$h_fail" -eq 0 ] && [ "$n_fail" -eq 0 ] && [ "$setu_fail" -eq 0 ] && [ "$stale" -eq 0 ] \
+   && [ "$f_fail" -eq 0 ]; then
   echo "FENCE ISOLATION: PASS"; exit 0
 else
   echo "FENCE ISOLATION: FAIL"; exit 1

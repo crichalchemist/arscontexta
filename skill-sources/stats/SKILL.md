@@ -424,11 +424,37 @@ fi
 # Methodology notes
 METHODOLOGY_COUNT=$(ls -1 ops/methodology/*.md 2>/dev/null | wc -l | tr -d ' ')
 
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+# The naive `grep -rl '^status: pending'` this replaced matched a line-anchored `status:`
+# ANYWHERE in the file, including inside a fenced block in the body, so a note that
+# documented the schema by showing `status: pending` in an example read as pending.
+FM_LIB="ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# A directory that does not exist means that feature is not active — valid state, count 0,
+# reported as N/A above. A scan that FAILS over a directory that exists must not fold to 0.
+count_open_items() {                       # count_open_items <dir>
+  [ -d "$1" ] || { printf '0'; return 0; }
+  count_notes_by_field "$1" status pending open
+}
+
 # Observations pending
-OBS_PENDING=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_PENDING=$(count_open_items ops/observations) || {
+  echo "error: observation scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Tensions pending
-TENSION_PENDING=$(grep -rl '^status: open\|^status: pending' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
+TENSION_PENDING=$(count_open_items ops/tensions) || {
+  echo "error: tension scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Sessions captured
 SESSION_COUNT=$(ls -1 ops/sessions/*.md 2>/dev/null | wc -l | tr -d ' ')

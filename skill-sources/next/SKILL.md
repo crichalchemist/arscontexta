@@ -163,11 +163,38 @@ OLDEST_INBOX=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 -exec stat -c "
 # Note count
 NOTE_COUNT=$(ls -1 {vocabulary.notes}/*.md 2>/dev/null | wc -l | tr -d ' ')
 
+# Sourced, never re-implemented. The naive `grep -rl '^status: pending'` spelling this
+# replaced matches a line-anchored `status:` ANYWHERE in the file, including inside a
+# fenced block in the body — so a note that documents the schema by showing
+# `status: pending` in a ```yaml example counted as a pending note.
+FM_LIB="ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# A directory that does not exist is a valid state per this skill's own adaptation
+# rules ("a missing directory means that feature is not active"). A scan that FAILS
+# over a directory that DOES exist is not, and must not fold to 0.
+count_open_items() {                       # count_open_items <dir>
+  [ -d "$1" ] || { printf '0'; return 0; }
+  count_notes_by_field "$1" status pending open
+}
+
 # Pending observations
-OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_COUNT=$(count_open_items ops/observations) || {
+  echo "error: observation scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Pending tensions
-TENSION_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
+TENSION_COUNT=$(count_open_items ops/tensions) || {
+  echo "error: tension scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Unmined sessions
 SESSION_COUNT=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null | wc -l | tr -d ' ')
@@ -178,9 +205,12 @@ SESSION_COUNT=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null | wc -l | 
 # sources. They are counted here or they come out of the contract; a promised field
 # with no code behind it is the house failure in prose form.
 
-# Sourced, never re-implemented. `check-portability.sh` rejects inlined copies, and
-# the naive `grep -rl "[[$NAME]]"` spelling counts links inside fenced blocks, does
-# not case-fold, and matches the wrong direction for orphans.
+# Sourced, never re-implemented — a rule enforced by convention, NOT by a gate. This
+# comment used to claim `check-portability.sh` rejects inlined copies; it does not.
+# That script runs five checks and none of them detects an inlined copy of anything,
+# which `reference/lib/link-extraction.sh` states outright in its own header. The
+# reason to source it is the naive `grep -rl "[[$NAME]]"` spelling: it counts links
+# inside fenced blocks, does not case-fold, and matches the wrong direction for orphans.
 LINK_LIB="ops/lib/link-extraction.sh"
 if [ -r "$LINK_LIB" ]; then
   . "$LINK_LIB"

@@ -91,9 +91,21 @@ The good description tells you: the scope (workdays vs weekends), the mechanism 
 Optional fields may be added when relevant:
 ```yaml
 type: insight | pattern | preference | fact | decision | question
-status: preliminary | active | archived
+status: preliminary | open | active | archived
 created: YYYY-MM-DD
 ```
+
+**`open` used to be missing from that line**, which made this the one note-status declaration in
+`generators/` that disagreed with the other three (`schema.md:30`, `schema.md:137`,
+`templates.md:30`). It was resolved *toward* them rather than away, because `schema.md` declares the
+`_schema` block "the single source of truth for field validation" — and both `_schema` blocks list
+`open`. A sample here that omits a value the validator accepts teaches authors a narrower vocabulary
+than the system enforces.
+
+This is the **{DOMAIN:note}** status enum only. `ops/tensions/` has its own (`pending | resolved |
+dissolved`) and queue entries have a third (`pending`, `done`); they are different fields that share
+a name. Re-derive every declaration with:
+`grep -rn 'status' generators/ --include='*.md'`
 
 Standard {DOMAIN:notes} do not need `type` — it is the default. Add `type` when the {DOMAIN:note} type matters for querying (e.g., finding all patterns, all decisions, all tensions).
 

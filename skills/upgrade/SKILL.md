@@ -334,31 +334,39 @@ It also ran each repair once per approved upgrade. The Final Report's `[current]
 (`queue lock dir: present [current]`) are the tell — a per-upgrade step has no reason to report
 "nothing needed."
 
-### 6a. Refresh the shared library
+### 6a. Refresh the shared libraries
 
-Generated vaults carry their own copy of the link-extraction library at `ops/lib/link-extraction.sh`.
+Generated vaults carry their own copies of **two** versioned libraries under `ops/lib/`:
 
-**Scope, stated rather than implied: this step reconciles that one file, not the whole of
+| Vault file | Plugin source | Version constant |
+|---|---|---|
+| `ops/lib/link-extraction.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` | `LINK_EXTRACTION_VERSION` |
+| `ops/lib/frontmatter.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
+
+**Scope, stated rather than implied: this step reconciles those two files, not the whole of
 `ops/lib/`.** A vault's `ops/lib/` may also hold graph parsers and their tests. Those carry no version
-marker to compare against, so this step cannot reconcile them and must not claim to. Report the file;
+marker to compare against, so this step cannot reconcile them and must not claim to. Report the files;
 never report the directory as repaired.
 
-**Do not assert which skills source this file.** In the one field vault measured, *no* skill
+**Run the procedure below once per row, independently.** One row halting or skipping says nothing
+about the other, and a single combined line in the report would hide which file was actually written.
+
+**Do not assert which skills source these files.** In the one field vault measured, *no* skill
 referenced `link-extraction.sh` at all: its `/graph` sources `ops/lib/graph.mjs` — which that skill
 calls the only sanctioned parser, warning that a naive wikilink regex once produced 135 false
-dangling links against a real count of 0 — and `/stats` sources neither. Restoring this file may
-therefore leave a vault's link counting broken. Say what was restored; do not infer what now works.
+dangling links against a real count of 0 — and `/stats` sources neither. Restoring a file may
+therefore leave a vault's counting broken. Say what was restored; do not infer what now works.
 
 **Do this as instructions you carry out, not as a bash block.** `${CLAUDE_PLUGIN_ROOT}` resolves for you; it is unset in a shell, so a shell copy would read from `/reference/lib/...` and silently do nothing.
 
-1. Read `LINK_EXTRACTION_VERSION` from the plugin's `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh`.
-   **If that file is absent, halt this step and report it — do not treat it as version `0`.** A
+1. Read the row's version constant from the row's **plugin** source.
+   **If that file is absent, halt this row and report it — do not treat it as version `0`.** A
    missing plugin-side library means the installed plugin predates the step reading it; there is
    nothing to refresh *from*, and the only safe action is to leave the vault's copy untouched. This
    is a live case, not a hypothetical: a plugin installed from a release older than this step has no
    `reference/lib/` at all, and treating that as `0` would copy a nonexistent file over a working
-   library. Report `link-extraction.sh: plugin copy absent [skipped — plugin older than this step]`.
-2. Read `LINK_EXTRACTION_VERSION` from the vault's `ops/lib/link-extraction.sh`. Treat a missing file or a missing assignment as version `0`.
+   library. Report `<file>: plugin copy absent [skipped — plugin older than this step]`.
+2. Read the same constant from the row's **vault** file. Treat a missing file or a missing assignment as version `0`.
 3. **Compare numerically, and copy only when the plugin's version is strictly greater than the
    vault's.** Equal means current — do nothing. Vault *ahead* of plugin means the vault was refreshed
    by a newer plugin than the one now installed; leave it alone and report it. Copying on "the two
@@ -367,8 +375,9 @@ therefore leave a vault's link counting broken. Say what was restored; do not in
    file over the vault's, preserving the executable bit.
 4. Confirm the copy landed: the vault file must now exist, be readable, and report the plugin's version. If it does not, report the failure — do not record the refresh as applied.
 
-**Report the replacement; never overwrite silently.** Name both versions and the outcome in the Final
-Report — every branch above has a line, including the ones where nothing was written:
+**Report each replacement; never overwrite silently.** Name both versions and the outcome in the Final
+Report, **one line per row** — every branch above has a line, including the ones where nothing was
+written:
 
 ```text
 link-extraction.sh: v0 (absent) → v2 [restored]
@@ -376,12 +385,20 @@ link-extraction.sh: v1 → v2 [refreshed]
 link-extraction.sh: v2 [current]
 link-extraction.sh: v2 → v1 [vault ahead, skipped]
 link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
+frontmatter.sh:     v0 (absent) → v1 [restored]
+frontmatter.sh:     v1 [current]
 ```
 
-When the vault's `ops/lib/` held other files, add the scope line so the user is not left reading a
-restored file as a restored directory: `other ops/lib/ files not checked`. A library swapped in
-without a line in the report is a change the user cannot audit — and this file decides what every
-link count in the vault reports.
+`frontmatter.sh` is absent from **every vault generated before it existed**, so `v0 (absent) → v1
+[restored]` is the expected line on an older vault, not an anomaly. Until that copy lands, `/next`,
+`/rethink` and `/stats` exit 1 naming this step as the repair — which is why this step must actually
+perform it. A remedy message pointing at a step that does not restore the file would be the silent
+failure this repo is named for, wearing a helpful voice.
+
+When the vault's `ops/lib/` held files other than the two rows above, add the scope line so the user
+is not left reading restored files as a restored directory: `other ops/lib/ files not checked`. A
+library swapped in without a line in the report is a change the user cannot audit — and these files
+decide what every link count and every status count in the vault reports.
 
 ### 6b. Restore the queue lock directory
 
@@ -535,7 +552,10 @@ Vault infrastructure (Step 6 — runs regardless of approvals):
   - link-extraction.sh: v{vault} → v{plugin} [restored | refreshed | current
                                               | vault ahead, skipped
                                               | plugin copy absent, skipped]
-    {when ops/lib/ held other files:} other ops/lib/ files not checked
+  - frontmatter.sh:     v{vault} → v{plugin} [restored | refreshed | current
+                                              | vault ahead, skipped
+                                              | plugin copy absent, skipped]
+    {when ops/lib/ held files other than those two:} other ops/lib/ files not checked
   - queue lock dir: {absent → created [restored] | present [current]}
   - self_evolution: {absent → seeded (10/5) [restored] | present [current]
                      | absent, but maintenance.conditions declares {n}/{n} —

@@ -122,10 +122,49 @@ done
 # Accept BOTH spellings: generated vaults write `status: open`, older templates
 # write `status: pending`. Matching one alone yields 0 on half the vaults in
 # existence, and a threshold that reads 0 can never fire.
+#
+# The FIELD is read from frontmatter, not matched line-anchored anywhere in the file.
+# The `grep -rl '^status: pending'` spelling this replaced also matched a `status:`
+# line in the BODY, including inside a fenced block, so an observation that quoted a
+# schema example counted itself as open. Sourced, never re-implemented — a rule held
+# by convention, not by a gate. See reference/lib/frontmatter.sh.
+#
+# THIS HOOK DOES NOT `exit 1` THE WAY THE SLASH COMMANDS DO. It runs at SessionStart,
+# where aborting costs the user the entire orientation block over one missing file. It
+# follows `threshold()` below instead: say the condition on stderr, OMIT the signal,
+# let the session start. Omitting is visible. Substituting 0 would not be — and 0 is
+# precisely the value that stops a threshold from ever firing.
+FM_LIB="ops/lib/frontmatter.sh"
+FM_OK=0
+if [ -r "$FM_LIB" ] && . "$FM_LIB" 2>/dev/null; then
+  FM_OK=1
+else
+  echo "CONDITION: ops/lib/frontmatter.sh missing or unreadable — observation and tension" >&2
+  echo "  signals omitted this session. Run /arscontexta:upgrade to restore it." >&2
+fi
+
+# A directory that does not exist means that feature is not active — valid state, 0.
+# A scan that FAILS over a directory that DOES exist omits the signal rather than
+# reporting 0, for the reason stated above.
+count_open_items() { # count_open_items <dir>
+  [ -d "$1" ] || { printf '0'; return 0; }
+  count_notes_by_field "$1" status pending open
+}
+
 OBS_TOTAL=$(ls -1 ops/observations/*.md 2>/dev/null | wc -l | tr -d ' ')
-OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
 TENS_TOTAL=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
-TENS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_COUNT=""
+TENS_COUNT=""
+if [ "$FM_OK" -eq 1 ]; then
+  OBS_COUNT=$(count_open_items ops/observations) || {
+    echo "CONDITION: observation scan failed — signal omitted this session." >&2
+    OBS_COUNT=""
+  }
+  TENS_COUNT=$(count_open_items ops/tensions) || {
+    echo "CONDITION: tension scan failed — signal omitted this session." >&2
+    TENS_COUNT=""
+  }
+fi
 # NO `|| echo 0` HERE. `grep -c` prints `0` AND exits 1 when nothing matches, so a
 # `|| echo 0` fallback fires *in addition* to the 0 already printed and the variable
 # becomes the two-line string "0\n0". Every session start then emits
@@ -161,10 +200,13 @@ threshold() { # threshold <dotted-key> <default>
 OBS_THRESHOLD=$(threshold self_evolution.observation_threshold 10)
 TENS_THRESHOLD=$(threshold self_evolution.tension_threshold 5)
 
-if [ "$OBS_COUNT" -ge "$OBS_THRESHOLD" ]; then
+# The -n guards are the omission path, not defensive padding: an unmeasured count is
+# the empty string, and `[ "" -ge 10 ]` is an `integer expected` error, not a false.
+# The condition was already reported on stderr where the count could not be taken.
+if [ -n "$OBS_COUNT" ] && [ "$OBS_COUNT" -ge "$OBS_THRESHOLD" ]; then
   echo "CONDITION: $OBS_COUNT pending observations (of $OBS_TOTAL total). Consider /rethink."
 fi
-if [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
+if [ -n "$TENS_COUNT" ] && [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
   echo "CONDITION: $TENS_COUNT unresolved tensions (of $TENS_TOTAL total). Consider /rethink."
 fi
 # UNDECLARED THRESHOLDS. These two, and the 30 in the staleness check below, appear in
