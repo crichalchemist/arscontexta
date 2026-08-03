@@ -97,6 +97,16 @@ to a fence that has no such precondition, or that must succeed on a healthy tree
 fence that exits non-zero while writing stderr, which is what assertion H fails. The guard is correct;
 applying it where nothing can be absent is the defect.
 
+**Counting wiki-links, orphans, or dangling links? Source the library; do not write the pattern.**
+`reference/lib/link-extraction.sh` is the single definition of link counting and resolution, and
+`check-portability.sh` rejects inlined copies of it. The naive spelling —
+`grep -rl "[[$NAME]]" | wc -l` — is the one every author reaches for and it is wrong in three ways at
+once: it counts links inside fenced code blocks, it does not case-fold, and it matches the wrong
+direction for orphan detection. That last one is a documented accepted defect in two shipped
+templates, which is exactly why it must not spread to a third. Prefer the `*_recursive` variants: a
+vault with no subdirectories today may grow one tomorrow, and the flat scan under-reports silently
+rather than failing.
+
 What the gate asserts, cited by letter so this table cannot drift from it:
 
 | Letter | The gate asserts | What satisfies it |

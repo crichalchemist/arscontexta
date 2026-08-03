@@ -4,6 +4,11 @@
 # Sourced by skill templates and by validate-kernel.sh. Do NOT inline copies of
 # these functions anywhere; check-portability.sh enforces that.
 #
+# Writing or editing a SKILL.md? Read reference/skill-authoring.md — which tree
+# you are in, placeholder families, when a fail-loud guard fires, and what makes a
+# prose contract complete. This pointer is here because it was measured: agents
+# asked to add a counting fence read this file in full and never found that one.
+#
 # FLAT vs RECURSIVE:
 # Flat functions (count_links, extract_link_targets, existing_note_index) scan
 # a single directory only. Recursive variants (*_recursive) scan a directory
