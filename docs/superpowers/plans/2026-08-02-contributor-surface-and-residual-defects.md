@@ -457,15 +457,15 @@ cannot test.
 
 **This mutates a live vault. It is the owner's call to run, and requires their explicit go-ahead.**
 
-- [ ] **Step 1: Snapshot first**
+- [x] **Step 1: Snapshot first**
 
 ```bash
 cd ~/second-brain && git status --short && git rev-parse --short HEAD
 ```
 
-- [ ] **Step 2: Run `/arscontexta:upgrade`, capture the full report**
+- [x] **Step 2: Run `/arscontexta:upgrade`, capture the full report**
 
-- [ ] **Step 3: Verify each claimed repair independently of the report**
+- [x] **Step 3: Verify each claimed repair independently of the report**
 
 ```bash
 cd ~/second-brain
@@ -478,9 +478,65 @@ rg -n -A2 'self_evolution:' ops/config.yaml
 Expect `LINK_EXTRACTION_VERSION=2` — v1 is the macOS-only fold, and the version bump exists precisely
 so upgrade refreshes it.
 
-- [ ] **Step 4: Record what the report claimed vs what was true**
+- [x] **Step 4: Record what the report claimed vs what was true**
 
 Any divergence is a defect in the upgrade skill's prose contract and needs its own observation.
+
+---
+
+**EXECUTED 2026-08-02 against `~/second-brain` (vault at `7fdcd62a`, clean but for an untracked
+`.tracer`). Authorized explicitly by the owner.**
+
+**Report vs. filesystem: no divergence.** Every claimed repair was checked independently and every
+claim held — that is the question this task asked, and it is the good outcome.
+
+| Repair | Claimed | Verified independently |
+|---|---|---|
+| `ops/lib/link-extraction.sh` | absent → v2 | present, `LINK_EXTRACTION_VERSION=2` at line 36 |
+| `self_evolution:` in `ops/config.yaml` | absent → seeded 10/5 | present, column-0 anchor, parses |
+| `ops/queue/.locks/` | already present, no-op | present, mtime unchanged |
+
+Kernel validation after: **15 PASS / 2 WARN / 0 FAIL**, unchanged. Vault diff confined to exactly
+those two files. Nothing committed.
+
+**THE FINDING — `/upgrade` as published cannot perform any of these repairs.** Verified at the
+installed cache, `~/.claude/plugins/cache/agenticnotetaking/arscontexta/0.8.0/`:
+
+- The cached `skills/upgrade/SKILL.md` is **395 lines carrying only §5a–§5d**; the repo's is **465
+  lines with §5a–§5g**. **§5e, §5f and §5g — every repair this task set out to verify — are absent
+  from the installed skill.**
+- The cache has `reference/` but **no `reference/lib/`**, so the file §5e copies from is unpublished
+  too. §5e deliberately forbids a bash block because `${CLAUDE_PLUGIN_ROOT}` resolves for the model
+  — but in the published plugin it resolves to a tree where the source does not exist.
+
+**Both trees call themselves 0.8.0.** `reference/lib/link-extraction.sh` is git-tracked in the repo
+at 0.8.0 and missing from the installed 0.8.0. **A version string that does not identify a unique
+artifact is this repo's signature defect at the packaging layer**, and it is invisible from inside
+either tree — which is why only running the thing found it.
+
+This run succeeded *only* because the forked agent could reach the repo checkout by absolute path. A
+real user gets a silent no-op.
+
+**Second finding: the skill cannot be pointed at a vault.** It resolves `ops/config.yaml` and
+`ops/derivation-manifest.md` against the working directory, so it upgrades whatever directory it is
+invoked from. The fork inherited the plugin repo as its cwd and the true target had to be supplied
+out of band. For a skill whose whole job is repairing vault structure, having no way to name the
+vault is a real gap.
+
+**Third finding, surfaced not averaged: the repair introduced a threshold disagreement.** §5g seeded
+the documented defaults `10/5`, but this vault's `.claude/hooks/session-orient.sh:124` hardcodes
+`-gt 20`, commented as matching its root `CLAUDE.md`. So `ops/config.yaml` now says 10/5 while the
+hook fires at 20/10, and the three skills reading `self_evolution.*` will disagree with the
+SessionStart hook. §5g's "do not overwrite a tuned value" guard could not see it, because the tuned
+value lives in the hook rather than in `config.yaml`. **This is divergence 2 — two configuration
+surfaces that cannot see each other — reproducing in the field, made concrete by the repair rather
+than merely latent.** Left as-is: reconciling is a design decision, and the vault is the owner's.
+
+Also observed, not acted on: 8 plugin skills differ between cache and repo; a stale empty
+`ops/queue/.locks/qmd.lock` (mtime 2026-04-21) sits inert because the live `reflect`/`reweave` carry
+no lock loop — harmless today, a tripwire the moment a mutex-carrying template is restored; and the
+refreshed library has **zero consumers**, since the vault's live skills predate the extraction and
+still carry inlined logic.
 
 ---
 
