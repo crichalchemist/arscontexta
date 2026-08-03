@@ -93,9 +93,26 @@ should be produced by a command rather than by reading.
 `TENSION_COUNT` and `skills/health` each use `grep -rl '^status:'`, which matches body text as well as
 frontmatter.
 
-Currently **latent**: all 14 matching files in the field vault carry that line inside the frontmatter
-block, zero body-text matches. A note quoting frontmatter in a fenced block inflates the count, and
-the field vault holds notes of exactly that shape.
+**Latent in the directories the threshold counts actually read; the "14" below was the wrong
+quantity.** Measured: `ops/observations/` has **38** files matching `^status:` and **0** where the
+match is body-only; `ops/tensions/` **27** and **0**. So no shipped count was ever wrong there.
+
+**14 is the count of `status: open|pending` observations, not of files matching `^status:`** — a
+different measurement, correct where this spec uses it for the threshold contradiction in D5 and
+wrong here, where "matching" means the naive parser's own pattern. Same number, two subjects, one
+document. That is the conflation `CLAUDE.md` already warns about for the two unrelated `30`s
+(`DAYS_STALE` versus `stale_notes`), reproduced while writing the spec that catalogues it.
+
+**And "latent" is too strong once you look outside the converted scope.** The field vault has
+body-only `^status:` matches elsewhere, including in `ops/methodology/` — which
+`generators/features/methodology-knowledge.md:31` instructs generated vaults to scan with
+`rg '^status: active'`. The class is therefore live in the **generator recipes**, which a shared
+library cannot fix, because a recipe is text telling a vault what command to run and cannot source
+anything. That is a follow-up, not part of D8.
+
+(Exact vault-wide body-only count is under verification: two measurements disagree, 15/2 versus 14/1,
+using different awk. The disagreement is about method, not direction — both find nonzero matches in
+`ops/methodology/`.)
 
 **D9 folds in here as an acceptance criterion, not a separate task.** The fence-gate fixture
 (`reference/test/fence-isolation.test.sh:170-172`) builds five notes with no `status:` field, so an
@@ -199,8 +216,15 @@ inverted.
 - **D9 is narrower than first stated.** Where the threshold counts actually read `status:` —
   observations, tensions, queue — the fence fixture *does* carry it. Only the notes directory lacks it,
   and nothing scans notes for it today.
-- **D8 is latent, not manifest.** Measured on the live vault: all 14 matching files carry the line
-  inside frontmatter. The risk is real; the wrong number is not currently being produced.
+- **D8's supporting number was mislabelled, and "latent" was too strong.** The original text said
+  "all 14 matching files carry the line inside frontmatter". Measured: the directories the threshold
+  counts read are `ops/observations/` (**38** matching, **0** body-only) and `ops/tensions/`
+  (**27**, **0**) — so no shipped count was wrong, which is what the claim was reaching for. But
+  **14** is the count of *open* observations, a different quantity, correct elsewhere in this spec
+  and wrong there. And body-only matches do exist outside that scope, including in
+  `ops/methodology/`, which a generator recipe tells vaults to scan — so the class is live in the
+  recipes, where no library can reach it. Found by the Task 3 implementer, who also warned the
+  figure might be quoted in other briefs; it is not.
 
 ---
 
