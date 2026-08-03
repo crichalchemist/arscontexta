@@ -84,8 +84,9 @@ its header. Both were false — the five checks are enumerated above and none of
 cost was not hypothetical: inlined matchers sat in five `skill-sources` fences through four gates, a
 127 KB review and a live vault run, and the commit that removed them added a *sixth* inlined
 extraction (`skill-sources/graph/SKILL.md`, the `rg -o` edge builder) which likewise passed every
-gate. The rule is real and still binding; it is convention, not enforcement. See divergences 12 and
-13. Building the missing check is a gate-design question and belongs to the CI-hardening spec — do
+gate. The rule is real and still binding; it is convention, not enforcement.
+See divergences 12 and 13.
+Building the missing check is a gate-design question and belongs to the CI-hardening spec — do
 not bolt it on here.
 
 That is not a small caveat, because it is where this repo's defects actually live. Every correctness
@@ -522,9 +523,15 @@ that, and the pattern stops caring about command, flags, or quote style:
 grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' skill-sources/ skills/ platforms/claude-code/ reference/
 ```
 
-Verified against the tree, not remembered: **10 raw hits**, of which **8 are executable** and **0 are
-in `skill-sources/`** (criterion 2 met on `fix/spec-f-divergence-drain`). The remaining executable
-sites, none of which this branch touched:
+Verified against the tree, not remembered: **10 raw hits**, of which **7 are executable**, **1 is a
+comment inside a gate**, **2 are a documentation table**, and **0 are
+in `skill-sources/`** (criterion 2 met on `fix/spec-f-divergence-drain`). The split is
+`10 = 7 + 1 + 2`; keep it that way, because an earlier revision of this entry said "8 are executable"
+here while saying "seven executable sites" twice below, and the table has always had eight rows of
+which one is a comment.
+
+All eight rows the pattern flags outside `skill-sources/` — the seven executable ones, plus the
+comment that sits inside the gate itself. None was touched by this branch:
 
 | Site | Spelling | What it feeds |
 |---|---|---|
@@ -573,7 +580,7 @@ adding an edges function is a library API addition needing its own fixture and a
 extraction and matching are different problems, and that branch closed matching. The argument for
 doing it is this number; if it grows, the argument gets stronger.
 
-Note the interaction with divergence 11: because these sites use `rg -o` with a negated class and no
+Note the interaction with divergence 12: because these sites use `rg -o` with a negated class and no
 closing `\]\]`, the class-wide matcher pattern correctly does **not** flag them. They are a separate
 defect, not a residue of the same one.
 
