@@ -89,11 +89,7 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 # where the fence legitimately passes.
 #
 # Format: <label>~<assertion letter>~<reason>
-KNOWN_OPEN='skill-sources/seed f01~U~reads $FILE, the source path the skill was invoked with, defined in no fence of this file
-skill-sources/seed f03~U~reads $FILE (see f01)
-skill-sources/seed f04~U~reads $FILE and $ARCHIVE_DIR, both set in earlier fences
-skill-sources/seed f05~U~reads $FILE (see f01)
-skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
+KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01'
 
 table_reason() {                    # table_reason <table> <label> [letter]
@@ -322,7 +318,17 @@ PIDF="$WORK/fence.pid"
 run_fence() {                       # run_fence <script> <vault> <outfile>
   rm -f "$RCF" "$PIDF"
   ( cd "$2" || exit 125
-    CLAUDE_PROJECT_DIR="$2" "$SELF" "$1" > "$3" 2> "$3.err" < /dev/null &
+    # ARGUMENTS is the invocation argument a user-invocable skill is called with.
+    # The fixture models a healthy VAULT; without this it did not model a healthy
+    # INVOCATION, so every fence that establishes its target from $ARGUMENTS (see
+    # skill-sources/seed) failed assertion H for the one reason H cannot forgive —
+    # exiting non-zero with a message on stderr — while being entirely correct.
+    # Pointed at a file that really exists in the full fixture, and whose path
+    # contains the inbox name, so seed's archive-and-move branch is exercised
+    # rather than skipped. The empty-$ARGUMENTS path is deliberately NOT tested
+    # here; it is verified directly (see the plan's Task 3 notes).
+    CLAUDE_PROJECT_DIR="$2" ARGUMENTS="inbox/raw-capture.md" \
+      "$SELF" "$1" > "$3" 2> "$3.err" < /dev/null &
     ip=$!; printf '%s\n' "$ip" > "$PIDF"; wait "$ip"; printf '%s\n' "$?" > "$RCF" ) &
   outer=$!
   ticks=0

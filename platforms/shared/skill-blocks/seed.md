@@ -62,6 +62,16 @@ Check if this source has already been processed. Two levels of detection:
 Search the queue file and archive folders for matching source names:
 
 ```bash
+# Fences are separate shell invocations, so every fence that uses the target path must
+# establish it. Reading $FILE from an earlier fence expands to empty and the block then
+# runs against "" — which is how this failed silently. `${ARGUMENTS:-}` rather than
+# `$ARGUMENTS`: an unguarded read of an unset name aborts under `set -u`, which would
+# relocate the defect rather than remove it.
+FILE="${ARGUMENTS:-}"
+if [ -z "$FILE" ]; then
+  echo "error: no source file given; pass the source path as the argument" >&2
+  exit 1
+fi
 SOURCE_NAME=$(basename "$FILE" .md | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
 
 # Check queue for existing entry
@@ -103,6 +113,12 @@ If either check finds a match:
 Create the archive folder. The date-prefixed folder name ensures uniqueness.
 
 ```bash
+# Separate shell invocation: establish the target path here too (see Step 1).
+FILE="${ARGUMENTS:-}"
+if [ -z "$FILE" ]; then
+  echo "error: no source file given; pass the source path as the argument" >&2
+  exit 1
+fi
 DATE=$(date -u +"%Y-%m-%d")
 SOURCE_BASENAME=$(basename "$FILE" .md | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
 ARCHIVE_DIR="{config.ops_dir}/queue/archive/${DATE}-${SOURCE_BASENAME}"
@@ -119,6 +135,20 @@ Move the source file from its current location to the archive folder. This is th
 
 **{config.inbox_dir} sources get moved:**
 ```bash
+# Separate shell invocation: establish the target path here too (see Step 1). $ARCHIVE_DIR
+# is re-derived by the identical rule Step 3 used, and re-created with the same idempotent
+# mkdir -p, so this fence stands alone rather than inheriting either name. (A UTC-midnight
+# rollover between Step 3 and here would derive tomorrow's folder; accepted, and preferred
+# to inheriting a variable across a shell boundary where it silently expands to empty.)
+FILE="${ARGUMENTS:-}"
+if [ -z "$FILE" ]; then
+  echo "error: no source file given; pass the source path as the argument" >&2
+  exit 1
+fi
+DATE=$(date -u +"%Y-%m-%d")
+SOURCE_BASENAME=$(basename "$FILE" .md | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
+ARCHIVE_DIR="{config.ops_dir}/queue/archive/${DATE}-${SOURCE_BASENAME}"
+mkdir -p "$ARCHIVE_DIR"
 if [[ "$FILE" == *"{config.inbox_dir}"* ]] || [[ "$FILE" == *"inbox"* ]]; then
   mv "$FILE" "$ARCHIVE_DIR/"
   FINAL_SOURCE="$ARCHIVE_DIR/$(basename "$FILE")"
@@ -129,6 +159,12 @@ fi
 ```bash
 # Living docs (like configuration files) stay where they are
 # Archive folder is still created for task files
+# Separate shell invocation: establish the target path here too (see Step 1).
+FILE="${ARGUMENTS:-}"
+if [ -z "$FILE" ]; then
+  echo "error: no source file given; pass the source path as the argument" >&2
+  exit 1
+fi
 FINAL_SOURCE="$FILE"
 ```
 
