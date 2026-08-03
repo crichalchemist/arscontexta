@@ -1,0 +1,17 @@
+# The portability guard runs in under a second, so it belongs at commit time rather
+# than only after a push. CI once stayed red across two pushes because `gh` on a
+# fork answers from upstream and an empty run list is indistinguishable from a clean
+# one — a local gate does not have that failure mode.
+#
+# Deliberately ONE hook. The fence sweep takes about two minutes per shell; a
+# pre-commit that slow gets bypassed with --no-verify, and a gate people route
+# around is worse than one that never ran.
+repos:
+  - repo: local
+    hooks:
+      - id: portability-guard
+        name: portability guard (grep -P, link capture, frozen templates)
+        entry: bash reference/check-portability.sh
+        language: system
+        pass_filenames: false
+        always_run: true

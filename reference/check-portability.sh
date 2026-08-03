@@ -351,6 +351,29 @@ else
   fi
 fi
 
+echo "5. AGENTS.md is a symlink to CLAUDE.md, not a copy of it"
+# WHY A SYMLINK AND WHY THIS IS GATED: CLAUDE.md carries the traps, the invariants
+# and the divergence list, and only one runtime reads that filename. AGENTS.md makes
+# it visible to the others. A COPY would be a second configuration surface that
+# cannot see the first — which is the defect this repo already carries once, in
+# read_config.sh versus ops/config.yaml. One inode, two names, and drift is not
+# unlikely but impossible.
+#
+# Keyed on .claude-plugin/plugin.json, not on CLAUDE.md: guard-failure.test.sh
+# builds synthetic roots that legitimately have neither, and a check that fails on
+# every tree but this one is how check 4 broke that suite once already.
+if [ ! -f "$ROOT/.claude-plugin/plugin.json" ]; then
+  skip "not the plugin root — no agent surface expected"
+elif [ ! -e "$ROOT/AGENTS.md" ]; then
+  red "AGENTS.md is missing — the agent-facing surface is Claude-only again"
+elif [ ! -L "$ROOT/AGENTS.md" ]; then
+  red "AGENTS.md is a regular file, not a symlink — a copy drifts from CLAUDE.md silently"
+elif [ "$(readlink "$ROOT/AGENTS.md")" != "CLAUDE.md" ]; then
+  red "AGENTS.md points at $(readlink "$ROOT/AGENTS.md"), not CLAUDE.md"
+else
+  ok "AGENTS.md -> CLAUDE.md"
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "PORTABILITY: PASS"; exit 0
