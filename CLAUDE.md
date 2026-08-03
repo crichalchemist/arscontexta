@@ -137,8 +137,11 @@ Supporting layers:
   renamed at generation time (line 14 of that file is the mapping table).
 - `platforms/` — platform adapters (`claude-code/`, `shared/`). **`platforms/shared/skill-blocks/`
   is frozen and generates nothing** — `check-portability.sh` check 4 rejects any edit to it. It is a
-  read-only inventory of vocabulary points, and it holds the repo's most complete `{vocabulary.*}` /
-  `{config.*}` markup: 122 markers in `verify` where `skill-sources` has 8. Consult it when you need
+  read-only inventory of vocabulary points, and it holds the repo's most complete markup: counting
+  `{vocabulary.*}`, `{config.*}` and `{DOMAIN:*}`, 146 markers in `verify` where `skill-sources` has
+  27. `reference/skill-authoring.md` §2 carries the exact command — a placeholder tally that does not
+  state its pattern cannot be re-derived, and a bare `{…}` also counts `${TARGET}` and `${FILE}`.
+  Consult it when you need
   to know whether a string is vocabulary-variable; never port a behavior change into it. Its
   guard and logic parity with `skill-sources/` is explicitly **not** maintained. See
   `platforms/shared/skill-blocks/README.md`.

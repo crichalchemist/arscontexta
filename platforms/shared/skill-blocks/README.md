@@ -10,18 +10,23 @@ or `presets/` references `platforms/` at any depth. Editing a file here changes 
 These files carry the most complete `{vocabulary.*}` / `{config.*}` markup in the repository — every
 point where a string is vocabulary-variable, marked. Measured against their `skill-sources` twins:
 
+Counting the three placeholder families — `{vocabulary.*}`, `{config.*}`, `{DOMAIN:*}` — with the
+command in `reference/skill-authoring.md` §2. **The pattern matters:** a bare `{…}` also matches
+`${TARGET}` and `${FILE}`, which inflates a shell-variable count into a placeholder count. An earlier
+version of this table stated no pattern and could not be re-derived from any single one.
+
 | skill | `skill-sources` | here |
 |---|---|---|
-| validate | 3 | **56** |
-| remember | 4 | **48** |
-| verify | 8 | **122** |
-| ralph | 15 | **139** |
-| pipeline | 16 | **71** |
-| seed | 19 | **62** |
-| rethink | 26 | **78** |
-| reweave | 111 | **165** |
-| reflect | 121 | **202** |
-| reduce | 131 | **154** |
+| remember | 4 | **49** |
+| validate | 5 | **60** |
+| pipeline | 17 | **72** |
+| ralph | 18 | **143** |
+| seed | 19 | **63** |
+| verify | 27 | **146** |
+| rethink | 27 | **79** |
+| reweave | 111 | **166** |
+| reflect | 121 | **203** |
+| reduce | 131 | **155** |
 
 That makes this directory the best answer in the repo to **"is this string vocabulary-variable, or
 is it structural?"** — the question every template author has to answer and can otherwise only guess
