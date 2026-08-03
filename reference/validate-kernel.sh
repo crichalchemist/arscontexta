@@ -299,10 +299,19 @@ if $has_search; then
     # retired tool names. An archived skill is a record, not a declaration — it is never
     # executed. Scanning it found 24 files in the field vault whose live skills declare
     # zero dead names, and would have made this check unfixable without rewriting history.
+    #
+    # The vault's root CLAUDE.md IS part of the live surface and is scanned: it is
+    # always-loaded context whose Helper Functions section holds executable calls, so a
+    # dead name there fails every session in the one file guaranteed to be read. Its
+    # omission also contradicted this script's own model — has_search_docs above already
+    # treats $VAULT/CLAUDE.md as a place semantic search is declared. Verified against the
+    # field vault before adding: it contains zero mcp__qmd__* names, so this cannot
+    # reintroduce the archive/changelog false positive the scoping exists to avoid.
     qmd_scan=()
     [ -d "$VAULT/.claude" ] && qmd_scan+=("$VAULT/.claude")
     [ -d "$VAULT/.agents" ] && qmd_scan+=("$VAULT/.agents")
     [ -f "$VAULT/.mcp.json" ] && qmd_scan+=("$VAULT/.mcp.json")
+    [ -f "$VAULT/CLAUDE.md" ] && qmd_scan+=("$VAULT/CLAUDE.md")
     if [ ${#qmd_scan[@]} -eq 0 ]; then
         pass "Semantic search capability found (${details}); no live tool surface to verify"
         rm -f "$qmd_hits"

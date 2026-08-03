@@ -298,7 +298,15 @@ both shells; expect `known-open=4`.
 
 - **Step 1's `NOTES_DIR` guard is right, but the message in the draft was not.** D1 requires the
   message to carry the remedy, since it is the only thing the user sees. Three of the four sites
-  need *two* directories checked, so each loops and names the one that is absent.
+  read *two* directories — `help`, `health` and `next` — so each loops and names the one that is
+  absent; `reflect` reads only the notes directory and guards only that.
+
+  > **Corrected after the final review.** This note originally claimed three sites looped, when
+  > only `health` and `next` did: `help` guarded its notes directory while still counting
+  > `{vocabulary.inbox}` unguarded, so a vault with notes intact but no inbox reported "0 inbox
+  > items" and exited 0 — D1's exact defect, surviving inside the fix for it, in the diagnostic
+  > command D1 singled out. `help` now loops over both. The note and the code disagreed, and the
+  > note was the more dangerous half.
 - **Step 3's `reflect` fix could not keep the `*.md` glob.** Replacing `grep -r … | wc -l` with
   `cat "$DIR"/*.md | grep -c …` reintroduces the zsh non-matching-glob abort that two allowlist
   entries already exist for. The shipped form greps the *directory*, captures grep's status into

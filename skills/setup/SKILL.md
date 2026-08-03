@@ -1612,7 +1612,7 @@ Run all 15 primitive checks against the generated system. Use `${CLAUDE_PLUGIN_R
     That `mkdir` deliberately omits `-p` — creating the lock directory atomically IS the mutex, and
     `-p` would return 0 when the lock is already held, destroying it. So the *parent* must already
     exist; the skills create it themselves with `mkdir -p "$(dirname "$LOCKDIR")"`, and creating it
-    here as well is the belt to that braces. Never add `-p` to the lock itself.
+    here as well is belt-and-braces. Never add `-p` to the lock itself.
 
     The bound is what makes a stale lock — one left by a run that died between `mkdir` and its
     release — recoverable. Unbounded, that lock hung every subsequent run forever with no output.

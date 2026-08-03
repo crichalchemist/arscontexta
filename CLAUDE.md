@@ -190,10 +190,15 @@ not a claim you should take on trust: it is what the five checks above enforce, 
 
 **1. The fence-gate allowlist can hide an unrelated failure.** Highest priority, because it is the
 entry that lets the others recur unseen. Absorption keys on `(letter, label)` alone — it ignores
-both the entry's stated reason and its `ZSH ONLY:` scope. Measured: with `skill-sources/seed`
-fences guarded, `seed f01` failed assertion H **under bash** and was silently absorbed by an `~H~`
-entry whose own reason is a zsh-only glob fork and cannot apply under bash. `f03`/`f04`/`f05`, which
-carry no `~H~` entry, reported the identical failure normally. Reproduce:
+both the entry's stated reason and its `ZSH ONLY:` scope.
+
+**Nothing is masked on the shipped tree** — re-checked: `seed f01` passes H under bash, so deleting
+its entry changes no result. The defect is the keying, and it was demonstrated at an intermediate
+state during Spec C: with seed's fences guarded but *before* the gate's fixture supplied
+`ARGUMENTS`, `seed f01` failed assertion H **under bash** and was silently absorbed by an `~H~`
+entry whose own reason is a zsh-only glob fork that cannot apply under bash. `f03`/`f04`/`f05`,
+carrying no `~H~` entry, reported the identical failure normally. To reproduce the mechanism, drop
+`ARGUMENTS=` from `run_fence`, then:
 
 ```bash
 cp reference/test/fence-isolation.test.sh reference/test/.probe.sh
