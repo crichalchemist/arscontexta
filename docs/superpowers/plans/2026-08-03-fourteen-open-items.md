@@ -214,9 +214,9 @@ Ask each to adjudicate deliberate deviations rather than pre-judging them.
 bash reference/check-portability.sh                    # rc 0
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh            # 19/19
-  $s reference/test/guard-failure.test.sh              # 32/32
+  $s reference/test/guard-failure.test.sh              # 34/34
   $s reference/test/fence-isolation.test.sh            # PASS
-  $s reference/test/bump-version.test.sh               # 26/26
+  $s reference/test/bump-version.test.sh               # 28/28
   $s scripts/bump-version.sh --check                   # rc 0
 done
 ./reference/validate-kernel.sh ~/second-brain          # 15/15

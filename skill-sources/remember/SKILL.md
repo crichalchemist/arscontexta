@@ -263,7 +263,7 @@ This mode scans stored session transcripts for friction patterns the user addres
 ```bash
 # Find session files without mined: true marker
 UNMINED=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null)
-UNMINED_COUNT=$(echo "$UNMINED" | grep -c . 2>/dev/null || echo 0)
+UNMINED_COUNT=$(echo "$UNMINED" | grep -c . 2>/dev/null)
 ```
 
 If no unmined sessions found:

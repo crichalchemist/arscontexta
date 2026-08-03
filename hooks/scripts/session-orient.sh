@@ -126,7 +126,14 @@ OBS_TOTAL=$(ls -1 ops/observations/*.md 2>/dev/null | wc -l | tr -d ' ')
 OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
 TENS_TOTAL=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
 TENS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
-SESS_COUNT=$(ls -1 ops/sessions/*.json 2>/dev/null | grep -cv current 2>/dev/null || echo 0)
+# NO `|| echo 0` HERE. `grep -c` prints `0` AND exits 1 when nothing matches, so a
+# `|| echo 0` fallback fires *in addition* to the 0 already printed and the variable
+# becomes the two-line string "0\n0". Every session start then emits
+# `[: 0\n0: integer expected` and the -ge comparison below errors (rc 2) rather than
+# evaluating. That is the repo's own named `grep -c || echo 0` family, and it was live
+# here in the commonest state of all: a vault whose only session file is current.json.
+# grep -c's printed 0 is already the answer.
+SESS_COUNT=$(ls -1 ops/sessions/*.json 2>/dev/null | grep -cv current)
 INBOX_COUNT=$(ls -1 inbox/*.md 2>/dev/null | wc -l | tr -d ' ')
 
 # THESE TWO ARE READ, NOT HARDCODED — the three skill templates (`next`, `remember`,

@@ -83,12 +83,12 @@ If `ops/tasks.md` does not exist, note: "No task stack found. Run `/tasks add [d
 # Check for queue file (YAML or JSON)
 if [[ -f "ops/queue/queue.yaml" ]]; then
   QUEUE_FILE="ops/queue/queue.yaml"
-  PENDING_TASKS=$(grep -c 'status: pending' "$QUEUE_FILE" 2>/dev/null || echo 0)
-  DONE_TASKS=$(grep -c 'status: done' "$QUEUE_FILE" 2>/dev/null || echo 0)
+  PENDING_TASKS=$(grep -c 'status: pending' "$QUEUE_FILE" 2>/dev/null)
+  DONE_TASKS=$(grep -c 'status: done' "$QUEUE_FILE" 2>/dev/null)
 elif [[ -f "ops/queue/queue.json" ]]; then
   QUEUE_FILE="ops/queue/queue.json"
-  PENDING_TASKS=$(grep -c '"status": "pending"' "$QUEUE_FILE" 2>/dev/null || echo 0)
-  DONE_TASKS=$(grep -c '"status": "done"' "$QUEUE_FILE" 2>/dev/null || echo 0)
+  PENDING_TASKS=$(grep -c '"status": "pending"' "$QUEUE_FILE" 2>/dev/null)
+  DONE_TASKS=$(grep -c '"status": "done"' "$QUEUE_FILE" 2>/dev/null)
 else
   QUEUE_FILE=""
   PENDING_TASKS=0

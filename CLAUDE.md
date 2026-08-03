@@ -72,6 +72,20 @@ done
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
 
+**None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
+self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
+the number it prints is *right* is not checked by anything here.
+
+That is not a small caveat, because it is where this repo's defects actually live. Every correctness
+defect fixed on the branch that added this paragraph — the claim counter truncating at three digits,
+`/next` promising eight state fields and computing five, the padding — **passed every gate in both
+shells before and after the fix.** A green run means "no fence is silently broken", never "the
+arithmetic is right." Correctness rests on review, and the gate set does not substitute for it.
+
+Building the missing gate means per-fence expected-output fixtures — a project, not a task. Until it
+exists, this paragraph is the honest form of the inventory, in the same spirit as
+`check-prose-paths.sh` printing its own limits on every run.
+
 **One suite hardcodes a shell and one does not, and the distinction is the invocation surface —
 not the shebang.** `guard-failure.test.sh` always invokes the guard as `bash "$GUARD"` because
 *nothing* invokes `check-portability.sh` by any other name: CI, `.pre-commit-config.yaml` and this
@@ -247,7 +261,7 @@ one had begun to lie in the way it warns about.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the six checks above enforce, and CI is green on
+not a claim you should take on trust: it is what the seven checks above enforce, and CI is green on
 `main` across all **11** steps — and **14** on this branch, which added three
 (`bump-version.test.sh` under both shells, plus `check-prose-paths.sh`). Counting them takes care:
 `grep -c '^      - name:'` returns one fewer than the true count, because `actions/checkout` carries
@@ -408,8 +422,16 @@ The human diff of the two trees at release remains the only check on the full §
   section above for the residual that was left open on purpose.
 - **`/next` promised eight state fields and computed five** — was divergence 2, and the only entry on
   that list that reached users' machines. Orphans, Dangling, Stale and Queue are now computed, the
-  first two through `ops/lib/link-extraction.sh` rather than an inlined naive matcher; `graph` got the
-  same treatment. `stale_notes` was redefined in prose to the definition the code can actually
+  first two through `ops/lib/link-extraction.sh` rather than an inlined naive matcher; `graph`'s
+  **orphan loop** got the same treatment — **its authority-ranking loop at `skill-sources/graph/SKILL.md:434`
+  still inlines `grep -rl "\[\[$NAME\]\]"`.** That sentence used to read "`graph` got the same
+  treatment", and commit `741b2b7` claims the naive spelling is "gone from executable code in both
+  files"; both overstate. Base had two executable sites in `graph`, the branch fixed one. The survivor
+  carries the same defects the rest of this entry enumerates (counts matches inside fenced blocks, no
+  case folding) and feeds the influence ranking. `check-portability.sh` check 2 does not catch it — it
+  matches greedy-dot capture patterns, not a fixed-name `grep -rl` — and it carries no
+  `portability-exempt` marker. Left as-is rather than rewritten: porting the library into a shipped
+  template unreviewed at the end of a branch is how the next divergence gets made. `stale_notes` was redefined in prose to the definition the code can actually
   compute — "not modified in 30+ days" — instead of shipping a fifth reading of "stale".
 - **The claim counter truncated at three digits.** `{source}-999.md` was not a cap but a *collision*:
   the scan matched exactly three digits, so the maximum went backwards once numbering passed 999.
@@ -420,7 +442,7 @@ The human diff of the two trees at release remains the only check on the full §
   exit code alone — `cksum < <missing>` yields an empty digest and reports MODIFIED at the same rc 1,
   which also mis-fires the "suspect a differing cksum implementation" note; two message assertions now
   distinguish them. `guard-failure.test.sh`'s hardcoded `bash "$GUARD"` is now a stated decision with
-  a shebang assertion pinning it. `bump-version.sh` went from zero coverage to 26 assertions in both
+  a shebang assertion pinning it. `bump-version.sh` went from zero coverage to 28 assertions in both
   shells, wired into CI.
 
 ### Closed on `fix/spec-c-primitive-10`

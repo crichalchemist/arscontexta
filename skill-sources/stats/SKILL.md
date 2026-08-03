@@ -276,12 +276,12 @@ INBOX_COUNT=$(find {vocabulary.inbox}/ -name "*.md" 2>/dev/null | wc -l | tr -d 
 QUEUE_FILE=""
 if [[ -f "ops/queue/queue.yaml" ]]; then
   QUEUE_FILE="ops/queue/queue.yaml"
-  QUEUE_PENDING=$(grep -c 'status: pending' "$QUEUE_FILE" 2>/dev/null || echo 0)
-  QUEUE_DONE=$(grep -c 'status: done' "$QUEUE_FILE" 2>/dev/null || echo 0)
+  QUEUE_PENDING=$(grep -c 'status: pending' "$QUEUE_FILE" 2>/dev/null)
+  QUEUE_DONE=$(grep -c 'status: done' "$QUEUE_FILE" 2>/dev/null)
 elif [[ -f "ops/queue/queue.json" ]]; then
   QUEUE_FILE="ops/queue/queue.json"
-  QUEUE_PENDING=$(grep -c '"status": "pending"' "$QUEUE_FILE" 2>/dev/null || echo 0)
-  QUEUE_DONE=$(grep -c '"status": "done"' "$QUEUE_FILE" 2>/dev/null || echo 0)
+  QUEUE_PENDING=$(grep -c '"status": "pending"' "$QUEUE_FILE" 2>/dev/null)
+  QUEUE_DONE=$(grep -c '"status": "done"' "$QUEUE_FILE" 2>/dev/null)
 else
   QUEUE_PENDING=0
   QUEUE_DONE=0

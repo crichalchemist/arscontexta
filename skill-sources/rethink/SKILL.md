@@ -158,9 +158,9 @@ If drift observations were created, they join the pool of pending observations f
 
 ```bash
 OBS_PENDING=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null)
-OBS_COUNT=$(echo "$OBS_PENDING" | grep -c . 2>/dev/null || echo 0)
+OBS_COUNT=$(echo "$OBS_PENDING" | grep -c . 2>/dev/null)
 TENSION_PENDING=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null)
-TENSION_COUNT=$(echo "$TENSION_PENDING" | grep -c . 2>/dev/null || echo 0)
+TENSION_COUNT=$(echo "$TENSION_PENDING" | grep -c . 2>/dev/null)
 ```
 
 Read each pending item fully. These are small atomic notes — load all of them. Understanding the full content is required for accurate triage. If zero pending items, report clean state and exit early.

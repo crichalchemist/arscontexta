@@ -90,10 +90,18 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 #
 # Format: <label>~<assertion letter>~<reason>
 # A reason may open with the literal, case-sensitive prefix `ZSH ONLY:` or
-# `BASH ONLY:` to scope the entry to one shell — see in_scope(). Anything else,
-# including `zsh only:`, is treated as applying in every shell. That default errs
-# safe (an unrecognised prefix can only widen scope, never silently narrow it), but
-# it does mean a lowercase prefix silently does nothing.
+# `BASH ONLY:` to scope the entry to one shell — see in_scope().
+#
+# A NEAR-MISS IS A HARNESS ERROR, NOT A DEFAULT. This comment used to claim the
+# fallthrough "errs safe (an unrecognised prefix can only widen scope, never
+# silently narrow it)" and that a lowercase prefix "silently does nothing". Both
+# halves were wrong, and in the direction that matters: widening is the UNSAFE
+# direction for absorption. A `zsh only:` entry does not do nothing — it converts
+# a shell-scoped entry into an EVERY-shell one and re-absorbs the bash failure
+# that scoping exists to block, which is the ce57b25 defect in a broader form.
+# Measured before this fix: same broken fence, `ZSH ONLY:` -> bash FAILs (correct);
+# `zsh only:` -> bash PASSes. So in_scope now rejects anything that looks like a
+# scope marker but is not one of the two canonical spellings.
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01'
 
@@ -388,11 +396,41 @@ trailer_digit() {                   # trailer_digit <file>
 # condition at the second site is how the two came apart in the first place.
 in_scope() { # in_scope <reason> — does this entry apply in the shell we are in?
   case "$1" in
-    'ZSH ONLY:'*)  [ "$SELF" = zsh ] ;;
-    'BASH ONLY:'*) [ "$SELF" = bash ] ;;
-    *) return 0 ;;
+    'ZSH ONLY:'*)  [ "$SELF" = zsh ]  ; return ;;
+    'BASH ONLY:'*) [ "$SELF" = bash ] ; return ;;
   esac
+  # Near-misses are rejected by validate_scope_prefixes at startup, NOT here --
+  # in_scope runs inside `while read` pipelines, so an `exit` here would kill the
+  # subshell and leave the gate exiting 0 with a loud message and a green tick.
+  # That was the first version of this fix and it is the very defect class the
+  # gate exists to catch. Validation belongs at the boundary, once, at top level.
+  return 0
 }
+
+# Reject allowlist reasons that LOOK like a scope marker but are not one of the
+# two canonical spellings. Runs once, at top level, before any subshell -- so
+# `exit` actually terminates the gate.
+#
+# The separator class is bounded to [ _-] so ONLY must follow the shell name
+# immediately; a legitimate unscoped reason like "zsh aborts the command on a
+# non-matching glob" must NOT trip this.
+validate_scope_prefixes() {
+  printf '%s\n' "$KNOWN_OPEN" | while IFS='~' read -r _l _a r; do
+    [ -n "${r:-}" ] || continue
+    case "$r" in
+      'ZSH ONLY:'*|'BASH ONLY:'*) continue ;;
+      [Zz][Ss][Hh][\ _-]*[Oo][Nn][Ll][Yy]*|[Bb][Aa][Ss][Hh][\ _-]*[Oo][Nn][Ll][Yy]*)
+        printf 'HARNESS ERROR: allowlist reason opens with an unrecognised scope prefix:\n' >&2
+        printf '  %s\n' "$r" >&2
+        printf '  Canonical spellings are exactly "ZSH ONLY:" and "BASH ONLY:" -- uppercase,\n' >&2
+        printf '  single space, trailing colon. A near-miss silently widens the entry to EVERY\n' >&2
+        printf '  shell and absorbs the failures scoping exists to block.\n' >&2
+        printf 'BADPREFIX\n' ;;
+    esac
+  done | grep -q BADPREFIX && exit 2
+  return 0
+}
+validate_scope_prefixes
 
 # judge <letter> <label> <message> [detail-file]
 # Routes one failing assertion to either the KNOWN list or the blocking list.

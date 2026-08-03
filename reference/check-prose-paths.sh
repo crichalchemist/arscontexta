@@ -76,6 +76,13 @@ for f in $SCOPE; do
   # comment from code and is deliberately strict about it -- so it is not named.)
   raw=$(grep -o '`[^`]*`' "$f" 2>/dev/null | tr -d '`')
 
+  # -f: word-splitting below is intentional, pathname expansion is not. Without it
+  # a backticked token containing a glob metacharacter is expanded before the case
+  # filter that would have rejected it. No false MISSING is reachable either way
+  # (a glob that matches yields real paths; one that does not stays literal and is
+  # filtered), but it inflates the `found` tally, and a count that drifts for a
+  # reason nobody can reconstruct is how the numbers in this repo go bad.
+  set -f
   for tok in $raw; do
     # A skill may name a path relative to the plugin root. Strip that prefix so
     # the remainder can be tested -- this is the §4 shape.
