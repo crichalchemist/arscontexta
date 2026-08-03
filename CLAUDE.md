@@ -523,12 +523,22 @@ that, and the pattern stops caring about command, flags, or quote style:
 grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' skill-sources/ skills/ platforms/claude-code/ reference/
 ```
 
+**The property this entry is measured against**, stated here rather than cited, because a definition
+that lives only in a plan file does not ship and cannot be recovered by a reader: *no **executable**
+code in `skill-sources/` may inline a wiki-link matcher* — where "executable" means inside a
+` ```bash ` fence or a shipped script, and deliberately **excludes** documentation tables and
+comments, which are prose about matchers rather than matchers that run. That word is load-bearing in
+both directions: drop it and the claim below is false by the entry's own arithmetic; widen it to all
+text and the entry would have to flag its own explanatory prose.
+
 Verified against the tree, not remembered: **10 raw hits**, of which **7 are executable**, **1 is a
-comment inside a gate**, **2 are a documentation table**, and **0 are
-in `skill-sources/`** (criterion 2 met on `fix/spec-f-divergence-drain`). The split is
+comment inside a gate**, **2 are a documentation table**, and **0 executable sites are
+in `skill-sources/`** (the criterion above, met on `fix/spec-f-divergence-drain`). The split is
 `10 = 7 + 1 + 2`; keep it that way, because an earlier revision of this entry said "8 are executable"
 here while saying "seven executable sites" twice below, and the table has always had eight rows of
-which one is a comment.
+which one is a comment. The two hits that *are* in `skill-sources/` are the documentation-table rows
+named below — which is exactly why the unqualified "0 are in `skill-sources/`" that stood here was
+wrong, and why `10 − 8 = 2` makes it measurable.
 
 All eight rows the pattern flags outside `skill-sources/` — the seven executable ones, plus the
 comment that sits inside the gate itself. None was touched by this branch:
