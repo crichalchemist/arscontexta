@@ -60,7 +60,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 28/28
-  $s reference/test/kernel-note-dirs.test.sh             # 21/21
+  $s reference/test/kernel-note-dirs.test.sh             # 28/28
 done
 ```
 
@@ -464,23 +464,38 @@ list, not because the earlier claims were true. **A record that does not ship is
 
 **11. The dangling-link check samples 100 links and does not scan them all.** Surfaced by fixing
 divergence 1, and left open on purpose rather than folded into that commit. `validate-kernel.sh`
-caps `link_candidates` at 100 after dedup; on the field vault that is 99 of 2681 unique links, or
-3.7%. While the scan resolved nothing the cap could not mislead anyone, because the sample was
-always empty — it only became load-bearing once the check started running. The over-claim is
-already closed: the PASS now reads `in a 99-link sample of 2681 unique` rather than an unqualified
-`No dangling wiki links`, and `kernel-note-dirs.test.sh` pins both the above-cap and below-cap
-wordings. What is open is the cap itself.
+caps `link_candidates` at 100 after dedup. While the scan resolved nothing the cap could not mislead
+anyone, because the sample was always empty — it only became load-bearing once the check started
+running. The over-claim is already closed: the PASS states the sample size, the true total, the
+percentage and the unchecked remainder, and `kernel-note-dirs.test.sh` pins all four. What is open
+is the cap itself.
 
-Lifting it is not free and not obviously right: the comparison is one `grep -qxF` per link against
-an index held in a shell variable, so a full scan is roughly 2681 process pairs on top of a run that
-already takes ~45s on the field vault. The honest fix is probably to replace the per-link loop with
-a single `comm` or `join` against a sorted index, which makes the cap unnecessary rather than merely
-larger. Re-derive the numbers with:
+**Two different counts are in play here and they are easy to swap by accident** — an earlier version
+of this entry did exactly that, quoting one figure beside a command that measured the other. Both
+drift as the vault grows, so read them as shapes, not constants:
+
+| count | what it measures | 2026-08-03 (drifts) |
+|---|---|---|
+| notes-only | unique link targets in `nodes/` alone | 2681 |
+| **scanned union** | **unique targets across every directory the validator resolves** — `nodes` + `capture` + `self` — **this is what primitive 2 prints** | **2711** |
+
+The two differ by 30 because `nodes/` dominates, which is precisely why substituting one for the
+other went unnoticed: the wrong figure was close enough to look right. Re-derive both — the second
+is the one any statement about the validator's output must use:
 
 ```bash
 . reference/lib/link-extraction.sh
-extract_link_targets_recursive ~/second-brain/nodes | grep -c .    # 2681 unique
+extract_link_targets_recursive ~/second-brain/nodes | grep -c .        # notes only (counts drift)
+{ for d in nodes capture self; do extract_link_targets_recursive ~/second-brain/$d; done; } \
+  | sort -u | grep -c .                                               # scanned union (counts drift)
+./reference/validate-kernel.sh ~/second-brain 2>&1 | grep 'unique links'   # what it actually prints
 ```
+
+Lifting the cap is not free and not obviously right: the comparison is one `grep -qxF` per link
+against an index held in a shell variable, so a full scan is one process pair per link in the
+scanned union on top of a run that already takes ~45s on the field vault. The honest fix is probably
+to replace the per-link loop with a single `comm` or `join` against a sorted index, which makes the
+cap unnecessary rather than merely larger.
 
 ### Closed on `fix/spec-f-divergence-drain`
 
@@ -509,20 +524,28 @@ extract_link_targets_recursive ~/second-brain/nodes | grep -c .    # 2681 unique
   **Unresolvable is now FAIL, never WARN** — three outcomes where there were two, since "could not
   run" and "ran and found nothing" are different facts.
 
+  Every message from the primitive now prints `scanned: <basenames>` as well as the source label,
+  because naming the source is not naming the set: on the field vault the vocabulary route resolves
+  3 directories and the shape scan resolves 6, so two vaults identical but for a manifest get
+  different coverage under the same green PASS. The resolver's header carries the measured
+  comparison and states that reconciling the two routes is deliberately not done here.
+
   Measured after, on the field vault: `16 PASS / 1 WARN / 0 FAIL`, the WARN being frontmatter
-  coverage. Guarded by `reference/test/kernel-note-dirs.test.sh`, 21 assertions in both shells, in
+  coverage. Guarded by `reference/test/kernel-note-dirs.test.sh`, 28 assertions in both shells, in
   CI — every fixture uses the arbitrary directory name `zzz-arbitrary`, never `nodes`, because a fix
   verified against the field vault only proves that `nodes` joined the hardcoded list. Confirmed to
   fail 15 of 21 against the pre-fix validator.
 
 - **A new over-claim the fix would otherwise have minted.** The dangling loop samples the first 100
   links, which was harmless while the scan resolved nothing and the sample was always empty. With
-  resolution working, `PASS No dangling wiki links` would have asserted over the field vault's 2681
-  unique links on the strength of 99. The cap is deliberately left alone — changing what is scanned
-  in the same commit that changed how directories are resolved would make the two effects
-  impossible to attribute — but the message now states its own scope: `in a 99-link sample of 2681
-  unique` above the cap, `checked all N unique links` below it. Whether to lift the cap is open; see
-  the note in the open list.
+  resolution working, `PASS No dangling wiki links` would have asserted over the field vault's 2711
+  unique links on the strength of a hundred. The cap is deliberately left alone — changing what is
+  scanned in the same commit that changed how directories are resolved would make the two effects
+  impossible to attribute — but the message now discloses the sample size, the true total, **the
+  percentage** and the unchecked remainder, because `100 of 2711` skims as near-complete and `3.7%`
+  does not. The sample was also one short of its own cap: `link_candidates` is seeded empty and the
+  leading blank line survived `sort -u`, so `head -100` delivered 99. Whether to lift the cap is
+  open; see divergence 11.
 
 ### Closed on `fix/spec-e-fourteen-items`
 

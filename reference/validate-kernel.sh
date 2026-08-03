@@ -54,6 +54,31 @@ fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
 # downstream, and treating a parsed-but-absent name as success would reproduce
 # the original defect one layer up.
 #
+# WHICH VOCABULARY KEYS ARE READ, AND THE COVERAGE GAP THAT CREATES:
+# only `notes:` and `inbox:` — the capture-then-refine pipeline, which is where
+# the note graph lives. The field vault's vocabulary block also declares
+# `projects:`, `archive:` and `ops:`. Those are excluded: `archive` is cold
+# storage whose links are expected to dangle by the same argument as logs below,
+# `ops` is operational record, and `projects` holds domain output written
+# directly rather than notes reached through the pipeline.
+#
+# BE AWARE THIS MAKES THE TWO ROUTES DISAGREE, and the disagreement is real
+# rather than theoretical. Measured on the field vault, 2026-08-03:
+#
+#   vocabulary route -> nodes, capture (+ self)                     = 3 dirs
+#   shape scan       -> capture, docs, nodes, projects, self, workers = 6 dirs
+#
+# So two vaults identical but for the presence of a manifest get different
+# coverage under the same green PASS. Neither set is obviously right: the
+# vocabulary route misses `projects/` (41 unique link targets in the field
+# vault), while the shape scan sweeps in `docs/` and `workers/`, which are
+# plausibly not note directories at all. Reconciling them is a design question,
+# not a bug fix, and it is NOT resolved here. What is fixed is the invisibility:
+# every message from this primitive now prints `scanned: <basenames>`, so a
+# reader can see which set produced the result instead of inferring it from the
+# source label. Do not "just add projects" without deciding what the shape scan
+# should do to match.
+#
 # WHAT IS DELIBERATELY OUT OF SCOPE: logs and operational records. The old list
 # carried `04_meta/logs`, and the vocabulary names no logs directory, so a
 # derived scan cannot restore it. That is a decision, not an oversight: a wiki
@@ -203,12 +228,14 @@ if [ "$resolve_rc" -eq 0 ]; then
     note_dirs=$(printf '%s\n' "$note_dirs_raw" | tail -n +2)
 fi
 
+SCANNED_NAMES=""
 if [ "$resolve_rc" -eq 0 ]; then
     # Iterate with `while read`, not `for d in $note_dirs`: zsh does not
     # word-split unquoted expansions, so the `for` spelling would hand the whole
     # newline-joined list over as a single nonexistent path and scan nothing.
     while IFS= read -r d; do
         [ -z "$d" ] && continue
+        SCANNED_NAMES="$SCANNED_NAMES $(basename "$d")"
         new_links=$(extract_link_targets_recursive "$d")
         if [ -n "$new_links" ]; then
             link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
@@ -223,10 +250,12 @@ EOF
     # sources: its absence must not make resolution fail, and its presence must
     # not stand in for a notes directory.
     if [ -d "$VAULT/self" ]; then
+        case " $SCANNED_NAMES " in *" self "*) : ;; *) SCANNED_NAMES="$SCANNED_NAMES self" ;; esac
         new_links=$(extract_link_targets_recursive "$VAULT/self")
         [ -n "$new_links" ] && link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
     fi
 fi
+SCANNED_NAMES=$(printf '%s' "$SCANNED_NAMES" | sed 's/^ *//; s/ /, /g')
 
 # Deduplicate, then sample. The 100-link cap is pre-existing and is deliberately
 # left in place here -- changing what gets scanned in the same commit that
@@ -237,7 +266,14 @@ fi
 # assert over 2681 links on the strength of 99. The totals below let the message
 # state its own scope instead. Full-scan cost is the open question; the
 # over-claim was not.
-link_candidates=$(echo "$link_candidates" | sort -u)
+#
+# `grep -v '^$'` before the cap is load-bearing, not tidying. link_candidates is
+# seeded empty and grown with `printf '%s\n%s'`, so it carries a leading empty
+# line that survives sort -u and consumed one of the hundred slots: the field
+# vault reported a 99-link sample from a `head -100`. The cap now means what it
+# says, and the sample size is asserted in kernel-note-dirs.test.sh rather than
+# left to be read off a message.
+link_candidates=$(echo "$link_candidates" | grep -v '^$' | sort -u)
 link_total=$(printf '%s\n' "$link_candidates" | grep -c . || true)
 link_candidates=$(printf '%s\n' "$link_candidates" | head -100)
 
@@ -263,17 +299,22 @@ done <<< "$link_candidates"
 if [ "$resolve_rc" -ne 0 ]; then
     fail "Dangling-link check did NOT run: no note-bearing directory could be resolved in '$VAULT' (tried ops/derivation-manifest.md vocabulary, then ops/config.yaml vocabulary, then a scan for top-level directories containing *.md). This is a failure, not a warning -- nothing was checked."
 elif [ "$checked" -eq 0 ]; then
-    warn "Resolved note directories via $NOTE_DIR_SOURCE, but they contain no wiki links to check"
+    warn "Resolved note directories via $NOTE_DIR_SOURCE, but they contain no wiki links to check [scanned: $SCANNED_NAMES]"
 elif [ "$dangling" -eq 0 ]; then
     if [ "$link_total" -gt "$checked" ]; then
-        pass "No dangling wiki links in a $checked-link sample of $link_total unique (directories via $NOTE_DIR_SOURCE)"
+        # A disclosed sample stays a PASS, but the percentage is printed beside
+        # the counts on purpose: "100 of 2711" skims as near-complete and "3.7%"
+        # does not. The unchecked remainder is named too, so the reader is told
+        # the size of what this PASS does not cover.
+        pct=$(awk -v c="$checked" -v t="$link_total" 'BEGIN { printf "%.1f", (c * 100) / t }')
+        pass "No dangling links among $checked links checked -- but that is only ${pct}% of $link_total unique links; $((link_total - checked)) were NOT checked [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
     else
-        pass "No dangling wiki links (checked all $checked unique links; directories via $NOTE_DIR_SOURCE)"
+        pass "No dangling wiki links (checked all $checked unique links) [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
     fi
 else
     # Dangling links are common in mature vaults (examples, planned notes)
     # Report as info, not failure
-    warn "$dangling unresolved wiki links out of $checked unique checked of $link_total total (may include examples; directories via $NOTE_DIR_SOURCE)"
+    warn "$dangling unresolved wiki links out of $checked unique checked of $link_total total (may include examples) [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
 fi
 
 # --- Primitive 3: MOC hierarchy ---
