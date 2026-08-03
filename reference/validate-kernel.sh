@@ -98,12 +98,30 @@ fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
 # awk gives concatenation LOWER precedence than comparison, so that spelling
 # parses as `($1 == key) ":"` -- a non-empty string, hence always true, matching
 # every line in the block.
+#
+# THE VALUE IS THE REST OF THE LINE, NOT `$2`. Reading `$2` truncated at the
+# first space, so `notes: "my notes"` yielded `my`, the `-d` test on it failed,
+# and resolution fell through to the shape scan -- silently bypassing the source
+# this file's own header calls authoritative, with no error and a plausible
+# result. The failure was invisible precisely because the fallback works.
+#
+# Single quotes are written as \047 rather than escaped through the shell: the
+# whole awk program is inside a shell single-quoted string, and the '"'"' dance
+# needed to embed one is where this kind of parser usually acquires its next bug.
 _vocab_dir() {
     [ -r "$1" ] || return 1
     _vd_out=$(awk -v k="$2:" '
         /^vocabulary:[[:space:]]*$/ { inb = 1; next }
         inb && /^[^[:space:]]/     { inb = 0 }
-        inb && $1 == k             { v = $2; gsub(/^["'"'"']|["'"'"']$/, "", v); print v; exit }
+        inb && $1 == k {
+            v = $0
+            sub(/^[[:space:]]*[^:]*:[[:space:]]*/, "", v)    # drop the key, keep the value
+            if (v ~ /^"/)       { sub(/^"/, "", v);     sub(/".*$/, "", v) }
+            else if (v ~ /^\047/) { sub(/^\047/, "", v); sub(/\047.*$/, "", v) }
+            else                { sub(/[[:space:]]+#.*$/, "", v) }        # trailing comment
+            sub(/[[:space:]]+$/, "", v)
+            print v; exit
+        }
     ' "$1" 2>/dev/null)
     [ -n "$_vd_out" ] || return 1
     case "$_vd_out" in *..*) return 1 ;; esac   # never let a mapping walk upward
@@ -235,7 +253,8 @@ if [ "$resolve_rc" -eq 0 ]; then
     # newline-joined list over as a single nonexistent path and scan nothing.
     while IFS= read -r d; do
         [ -z "$d" ] && continue
-        SCANNED_NAMES="$SCANNED_NAMES $(basename "$d")"
+        SCANNED_NAMES="$SCANNED_NAMES$(basename "$d")
+"
         new_links=$(extract_link_targets_recursive "$d")
         if [ -n "$new_links" ]; then
             link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
@@ -250,12 +269,20 @@ EOF
     # sources: its absence must not make resolution fail, and its presence must
     # not stand in for a notes directory.
     if [ -d "$VAULT/self" ]; then
-        case " $SCANNED_NAMES " in *" self "*) : ;; *) SCANNED_NAMES="$SCANNED_NAMES self" ;; esac
+        printf '%s' "$SCANNED_NAMES" | grep -qxF 'self' || SCANNED_NAMES="${SCANNED_NAMES}self
+"
         new_links=$(extract_link_targets_recursive "$VAULT/self")
         [ -n "$new_links" ] && link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
     fi
 fi
-SCANNED_NAMES=$(printf '%s' "$SCANNED_NAMES" | sed 's/^ *//; s/ /, /g')
+# Accumulated one name per LINE and joined per-record, not by rewriting spaces.
+# The previous joiner was `sed 's/ /, /g'`, which turned a directory named
+# `my notes` into `scanned: my, notes` -- a set that does not exist, shown to a
+# reader whose whole reason for reading it is to learn which set produced the
+# result. Correct counts, plausible message, no error: the house class, sitting
+# inside the disclosure added to fix an earlier instance of it.
+SCANNED_NAMES=$(printf '%s' "$SCANNED_NAMES" | grep -v '^$' \
+    | awk '{ printf "%s%s", (NR > 1 ? ", " : ""), $0 } END { if (NR) print "" }')
 
 # Deduplicate, then sample. The 100-link cap is pre-existing and is deliberately
 # left in place here -- changing what gets scanned in the same commit that

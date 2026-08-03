@@ -229,20 +229,59 @@ rm -rf "$ROOT"
 # The exact shape of the original defect: a PASS about link coverage printed
 # beside a WARN saying nothing was found to check.
 #
-# THIS SECTION IS THE REGRESSION TEST FOR THE WHOLE TASK, and as first written
-# it was the one assertion here with no companion: it reported `clean` whenever
-# the second grep missed, which includes the case where the validator printed
-# nothing at all. A review demonstrated that by stubbing p2 to return nothing.
-# The p2 sentinel now covers that generally; the positive assertion below covers
-# it locally, so this section cannot report clean by silence even if the
-# sentinel is ever removed.
+# THIS SECTION IS THE REGRESSION TEST FOR THE WHOLE TASK, and it has now been
+# wrong twice, in two different ways.
+#
+# First it was a lone negative: it reported `clean` whenever its second grep
+# missed, which includes the validator printing nothing. A positive companion
+# and the p2 sentinel fixed that.
+#
+# Then a review found the real defect underneath, which the companion did not
+# touch: the negative grepped `No wiki links found to check`, and THAT STRING IS
+# UNREACHABLE. Commit d384094 -- the commit this whole suite was written for --
+# changed the emitted wording to `…contain no wiki links to check` while this
+# assertion kept the pre-task spelling. It was born dead. It could not fail, so
+# `clean` meant nothing, and adding a companion beside it only ruled out silence
+# -- which is not the property this section exists to test. The tell was already
+# in the file: §7 asserts the CURRENT wording is present, four sections above a
+# §8 asserting a DIFFERENT wording is absent.
+#
+# Two things keep it honest now. The grep points at the live wording, and §8b
+# below pins that grep against a fixture where the contradiction really does
+# occur. A negative assertion whose string can drift out from under it is how
+# this was born dead; §8b makes the next wording change FAIL a test instead of
+# silently disarming one.
 V=$(mkvault); ROOT=$(dirname "$V")
 OUT=$(p2 "$V")
 eq "coverage line IS present (so 'clean' below cannot mean 'nothing printed')" "present" \
    "$(printf '%s' "$OUT" | grep -q 'PASS .* contain wiki links' && echo present || echo "missing:$OUT")"
-eq "no 'PASS … contain wiki links' beside 'No wiki links found to check'" "clean" \
-   "$(if printf '%s' "$OUT" | grep -q 'PASS .* contain wiki links' && printf '%s' "$OUT" | grep -q 'No wiki links found to check'; then echo "contradiction:$OUT"; else echo clean; fi)"
+eq "healthy vault: no coverage PASS beside a 'no wiki links to check'" "clean" \
+   "$(if printf '%s' "$OUT" | grep -q 'PASS .* contain wiki links' && printf '%s' "$OUT" | grep -q 'no wiki links to check'; then echo "contradiction:$OUT"; else echo clean; fi)"
 rm -rf "$ROOT"
+
+# --- 8b. the detector fires on a vault that really does produce both ---------
+# The discriminator: a notes directory that RESOLVES but holds no links, beside
+# enough linked files elsewhere to clear the 50% coverage threshold. The vault
+# below has 6 markdown files, 4 of them linked, and its resolved notes directory
+# is empty of links -- so primitive 2 emits the coverage PASS and the
+# nothing-to-check WARN in one run.
+#
+# This section asserts the DETECTOR FIRES, which is what makes §8a's `clean`
+# mean something. If the emitted wording changes again, this fails loudly rather
+# than §8a going quietly vacuous.
+V2=$(mktemp -d)/vault; mkdir -p "$V2/zzz-arbitrary" "$V2/docs" "$V2/ops"
+ROOT2=$(dirname "$V2")
+printf -- '---\nd: p\n---\nno links here at all\n' > "$V2/zzz-arbitrary/plain.md"
+for n in a b c d; do printf -- '---\nd: %s\n---\nsee [[plain]]\n' "$n" > "$V2/docs/$n.md"; done
+printf 'vocabulary:\n  notes: "zzz-arbitrary"\n' > "$V2/ops/derivation-manifest.md"
+OUT=$(p2 "$V2")
+eq "8b fixture really does emit the coverage PASS" "present" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS .* contain wiki links' && echo present || echo "missing:$OUT")"
+eq "8b fixture really does emit the nothing-to-check WARN" "present" \
+   "$(printf '%s' "$OUT" | grep -q 'no wiki links to check' && echo present || echo "missing:$OUT")"
+eq "8a's detector fires here -- proving its grep is live, not dead wording" "contradiction" \
+   "$(if printf '%s' "$OUT" | grep -q 'PASS .* contain wiki links' && printf '%s' "$OUT" | grep -q 'no wiki links to check'; then echo contradiction; else echo "detector-dead:$OUT"; fi)"
+rm -rf "$ROOT2"
 
 # --- 9. a PASS must state its own scope when the 100-link cap truncates ------
 # The cap predates this fix and is left in place, but it used to be harmless:
@@ -281,6 +320,41 @@ printf -- '---\nd: b\n---\n[[alpha]]\n' > "$V/zzz-arbitrary/beta.md"
 OUT=$(p2 "$V")
 eq "under the cap: PASS says it checked all of them" "all" \
    "$(printf '%s' "$OUT" | grep -q 'checked all 2 unique links' && echo all || echo "other:$OUT")"
+rm -rf "$ROOT"
+
+# --- 10. a directory name containing a space ---------------------------------
+# Two separate defects met here, and each hid the other. `_vocab_dir` read awk's
+# $2, so `notes: "my notes"` yielded `my`; the -d test on it failed; resolution
+# fell through to the shape scan and SILENTLY BYPASSED the source this validator
+# calls authoritative, with a correct-looking result. And the message joiner
+# rewrote every space as ", ", so the shape scan then reported one directory as
+# two -- `scanned: my, notes`, a set that does not exist.
+#
+# Asserted in both halves, because either alone passes while the other is
+# broken: the source must be the manifest (not the fallback), AND the name must
+# survive intact.
+V=$(mktemp -d)/vault; ROOT=$(dirname "$V")
+mkdir -p "$V/my notes" "$V/ops"
+printf -- '---\nd: a\n---\n[[beta]]\n' > "$V/my notes/alpha.md"
+printf -- '---\nd: b\n---\n[[nowhere-at-all]]\n' > "$V/my notes/beta.md"
+printf 'vocabulary:\n  notes: "my notes"\n' > "$V/ops/derivation-manifest.md"
+OUT=$(p2 "$V")
+eq "spaced dir: resolves via the MANIFEST, not the shape-scan fallback" "manifest" \
+   "$(printf '%s' "$OUT" | grep -q 'derivation-manifest.md vocabulary' && echo manifest || echo "bypassed:$OUT")"
+eq "spaced dir: reported as one directory, not two" "my notes" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p')"
+eq "spaced dir: still finds the 1 dangling link" "1" \
+   "$(printf '%s' "$OUT" | sed -n 's/^ *WARN \([0-9][0-9]*\) unresolved wiki links.*/\1/p')"
+
+# Same value unquoted and trailing a comment -- the other spelling a real
+# manifest uses. A parser that only handles the quoted form passes the assertion
+# above and still bypasses the manifest on this one.
+printf 'vocabulary:\n  notes: my notes   # level 1 folder\n' > "$V/ops/derivation-manifest.md"
+OUT=$(p2 "$V")
+eq "spaced dir, unquoted + trailing comment: still the manifest" "manifest" \
+   "$(printf '%s' "$OUT" | grep -q 'derivation-manifest.md vocabulary' && echo manifest || echo "bypassed:$OUT")"
+eq "spaced dir, unquoted + trailing comment: comment not part of the name" "my notes" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p')"
 rm -rf "$ROOT"
 
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"

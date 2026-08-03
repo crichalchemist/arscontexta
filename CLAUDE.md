@@ -60,7 +60,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 28/28
-  $s reference/test/kernel-note-dirs.test.sh             # 28/28
+  $s reference/test/kernel-note-dirs.test.sh             # 36/36
 done
 ```
 
@@ -531,7 +531,7 @@ cap unnecessary rather than merely larger.
   comparison and states that reconciling the two routes is deliberately not done here.
 
   Measured after, on the field vault: `16 PASS / 1 WARN / 0 FAIL`, the WARN being frontmatter
-  coverage. Guarded by `reference/test/kernel-note-dirs.test.sh`, 28 assertions in both shells, in
+  coverage. Guarded by `reference/test/kernel-note-dirs.test.sh`, 36 assertions in both shells, in
   CI — every fixture uses the arbitrary directory name `zzz-arbitrary`, never `nodes`, because a fix
   verified against the field vault only proves that `nodes` joined the hardcoded list. Confirmed to
   fail 15 of 21 against the pre-fix validator.
