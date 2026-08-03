@@ -23,6 +23,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep zsh jq bc
       - name: Portability guard
         run: bash reference/check-portability.sh
+      # Checks the CHECKOUT, not the packaged plugin -- see the script's banner,
+      # which prints that distinction on every run precisely so a green tick here
+      # is not read as the stronger §4 property it cannot verify.
+      - name: Prose paths resolve (checkout only)
+        run: bash reference/check-prose-paths.sh
       - name: Shell syntax check
         run: |
           bash -n reference/validate-kernel.sh

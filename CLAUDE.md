@@ -46,7 +46,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are six executable checks. Five run in CI (`.github/workflows/checks.yml`) on every push.
+There are seven executable checks. Six run in CI (`.github/workflows/checks.yml`) on every push.
 Three defects shipped here were bash/zsh forks, so **the four test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
@@ -54,6 +54,7 @@ harness rather than its subject.
 
 ```bash
 bash reference/check-portability.sh                      # exit 0
+bash reference/check-prose-paths.sh                      # 0 missing (path count drifts)
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
@@ -69,6 +70,7 @@ done
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
+| `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
 
 **One suite hardcodes a shell and one does not, and the distinction is the invocation surface —
 not the shebang.** `guard-failure.test.sh` always invokes the guard as `bash "$GUARD"` because
@@ -103,7 +105,8 @@ visible rather than silent. Keying absorption on the message was rejected — it
 entry to the gate's own wording, so rewording a message would turn all entries stale, a new trap
 inside the mechanism built to drain them.
 
-The sixth check is kernel validation, run manually against a generated vault:
+The seventh check is kernel validation — the one that does **not** run in CI, because it needs a
+generated vault to run against:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -231,20 +234,31 @@ A backport that skips these compiles fine and silently ships one user's vocabula
 
 ## Known open divergences
 
-Verified against this checkout on 2026-08-02, ranked by blast radius. Not an exhaustive audit — the
-point is the shape of the problem and where to look.
+Every number below was **re-derived from a command on 2026-08-03**, not carried forward from the
+previous revision. Ranked by blast radius. Not an exhaustive audit — the point is the shape of the
+problem and where to look.
+
+That sweep is not ceremony: it found the list's own entries drifting in three different ways. A count
+measured against the live vault had moved (`3784 of 5251` → `3786 of 5253`) because the vault gains
+files. A count measured against this repo had moved because *this branch changed it* (CI steps).
+And one entry described a defect that had since been fixed in the files it named while remaining
+live in a file it did not — see divergence 5. **A divergence list is itself a status file, and this
+one had begun to lie in the way it warns about.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
 not a claim you should take on trust: it is what the six checks above enforce, and CI is green on
-`main` across all 11 steps. What follows is what remains.
+`main` across all **11** steps — and **14** on this branch, which added three
+(`bump-version.test.sh` under both shells, plus `check-prose-paths.sh`). Counting them takes care:
+`grep -c '^      - name:'` returns one fewer than the true count, because `actions/checkout` carries
+no `name:`. Count step *items* (`^      - `), not names. What follows is what remains.
 
 **1. `validate-kernel.sh` soft-passes the dangling-link primitive, and its own output says so.**
 Highest blast radius: this is the kernel contract, run against every generated vault, and it has been
 reporting a soft pass on a check that never executed. Two consecutive lines of one run:
 
 ```text
-PASS 3784 of 5251 files contain wiki links
+PASS 3786 of 5253 files contain wiki links
 WARN No wiki links found to check
 ```
 
@@ -336,20 +350,53 @@ change across three templates, so 6c now refuses to make the split worse and doe
 `read_config.sh` reads one level of nesting, so the three-level `maintenance.conditions.*` pair is
 unreachable by the hook either way — a stated limit from divergence 3's fix, not a regression.
 
-Separately, the two older plans in
-`docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file
-that lies about status, which is this repo's signature defect wearing a different hat.
+**Separately — a status file that lies about status, and the entry describing it had itself gone
+stale in three different directions.** Worth spelling out, because a number swap would have hidden
+all three:
 
-**The one prose-contract rule that is not mechanically checked, and the decision not to check it.**
+| | Plan(s) named | Measured 2026-08-03 |
+|---|---|---|
+| What this entry used to claim | "two older plans … 0 of 93 steps" | `93` = portability (42) + silent-failure-hardening (51). Both now **42/42** and **51/51** — ticked since. |
+| What the fix plan proposed instead | "Measured: 16/16 and 22/22" | Correct, but about *different* plans (stale-contracts, contributor-surface) that were never the subject of the `93`. |
+| What is **actually** still lying | named by neither | `2026-08-02-skill-authoring-reference.md` at **0/29** — with a complete ledger (16 completion lines, `final-review.md`) and its 181-line deliverable `reference/skill-authoring.md` on disk. |
+
+```bash
+for p in docs/superpowers/plans/*.md; do
+  printf '%-58s %s/%s\n' "$(basename "$p")" \
+    "$(grep -c '^- \[x\]' "$p")" "$(grep -c '^- \[[x ]\]' "$p")"
+done
+```
+
+So the entry named two plans that got fixed, its correction named two others that were never the
+subject, and the live instance is in a third file neither mentions. **Those 29 boxes are deliberately
+left unticked** — retro-ticking them would destroy the only standing evidence of the defect, and it
+is a write to a file this work does not own.
+
+**The prose-contract rule, now half-checked — under a name that says which half.**
 `reference/skill-authoring.md` §4 requires that every filesystem path named in a prose contract exist
-in the *packaged* plugin. That rule is stated and enforced by nothing — a defect of exactly this shape
-once survived four gates, a 127 KB review, and a live vault run. A checker was considered and
-**deliberately not built**: "the packaged plugin" is not a defined build target, because this repo has
-no build step. A script could only compare prose against whatever `/plugin install` last happened to
-copy, so a green result would assert nothing while looking like assurance — the proxy-for-property
-failure this file spends most of its length warning about, added to the gate set that warns about it.
-The honest interim check is a human diffing the two trees at release, which is why the version bump
-now makes them distinguishable at all. Revisit if a build step ever exists.
+in the *packaged* plugin. A checker for **that** claim is still deliberately not built, for the reason
+it always was: "the packaged plugin" is not a defined build target, because this repo has no build
+step. A script could only compare prose against whatever `/plugin install` last happened to copy, so a
+green result would assert nothing while looking like assurance — the proxy-for-property failure this
+file spends most of its length warning about, added to the gate set that warns about it.
+
+Asked a narrower question, though, a real answer exists: *does every repo path named in prose resolve
+in this checkout?* That is a strictly weaker property and it is honestly checkable, so
+`reference/check-prose-paths.sh` now checks it, across 8 documents, in CI. **Its name, its
+header and its every-run banner all say `checkout only — packaging unverified`**, because a gate whose
+green is read as the stronger claim is worse than no gate.
+
+It cannot catch the §4 defect class alone, and the live proof is in divergence 5: `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh`
+**resolves here and is absent from the installed 0.8.0.** This gate passes that path. It catches the
+strictly easier error — prose naming something that exists nowhere.
+
+Two design choices worth keeping if it is ever extended. Scope is a **stated file list**, not a
+discovered one, and an in-scope file that goes missing is an `ERROR` rather than a skip — a shrinking
+scope must not read as clean. And extracting **zero** paths exits `2` with "the extractor is broken,
+not that prose is clean", distinct from `1` for a genuine miss: this repo has twice shipped a scan
+that matched nothing and reported green.
+
+The human diff of the two trees at release remains the only check on the full §4 rule.
 
 ### Closed on `fix/spec-e-fourteen-items`
 

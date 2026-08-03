@@ -182,11 +182,17 @@ data point against a frozen tree.
 
 ## Task 7 — E10 + E11: close the two documentation entries
 
-- [ ] **Step 1 — E11, correct the stale divergence entry.** CLAUDE.md divergence 5, "Verification gaps in the loop itself" (numbering shifts as entries open and close — match on the title) claims two plans
+- [x] **Step 1 — E11, correct the stale divergence entry.** DONE — and the correction proposed here
+      was itself mis-aimed. `93` = portability(42)+silent-failure(51), both since ticked; the "16/16 and
+      22/22" replacement names two *other* fully-ticked plans. The live liar is
+      `2026-08-02-skill-authoring-reference.md` at 0/29, named by neither. Rewritten as three states.
+      All other numbers re-derived from commands. Original text follows. CLAUDE.md divergence 5, "Verification gaps in the loop itself" (numbering shifts as entries open and close — match on the title) claims two plans
       show 0 of 93 steps complete. Measured: 16/16 and 22/22 ticked. Delete that half of the entry.
       **Then re-derive every other number in the divergence list** — the entry that names
       status-files-that-lie was one.
-- [ ] **Step 2 — E10, re-examine the prose-contract checker once**, under the narrower question: can
+- [x] **Step 2 — E10, re-examine the prose-contract checker once** — BUILT, not closed.
+      `reference/check-prose-paths.sh`, in CI, banner says `checkout only — packaging unverified` every
+      run. Original text follows., under the narrower question: can
       *every path named in prose exists in the repo* be checked without pretending to be *exists in
       the packaged plugin*? Build it under an honest name, or close the entry permanently. Do not
       leave it recurring.
