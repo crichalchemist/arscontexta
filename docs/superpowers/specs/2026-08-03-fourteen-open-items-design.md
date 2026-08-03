@@ -33,7 +33,7 @@ passed 999 and it now holds `…-1000.md` through `…-1020.md`. It was fixed **
 backported — `~/second-brain/.claude/skills/extract/SKILL.md:904` carries a Width paragraph the
 template does not:
 
-> `NNN` is three digits minimum, more as needed — pad to three, then let wider numbers through
+> `NNN` is seven digits minimum (raised from three at the author's direction), and wider numbers pass through
 > unchanged. Never truncate to three, and never pad to a fixed wider width: re-padding would rename
 > every existing claim and break every reference to it.
 

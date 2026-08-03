@@ -1060,7 +1060,8 @@ After creating task files, update `ops/queue/queue.json`:
 
 - Start from `next_claim_start` value in the extract task file (set by /seed)
 - /seed calculated this by checking the queue and archive for the highest existing claim number
-- Example: if highest claim in vault is 009, next_claim_start will be 010
+- Example: if the highest number issued in the vault is 9, next_claim_start is 10. Write it
+  unpadded — a padded `010` in frontmatter is octal to any later shell arithmetic.
 - Claim numbers are GLOBAL and never reused across batches
 - Enrichments continue the same numbering sequence after claims
 

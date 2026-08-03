@@ -166,57 +166,70 @@ Use `$FINAL_SOURCE` in the task file — this is the path all downstream phases 
 Find the highest existing claim number across the queue and archive to ensure globally unique claim IDs.
 
 ```bash
-# WIDTH: claim numbers are three digits or more — seven for anything newly created,
-# and vaults predating that rule keep their narrower names. `[0-9]{3}` matches
-# EXACTLY three, so on a wider name it captured the LAST three: `…-1000.md` read as
-# `000`. The maximum then went BACKWARDS, and the next claim reused a number already
-# on disk — silently breaking the "globally unique, never reused" guarantee asserted
-# below. `{3,}` matches the whole run; the leading `-` anchors to the claim suffix
-# so an unrelated digit run elsewhere in the name cannot win.
-# RECOGNISE CLAIMS BY CONTENT, NOT BY FILENAME SHAPE. A filename scan cannot tell
-# `article-1000.md` from `paper-2026-05-04-171057.md`; measured on a fixture, the
-# timestamped file won and drove the next claim number to 171058. Claim files carry
-# a `# claim-NNN` heading, with frontmatter `claim:` as the fallback for files
-# written before that rule. Everything else — timestamped captures, arXiv IDs — is
-# invisible to the counter, which is the point.
-claim_numbers() {
-  find "$@" -maxdepth 1 -type f -name '*.md' 2>/dev/null \
-    | grep -v summary \
+# RECURSIVE, AND ops/queue ALONE. /archive-batch moves task files to
+# a dated per-source subdirectory of ops/queue/archive, which is DEPTH 2 — a `-maxdepth 1` scan cannot
+# see the layout this skill itself creates, so every vault that has completed one
+# batch reads as having no claims at all. Passing both ops/queue and its own child
+# also double-counts every archived file, which is a wrong number inside an error
+# message. One recursive walk of the parent covers both and counts each file once.
+#
+# ENRICHMENTS DRAW ON THE SAME COUNTER. reduce documents "claims 010-015,
+# enrichments start at 016", and enrichment files carry a type of enrichment with no
+# `claim:` key. A filter that recognises only claims makes the maximum go backwards
+# by however many enrichments the last batch issued — the same defect this scan was
+# rewritten to remove, in the other direction. Extract task files carry
+# `type: extract` and were never issued a number, so they stay out.
+#
+# The heading alternative is `# [Cc]laim[ -]`: reduce writes `# Claim NNN:` with a
+# capital C and a space, so an exact `^# claim-` branch matches nothing it produces.
+issued_files() {
+  find "$@" -type f -name '*.md' 2>/dev/null \
     | while IFS= read -r f; do
-        # `^claim: ` tests for the frontmatter KEY, not a numeric value — the key
-        # holds the claim sentence. Requiring a number there matches nothing, and
-        # since the counter would then read 0, the guard below is what stands
-        # between that and renumbering an existing vault from 1.
-        grep -qE '^claim: |^# claim-[0-9]+' "$f" 2>/dev/null || continue
-        printf '%s\n' "$f"
-      done \
-    | grep -oE -- '-[0-9]{3,}\.md$' | grep -oE '[0-9]{3,}' | sort -n | tail -1
+        grep -qE '^claim: |^type: enrichment|^# [Cc]laim[ -][0-9]+|^# Enrichment [0-9]+' \
+          "$f" 2>/dev/null && printf '%s\n' "$f"
+      done
 }
+highest_in() { grep -oE -- '-[0-9]{3,}\.md$' | grep -oE '[0-9]{3,}' | sort -n | tail -1; }
 
-# `find` rather than a glob: a non-matching glob aborts the command under zsh where
-# bash passes the pattern through, and that fork has shipped here before.
-QUEUE_MAX=$(claim_numbers ops/queue)
-ARCHIVE_MAX=$(claim_numbers ops/queue/archive)
+ISSUED_FILES=$(issued_files ops/queue)
+FILE_MAX=$(printf '%s\n' "$ISSUED_FILES" | highest_in)
+
+# THE QUEUE IS A RECORD OF ISSUED NUMBERS INDEPENDENT OF THE FILES. reduce writes
+# per-claim "file" entries there. Reading only the filesystem restarts
+# numbering at 1 against a queue that already records 021 whenever the task files
+# have been consumed or cleaned — which is exactly the silent reissue this scan
+# exists to prevent.
+QUEUE_MAX=$(find ops -maxdepth 2 \( -name 'queue*.yaml' -o -name 'queue*.json' \) \
+  -exec grep -ohE -- '-[0-9]{3,}\.md' {} + 2>/dev/null | grep -oE '[0-9]{3,}' | sort -n | tail -1)
 
 # BASE 10, EXPLICITLY. Zero-padded numbers are OCTAL to shell arithmetic:
 # $((0000010)) is 8, and $((0000019)) is a fatal "value too great for base". With a
 # seven-digit pad every claim number hits this. `10#` forces base 10.
+FILE_MAX=$((10#${FILE_MAX:-0}))
 QUEUE_MAX=$((10#${QUEUE_MAX:-0}))
-ARCHIVE_MAX=$((10#${ARCHIVE_MAX:-0}))
 
-# FAIL LOUD RATHER THAN RESTART AT 1. If claim files exist but no number could be
-# read, the scan is broken — the vault is not empty. Defaulting to 0 there hands the
-# next batch numbers that collide with every claim already on disk.
-CLAIM_FILE_COUNT=$(find ops/queue ops/queue/archive -name '*-[0-9][0-9][0-9]*.md' 2>/dev/null \
-  | grep -vc summary || true)
-if [ "${CLAIM_FILE_COUNT:-0}" -gt 0 ] && [ "$QUEUE_MAX" -eq 0 ] && [ "$ARCHIVE_MAX" -eq 0 ]; then
-  printf 'error: %s claim files exist but no claim number could be read — refusing to restart numbering at 1\n' \
-    "$CLAIM_FILE_COUNT" >&2
+# THE GUARD USES THE SCANNER'S OWN DETECTOR. A previous version detected claims by
+# filename glob while the scan detected them by content, so the two disagreed about
+# what a claim is: it refused to run on a vault whose only file was an extract task
+# named `arxiv-2501-12345.md`, and stayed silent on the queue-record case its own
+# message describes. Same detector, so it can only fire when the scan genuinely
+# failed on files it genuinely recognised.
+ISSUED_COUNT=$(printf '%s\n' "$ISSUED_FILES" | grep -c . || true)
+if [ "${ISSUED_COUNT:-0}" -gt 0 ] && [ "$FILE_MAX" -eq 0 ] && [ "$QUEUE_MAX" -eq 0 ]; then
+  printf 'error: %s numbered files exist but no number could be read — refusing to restart at 1\n' \
+    "$ISSUED_COUNT" >&2
   exit 1
 fi
 
-# Next claim starts after the highest
-NEXT_CLAIM_START=$((QUEUE_MAX > ARCHIVE_MAX ? QUEUE_MAX + 1 : ARCHIVE_MAX + 1))
+# NO "UNCLASSIFIABLE FILE" REFUSAL, DELIBERATELY. A guard that refused on any
+# numbered file lacking a marker was written and removed: it fired on a timestamped
+# capture sitting in the archive, which is normal vault content, and refusing there
+# reproduces exactly the bricking this scan was rewritten to fix. The residual hole
+# is a claim file that lost its frontmatter — a corrupt state reduce cannot produce —
+# and the queue record above still carries its number, so the counter does not
+# restart over it.
+# Next claim starts after the highest number seen anywhere — disk or queue record.
+NEXT_CLAIM_START=$((FILE_MAX > QUEUE_MAX ? FILE_MAX + 1 : QUEUE_MAX + 1))
 ```
 
 Claim numbers are globally unique and never reused across batches. This ensures every claim file name (`{source}-{NNN}.md`) is unique vault-wide.

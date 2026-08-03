@@ -41,7 +41,7 @@ Ships to every generated vault. Do this first.
       is `reduce`. The vault names `nodes/`; the template says `{vocabulary.notes}`. A verbatim
       copy-paste ships one user's vocabulary to everyone.
 - [ ] **Step 2 — Add the Width rule to `reduce`** after the `NNN is the claim number` line (`:897`).
-      Three digits minimum, wider numbers through unchanged. **Carry the re-padding warning** — it is
+      Seven digits minimum (author-directed; the spec text said three before that call), wider through unchanged. **Carry the re-padding warning** — it is
       the half that matters: widening `…-042.md` to `…-0042.md` renames the file and breaks every wiki
       link to it, because links resolve by filename.
 - [ ] **Step 3 — Make `seed` validate width-agnostically.** It must accept three **or more** digits
