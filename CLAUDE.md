@@ -129,9 +129,9 @@ fence no longer exists, fails the gate, so the list drains rather than rots.
 
 It also carries one assertion that is **not** about fences: **F**, which runs once against a
 four-note discriminating set and pins `reference/lib/frontmatter.sh` three ways — correct parser 2,
-naive `grep -rl '^status:'` 1, wrong-field parser 4. It lives here rather than in a
-`reference/test/frontmatter.test.sh` of its own because a suite wired into neither CI nor the table
-above is a green-looking nothing, and this gate is already wired into both.
+naive `grep -rl '^status:'` 1, wrong-field parser 4. It lives here rather than in a standalone
+frontmatter test suite of its own because a suite wired into neither CI nor the table above is a
+green-looking nothing, and this gate is already wired into both.
 
 That two-directional check had a hole in it, now closed: absorption matched on `(letter, label)`
 alone and ignored the entry's `ZSH ONLY:` / `BASH ONLY:` scope, while the staleness half honoured it.
@@ -441,14 +441,25 @@ They are collapsed into one entry because they were one defect wearing three hat
 (8), so no single place for the vocabulary to be right (7), and a fixture that could not tell a
 correct parser from a broken one (9), which is why 7 and 8 survived every gate.
 
-**What is still open, and was never in these three entries:** `generators/features/graph-analysis.md:39,141`
-and `generators/features/schema.md:74` emit `rg -l '^type: tension' … | xargs rg '^status: pending'`
-as *recipes into a generated vault's documentation*. That is the same line-anchored form, in the same
-defect class, and it is not converted here — a recipe cannot source a library the way a fence can, so
-fixing it is a design change to what generation emits, not a substitution. Re-derive with:
+**What is still open, and was never in these three entries:** `generators/features/graph-analysis.md:39,141`,
+`generators/features/schema.md:74` and `generators/features/methodology-knowledge.md:31` emit
+line-anchored `rg '^status: …'` as *recipes into a generated vault's documentation*. Same defect
+class, not converted here — a recipe cannot source a library the way a fence can, so fixing it is a
+design change to what generation emits.
+
+**Whoever takes this: it is not a relocation, and it will move a number.** The library treats an
+unclosed frontmatter block as no frontmatter; the recipes do not care.
+`~/second-brain/ops/methodology/prioritize-dissenting-viewpoints.md` opens `---` at line 1, never
+closes it, and carries `status: active` at line 7 — so for `ops/methodology/` the shipped recipe
+counts **13** and the library counts **12**, and that one file is the entire difference. The real
+decision is which answer is right (fix the malformed file, or have the library tolerate an unclosed
+block), and it should be made deliberately rather than discovered as a count that dropped. Re-derive:
 
 ```bash
-grep -rn 'status' generators/ --include='*.md'
+grep -rn 'status' generators/ --include='*.md'          # every declaration and recipe
+. reference/lib/frontmatter.sh
+rg -l '^status: active' ~/second-brain/ops/methodology/ | wc -l    # 13, the recipe
+count_notes_by_field ~/second-brain/ops/methodology status active  # 12, the library
 ```
 
 The field vault also carries `status: implemented` on observations — a value declared in no generator

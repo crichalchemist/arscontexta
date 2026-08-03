@@ -49,6 +49,35 @@
 # NOT HANDLED, on purpose: trailing YAML comments (`status: open # why`) are part
 # of the value, and multi-line/flow values are returned verbatim. No caller needs
 # either, and guessing at them would add failure modes without adding a user.
+#
+# TWO NAMED SEMANTIC CHANGES vs the `grep -rl '^status: pending'` form this replaced.
+# Both are deliberate. Both are stated here because a converted caller inherits them
+# whether or not whoever converted it noticed, and one of them is LIVE on real data.
+#
+#   A. VALUES MATCH EXACTLY, where the naive form matched prefixes. `^status: pending`
+#      also matches `pending-review`; this library compares with `=`. Measured on the
+#      field vault's 65 observation and tension files: no disagreement (observations
+#      14/14, tensions 8/8), because the values in use -- open, implemented, archived,
+#      resolved -- are none of them a prefix of another. Latent, but real.
+#
+#   B. AN UNCLOSED FRONTMATTER BLOCK IS NOT FRONTMATTER (rule 1 above), where the
+#      naive form did not care. **This one changes a count on real data today.**
+#      `~/second-brain/ops/methodology/prioritize-dissenting-viewpoints.md` opens
+#      `---` at line 1, never closes it, and carries `status: active` at line 7.
+#      `generators/features/methodology-knowledge.md:31` ships
+#      `rg '^status: active' ops/methodology/` to generated vaults for exactly that
+#      directory: the recipe counts 13 files, this library counts 12, and that file is
+#      the whole difference.
+#
+#      So converting those generator recipes is NOT a relocation. It is a behavior
+#      change that will move a number, and the number moves because a real file is
+#      malformed. Whoever takes it decides which answer is right -- fix the file, or
+#      have the library tolerate an unclosed block -- and should not discover the
+#      question by watching a count drop. Re-derive:
+#
+#        . reference/lib/frontmatter.sh
+#        rg -l '^status: active' ~/second-brain/ops/methodology/ | wc -l   # 13
+#        count_notes_by_field ~/second-brain/ops/methodology status active # 12
 
 # Contract version. Bump on any BEHAVIOR change (delimiter rules, key matching,
 # quote stripping, recursion semantics). Callers and /arscontexta:upgrade read it.
