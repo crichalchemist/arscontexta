@@ -267,6 +267,10 @@ Or "show 2" for side-by-side detail on a specific skill.
 
 Wait for user response. Do NOT proceed without explicit approval.
 
+**Approval gates Step 5 only.** Step 6's vault repairs run either way — including when the report
+above was "no upgrades needed" and there is nothing to approve. Do not skip to the Final Report from
+here.
+
 ---
 
 ## Step 5: Apply Approved Upgrades
@@ -315,20 +319,71 @@ skills:
     changes: "{brief description of what changed}"
 ```
 
-### 5e. Refresh the Shared Library
+---
 
-Generated vaults carry their own copy of the link-extraction library at `ops/lib/link-extraction.sh`; every vault-tier skill that counts links, connections, or density sources it from there. Vaults generated before that copy existed have no `ops/lib/` at all, and their `/stats` and `/graph` exit 1 until this step repairs them.
+## Step 6: Repair Vault Infrastructure
+
+**This step runs on every invocation — including when no upgrades were available, and when the user
+approved none.** The three repairs below are vault-level (one shared library, one lock directory, one
+config section), not per-skill.
+
+They were once written as subsections of Step 5's *"For each approved upgrade"* loop. That made them
+unreachable in exactly the case that needs them most: the vault most likely to be missing `ops/lib/`
+is an **old** vault, which is also the one most likely to have its user decline the skill upgrades.
+It also ran each repair once per approved upgrade. The Final Report's `[current]` variants
+(`queue lock dir: present [current]`) are the tell — a per-upgrade step has no reason to report
+"nothing needed."
+
+### 6a. Refresh the shared library
+
+Generated vaults carry their own copy of the link-extraction library at `ops/lib/link-extraction.sh`.
+
+**Scope, stated rather than implied: this step reconciles that one file, not the whole of
+`ops/lib/`.** A vault's `ops/lib/` may also hold graph parsers and their tests. Those carry no version
+marker to compare against, so this step cannot reconcile them and must not claim to. Report the file;
+never report the directory as repaired.
+
+**Do not assert which skills source this file.** In the one field vault measured, *no* skill
+referenced `link-extraction.sh` at all: its `/graph` sources `ops/lib/graph.mjs` — which that skill
+calls the only sanctioned parser, warning that a naive wikilink regex once produced 135 false
+dangling links against a real count of 0 — and `/stats` sources neither. Restoring this file may
+therefore leave a vault's link counting broken. Say what was restored; do not infer what now works.
 
 **Do this as instructions you carry out, not as a bash block.** `${CLAUDE_PLUGIN_ROOT}` resolves for you; it is unset in a shell, so a shell copy would read from `/reference/lib/...` and silently do nothing.
 
 1. Read `LINK_EXTRACTION_VERSION` from the plugin's `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh`.
+   **If that file is absent, halt this step and report it — do not treat it as version `0`.** A
+   missing plugin-side library means the installed plugin predates the step reading it; there is
+   nothing to refresh *from*, and the only safe action is to leave the vault's copy untouched. This
+   is a live case, not a hypothetical: a plugin installed from a release older than this step has no
+   `reference/lib/` at all, and treating that as `0` would copy a nonexistent file over a working
+   library. Report `link-extraction.sh: plugin copy absent [skipped — plugin older than this step]`.
 2. Read `LINK_EXTRACTION_VERSION` from the vault's `ops/lib/link-extraction.sh`. Treat a missing file or a missing assignment as version `0`.
-3. If the two versions differ, create `ops/lib/` if absent and copy the plugin's file over the vault's, preserving the executable bit.
+3. **Compare numerically, and copy only when the plugin's version is strictly greater than the
+   vault's.** Equal means current — do nothing. Vault *ahead* of plugin means the vault was refreshed
+   by a newer plugin than the one now installed; leave it alone and report it. Copying on "the two
+   versions differ" silently downgrades a working library and renders it as `[refreshed]`, which
+   reads like progress. When the copy is warranted, create `ops/lib/` if absent and copy the plugin's
+   file over the vault's, preserving the executable bit.
 4. Confirm the copy landed: the vault file must now exist, be readable, and report the plugin's version. If it does not, report the failure — do not record the refresh as applied.
 
-**Report the replacement; never overwrite silently.** Name both versions and the outcome in the Final Report, e.g. `link-extraction.sh: v0 (absent) → v1 [restored]` or `v1 → v2 [refreshed]`. When the versions already match, say so: `link-extraction.sh: v1 [current]`. A library swapped in without a line in the report is a change the user cannot audit — and this file decides what every link count in the vault reports.
+**Report the replacement; never overwrite silently.** Name both versions and the outcome in the Final
+Report — every branch above has a line, including the ones where nothing was written:
 
-### 5f. Restore the queue lock directory
+```text
+link-extraction.sh: v0 (absent) → v2 [restored]
+link-extraction.sh: v1 → v2 [refreshed]
+link-extraction.sh: v2 [current]
+link-extraction.sh: v2 → v1 [vault ahead, skipped]
+link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
+```
+
+When the vault's `ops/lib/` held other files, add the scope line so the user is not left reading a
+restored file as a restored directory: `other ops/lib/ files not checked`. A library swapped in
+without a line in the report is a change the user cannot audit — and this file decides what every
+link count in the vault reports.
+
+### 6b. Restore the queue lock directory
 
 `/{DOMAIN:reflect}` and `/{DOMAIN:reweave}` serialize their qmd calls with
 `until mkdir "$LOCKDIR" 2>/dev/null; do … done`, bounded at 60 seconds. The `mkdir` deliberately
@@ -354,7 +409,7 @@ templates a given vault's skills came from.
 
 Report the outcome: `queue lock dir: absent → created [restored]`, or `present [current]`.
 
-### 5g. Seed the self-evolution thresholds
+### 6c. Seed the self-evolution thresholds
 
 `/{DOMAIN:rethink}`, `/{DOMAIN:remember}` and `/{DOMAIN:next}` all read
 `self_evolution.observation_threshold` and `self_evolution.tension_threshold` from `ops/config.yaml`,
@@ -362,8 +417,28 @@ and all document the same defaults. No generator ever wrote those keys, so in ev
 before this step they are simply absent: each skill falls back to its built-in default, and a user
 who wants to tune the loop has nothing to edit and no way to discover the setting exists.
 
+**Check both names before writing anything.** A vault may already declare these thresholds under a
+different key. The field vault does — `maintenance.conditions.pending_observations_threshold: 20` and
+`pending_tensions_threshold: 10` — and it wrote that mismatch up itself on 2026-07-25, in
+`ops/observations/drift-self-evolution-config-path-mismatch-in-rethink-skill.md`. Its `/rethink`
+reads the `maintenance.conditions.*` pair; `/next` and `/remember` read `self_evolution.*`.
+
+A check keyed only to `self_evolution:` cannot see that tuning. It seeds the **defaults** `10/5`
+directly beneath a user's configured `20/10`, halving both, while reporting that it seeded a missing
+section. That is not a hypothetical ordering — it is what this step does to the one real vault it has
+been run against.
+
 1. Check whether `ops/config.yaml` contains a `self_evolution:` section.
-2. If absent, append it with the documented defaults, preserving the file's existing comment style:
+2. Check whether it declares the same thresholds under `maintenance.conditions:` as
+   `pending_observations_threshold` / `pending_tensions_threshold`.
+3. **If either is present, write nothing.**
+   - `self_evolution:` present → `self_evolution: present [current]`.
+   - Only `maintenance.conditions.*` present → report the conflict, naming **both keys and both
+     values**, and stop: `self_evolution: absent, but maintenance.conditions declares 20/10 —
+     not seeded [conflict]`. A report that says only "not seeded" replaces a silent overwrite with a
+     silent skip, which is no better.
+4. Only when **neither** is present, append the documented defaults, preserving the file's existing
+   comment style:
 
    ```yaml
    self_evolution:
@@ -371,20 +446,33 @@ who wants to tune the loop has nothing to edit and no way to discover the settin
      tension_threshold: 5        # open tensions before suggesting rethink
    ```
 
-3. If present, leave the user's values alone — this step seeds a missing section, it does not
-   reset a tuned one.
+   Report: `self_evolution: absent → seeded (10/5) [restored]`.
 
-Report the outcome: `self_evolution: absent → seeded (10/5) [restored]`, or `present [current]`.
+**The namespace question this leaves open.** The field vault's own recommendation was the opposite
+repair: change the skills to read `maintenance.conditions.*` rather than invent a `self_evolution`
+namespace that no generator ever wrote (Rule 12 — conform to the existing structure). That is a
+design change across three skill templates, not an upgrade step, so it is not made here. This step
+now refuses to make the split worse; it does not resolve it.
 
-**Note a genuine split rather than bridging it silently.** The SessionStart hook does not read these
-keys — it carries its own hardcoded thresholds, and `read_config.sh` reads the top-level
-`.arscontexta` marker, so it cannot reach a nested `ops/config.yaml` key at all. Seeding the section
-therefore makes the loop tunable for the three skills that read it, and leaves the hook unaffected.
-Unifying the two configuration surfaces is a design change, not an upgrade step.
+**Seeding this section now changes hook behavior too — it is no longer cosmetic.** This note used to
+say the opposite, and was correct when written: the SessionStart hook carried hardcoded thresholds
+and `read_config.sh` read only the top-level `.arscontexta` marker, so a nested `ops/config.yaml` key
+was unreachable. Both halves of that changed. `read_config.sh` routes dotted keys to
+`ops/config.yaml`, and `session-orient.sh` reads `self_evolution.observation_threshold` and
+`self_evolution.tension_threshold` rather than hardcoding them.
+
+So a seeded section is read by the hook as well as by `/{DOMAIN:rethink}`, `/{DOMAIN:remember}` and
+`/{DOMAIN:next}`. That is a stronger reason to seed a genuinely missing section — and the reason
+step 3 above must refuse to seed over a threshold declared under another name. Writing `10/5` here no
+longer merely fails to help; it now actively overrides what the vault was tuned to.
+
+One limit worth stating rather than discovering later: `read_config.sh` resolves **one** level of
+nesting, which is all `self_evolution.*` needs. `maintenance.conditions.pending_observations_threshold`
+is three levels, so the hook cannot read that pair whichever way this step is resolved.
 
 ---
 
-## Step 6: Validate
+## Step 7: Validate
 
 After applying all approved upgrades:
 
@@ -422,8 +510,15 @@ Changes:
   - /{skill}: {what changed} (Research: "{claim}")
   - /{skill}: {what changed} (Research: "{claim}")
 
-Shared library:
-  - link-extraction.sh: v{vault} → v{plugin} [restored | refreshed | current]
+Vault infrastructure (Step 6 — runs regardless of approvals):
+  - link-extraction.sh: v{vault} → v{plugin} [restored | refreshed | current
+                                              | vault ahead, skipped
+                                              | plugin copy absent, skipped]
+    {when ops/lib/ held other files:} other ops/lib/ files not checked
+  - queue lock dir: {absent → created [restored] | present [current]}
+  - self_evolution: {absent → seeded (10/5) [restored] | present [current]
+                     | absent, but maintenance.conditions declares {n}/{n} —
+                       not seeded [conflict]}
 
 Validation: {PASS | FAIL with details}
 
