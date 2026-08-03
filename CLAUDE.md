@@ -311,9 +311,32 @@ the arithmetic is deliberately unchanged, because /help is orientation and that 
 The *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those numbers
 cross a threshold.
 
-**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
-real vault, and it now performs three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`)
-that are prose contracts CI cannot exercise. Separately, the two older plans in
+**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` **has still never been invoked as
+a slash command against a real vault** — a slash command runs in the session's working directory and
+cannot be pointed at another tree, so that gap is structural rather than merely undone. Its three
+repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`) remain prose contracts CI cannot
+exercise.
+
+What has now happened is narrower and worth the distinction: those steps were **carried out by hand**
+against an `rsync -a` copy of the field vault, in an as-is state and again with all three repairs
+deliberately damaged. That found **six defects, five now fixed** (`acb1ecf`) — the repairs were
+unreachable when no upgrade was approved; 5e downgraded a newer vault library on any version
+mismatch and reported it as `[refreshed]`; it had no behavior for a missing plugin-side file, which
+is the state of the *installed* plugin; it restores one file of five and claimed `/stats` and
+`/graph` source it when no vault skill references it at all; and 5g performed the resolution the
+field vault had explicitly rejected, seeding the `10/5` defaults beneath that vault's configured
+`20/10` because its "do not reset a tuned one" guard tested only for `self_evolution:`. That last one
+was made load-bearing by divergence 3's own fix on this branch — the hook now reads the key 5g
+writes.
+
+**Still open from that run:** the field vault declares these thresholds under
+`maintenance.conditions.*` while `next`/`remember`/`rethink` read `self_evolution.*`. The vault
+recommended the skills conform rather than the namespace be invented. Resolving that is a design
+change across three templates, so 6c now refuses to make the split worse and does not resolve it.
+`read_config.sh` reads one level of nesting, so the three-level `maintenance.conditions.*` pair is
+unreachable by the hook either way — a stated limit from divergence 3's fix, not a regression.
+
+Separately, the two older plans in
 `docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file
 that lies about status, which is this repo's signature defect wearing a different hat.
 
