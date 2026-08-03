@@ -252,7 +252,12 @@ if [ -n "$TARGET" ]; then
   [ -f "$ROOT/$TARGET" ] || { printf 'harness: no such file: %s\n' "$TARGET" >&2; exit 1; }
   FILES="$TARGET"
 else
-  FILES=$(cd "$ROOT" && find skill-sources skills -name SKILL.md | sort)
+  # reference/skill-authoring.md is scanned too: its ```bash examples are what an
+  # author copies, so an example that cannot pass H/N/U/S is a defect being taught.
+  # Counter-examples in that document live in ```text and are invisible here, which
+  # is the only reason it can show a wrong pattern at all.
+  FILES=$(cd "$ROOT" && { find skill-sources skills -name SKILL.md
+                          find reference -name skill-authoring.md; } | sort)
 fi
 printf '%s\n' "$FILES" | while IFS= read -r rel; do
   [ -n "$rel" ] || continue
