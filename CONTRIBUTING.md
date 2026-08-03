@@ -87,6 +87,14 @@ Four run in CI on every push, **each under both bash and zsh**. Two shipped defe
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
+**Run all of them, not the one you changed — the gates are not independent.**
+`guard-failure.test.sh` *invokes* `check-portability.sh` and builds synthetic minimal roots to
+exercise its failure path, so a new check added to the guard changes what every other caller sees. A
+check added to `check-portability.sh` and proved non-vacuous against the real repo — but never re-run
+through the other three — took `guard-failure` from 19/19 to 16/3, and the assertions it broke were
+the ones proving the guard is not vacuous. Loud failure on a legitimately clean tree: the house
+defect with its sign flipped.
+
 ```bash
 bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
 

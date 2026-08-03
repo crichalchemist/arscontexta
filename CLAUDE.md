@@ -130,6 +130,11 @@ means the primitive is aspirational, not enforced.
 
 Supporting layers:
 
+- `reference/skill-authoring.md` — how to author or edit a `SKILL.md` here: which of the three trees
+  you are in and the predicate that tells you, the placeholder families and the command that counts
+  them, when a fail-loud guard fires (and when applying it is itself the defect), what makes a prose
+  contract complete, and why counter-examples must live in ` ```text `. Read `CONTRIBUTING.md` first;
+  this does not restate it. Its own ` ```bash ` examples are gate fixtures.
 - `methodology/` — 249 atomic research claims. The "why" behind every derivation decision;
   `/arscontexta:ask` queries this.
 - `reference/vocabulary-transforms.md` — maps canonical command names onto domain-native ones. This
@@ -218,20 +223,33 @@ Any already-listed fence can therefore mask a new, unrelated failure. The fix is
 whether entries key on reason, or whether the shell filter (which governs the stale table but not
 the absorption path) should gate absorption too — so it is recorded rather than patched in passing.
 
-**2. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
+**2. `/next` promises eight state fields and computes five — and it ships.** The only entry here that
+reaches users' machines. `skill-sources/next/SKILL.md` names `orphan_notes` in 8 places, `queue` in
+21, and its output-format contract — inherited by every generated vault — reads
+`Inbox | Notes | Orphans | Dangling | Stale | Obs | Tensions | Queue`. Enumerating every variable the
+file assigns gives `INBOX_COUNT NOTE_COUNT OBS_COUNT SESSION_COUNT TENSION_COUNT` plus `INBOX_DIR
+MAINT_MAX NEXT_MAINT NOTES_DIR OLDEST_INBOX TIMESTAMP`. **Orphans, Dangling, Stale and Queue are
+assigned nowhere, and no helper is sourced.** Claude reads the contract, emits the line, and invents
+four numbers — exit 0, plausible output, no error. `skill-sources/graph/SKILL.md` references orphans
+with zero `ORPHAN_COUNT=` occurrences, so the gap is not confined to `next`. Found by a control
+subagent asked to add an orphan count, which discovered the signal it was told to add was already
+promised. Left unfixed deliberately: the fix is a template change, not documentation work, and
+guessing which of four definitions of "stale" was meant would ship a fifth.
+
+**3. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
 the top-level `.arscontexta` marker and handles **scalar top-level keys only**, so it structurally
 cannot reach a nested `ops/config.yaml` key. The SessionStart hook therefore carries hardcoded
 thresholds while three skills read `self_evolution.*` from `config.yaml`. Three sources currently
 disagree (skills 10/5, plugin hook 10/5, the field vault's patched hook 20/10). Surfaced
 deliberately rather than averaged.
 
-**3. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
+**4. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
 methodology notes as one total; `platforms/shared/skill-blocks/stats.md:94-95` documents unfiltered
 counts under the label "Pending". Both are display decisions rather than clear defects — but note
 that the *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those
 numbers drive a threshold.
 
-**4. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
+**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
 real vault, and it now performs three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`)
 that are prose contracts CI cannot exercise. Separately, the two older plans in
 `docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file
