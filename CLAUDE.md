@@ -255,6 +255,17 @@ that are prose contracts CI cannot exercise. Separately, the two older plans in
 `docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file
 that lies about status, which is this repo's signature defect wearing a different hat.
 
+**The one prose-contract rule that is not mechanically checked, and the decision not to check it.**
+`reference/skill-authoring.md` §4 requires that every filesystem path named in a prose contract exist
+in the *packaged* plugin. That rule is stated and enforced by nothing — a defect of exactly this shape
+once survived four gates, a 127 KB review, and a live vault run. A checker was considered and
+**deliberately not built**: "the packaged plugin" is not a defined build target, because this repo has
+no build step. A script could only compare prose against whatever `/plugin install` last happened to
+copy, so a green result would assert nothing while looking like assurance — the proxy-for-property
+failure this file spends most of its length warning about, added to the gate set that warns about it.
+The honest interim check is a human diffing the two trees at release, which is why the version bump
+now makes them distinguishable at all. Revisit if a build step ever exists.
+
 ### Closed on `fix/spec-c-primitive-10`
 
 Listed because the entries above were renumbered, and a divergence list that quietly drops items is
