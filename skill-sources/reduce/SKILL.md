@@ -896,8 +896,29 @@ After extraction, for EACH claim, create a task file in `ops/queue/`:
 - {source} is the source basename (from the extract task)
 - NNN is the claim number, starting from `next_claim_start` in the extract task file
 
-**Example:** If `article-name.md` task has `next_claim_start: 010`, claims are:
-- `article-name-010.md`, `article-name-011.md`, etc.
+**Width:** pad to **seven digits minimum**, and let anything wider through unchanged.
+`{source}-0000010.md`, not `{source}-010.md`.
+
+Seven is not arbitrary — it is chosen so the width never has to change. A three-digit pad ran out at
+999 in practice, and the tempting repair, re-padding everything to a wider width, is the one thing
+that must never happen: renaming `{source}-042.md` to `{source}-0000042.md` **breaks every wiki link
+pointing at it**, because links resolve by filename, not by path or claim number. Seven digits reach
+ten million claims, past any plausible corpus, so the question does not come back.
+
+**Two rules that hold regardless of width:**
+
+- **Never truncate.** A number too wide for the pad is written in full, not cut to fit.
+- **Never re-pad an existing file.** A vault created before this rule keeps its narrower names and
+  simply continues past its own ceiling unpadded — `…-999.md` is followed by `…-1000.md`. Widening
+  those retroactively is a rename, and a rename is a broken link.
+
+`/{vocabulary.seed}` reads **width-agnostically** — three digits or more, padded or not — so both
+populations validate under one scan.
+
+**Example:** If `article-name.md` task has `next_claim_start: 10`, claims are:
+- `article-name-0000010.md`, `article-name-0000011.md`, etc.
+- in a vault predating this rule, existing `article-name-010.md` names stay as they are, and
+  numbering past 999 continues `article-name-1000.md` unpadded.
 
 **Why unique names:** Claim filenames must be unique across the entire vault. Claim numbers are global and never reused across batches. The pattern `{source}-NNN.md` ensures every claim file is uniquely identifiable even after archiving.
 

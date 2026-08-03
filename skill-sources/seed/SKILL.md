@@ -166,15 +166,54 @@ Use `$FINAL_SOURCE` in the task file — this is the path all downstream phases 
 Find the highest existing claim number across the queue and archive to ensure globally unique claim IDs.
 
 ```bash
-# Check queue for highest claim number in file references
-QUEUE_MAX=$(grep -oE '[0-9]{3}\.md' ops/queue*.yaml ops/queue/*.yaml 2>/dev/null | \
-  grep -oE '[0-9]{3}' | sort -n | tail -1)
-QUEUE_MAX=${QUEUE_MAX:-0}
+# WIDTH: claim numbers are three digits or more — seven for anything newly created,
+# and vaults predating that rule keep their narrower names. `[0-9]{3}` matches
+# EXACTLY three, so on a wider name it captured the LAST three: `…-1000.md` read as
+# `000`. The maximum then went BACKWARDS, and the next claim reused a number already
+# on disk — silently breaking the "globally unique, never reused" guarantee asserted
+# below. `{3,}` matches the whole run; the leading `-` anchors to the claim suffix
+# so an unrelated digit run elsewhere in the name cannot win.
+# RECOGNISE CLAIMS BY CONTENT, NOT BY FILENAME SHAPE. A filename scan cannot tell
+# `article-1000.md` from `paper-2026-05-04-171057.md`; measured on a fixture, the
+# timestamped file won and drove the next claim number to 171058. Claim files carry
+# a `# claim-NNN` heading, with frontmatter `claim:` as the fallback for files
+# written before that rule. Everything else — timestamped captures, arXiv IDs — is
+# invisible to the counter, which is the point.
+claim_numbers() {
+  find "$@" -maxdepth 1 -type f -name '*.md' 2>/dev/null \
+    | grep -v summary \
+    | while IFS= read -r f; do
+        # `^claim: ` tests for the frontmatter KEY, not a numeric value — the key
+        # holds the claim sentence. Requiring a number there matches nothing, and
+        # since the counter would then read 0, the guard below is what stands
+        # between that and renumbering an existing vault from 1.
+        grep -qE '^claim: |^# claim-[0-9]+' "$f" 2>/dev/null || continue
+        printf '%s\n' "$f"
+      done \
+    | grep -oE -- '-[0-9]{3,}\.md$' | grep -oE '[0-9]{3,}' | sort -n | tail -1
+}
 
-# Check archive for highest claim number
-ARCHIVE_MAX=$(find ops/queue/archive -name "*-[0-9][0-9][0-9].md" 2>/dev/null | \
-  grep -v summary | sed 's/.*-\([0-9][0-9][0-9]\)\.md/\1/' | sort -n | tail -1)
-ARCHIVE_MAX=${ARCHIVE_MAX:-0}
+# `find` rather than a glob: a non-matching glob aborts the command under zsh where
+# bash passes the pattern through, and that fork has shipped here before.
+QUEUE_MAX=$(claim_numbers ops/queue)
+ARCHIVE_MAX=$(claim_numbers ops/queue/archive)
+
+# BASE 10, EXPLICITLY. Zero-padded numbers are OCTAL to shell arithmetic:
+# $((0000010)) is 8, and $((0000019)) is a fatal "value too great for base". With a
+# seven-digit pad every claim number hits this. `10#` forces base 10.
+QUEUE_MAX=$((10#${QUEUE_MAX:-0}))
+ARCHIVE_MAX=$((10#${ARCHIVE_MAX:-0}))
+
+# FAIL LOUD RATHER THAN RESTART AT 1. If claim files exist but no number could be
+# read, the scan is broken — the vault is not empty. Defaulting to 0 there hands the
+# next batch numbers that collide with every claim already on disk.
+CLAIM_FILE_COUNT=$(find ops/queue ops/queue/archive -name '*-[0-9][0-9][0-9]*.md' 2>/dev/null \
+  | grep -vc summary || true)
+if [ "${CLAIM_FILE_COUNT:-0}" -gt 0 ] && [ "$QUEUE_MAX" -eq 0 ] && [ "$ARCHIVE_MAX" -eq 0 ]; then
+  printf 'error: %s claim files exist but no claim number could be read — refusing to restart numbering at 1\n' \
+    "$CLAIM_FILE_COUNT" >&2
+  exit 1
+fi
 
 # Next claim starts after the highest
 NEXT_CLAIM_START=$((QUEUE_MAX > ARCHIVE_MAX ? QUEUE_MAX + 1 : ARCHIVE_MAX + 1))
