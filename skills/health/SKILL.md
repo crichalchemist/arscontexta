@@ -397,6 +397,18 @@ fi
 **How to check:**
 
 ```bash
+# A missing directory must not render as a 0% ratio — that is indistinguishable from a
+# healthy empty inbox. Name the directory that is absent, and the remedy: this message
+# is the only thing the user sees.
+NOTES_DIR="{vocabulary.notes}"
+INBOX_DIR="{vocabulary.inbox}"
+for d in "$INBOX_DIR" "$NOTES_DIR"; do
+  if [ ! -d "$d" ]; then
+    echo "error: directory '$d' does not exist; run /arscontexta:setup" >&2
+    exit 1
+  fi
+done
+
 # Count items in each space
 INBOX_COUNT=$(find {vocabulary.inbox}/ -name '*.md' -not -path '*/archive/*' 2>/dev/null | wc -l | tr -d ' ')
 NOTES_COUNT=$(find {vocabulary.notes}/ -name '*.md' 2>/dev/null | wc -l | tr -d ' ')

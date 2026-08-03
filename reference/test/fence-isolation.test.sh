@@ -93,10 +93,6 @@ KNOWN_OPEN='skill-sources/seed f01~U~reads $FILE, the source path the skill was 
 skill-sources/seed f03~U~reads $FILE (see f01)
 skill-sources/seed f04~U~reads $FILE and $ARCHIVE_DIR, both set in earlier fences
 skill-sources/seed f05~U~reads $FILE (see f01)
-skill-sources/next f04~N~every count folds to 0 with no notes directory, so a missing vault reads as an empty one
-skill-sources/reflect f03~N~grep piped into wc discards grep status; a missing directory renders 0
-skills/health f10~N~inbox-to-notes ratio renders 0% with no notes directory
-skills/help f01~N~orientation counts render 0 with no notes directory
 skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01'
 

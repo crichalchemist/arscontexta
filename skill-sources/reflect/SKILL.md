@@ -370,7 +370,28 @@ When you edit an older {vocabulary.note} to add a reverse link, you MAY flag it 
 
 **Check incoming links:**
 ```bash
-grep -r '\[\[note name\]\]' {vocabulary.notes}/*.md | wc -l
+# A missing directory must not read as zero incoming links. The previous form piped
+# grep into wc, which discards grep's status, so an unreadable tree rendered 0.
+NOTES_DIR="{vocabulary.notes}"
+if [ ! -d "$NOTES_DIR" ]; then
+  echo "error: notes directory '$NOTES_DIR' does not exist; run /arscontexta:setup" >&2
+  exit 1
+fi
+# grep the directory, not a glob: a non-matching glob aborts the command under zsh.
+# Capture grep's own status before anything else can overwrite it.
+links=$(grep -r '\[\[note name\]\]' "$NOTES_DIR")
+rc=$?
+if [ "$rc" -ge 2 ]; then
+  echo "error: grep failed reading '$NOTES_DIR'" >&2
+  exit 1
+fi
+# rc 1 is "no matches", which is a real answer, not a failure.
+if [ "$rc" -eq 1 ]; then
+  LINK_COUNT=0
+else
+  LINK_COUNT=$(printf '%s\n' "$links" | wc -l | tr -d ' ')
+fi
+echo "$LINK_COUNT"
 ```
 
 If >= 5, skip reweave flagging.

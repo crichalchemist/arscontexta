@@ -139,6 +139,18 @@ Gather all signals. Run independent checks in parallel where possible. Record ea
 **Signal collection commands:**
 
 ```bash
+# Guards sit above every count in this fence, not beside their own: a missing directory
+# must abort signal collection outright rather than let the remaining counts fold to 0
+# and report a missing vault as an idle one.
+INBOX_DIR="{vocabulary.inbox}"
+NOTES_DIR="{vocabulary.notes}"
+for d in "$INBOX_DIR" "$NOTES_DIR"; do
+  if [ ! -d "$d" ]; then
+    echo "error: directory '$d' does not exist; run /arscontexta:setup" >&2
+    exit 1
+  fi
+done
+
 # Inbox pressure (adapt path to vocabulary)
 INBOX_COUNT=$(find {vocabulary.inbox}/ -name "*.md" -maxdepth 2 2>/dev/null | wc -l | tr -d ' ')
 # GNU stat first, BSD second. Order is load-bearing: GNU reads `-f` as "filesystem

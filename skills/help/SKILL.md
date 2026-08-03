@@ -43,8 +43,15 @@ Determine the **notes folder** by checking which domain-named directory exists (
 - **Session count:** estimate from `ops/sessions/` file count (indicates usage maturity)
 
 ```bash
-# Quick state gathering
-note_count=$(ls -1 {vocabulary.notes}/*.md 2>/dev/null | wc -l | tr -d ' ')
+# A missing notes directory must not read as an empty vault. `ls … 2>/dev/null | wc -l`
+# renders 0 for both, and /help is often the first command a user runs when something
+# is wrong — reporting "0 notes" sends them looking for the wrong problem.
+NOTES_DIR="{vocabulary.notes}"
+if [ ! -d "$NOTES_DIR" ]; then
+  echo "error: notes directory '$NOTES_DIR' does not exist; run /arscontexta:setup" >&2
+  exit 1
+fi
+note_count=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 inbox_count=$(ls -1 {vocabulary.inbox}/*.md 2>/dev/null | wc -l | tr -d ' ')
 obs_count=$(ls -1 ops/observations/*.md ops/methodology/*.md 2>/dev/null | wc -l | tr -d ' ')
 tension_count=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
