@@ -307,6 +307,15 @@ if $has_search; then
     # treats $VAULT/CLAUDE.md as a place semantic search is declared. Verified against the
     # field vault before adding: it contains zero mcp__qmd__* names, so this cannot
     # reintroduce the archive/changelog false positive the scoping exists to avoid.
+    #
+    # KNOWN FALSE POSITIVE, and the reason this file rather than the whole tree: the scan
+    # matches a NAME, so it cannot tell a declaration from a deprecation notice. A vault
+    # CLAUDE.md "Common Pitfalls" entry reading "do NOT use mcp__qmd__deep_search, use
+    # mcp__qmd__query" FAILs this check while being correct guidance — and the field vault
+    # does have a Common Pitfalls section, so this is foreseeable, not hypothetical. It is
+    # accepted because it is cheaply recoverable (reword one line of one live file) where
+    # the archive case was not (rewriting history), and because prose in an always-loaded
+    # file is executed, so a dead name there is worth a second look either way.
     qmd_scan=()
     [ -d "$VAULT/.claude" ] && qmd_scan+=("$VAULT/.claude")
     [ -d "$VAULT/.agents" ] && qmd_scan+=("$VAULT/.agents")
