@@ -246,7 +246,7 @@ map_value() {
 # An optional argument scopes the run to ONE SKILL.md, which turns a five-minute
 # sweep into a twenty-second one. That is what makes the non-vacuity proofs in
 # the plan practical: each mutation is checked against the file it was planted
-# in, under both shells, instead of against all twenty-six.
+# in, under both shells, instead of against the whole scan set.
 TARGET="${1:-}"
 if [ -n "$TARGET" ]; then
   [ -f "$ROOT/$TARGET" ] || { printf 'harness: no such file: %s\n' "$TARGET" >&2; exit 1; }

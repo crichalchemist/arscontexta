@@ -267,10 +267,30 @@ else
   # The `|| [ -n ... ]` continuation matters: `read` returns non-zero at EOF, so a
   # manifest whose final line lacks a newline would silently skip its last entry —
   # un-freezing exactly one file, without a word.
+  # ONE PARSE, AND MALFORMED LINES ARE A FAILURE, NOT A SKIP:
+  # This loop used to read `want name` and `continue` when name was empty, while a
+  # separate `cut -d' ' -f2-` built the untracked list. The two disagreed. A line
+  # carrying only a filename parsed as want=<filename>, name="" and was skipped by
+  # the hash check — and `cut` returned the line unchanged when the delimiter was
+  # absent, so the name appeared in the untracked list too and passed that test.
+  # The file was neither hashed nor reported: rc 0, plausible count, no error. The
+  # guard's own regeneration snippet emits exactly that line when cksum cannot read
+  # a file. Both lists now come from this one parse, and a line that does not look
+  # like "<digits>-<digits> <name>" fails loudly instead of vanishing.
   pinned=0
-  while IFS=' ' read -r want name || [ -n "${want:-}${name:-}" ]; do
-    [ -n "${name:-}" ] || continue
+  pinned_names=""
+  while IFS= read -r line || [ -n "${line:-}" ]; do
+    [ -n "${line:-}" ] || continue
+    case "$line" in
+      [0-9]*-[0-9]*\ ?*) ;;
+      *) frozen_bad="$frozen_bad  MALFORMED MANIFEST LINE: $line
+"; continue ;;
+    esac
+    want=${line%% *}
+    name=${line#* }
     pinned=$((pinned + 1))
+    pinned_names="$pinned_names$name
+"
     if [ ! -f "$FROZEN_DIR/$name" ]; then
       frozen_bad="$frozen_bad  DELETED $name
 "
@@ -286,11 +306,14 @@ else
   # prose claimed any edit was rejected. A contributor porting guards into
   # skill-blocks/sub/ is the exact scenario this freeze exists to stop.
   # README.md is the one file this directory is allowed to grow.
-  pinned_names=$(cut -d' ' -f2- "$FROZEN_MANIFEST")
   # Captured with $( ), not redirected to a file: `find | while` runs the body in a
   # subshell, so appending to frozen_bad inside it would be discarded — and routing
   # around that with a temp file is what C1 was.
-  untracked=$(find "$FROZEN_DIR" -type f | while IFS= read -r f; do
+  #
+  # -type l as well as -type f: a plain `-type f` excludes symlinks, so dropping a
+  # symlink named reflect.md into this directory was invisible. Its two siblings in
+  # that class, sub/*.md and .hidden.md, each already have an assertion.
+  untracked=$(find "$FROZEN_DIR" \( -type f -o -type l \) | while IFS= read -r f; do
     rel=${f#"$FROZEN_DIR"/}
     [ "$rel" = "README.md" ] && continue
     # -x, not a substring match: an unanchored search would miss a new file whose

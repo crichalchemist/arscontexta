@@ -68,7 +68,7 @@ done
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
-it to 0, and the block exits 0 with a plausible number. It extracts all 74 fences from 26 files,
+it to 0, and the block exits 0 with a plausible number. It extracts all 75 fences from 27 files,
 substitutes vocabulary placeholders, and runs each standalone against a healthy fixture and a
 missing-vault fixture. It supplies `ARGUMENTS` so the healthy fixture models a healthy *invocation*
 and not merely a healthy vault. It carries an allowlist of known-open defects — now 2, both

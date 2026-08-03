@@ -26,9 +26,10 @@ trap:
 | `skills/` | 10 | no — is the plugin's own commands | **yes** |
 | `platforms/shared/skill-blocks/` | 16 | **no — nothing reads it** | **no; frozen** |
 
-The third row is the trap. It looks like a second copy of `skill-sources/` and it is not: nothing
-under `skills/`, `generators/`, `hooks/`, `reference/` or `presets/` references `platforms/` at any
-depth. A guard fixed there reaches no user. `check-portability.sh` rejects edits to it; see
+The third row is the trap. It looks like a second copy of `skill-sources/` and it is not: **nothing
+generates from it.** No file under `skills/`, `generators/`, `hooks/` or `presets/` references
+`platforms/` at any depth. (`reference/` does — the freeze check, its tests, and this document — but
+those inspect the directory, they do not generate from it.) A guard fixed there reaches no user. `check-portability.sh` rejects edits to it; see
 `platforms/shared/skill-blocks/README.md` for why it is kept.
 
 **Backporting from a field vault reverses two transforms.** A vault speaks its derived dialect and
@@ -52,7 +53,12 @@ placeholder; the harness prints the token and exits 1. You get a named error, ne
 complete markup. Count it yourself — a placeholder tally that does not state its pattern cannot be
 re-derived, and one written here previously could not be:
 
-```bash
+Run this **from the repo root** — it is `text` rather than `bash` deliberately, and §5 says why: the
+fence gate executes every ```bash block against a generated-vault fixture, where `skill-sources/`
+does not exist. Marked `bash` it would print three rows of zeros and exit 0 — a plausible answer to a
+question it never asked, which is the failure this document is about.
+
+```text
 PAT='{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}\|{DOMAIN:[^}]*}'
 for p in verify validate reflect; do
   printf '%-9s source=%-4s blocks=%s\n' "$p" \
@@ -151,11 +157,16 @@ Two checkable rules:
 
 ## §5 — Which fence type
 
-Every ```bash fence in this repository is extracted and executed by the fence gate, including the
-ones in this document. A working example belongs in ```bash and must pass H/N/U/S in both shells. **A
-counter-example — a deliberately broken block shown as the thing not to do — must go in ```text**, or
-the gate will execute it and correctly report it as a defect. This is the only reason this document
-can show a wrong pattern at all:
+The fence gate extracts and executes every ```bash fence in **its scan set** — every `SKILL.md` under
+`skill-sources/` and `skills/`, plus this document. It does **not** reach bash blocks in
+`CONTRIBUTING.md`, `CLAUDE.md`, `generators/`, `presets/`, `hooks/` or `README.md`; those are read by
+humans and by Claude but never executed by a gate, so their correctness rests on review alone.
+
+Inside the scan set: a working example belongs in ```bash and must pass H/N/U/S in both shells,
+against a **generated-vault fixture** — so a block that needs the plugin repo's own directories will
+not find them there. **A counter-example, or anything that must run somewhere other than a vault,
+goes in ```text**, or the gate executes it and correctly reports it. That is the only reason this
+document can show a wrong pattern at all:
 
 ```text
 COUNT=$(ls "$DIR"/*.md | wc -l)      # $DIR from another fence: empty, folds to 0, exits 0

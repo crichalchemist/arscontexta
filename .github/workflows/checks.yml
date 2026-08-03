@@ -51,8 +51,8 @@ jobs:
         run: zsh reference/test/fence-isolation.test.sh
 
       # The manifests must agree with each other on every push, not only at
-      # release time. A published plugin and this tree once both called
-      # themselves 0.8.0 while differing materially, which made the version
+      # release time. A published plugin and this tree once both claimed the
+      # same version while differing materially, which made the version
       # string useless for telling two artifacts apart. The script this was
       # ported from is a manual release tool in a repo with no CI at all —
       # precisely how a stale version survives.
