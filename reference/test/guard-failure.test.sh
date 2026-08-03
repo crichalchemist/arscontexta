@@ -86,20 +86,41 @@ out_of() { bash "$GUARD" "$1" 2>/dev/null; }
 # PINNED ON THE THING THE ARGUMENT RESTS ON. If a caller ever invokes the guard
 # under another shell, the premise is gone and this assertion goes red, which forces
 # whoever added that caller back to this decision.
+# NOT HERMETIC, UNLIKE EVERY OTHER ASSERTION IN THIS FILE. These two read the real
+# checkout rather than a synthetic root, because the claim is about the real callers
+# and nothing else can stand in for them. Consequence: in a tree without `.github/`
+# and `.pre-commit-config.yaml` — a packaged plugin, an export, a vendored copy —
+# this pair goes red for a reason unrelated to the guard's behaviour.
 REPO="$HERE/../.."
-# The caller list is asserted to be non-empty first. `$ROOT` was used here for one
+
+# The caller list is asserted to be non-empty FIRST. `$ROOT` was used here for one
 # revision; it is not defined in this file, so under `set -u` the substitution
-# subshell died and `invocations` came back empty — and an empty result is what
-# PASSING looks like for the assertion below. It went green having grepped nothing.
-# A negative assertion needs a positive one beside it or it passes on absence.
-callers=$(grep -rn 'check-portability\.sh' "$REPO/.github" "$REPO/.pre-commit-config.yaml" 2>/dev/null | grep -c .)
+# subshell died and the result came back empty — and empty is what PASSING looks
+# like for the negative assertion below. It went green having grepped nothing. A
+# negative assertion needs a positive one beside it or it passes on absence.
+raw=$(grep -rn 'check-portability\.sh' "$REPO/.github" "$REPO/.pre-commit-config.yaml" 2>/dev/null)
+callers=$(printf '%s\n' "$raw" | grep -c .)
 eq "the guard's callers are findable at all"           "yes" \
    "$([ "${callers:-0}" -ge 2 ] && echo yes || echo no)"
-# Every line that names the guard must also say `bash`. Matching one exact string
-# was wrong: the syntax-check step invokes it as `bash -n reference/…`, which is
-# bash and was flagged anyway. The property is the interpreter, not the spelling.
-invocations=$(grep -rn 'check-portability\.sh' "$REPO/.github" "$REPO/.pre-commit-config.yaml" 2>/dev/null \
-              | grep -v 'bash')
+
+# MATCH THE INVOCATION POSITION, NOT THE SUBSTRING `bash` ANYWHERE IN THE RECORD.
+# Two earlier filters were wrong in opposite directions. One exact string missed
+# `bash -n reference/…`, which is bash. Then `grep -v bash` over the whole
+# `path:lineno:content` record could be defeated two ways, both measured green at
+# 34/34 with zero bash invocations anywhere: a workflow named `bash-checks.yml` hid
+# every line in the file behind its own path, and `zsh … # was bash` hid one line
+# behind a comment. The positive assertion above does not cover either, because it
+# counts the same records without the filter.
+#
+# So: strip `path:lineno:` before filtering, and require `bash`, optional flags, and
+# then the path — the shape of an invocation rather than an appearance of the word.
+invocations=$(printf '%s\n' "$raw" | while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  content=${line#*:}; content=${content#*:}
+  printf '%s\n' "$content" \
+    | grep -qE '(^|[^-[:alnum:]_])bash( +-[[:alnum:]]+)* +[^ ]*check-portability\.sh' \
+    || printf '%s\n' "$line"
+done)
 eq "nothing invokes the guard under a shell other than bash" "" "$invocations"
 # Kept as a consistency check on the same premise: a caller saying `bash` while the
 # file declares another interpreter is a contradiction, whichever one is wrong.

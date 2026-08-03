@@ -119,6 +119,13 @@ Primitives 8 and 10 both PASS there; the two WARNs are frontmatter coverage and 
 that never ran. `15 PASS / 2 WARN / 0 FAIL` has been recorded as acceptable across several sessions
 by reading the totals rather than the labels. See divergence 1.
 
+**The criterion and the summary count different things, which is what made the labels skippable.**
+"15/15" is primitives; the summary counts *result lines*. On the field vault there are 15 primitives,
+16 numbered headers (1–15 plus 10A) and 17 result lines, because primitive 2 emits two. So `PASS: 15`
+is simply `17 − 2` — it is not independent evidence that fifteen primitives passed, and it would read
+`16` if either WARN cleared. Matching the target number against that total is a coincidence of
+arithmetic. **Read the labels.**
+
 **The blind spot that used to be here is closed.** Primitive 10 once checked only that `qmd` was on
 `PATH`, which is why 62 references to qmd tools removed from its MCP surface survived across 20
 files while the validator reported semantic search satisfied — qmd was on `PATH` the whole time. It
