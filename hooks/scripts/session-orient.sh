@@ -129,12 +129,41 @@ TENS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/nul
 SESS_COUNT=$(ls -1 ops/sessions/*.json 2>/dev/null | grep -cv current 2>/dev/null || echo 0)
 INBOX_COUNT=$(ls -1 inbox/*.md 2>/dev/null | wc -l | tr -d ' ')
 
-if [ "$OBS_COUNT" -ge 10 ]; then
+# THESE TWO ARE READ, NOT HARDCODED — the three skill templates (`next`, `remember`,
+# `rethink`) already read `self_evolution.*` from ops/config.yaml, and this hook used
+# to hardcode the same defaults. Identical values hid the defect: a user who changed
+# the threshold got the skills honouring it and this hook still firing at 10, with
+# nothing reporting the split. `read_config.sh` routes dotted keys to ops/config.yaml.
+#
+# A value the user wrote but the reader cannot parse exits 1 rather than returning the
+# default. Surface that in the orientation output instead of falling back silently —
+# but do not abort the session over a config typo.
+threshold() { # threshold <dotted-key> <default>
+  local v
+  if ! v=$(bash "$READ_CONFIG" "$1" "$2" 2>&1); then
+    echo "CONDITION: $v — falling back to $2" >&2
+    printf '%s' "$2"; return
+  fi
+  case "$v" in
+    ''|*[!0-9]*)
+      echo "CONDITION: $1 is '$v', which is not a number — falling back to $2" >&2
+      printf '%s' "$2"; return ;;
+  esac
+  printf '%s' "$v"
+}
+OBS_THRESHOLD=$(threshold self_evolution.observation_threshold 10)
+TENS_THRESHOLD=$(threshold self_evolution.tension_threshold 5)
+
+if [ "$OBS_COUNT" -ge "$OBS_THRESHOLD" ]; then
   echo "CONDITION: $OBS_COUNT pending observations (of $OBS_TOTAL total). Consider /rethink."
 fi
-if [ "$TENS_COUNT" -ge 5 ]; then
+if [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
   echo "CONDITION: $TENS_COUNT unresolved tensions (of $TENS_TOTAL total). Consider /rethink."
 fi
+# UNDECLARED THRESHOLDS. These two, and the 30 in the staleness check below, appear in
+# no config file — `ops/config.yaml` declares only `self_evolution.*`. They are left
+# hardcoded rather than given invented config keys, but "one surface owns each
+# threshold" is not yet true of them. Recorded in the ledger, not silently equalised.
 if [ "$SESS_COUNT" -ge 5 ]; then
   echo "CONDITION: $SESS_COUNT unprocessed sessions. Consider /remember --mine-sessions."
 fi

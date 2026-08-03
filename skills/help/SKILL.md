@@ -59,7 +59,14 @@ for d in "$INBOX_DIR" "$NOTES_DIR"; do
 done
 note_count=$(ls -1 "$NOTES_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 inbox_count=$(ls -1 "$INBOX_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-obs_count=$(ls -1 ops/observations/*.md ops/methodology/*.md 2>/dev/null | wc -l | tr -d ' ')
+# NAMED FOR WHAT IT COUNTS. This is every file in BOTH directories, unfiltered by
+# status — not the pending-observation count the /rethink threshold fires on. It was
+# called `obs_count` and displayed as "N pending observations", which is two claims
+# it cannot support: methodology notes are not observations, and no status filter ran.
+# Left as one merged number on purpose — /help is orientation, not a gate, and this
+# number drives nothing. The same mislabel in session-orient.sh and /health WAS a
+# defect, because those numbers cross a threshold. Renamed, not recomputed.
+learning_file_count=$(ls -1 ops/observations/*.md ops/methodology/*.md 2>/dev/null | wc -l | tr -d ' ')
 tension_count=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
 ```
 
@@ -190,7 +197,7 @@ Your system: [domain] knowledge graph
 Right now:
   [State-aware observations — pick up to 3 most relevant:]
   Your inbox has [N] items (oldest: [age])
-  [N] pending observations -- approaching /rethink threshold
+  [N] observation + methodology files -- browse with /ask
   Pipeline: [N] tasks at [phase] phase
   [N] notes have sparse connections (< 2 links)
 
@@ -232,7 +239,7 @@ Pick the FIRST matching condition:
 |-----------|-----------|
 | Inbox has items | `Process your inbox: /{reduce} [oldest-inbox-item-filename]` |
 | Pipeline has pending tasks | `Resume processing: /next` |
-| 10+ observations or 5+ tensions | `Review accumulated evidence: /{rethink}` |
+| Pending observations or tensions at their configured thresholds (`self_evolution.*` in `ops/config.yaml`, default 10/5 — the merged count above is not this number) | `Review accumulated evidence: /{rethink}` |
 | Health warnings exist | `Check health: /health` |
 | Notes exist, sparse connections | `Build connections: /{reflect}` |
 | User hasn't tried /learn | `Grow your graph: /learn [topic related to their domain]` |

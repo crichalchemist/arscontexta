@@ -278,18 +278,38 @@ leaves `pkg/plugin.json` at `8.8.8` and `marketplace.json` at the old version.
 pinning the on-disk state — pinning it would make an atomic fix look like a regression. A proper fix
 writes all sites to temps and commits them together.
 
-**3. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
-the top-level `.arscontexta` marker and handles **scalar top-level keys only**, so it structurally
-cannot reach a nested `ops/config.yaml` key. The SessionStart hook therefore carries hardcoded
-thresholds while three skills read `self_evolution.*` from `config.yaml`. Three sources currently
-disagree (skills 10/5, plugin hook 10/5, the field vault's patched hook 20/10). Surfaced
-deliberately rather than averaged.
+**3. Thresholds the hook cannot read are still undeclared — but the `self_evolution.*` half is
+fixed.** The entry that stood here was wrong on its own facts, which is worth recording: it claimed
+"three sources currently disagree (skills 10/5, plugin hook 10/5, the field vault's patched hook
+20/10)". Measured — the first two *agree*, and the third is a hand-patch inside one vault, which is
+evidence of the defect rather than an instance of the disagreement. The real defect was narrower and
+worse: the hook **structurally could not read a configured value**, because `read_config.sh` reads
+`.arscontexta` and the thresholds live in `ops/config.yaml`. Nesting was never the axis; the file
+was. A user who set `observation_threshold: 20` got the three skill templates honouring it and the
+hook still firing at its hardcoded 10, silently. The field vault proves it: someone wanted 20/10,
+hand-patched the hook because that was the only lever, and that vault's hook and its own
+`config.yaml` now disagree.
 
-**4. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
-methodology notes as one total; `platforms/shared/skill-blocks/stats.md:94-95` documents unfiltered
-counts under the label "Pending". Both are display decisions rather than clear defects — but note
-that the *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those
-numbers drive a threshold.
+`read_config.sh` now routes **dotted** keys to `ops/config.yaml` (one level, which is all
+`self_evolution.*` needs) while bare keys read `.arscontexta` unchanged, and `session-orient.sh`
+reads both thresholds instead of hardcoding them. A key that is present but unparseable exits 1 and
+says so rather than returning the default — returning the default is exactly how the hardcoded 10
+stayed invisible.
+
+**What is still open:** three thresholds are declared in no config file at all — `SESS_COUNT ≥ 5`,
+`INBOX_COUNT ≥ 3`, and `DAYS_STALE ≥ 30` in `session-orient.sh`. They were left hardcoded rather than
+given invented config keys, so "one surface owns each threshold" is not yet true of them. (That 30 is
+methodology-notes-behind-config drift; it is **not** the same 30 as `/next`'s `stale_notes`, which is
+"not modified in 30+ days". Same number, different subject.)
+
+**4. Display counts that merge or omit a status filter.** `platforms/shared/skill-blocks/stats.md:94-95`
+documents unfiltered counts under the label "Pending" — frozen, so it stays. `skills/help` is fixed:
+its merged observations-plus-methodology total was named `obs_count` and displayed as *"N pending
+observations — approaching /rethink threshold"*, two claims it could not support, since methodology
+notes are not observations and no status filter ran. Renamed to `learning_file_count` and relabelled;
+the arithmetic is deliberately unchanged, because /help is orientation and that number gates nothing.
+The *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those numbers
+cross a threshold.
 
 **5. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
 real vault, and it now performs three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`)

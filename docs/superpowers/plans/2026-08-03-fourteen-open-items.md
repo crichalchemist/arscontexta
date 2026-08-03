@@ -143,13 +143,13 @@ commit, and all four gates pass in both shells with the new check present.
 **Files:** `hooks/scripts/read_config.sh`, `hooks/scripts/session-orient.sh`, `skills/help/SKILL.md`,
 three skills reading `self_evolution.*`.
 
-- [ ] **Step 1 — E7, pick the owner.** Either teach `read_config.sh` one level of nesting, or move the
+- [x] **Step 1 — E7, pick the owner.** Either teach `read_config.sh` one level of nesting, or move the
       thresholds where it can already read them. **Whichever loses must fail loudly** rather than
       carry a stale default — a hardcoded 10/5 beside a configured 20/10 is how three sources came to
       disagree.
-- [ ] **Step 2 — Reconcile the three values** (skills 10/5, plugin hook 10/5, field vault 20/10) and
+- [x] **Step 2 — Reconcile the three values** (skills 10/5, plugin hook 10/5, field vault 20/10) and
       record which is canonical and why.
-- [ ] **Step 3 — E8, make each count state what it counts.** `skills/help:49` merges observations and
+- [x] **Step 3 — E8, make each count state what it counts.** `skills/help:49` merges observations and
       methodology notes. Note the same mislabel in `session-orient.sh` and `skills/health` WAS a
       defect because those numbers drove a threshold; these do not, so the fix is labelling, not
       arithmetic.
