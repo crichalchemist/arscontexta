@@ -169,17 +169,23 @@ Verify you did not hardcode a placeholder — the count must not decrease:
 
 ```bash
 git diff --name-only -z main..HEAD | while IFS= read -r -d '' f; do
-  case "$f" in skill-sources/*|platforms/shared/skill-blocks/*) ;; *) continue ;; esac
+  case "$f" in skill-sources/*) ;; *) continue ;; esac
   now=$(grep -o '{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}' "$f" 2>/dev/null | wc -l | tr -d ' ')
   was=$(git show "main:$f" 2>/dev/null | grep -o '{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}' | wc -l | tr -d ' ')
   [ "$now" -ge "$was" ] || echo "HARDCODED A PLACEHOLDER: $f ($was -> $now)"
 done
 ```
 
-Only `skill-sources/` and `platforms/shared/skill-blocks/` carry placeholders; `skills/` are the
-plugin's own commands and legitimately have none, so scanning them produces `0 -> 0` noise. A count
-that *rises* is normal — the hybrid qmd query form repeats its query string into both `lex` and
-`vec` sub-queries, so one placeholder legitimately becomes two.
+Only `skill-sources/` carries placeholders you may edit; `skills/` are the plugin's own commands and
+legitimately have none, so scanning them produces `0 -> 0` noise. A count that *rises* is normal —
+the hybrid qmd query form repeats its query string into both `lex` and `vec` sub-queries, so one
+placeholder legitimately becomes two.
+
+`platforms/shared/skill-blocks/` also carries placeholders — more of them than `skill-sources/`
+does — but it is **frozen**: nothing generates from it, and `check-portability.sh` check 4 rejects
+any edit. It is dropped from the scan above because it can no longer appear in a diff. Consult it
+when you need to know whether a string is vocabulary-variable; see
+`platforms/shared/skill-blocks/README.md`.
 
 **Failure mode:** a backport that skips these passes every gate and silently ships one user's
 vocabulary to everyone.

@@ -203,6 +203,64 @@ fi
 # Future work: Add a separate guard for matching direction or migrate to unified
 # pattern that captures variants at extraction time (not search time).
 
+echo "4. platforms/shared/skill-blocks/ is frozen (content unchanged)"
+# WHY A CONTENT MANIFEST AND NOT `git diff --name-only`:
+# The spec called for a git-diff rule. Measured before implementing: on the branch
+# that introduced this check, `git diff --name-only main...HEAD -- <dir>` already
+# reported three files — reflect.md, reweave.md, seed.md — because the inherited
+# Spec C commits legitimately touched them. A diff-range gate is therefore born
+# failing, and the only ways out are to pick a baseline that drifts (main moves) or
+# to except the very files most likely to be edited again. Hashing the content
+# answers "is it what we froze?" directly, with no baseline, no branch range, and
+# the same verdict in CI and a dirty working tree.
+#
+# WHY cksum: POSIX-mandated, so it is present wherever this runs. sha256sum is
+# absent on macOS and shasum is absent on minimal CI images; a per-machine tool
+# choice would make the digests themselves machine-dependent, turning a portability
+# guard into a portability defect. This detects accidental edits, not forgery.
+FROZEN_DIR="$ROOT/platforms/shared/skill-blocks"
+FROZEN_MANIFEST="$ROOT/reference/skill-blocks.frozen"
+frozen_report="$ROOT/.frozen-check.$$"
+: > "$frozen_report"
+if [ ! -d "$FROZEN_DIR" ]; then
+  red "frozen directory missing: $FROZEN_DIR — cannot conclude anything"
+elif [ ! -f "$FROZEN_MANIFEST" ]; then
+  red "frozen manifest missing: $FROZEN_MANIFEST — cannot conclude anything"
+else
+  # Modified or deleted: every manifest entry must still hash to its recorded value.
+  while IFS=' ' read -r want name; do
+    [ -n "$name" ] || continue
+    if [ ! -f "$FROZEN_DIR/$name" ]; then
+      printf '  DELETED %s\n' "$name" >> "$frozen_report"
+      continue
+    fi
+    got=$(cksum < "$FROZEN_DIR/$name" | tr -s ' ' | tr ' ' '-')
+    [ "$got" = "$want" ] || printf '  MODIFIED %s\n' "$name" >> "$frozen_report"
+  done < "$FROZEN_MANIFEST"
+  # Added: a new template here would be unfrozen and invisible to the loop above.
+  # README.md is the one file this directory is allowed to grow.
+  for f in "$FROZEN_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    b=$(basename "$f")
+    [ "$b" = "README.md" ] && continue
+    "$GREP" -qF " $b" "$FROZEN_MANIFEST" || printf '  UNTRACKED %s\n' "$b" >> "$frozen_report"
+  done
+  if [ -s "$frozen_report" ]; then
+    red "platforms/shared/skill-blocks/ is frozen — nothing generates from it:"
+    sed 's/^/     /' "$frozen_report"
+    echo "       Nothing reads this directory (skills/setup/SKILL.md:1285 generates"
+    echo "       from skill-sources/). See platforms/shared/skill-blocks/README.md."
+    echo "       Intending this? Regenerate the manifest and say why in the commit:"
+    echo "         for f in platforms/shared/skill-blocks/*.md; do \\"
+    echo "           [ \"\$(basename \$f)\" = README.md ] && continue; \\"
+    echo "           printf '%s %s\\n' \"\$(cksum < \$f | tr -s ' ' | tr ' ' -)\" \"\${f##*/}\"; \\"
+    echo "         done | sort > reference/skill-blocks.frozen"
+  else
+    ok "16 frozen templates unchanged"
+  fi
+fi
+rm -f "$frozen_report"
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "PORTABILITY: PASS"; exit 0
