@@ -70,9 +70,15 @@ done
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
 it to 0, and the block exits 0 with a plausible number. It extracts all 74 fences from 26 files,
 substitutes vocabulary placeholders, and runs each standalone against a healthy fixture and a
-missing-vault fixture. It carries an allowlist of 8 known-open defects, **checked in both
-directions** — a listed entry that starts passing, or whose fence no longer exists, fails the gate,
-so the list drains rather than rots.
+missing-vault fixture. It supplies `ARGUMENTS` so the healthy fixture models a healthy *invocation*
+and not merely a healthy vault. It carries an allowlist of known-open defects — now 2, both
+zsh-only, down from 8 — **checked in both directions**: a listed entry that starts passing, or whose
+fence no longer exists, fails the gate, so the list drains rather than rots.
+
+That two-directional check is load-bearing and has a hole in it. Absorption matches on
+`(letter, label)` only, ignoring the entry's stated reason and its `ZSH ONLY:` scope, so an entry
+listed for one reason will silently swallow a *different* failure on the same fence — measured, in
+the shell its own reason excludes. See divergence 1.
 
 The fifth check is kernel validation, run manually against a generated vault:
 
@@ -85,10 +91,14 @@ Pass criterion is 15/15 PASS. `WARN` is acceptable **only** for primitive 10 (se
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
 FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
 
-**Known blind spot, and it is the important one.** Primitive 10 checks that `qmd` is on `PATH`. It
-does NOT check that the tool names the repo calls actually resolve — which is why 62 references to
-qmd tools that had been removed from its MCP surface survived across 20 files while the validator
-reported semantic search satisfied. See Spec C, item 4.
+**The blind spot that used to be here is closed.** Primitive 10 once checked only that `qmd` was on
+`PATH`, which is why 62 references to qmd tools removed from its MCP surface survived across 20
+files while the validator reported semantic search satisfied — qmd was on `PATH` the whole time. It
+now asserts that the declared tool names resolve, scanning the vault's **live** surface (`.claude/`,
+`.agents/`, `.mcp.json`) rather than the whole tree: `ops/skills-archive/` and `ops/changelog.md`
+legitimately record retired names, and failing on those would make the check unfixable without
+rewriting history. *qmd absent* stays WARN; *qmd present but declaring names that do not resolve*
+is FAIL.
 
 `tree` and `ripgrep` are required (per the README's prerequisite table) — by generated systems at
 runtime and by `validate-kernel.sh` here. Fences additionally invoke `jq`, `bc` and `git`, which are
@@ -178,50 +188,61 @@ point is the shape of the problem and where to look.
 not a claim you should take on trust: it is what the five checks above enforce, and CI is green on
 `main` across all 11 steps. What follows is what remains.
 
-**1. Primitive 10 checks presence, not resolution.** Highest priority, because it is the check that
-lets this whole class recur. `validate-kernel.sh` verifies `qmd` is on `PATH`. qmd *was* on PATH
-throughout the entire period when all 62 of its call sites named tools qmd had removed — so the
-validator reported semantic search satisfied while every call failed and each skill's documented
-"fall back to `rg`" path quietly stood in. A presence check cannot detect a surface change. Spec C
-item 4 replaces it with one that asserts the declared tool names resolve, and keeps *qmd absent*
-(WARN) distinct from *qmd present but broken* (FAIL).
+**1. The fence-gate allowlist can hide an unrelated failure.** Highest priority, because it is the
+entry that lets the others recur unseen. Absorption keys on `(letter, label)` alone — it ignores
+both the entry's stated reason and its `ZSH ONLY:` scope. Measured: with `skill-sources/seed`
+fences guarded, `seed f01` failed assertion H **under bash** and was silently absorbed by an `~H~`
+entry whose own reason is a zsh-only glob fork and cannot apply under bash. `f03`/`f04`/`f05`, which
+carry no `~H~` entry, reported the identical failure normally. Reproduce:
 
-**2. Eight fence defects, listed and not blocking.** Enumerated inside
-`reference/test/fence-isolation.test.sh` with a reason each: `skill-sources/seed` f01/f03/f04/f05
-read `$FILE` (the invocation argument — the repair is a design decision about whether each fence
-re-derives it or reads `$ARGUMENTS`), plus `next` f04, `reflect` f03, `skills/health` f10 and
-`skills/help` f01, which each render `0` on a missing notes directory so an absent vault reads as an
-empty one. Two further entries are **zsh-only**, found only because the gate runs both shells: a
-non-matching glob aborts the command under zsh where bash passes the pattern through.
+```bash
+cp reference/test/fence-isolation.test.sh reference/test/.probe.sh
+sed -i '' '/^skill-sources\/seed f01~H~ZSH ONLY/d' reference/test/.probe.sh
+bash reference/test/.probe.sh   # -> H seed f01, invisible with the line present
+rm -f reference/test/.probe.sh
+```
 
-**3. The stale-lock retry is unbounded.** `skill-sources/{reflect,reweave}` take a mutex with
-`while ! mkdir "ops/queue/.locks/qmd.lock" 2>/dev/null; do sleep 2; done`. The missing-parent half is
-fixed (setup creates `ops/queue/.locks/`, upgrade §5f restores it), but a crash between `mkdir` and
-`rm -rf` leaves a stale lock and the next run spins forever.
+Any already-listed fence can therefore mask a new, unrelated failure. The fix is a design decision —
+whether entries key on reason, or whether the shell filter (which governs the stale table but not
+the absorption path) should gate absorption too — so it is recorded rather than patched in passing.
 
-> **`mkdir -p` is NOT the fix.** It returns 0 when the directory already exists, which destroys the
-> mutex — trading a visible hang for concurrent qmd runs corrupting each other, which is strictly
-> worse and far harder to notice. Bounding the wait changes shipped concurrency semantics and needs
-> its own review.
-
-**4. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
+**2. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
 the top-level `.arscontexta` marker and handles **scalar top-level keys only**, so it structurally
 cannot reach a nested `ops/config.yaml` key. The SessionStart hook therefore carries hardcoded
 thresholds while three skills read `self_evolution.*` from `config.yaml`. Three sources currently
 disagree (skills 10/5, plugin hook 10/5, the field vault's patched hook 20/10). Surfaced
 deliberately rather than averaged.
 
-**5. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
+**3. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
 methodology notes as one total; `platforms/shared/skill-blocks/stats.md:94-95` documents unfiltered
 counts under the label "Pending". Both are display decisions rather than clear defects — but note
 that the *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those
 numbers drive a threshold.
 
-**6. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
+**4. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
 real vault, and it now performs three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`)
 that are prose contracts CI cannot exercise. Separately, the two older plans in
 `docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file
 that lies about status, which is this repo's signature defect wearing a different hat.
+
+### Closed on `fix/spec-c-primitive-10`
+
+Listed because the entries above were renumbered, and a divergence list that quietly drops items is
+the same status-that-lies defect in miniature.
+
+- **Primitive 10 checked presence, not resolution** (`fd9bdb6`). `validate-kernel.sh` verified only
+  that `qmd` was on `PATH` — and qmd *was* on PATH throughout the entire period when all 62 of its
+  call sites named tools qmd had removed, so the validator reported semantic search satisfied while
+  every call failed and the documented "fall back to `rg`" path quietly stood in. It now asserts the
+  declared tool names resolve, keeping *qmd absent* (WARN) distinct from *qmd present but broken*
+  (FAIL).
+- **Eight fence defects** → two. `skills/help` f01, `skills/health` f10, `skill-sources/next` f04
+  and `skill-sources/reflect` f03 each rendered `0` on a missing notes directory (`bb219d0`);
+  `skill-sources/seed` f01/f03/f04/f05 each read a `$FILE` no fence defined (`a5e1795`). The two
+  survivors are the **zsh-only** glob forks, found only because the gate runs both shells.
+- **The stale-lock retry was unbounded** (`7765504`). Bounded at 60s, then exits 1 naming the lock
+  path. The lock is still never broken automatically on mtime, and `mkdir` still omits `-p` on the
+  lock itself — that atomic create *is* the mutex.
 
 ### The cross-cutting pattern
 
