@@ -46,17 +46,19 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are six executable checks. Five run in CI (`.github/workflows/checks.yml`) on every push,
-**each under both bash and zsh** — three defects shipped here were bash/zsh forks, and a single-shell
-run could not have seen any of them:
+There are six executable checks. Five run in CI (`.github/workflows/checks.yml`) on every push.
+Three defects shipped here were bash/zsh forks, so **the four test suites each run under both
+shells** — but read the paragraph below the table before treating that as "everything is tested
+under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
+harness rather than its subject.
 
 ```bash
 bash reference/check-portability.sh                      # exit 0
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
-  $s reference/test/guard-failure.test.sh                # 32/32
+  $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 26/26
+  $s reference/test/bump-version.test.sh                 # 28/28
 done
 ```
 
@@ -68,14 +70,18 @@ done
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
 
-**Two of these suites hardcode a shell and one does not, deliberately.**
-`guard-failure.test.sh` always invokes the guard as `bash "$GUARD"`, because
-`check-portability.sh` carries a `#!/bin/bash` shebang and CI runs it that way — running it under
-zsh would exercise a configuration that never occurs and could only manufacture false reds. Its zsh
-run therefore tests *the harness's own* portability, not the guard's, and an assertion pins the
-shebang so that decision resurfaces if anyone changes it. `bump-version.test.sh` makes the opposite
-call and runs the script under whichever shell the harness is in — that fork reached a release
-precisely because only the bash form was ever executed.
+**One suite hardcodes a shell and one does not, and the distinction is the invocation surface —
+not the shebang.** `guard-failure.test.sh` always invokes the guard as `bash "$GUARD"` because
+*nothing* invokes `check-portability.sh` by any other name: CI, `.pre-commit-config.yaml` and this
+file all spell `bash reference/check-portability.sh`, and an assertion fails if a caller ever stops
+doing so. Running it under zsh would exercise a configuration that does not occur. Its zsh run
+therefore tests *the harness's own* portability, not the guard's.
+
+A shebang alone would not have justified that: `scripts/bump-version.sh` also carries a bash shebang
+and is also run as `bash …` in CI, and it shipped a zsh fork anyway, because a human typed
+`zsh bump-version.sh`. So `bump-version.test.sh` makes the opposite call and runs the script under
+whichever shell the harness is in. The fence gate is the one suite that genuinely runs the same code
+under both, because Claude really does invoke those fences under whatever shell the user has.
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
@@ -107,6 +113,11 @@ The sixth check is kernel validation, run manually against a generated vault:
 Pass criterion is 15/15 PASS. `WARN` is acceptable **only** for primitive 10 (semantic search,
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
 FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
+
+**Measured against the live vault, that criterion is currently violated and has been read as passing.**
+Primitives 8 and 10 both PASS there; the two WARNs are frontmatter coverage and a dangling-link check
+that never ran. `15 PASS / 2 WARN / 0 FAIL` has been recorded as acceptable across several sessions
+by reading the totals rather than the labels. See divergence 1.
 
 **The blind spot that used to be here is closed.** Primitive 10 once checked only that `qmd` was on
 `PATH`, which is why 62 references to qmd tools removed from its MCP surface survived across 20
@@ -218,23 +229,62 @@ point is the shape of the problem and where to look.
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the five checks above enforce, and CI is green on
+not a claim you should take on trust: it is what the six checks above enforce, and CI is green on
 `main` across all 11 steps. What follows is what remains.
 
-**1. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
+**1. `validate-kernel.sh` soft-passes the dangling-link primitive, and its own output says so.**
+Highest blast radius: this is the kernel contract, run against every generated vault, and it has been
+reporting a soft pass on a check that never executed. Two consecutive lines of one run:
+
+```text
+PASS 3784 of 5251 files contain wiki links
+WARN No wiki links found to check
+```
+
+`reference/validate-kernel.sh:74` scans a hardcoded list — `01_thinking`, `notes`, `00_inbox`,
+`04_meta/logs`, plus `$VAULT/../self`. Measured against the field vault: **all five absent.** Its
+notes directory is `nodes/` (2,686 files), because that is what its derivation named it; pointing
+`extract_link_targets_recursive` at the real directory yields **2,681 link candidates**.
+`$VAULT/../self` is the same bug twice — for a top-level vault that resolves to `~/self`, while the
+vault's self space sits at `$VAULT/self`, where primitive 8 finds it and passes.
+
+Reproduce:
+
+```bash
+for d in 01_thinking notes 00_inbox 04_meta/logs; do
+  printf '%-14s ' "$d"; [ -d ~/second-brain/$d ] && echo PRESENT || echo ABSENT; done
+. reference/lib/link-extraction.sh
+extract_link_targets_recursive ~/second-brain/nodes | grep -c .   # 2681
+```
+
+**Same root cause as the primitive-10 defect closed on `fix/spec-c-primitive-10`:** canonical
+directory names hardcoded inside a validator for a generator whose whole purpose is renaming them.
+`reference/vocabulary-transforms.md` exists because vaults rename directories; the validator does not
+read it, and neither does anything else that names a path literally. Not fixed here because it
+surfaced during Task 6 prep on a branch whose tree was frozen for a review.
+
+**2. `bump-version.sh` can leave a partial bump — the drift it exists to prevent.** `cmd_bump` calls
+`write_json_field` unguarded under `set -e`, so a failure on the second declared site aborts with the
+first already rewritten. Reproduced: with `pkg/marketplace.json` unparseable, `bump-version.sh 8.8.8`
+leaves `pkg/plugin.json` at `8.8.8` and `marketplace.json` at the old version.
+`reference/test/bump-version.test.sh` asserts the run does not *report success*, deliberately without
+pinning the on-disk state — pinning it would make an atomic fix look like a regression. A proper fix
+writes all sites to temps and commits them together.
+
+**3. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
 the top-level `.arscontexta` marker and handles **scalar top-level keys only**, so it structurally
 cannot reach a nested `ops/config.yaml` key. The SessionStart hook therefore carries hardcoded
 thresholds while three skills read `self_evolution.*` from `config.yaml`. Three sources currently
 disagree (skills 10/5, plugin hook 10/5, the field vault's patched hook 20/10). Surfaced
 deliberately rather than averaged.
 
-**2. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
+**4. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
 methodology notes as one total; `platforms/shared/skill-blocks/stats.md:94-95` documents unfiltered
 counts under the label "Pending". Both are display decisions rather than clear defects — but note
 that the *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those
 numbers drive a threshold.
 
-**3. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
+**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
 real vault, and it now performs three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`)
 that are prose contracts CI cannot exercise. Separately, the two older plans in
 `docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file

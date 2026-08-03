@@ -175,10 +175,11 @@ eq "bump: rc 0 on a well-formed version"           "0"   "$(rc_of "$F" 8.8.8)"
 eq "bump: pkg/plugin.json moved"                   "8.8.8" "$(jq -r .version "$F/pkg/plugin.json")"
 eq "bump: metadata.version moved"                  "8.8.8" "$(jq -r .metadata.version "$F/pkg/marketplace.json")"
 eq "bump: plugins[0].version moved"                "8.8.8" "$(jq -r '.plugins[0].version' "$F/pkg/marketplace.json")"
-# write_json_field creates its temp before jq runs, so a jq that fails leaves the
-# file behind unless the || branch removes it. An orphaned .tmp.<pid> beside a
-# manifest is a second copy of release metadata that nothing declares.
-eq "bump: leaves no .tmp. file behind"             ""    "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+# SUCCESS PATH ONLY — `mv` consumes the temp whenever jq succeeds, so this cannot
+# say anything about the `|| { rm -f "$tmp"; }` branch. Deleting that `rm` leaves
+# this green. The failure path is asserted separately below; this line is here to
+# catch a future change that stops moving the temp at all.
+eq "bump: leaves no .tmp. behind when jq succeeds" ""    "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
 eq "bump: --check agrees afterwards"               "0"   "$(rc_of "$F" --check)"
 
 # --- a write that cannot complete fails loudly -------------------------------
@@ -196,6 +197,36 @@ F=$(mkfix); printf 'not json\n' > "$F/pkg/marketplace.json"
 bad_rc=$(rc_of "$F" 8.8.8)
 eq "bump: an unparseable declared file is not reported as success" "yes" \
    "$([ "$bad_rc" -ne 0 ] && echo yes || echo no)"
+
+# --- a jq that fails DURING the write leaves no temp -------------------------
+# The branch the success-path assertion above cannot reach. `write_json_field`'s
+# redirection creates $1.tmp.$$ before jq runs, so a jq that then fails skips the
+# `mv` and the temp survives unless the `|| { rm -f "$tmp"; }` branch removes it.
+# An orphaned .tmp.<pid> beside a manifest is a second copy of release metadata
+# that nothing declares — the drift condition, spelled differently.
+#
+# REACHING IT TAKES A FIELD THAT READS BUT CANNOT BE ASSIGNED TO. cmd_bump calls
+# read_json_field first and `set -e` aborts on its failure, so every way of
+# breaking the *file* fails before any write. `version|length` splits the two:
+# `jq -r '.version|length'` returns 5 at rc 0, while `.version|length = $v` is an
+# invalid path expression and exits 5 — with the temp already on disk.
+#
+# Non-vacuity: deleting `rm -f "$tmp"` from write_json_field:55 turns this red in
+# both shells and leaves every other assertion in the file green.
+F=$(mkfix)
+cat > "$F/.version-bump.json" <<'EOF'
+{
+  "files": [
+    {"path": "pkg/plugin.json", "field": "version|length"}
+  ],
+  "audit": { "exclude": [".git"] }
+}
+EOF
+tmp_rc=$(rc_of "$F" 8.8.8)
+eq "bump: a write-time jq failure is not reported as success" "yes" \
+   "$([ "$tmp_rc" -ne 0 ] && echo yes || echo no)"
+eq "bump: a write-time jq failure leaves no .tmp. behind" ""   \
+   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
 
 # --- argument handling -------------------------------------------------------
 F=$(mkfix)

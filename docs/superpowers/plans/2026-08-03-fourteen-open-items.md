@@ -92,8 +92,10 @@ Placed third because from here on it protects the rest of the work.
 - [x] **Step 2 — `GEMINI.md` as a pointer file**, not a symlink: it needs different tool references.
       Model on `/Volumes/Containers/superpowers/GEMINI.md`, which is two `@./path` include lines.
 - [x] **Step 3 — `.agents/plugins/marketplace.json`** for cross-runtime discovery, mirroring
-      `.claude-plugin/marketplace.json`. **Add it to `.version-bump.json`** or it becomes the next
-      version-drift entry.
+      `.claude-plugin/marketplace.json`. ~~**Add it to `.version-bump.json`**~~ — *superseded during
+      execution:* it was built as a **symlink** to `.claude-plugin/marketplace.json`, so declaring it
+      would put two rows on one file and `--check` would compare a file against itself. Correctly
+      absent. The plan text was written assuming a copy.
 - [x] **Step 4 — `.pre-commit-config.yaml`** running `bash reference/check-portability.sh` (under a
       second) on every commit. Not the full gate set — the fence sweep takes two minutes and would be
       abandoned.
@@ -175,7 +177,7 @@ data point against a frozen tree.
 
 ## Task 7 — E10 + E11: close the two documentation entries
 
-- [ ] **Step 1 — E11, correct the stale divergence entry.** CLAUDE.md divergence 3 (was 5 before this branch renumbered the list) claims two plans
+- [ ] **Step 1 — E11, correct the stale divergence entry.** CLAUDE.md divergence 5, "Verification gaps in the loop itself" (numbering shifts as entries open and close — match on the title) claims two plans
       show 0 of 93 steps complete. Measured: 16/16 and 22/22 ticked. Delete that half of the entry.
       **Then re-derive every other number in the divergence list** — the entry that names
       status-files-that-lie was one.

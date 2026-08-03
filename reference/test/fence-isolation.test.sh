@@ -89,6 +89,11 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 # where the fence legitimately passes.
 #
 # Format: <label>~<assertion letter>~<reason>
+# A reason may open with the literal, case-sensitive prefix `ZSH ONLY:` or
+# `BASH ONLY:` to scope the entry to one shell — see in_scope(). Anything else,
+# including `zsh only:`, is treated as applying in every shell. That default errs
+# safe (an unrecognised prefix can only widen scope, never silently narrow it), but
+# it does mean a lowercase prefix silently does nothing.
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01'
 

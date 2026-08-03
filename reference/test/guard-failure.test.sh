@@ -67,19 +67,43 @@ rc_of() { bash "$GUARD" "$1" >/dev/null 2>&1; printf '%s' "$?"; }
 out_of() { bash "$GUARD" "$1" 2>/dev/null; }
 
 # WHY `bash "$GUARD"` AND NOT `"$SELF" "$GUARD"` — asked and settled, not overlooked.
-# The guard carries a `#!/bin/bash` shebang and CI invokes it as
-# `bash reference/check-portability.sh`. Running it under zsh here would exercise a
-# configuration that never occurs in production and could only manufacture false
-# reds. What the zsh run of THIS file exercises is the harness's own portability —
-# CLAUDE.md's "each under both bash and zsh" reads as though the guard is being
-# tested under both shells, and it is not. The fence gate is the one that genuinely
-# runs the same code under both, because Claude really does invoke those fences
-# under whatever shell the user has.
 #
-# Pinned rather than narrated, so the decision survives its comment: change the
-# shebang and this assertion goes red, which forces whoever changed it back here
-# instead of leaving the hardcoded invocation quietly wrong.
-eq "the guard's shebang is bash (rc_of hardcodes that)" "#!/bin/bash" "$(head -1 "$GUARD")"
+# THE ARGUMENT IS THE INVOCATION SURFACE, NOT THE SHEBANG. A shebang proves nothing
+# on its own: `scripts/bump-version.sh` also carries a bash shebang and is also run
+# as `bash …` in CI, and it shipped a zsh fork regardless, because a human typed
+# `zsh bump-version.sh`. What distinguishes this guard is that NOTHING invokes it by
+# any other name — CI, `.pre-commit-config.yaml` and CLAUDE.md's instructions every
+# one of them spell `bash reference/check-portability.sh`. It is never typed by
+# hand under an arbitrary shell, so running it under zsh here would exercise a
+# configuration that does not occur and could only manufacture false reds.
+# `bump-version.test.sh` makes the opposite call for the opposite reason.
+#
+# What the zsh run of THIS file exercises is therefore the harness's own
+# portability, not the guard's. The fence gate is the one that genuinely runs the
+# same code under both, because Claude really does invoke those fences under
+# whatever shell the user has.
+#
+# PINNED ON THE THING THE ARGUMENT RESTS ON. If a caller ever invokes the guard
+# under another shell, the premise is gone and this assertion goes red, which forces
+# whoever added that caller back to this decision.
+REPO="$HERE/../.."
+# The caller list is asserted to be non-empty first. `$ROOT` was used here for one
+# revision; it is not defined in this file, so under `set -u` the substitution
+# subshell died and `invocations` came back empty — and an empty result is what
+# PASSING looks like for the assertion below. It went green having grepped nothing.
+# A negative assertion needs a positive one beside it or it passes on absence.
+callers=$(grep -rn 'check-portability\.sh' "$REPO/.github" "$REPO/.pre-commit-config.yaml" 2>/dev/null | grep -c .)
+eq "the guard's callers are findable at all"           "yes" \
+   "$([ "${callers:-0}" -ge 2 ] && echo yes || echo no)"
+# Every line that names the guard must also say `bash`. Matching one exact string
+# was wrong: the syntax-check step invokes it as `bash -n reference/…`, which is
+# bash and was flagged anyway. The property is the interpreter, not the spelling.
+invocations=$(grep -rn 'check-portability\.sh' "$REPO/.github" "$REPO/.pre-commit-config.yaml" 2>/dev/null \
+              | grep -v 'bash')
+eq "nothing invokes the guard under a shell other than bash" "" "$invocations"
+# Kept as a consistency check on the same premise: a caller saying `bash` while the
+# file declares another interpreter is a contradiction, whichever one is wrong.
+eq "the guard declares bash too"                       "#!/bin/bash" "$(head -1 "$GUARD")"
 
 # --- the failure path -------------------------------------------------------
 # All nine directories exist and are readable, so the guard's directory-existence
