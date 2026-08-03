@@ -42,6 +42,11 @@ fail=0
 
 red() { printf '  FAIL %s\n' "$1"; fail=1; }
 ok()  { printf '  PASS %s\n' "$1"; }
+# A third outcome, distinct from both. "This tree does not claim the property"
+# is not "this tree has the property" — reporting it as PASS is exactly the
+# vacuity these checks exist to prevent. skip() never touches `fail`, and never
+# prints PASS, so a reader can tell a verified check from an inapplicable one.
+skip() { printf '  SKIP %s\n' "$1"; }
 
 # WHY scan_or_die REPORTS ON STDERR AND NEVER SETS `fail` ITSELF:
 # Every caller runs this inside $( ), which is a subshell — a `fail=1` set here
@@ -222,10 +227,26 @@ FROZEN_DIR="$ROOT/platforms/shared/skill-blocks"
 FROZEN_MANIFEST="$ROOT/reference/skill-blocks.frozen"
 frozen_report="$ROOT/.frozen-check.$$"
 : > "$frozen_report"
-if [ ! -d "$FROZEN_DIR" ]; then
-  red "frozen directory missing: $FROZEN_DIR — cannot conclude anything"
+# WHY THE MANIFEST IS THE KEY AND NOT THE DIRECTORY:
+# The first version of this check called red() whenever the frozen directory was
+# absent. That broke guard-failure.test.sh (19/19 -> 16/3) and the three broken
+# assertions were the ones proving this guard is not vacuous — "a clean tree must
+# still pass, or the assertions above prove nothing." Its mkroot() builds the nine
+# shipped directories to test the FAILURE path; it has no reason to carry this
+# repo's frozen content, and demanding it does turns check-portability.sh into a
+# guard that fails on every tree but one. Loud failure on a legitimately clean
+# tree — the house defect with its sign flipped.
+#
+# The manifest is the tree's ASSERTION that a freeze exists, so it is the right
+# discriminator. Absent manifest AND absent directory means nothing here claims to
+# be frozen: skip, and say so. Either one alone is a real failure, including the
+# dangerous case the README names — deleting the manifest to let an edit through.
+if [ ! -f "$FROZEN_MANIFEST" ] && [ ! -d "$FROZEN_DIR" ]; then
+  skip "no frozen manifest and no frozen directory — nothing here claims a freeze"
 elif [ ! -f "$FROZEN_MANIFEST" ]; then
-  red "frozen manifest missing: $FROZEN_MANIFEST — cannot conclude anything"
+  red "frozen manifest missing: $FROZEN_MANIFEST — the directory is here with nothing pinning it"
+elif [ ! -d "$FROZEN_DIR" ]; then
+  red "frozen directory missing: $FROZEN_DIR — the manifest pins files that are gone"
 else
   # Modified or deleted: every manifest entry must still hash to its recorded value.
   while IFS=' ' read -r want name; do
