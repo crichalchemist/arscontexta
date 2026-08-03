@@ -554,7 +554,7 @@ comment that sits inside the gate itself. None was touched by this branch:
 | `reference/testing-milestones.md:410` | `grep -rl` | a test spec's own MOC-ref check |
 | `reference/check-portability.sh:128` | — | a comment inside the gate, not code |
 
-The two non-executable hits are `skill-sources/graph/SKILL.md:820` and `:825`, a documentation table
+The two hits in `skill-sources/` are `skill-sources/graph/SKILL.md:820` and `:825`, a documentation table
 of frontmatter query syntax (`rg '^topics:.*\[\[X\]\]'`) — a different operation, outside any fence,
 correctly out of scope.
 
