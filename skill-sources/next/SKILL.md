@@ -66,7 +66,7 @@ Before collecting state, evaluate all maintenance conditions and reconcile the q
 | pipeline_stalled | Queue tasks with status: pending unchanged across sessions. |
 | unprocessed_sessions | Count files in ops/sessions/ without mined: true. |
 | moc_oversize | For each topic map, count linked notes. |
-| stale_notes | Notes not modified in 30+ days with < 2 links. |
+| stale_notes | Notes not modified in 30+ days. |
 | low_link_density | Average link count across all notes. |
 | methodology_drift | Compare config.yaml modification time vs newest ops/methodology/ note modification time. If config is newer, methodology may be stale. |
 
@@ -122,7 +122,7 @@ Gather all signals. Run independent checks in parallel where possible. Record ea
 | **Note count** | Count `*.md` in {vocabulary.notes}/ | Total notes for context |
 | **Orphan notes** | For each note, grep for `[[filename]]` across all files — zero hits = orphan | Count, first 5 names |
 | **Dangling links** | Extract all `[[links]]` from notes/, verify each target file exists | Count, first 5 targets |
-| **Stale notes** | Notes not modified recently AND with low link density (< 2 links) | Count |
+| **Stale notes** | Notes not modified in 30+ days (mtime only) | Count |
 | **Goals** | Read `self/goals.md` or `ops/goals.md` — current priorities, active threads | Priority list, active research directions |
 | **Observations** | Count files with `status: pending` or `status: open` in `ops/observations/` | Count |
 | **Tensions** | Count files with `status: pending` or `status: open` in `ops/tensions/` | Count |
@@ -171,6 +171,49 @@ TENSION_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/
 
 # Unmined sessions
 SESSION_COUNT=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null | wc -l | tr -d ' ')
+
+# THE FOUR BELOW WERE PROMISED BY THE OUTPUT CONTRACT AND COMPUTED BY NOTHING.
+# Every one of them drives a recommendation further down this file, so the numbers
+# were being invented at render time: a State: line with eight fields and five
+# sources. They are counted here or they come out of the contract; a promised field
+# with no code behind it is the house failure in prose form.
+
+# Sourced, never re-implemented. `check-portability.sh` rejects inlined copies, and
+# the naive `grep -rl "[[$NAME]]"` spelling counts links inside fenced blocks, does
+# not case-fold, and matches the wrong direction for orphans.
+LINK_LIB="ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+
+  # Both captured and CHECKED before use: piping either into a loop would yield the
+  # loop's status, so a failed extraction would read as "no orphans, no dangling".
+  NOTE_INDEX=$(existing_note_index_recursive "$NOTES_DIR") || {
+    echo "error: note index build failed; refusing to report orphan or dangling counts" >&2
+    exit 1
+  }
+  LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
+    echo "error: link extraction failed; refusing to report orphan or dangling counts" >&2
+    exit 1
+  }
+  # Orphans: indexed notes that nothing links TO. Dangling: targets that resolve to
+  # no note. Both sides are already folded and sorted by the library, which is what
+  # makes comm valid here.
+  ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
+  DANGLING_COUNT=$(comm -13 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# Stale: notes untouched for 30+ days. This is mtime only, matching the wording the
+# recommendation itself uses ("haven't been touched since"). An earlier definition
+# added "and fewer than 2 links", which nothing downstream ever read.
+STALE_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -mtime +30 2>/dev/null | wc -l | tr -d ' ')
+
+# Queue: pending pipeline tasks, from whichever of the two shapes this vault uses.
+QUEUE_COUNT=$(grep -h 'status: *pending\|"status": *"pending"' \
+  ops/queue.yaml ops/queue/queue.yaml ops/queue/queue.json 2>/dev/null | grep -c . || true)
 ```
 
 ---

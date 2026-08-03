@@ -103,16 +103,11 @@ LINK_COUNT=$(count_links_recursive "$NOTES_DIR") || {
 # possible_links = N * (N - 1) for directed graph
 echo "Density: $LINK_COUNT / ($NOTE_COUNT * ($NOTE_COUNT - 1))"
 
-# Find orphan notes (zero incoming links)
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
-  [[ "$INCOMING" -eq 0 ]] && echo "ORPHAN: $NAME"
-done
-
-# Find dangling links (links to non-existent files)
+# Build both sides once. Orphans and dangling links are the two directions of the
+# same comparison, so they share an index and a target set rather than each paying
+# for its own scan.
 NOTE_INDEX=$(existing_note_index_recursive "$NOTES_DIR") || {
-  echo "error: note index build failed; refusing to report dangling links" >&2
+  echo "error: note index build failed; refusing to report orphans or dangling links" >&2
   exit 1
 }
 # Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
@@ -124,6 +119,15 @@ LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
 printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "DANGLING: $NAME"
 done
+
+# Orphans: indexed notes nothing links TO — the other direction of the comparison
+# above. This replaced a per-note `grep -rl "[[$NAME]]"` loop that ran one recursive
+# scan per note and carried all three defects check-portability.sh records as a
+# known blind spot: it counted links inside fenced code blocks, did not case-fold,
+# and matched the wrong direction. Both sides are already folded and sorted by the
+# library, which is what makes comm valid.
+comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") \
+  | while read -r NAME; do [ -n "$NAME" ] && echo "ORPHAN: $NAME"; done
 
 # MOC coverage: % of notes appearing in at least one MOC's Core Ideas.
 # The MOC file list is built once, outside the loop. Two reasons: rebuilding it
