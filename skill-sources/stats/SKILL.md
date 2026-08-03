@@ -188,29 +188,46 @@ TOTAL_FILES=$(find "$NOTES_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d
 MOC_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
 
-# Orphan count (notes with zero incoming links).
-# Counted through `wc -l` rather than by incrementing a variable: `find | while`
-# runs the loop body in a subshell, so an incremented ORPHAN_COUNT would be
-# discarded at the pipe and always render 0. Same shape as DANGLING_COUNT below.
-ORPHAN_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  grep -q '^type: moc' "$f" 2>/dev/null && continue
-  INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
-  [[ "$INCOMING" -eq 0 ]] && echo "$NAME"
-done | wc -l | tr -d ' ')
-
-# Dangling link count (folded on both — reference/lib/link-extraction.sh)
+# Orphan and dangling counts both read the SAME two folded, sorted sets, built
+# once here (folded on both sides — reference/lib/link-extraction.sh).
 NOTE_INDEX=$(existing_note_index_recursive "$NOTES_DIR") || {
-  echo "error: note index build failed; refusing to report a dangling-link count" >&2
+  echo "error: note index build failed; refusing to report orphan or dangling counts" >&2
   exit 1
 }
 # Extraction is captured and CHECKED BEFORE the loop. Piping it straight into
 # `while` would yield the loop's status, not extraction's, so a failed extraction
 # would render as a plausible 0 (PIPESTATUS is bash-only and cannot be used here).
 LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
-  echo "error: link extraction failed; refusing to report a dangling-link count" >&2
+  echo "error: link extraction failed; refusing to report orphan or dangling counts" >&2
   exit 1
 }
+
+# Orphan count (non-MOC notes with zero incoming links).
+# The replaced spelling was the same inlined matcher removed from /graph hubs —
+# a recursive grep of the whole tree for the note's own name in brackets,
+# filtered by `grep -v` on the file path. Described, not quoted, for the reason
+# given at that site. It was wrong three ways: it counted links sitting inside
+# ``` fences, it matched neither case-folded nor up to the `|` and `#`
+# terminators, and it interpolated the name into a REGEX, so a note named `a.b`
+# was also "linked" by any [[axb]]. Every one of those errors lands on the
+# zero/non-zero boundary this count is made of, so an orphan could be hidden by
+# a link that does not exist — and on a fixture the two spellings returned the
+# SAME total (6) over DIFFERENT sets, the errors cancelling in the sum.
+#
+# MOCs are excluded, as before: a map that nothing links TO is not an orphan.
+# The MOC index is folded through _fold_lower and sorted the same way the
+# library sorts NOTE_INDEX — comm does not warn usefully on inputs collated
+# differently, it just returns a wrong set.
+MOC_INDEX=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null \
+  | while IFS= read -r f; do basename "$f" .md; done | _fold_lower | sort -u)
+# Both sides are already folded and sorted, which is what makes comm valid here.
+ORPHAN_ALL=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS"))
+ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$ORPHAN_ALL") <(printf '%s\n' "$MOC_INDEX") \
+  | grep -c . || true)
+
+# Dangling: targets that resolve to no note. Left as a membership loop rather
+# than converted to `comm -13`: it was never broken, and comm would newly make
+# this count depend on both sets being collated identically.
 DANGLING_COUNT=$(printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "$NAME"
 done | wc -l | tr -d ' ')

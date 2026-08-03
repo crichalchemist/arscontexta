@@ -405,19 +405,14 @@ that matched nothing and reported green.
 
 The human diff of the two trees at release remains the only check on the full §4 rule.
 
-**6. `graph`'s authority loop still inlines the naive matcher.**
-`skill-sources/graph/SKILL.md:434` runs `grep -rl "\[\[$NAME\]\]"` — counting matches inside fenced
-code blocks, no case folding. Base had two such sites in that file; the branch fixed the orphan loop
-and left this one, while commit `741b2b7` claimed the spelling was "gone from executable code in both
-files". Detail is in the closed entry below, where it was first written down — but an *open* defect
-recorded only inside a **Closed** section is invisible to anyone scanning this list, which is why it
-also appears here. `check-portability.sh` check 2 does not catch it (it matches greedy-dot capture
-patterns, not a fixed-name `grep -rl`) and it carries no `portability-exempt` marker.
+**6. `graph`'s authority loop still inlines the naive matcher — FIXED on
+`fix/spec-f-divergence-drain`.** Kept in place and kept numbered, because entries below reference
+these numbers and work is in flight; renumbering would invalidate those references. Full record in
+[Closed on `fix/spec-f-divergence-drain`](#closed-on-fixspec-f-divergence-drain).
 
-```bash
-grep -cF 'grep -rl "\[\[' skill-sources/graph/SKILL.md          # 1
-git show 5a4ab28:skill-sources/graph/SKILL.md | grep -cF 'grep -rl "\[\['   # 2
-```
+**Read divergence 10 before concluding anything from this.** What was fixed is two *loops*; what the
+entry's title implied — that the naive-matcher class is gone — is still false, and the search string
+this entry shipped as its own reproduce command is what made that hard to see.
 
 **7. The `status` enum disagrees between its two generator sources.**
 `generators/features/schema.md:30` and `:137` both give `preliminary, open, active, archived`;
@@ -497,7 +492,65 @@ scanned union on top of a run that already takes ~45s on the field vault. The ho
 to replace the per-link loop with a single `comm` or `join` against a sorted index, which makes the
 cap unnecessary rather than merely larger.
 
+**10. The inlined-matcher search string is a proxy for the class, and six sites survive it.**
+Divergence 6 tracked the naive wiki-link matcher through the string `grep -rl "\[\[`. That string now
+returns 0 across `skill-sources/`, and **that is not evidence the class is gone.** The same matcher
+also ships spelled `xargs grep -l` and `-exec grep -l`, which the string cannot see. Six live sites
+remain, three of them inside `skill-sources/` — the very tree the criterion declared clean:
+
+| Site | Spelling | What it feeds |
+|---|---|---|
+| `skill-sources/graph/SKILL.md:145` | `xargs grep -l` | `/graph health` MOC coverage % |
+| `skill-sources/graph/SKILL.md:693` | `-exec grep -l` | `/graph backward` backlinks |
+| `skill-sources/stats/SKILL.md:257` | `xargs grep -l` | MOC coverage % |
+| `skills/architect/SKILL.md:179` | `grep -rl` | link counts in evolution advice |
+| `platforms/claude-code/hooks/session-orient.sh.template:149` | `grep -rl` | SessionStart orientation |
+| `reference/testing-milestones.md:410` | `grep -rl` | a test spec's own MOC-ref check |
+
+Every one carries the three defects measured on the two that were fixed: it counts links inside
+fenced code blocks, it does not case-fold either side, and it interpolates the note name into a
+**regex**, so a note named `a.b` is "linked" by any `[[axb]]`.
+
+Use a pattern that spans the spellings, not the one divergence 6 shipped:
+
+```bash
+grep -rnE 'grep (-rl|-l|-q|-c)[^|]*"\\\[\\\[' skill-sources/ skills/ platforms/claude-code/ reference/
+```
+
+**`check-portability.sh` check 2 is structurally blind to all six.** It flags a link capture whose
+negated class omits the `|` and `#` terminators — it keys on `[^` being *present*. A fixed-name
+bracket grep contains no negated class at all, so the gate built to catch this class never sees its
+most common spelling, and none of the six carries a `portability-exempt` marker to hint otherwise.
+
+Not fixed here on purpose. The blast radii differ enough to need separate review: the hook template
+runs on **every** SessionStart, where a fail-loud version guard turns a missing library into a broken
+session rather than a wrong number. Porting the library into a shipped template unreviewed at the end
+of a branch is how the previous divergence in this family was made.
+
 ### Closed on `fix/spec-f-divergence-drain`
+
+- **`graph`'s authority loop inlined the naive matcher** — divergence 6, and one more site than that
+  entry knew about: the identical loop also drove `stats`' orphan count
+  (`skill-sources/stats/SKILL.md:198`). Both now read the shared library. `/graph hubs` builds the
+  edge set once through `_strip_fences` + `_fold_lower` and counts per note with `grep -cxF`;
+  `stats` computes orphans as `comm -23` over the library's folded, sorted index and target set,
+  minus a folded MOC index — MOCs are still excluded, as they were before.
+
+  **The measured before/after is the reason to trust the change, and the reason the defect lasted.**
+  On an eight-note fixture exercising case, fences, aliases and regex metacharacters, the old
+  spelling scored `Target` 0 incoming (truly 2 — one link differing only in case, one `[[Target|alias]]`),
+  scored `Fenced` 1 (truly 0 — its only link sits inside a ``` block), and scored `a.b` 2 (truly 1 —
+  `.` matched the decoy `[[axb]]`, because the note name was interpolated into a regex). `grep -v "$f"`
+  had the same regex hole on the exclusion side. **Wrong in both directions at once**: the orphan set
+  came out at exactly 6 before and after, with `target` swapped for `fenced` inside it. A check
+  comparing totals would have called this fix cosmetic.
+
+  Gate coverage was proved rather than assumed: deleting the library `.`-source from that one fence
+  (line 436, `f03`, opening at line 415) makes `fence-isolation.test.sh` report
+  `H skill-sources/graph f03` and FAIL under bash; restoring it returns the suite to green.
+
+  **What this did not do is remove the class — see divergence 10.** The criterion it was tracked by
+  is a search string, and three sites in these same two files use a spelling that string cannot see.
 
 - **`validate-kernel.sh` soft-passed the dangling-link primitive** — was divergence 1, and the
   highest blast radius entry on the list: the kernel contract, run against every generated vault,
@@ -558,16 +611,15 @@ cap unnecessary rather than merely larger.
 - **`/next` promised eight state fields and computed five** — was divergence 2, and the only entry on
   that list that reached users' machines. Orphans, Dangling, Stale and Queue are now computed, the
   first two through `ops/lib/link-extraction.sh` rather than an inlined naive matcher; `graph`'s
-  **orphan loop** got the same treatment — **its authority-ranking loop at `skill-sources/graph/SKILL.md:434`
-  still inlines `grep -rl "\[\[$NAME\]\]"`.** That sentence used to read "`graph` got the same
-  treatment", and commit `741b2b7` claims the naive spelling is "gone from executable code in both
-  files"; both overstate. Base had two executable sites in `graph`, the branch fixed one. The survivor
-  carries the same defects the rest of this entry enumerates (counts matches inside fenced blocks, no
-  case folding) and feeds the influence ranking. `check-portability.sh` check 2 does not catch it — it
-  matches greedy-dot capture patterns, not a fixed-name `grep -rl` — and it carries no
-  `portability-exempt` marker. Left as-is rather than rewritten: porting the library into a shipped
-  template unreviewed at the end of a branch is how the next divergence gets made. `stale_notes` was redefined in prose to the definition the code can actually
-  compute — "not modified in 30+ days" — instead of shipping a fifth reading of "stale".
+  **orphan loop** got the same treatment, and its authority-ranking loop did **not** — that survivor
+  was carried as divergence 6 and is now closed on `fix/spec-f-divergence-drain`. This sentence has
+  been wrong twice in opposite directions, which is the part worth keeping. It first read "`graph` got
+  the same treatment" while a site remained; corrected, it read "still inlines" and is now stale the
+  other way. Commit `741b2b7`'s claim that the spelling is "gone from executable code in both files"
+  overstated it then and would overstate it now: **the class is not gone from either file** — see
+  divergence 10, which lists three surviving sites in `skill-sources/` under spellings the search
+  string used here cannot match. `stale_notes` was redefined in prose to the definition the code can
+  actually compute — "not modified in 30+ days" — instead of shipping a fifth reading of "stale".
 - **The claim counter truncated at three digits.** `{source}-999.md` was not a cap but a *collision*:
   the scan matched exactly three digits, so the maximum went backwards once numbering passed 999.
   Padding is now seven digits minimum, wider values pass through unchanged, and existing files are

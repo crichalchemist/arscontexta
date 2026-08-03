@@ -413,9 +413,10 @@ Rank {vocabulary.note_plural} by influence — most-linked-to (authorities) and 
 **Step 1: Count links**
 
 ```bash
-# Each fenced block is a SEPARATE shell invocation: NOTES_DIR does not survive
-# from the blocks above. Left undefined, `find ""` scans nothing and the ranking
-# comes back empty — which reads exactly like a vault with no links.
+# Each fenced block is a SEPARATE shell invocation: neither NOTES_DIR nor the
+# link-extraction library survives from the blocks above. Left undefined,
+# `find ""` scans nothing and the ranking comes back empty — which reads exactly
+# like a vault with no links. Both must be re-established here.
 NOTES_DIR="{vocabulary.notes}"
 
 # An EMPTY vault is a legitimate empty ranking; a MISSING directory is a failure
@@ -425,18 +426,94 @@ NOTES_DIR="{vocabulary.notes}"
   exit 1
 }
 
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 # Authority score: incoming links per note.
 # Captured FIRST, then sorted. `done | sort | head` yields HEAD's status, so a
 # failed scan rendered as an empty ranking with exit 0 — indistinguishable from
 # a vault that genuinely has no links.
-AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
-  echo "AUTH:$INCOMING:$NAME"
-done) || {
+#
+# The replaced spelling recursively grepped the whole tree for this note's own
+# name wrapped in brackets, then filtered that hit list with `grep -v` on the
+# file path. It was the last inlined wiki-link matcher in this tree. It is
+# DESCRIBED rather than quoted: the literal spelling is the search pattern used
+# to prove this class is gone from skill-sources/, so a comment reproducing it
+# would answer that search with itself.
+#
+# Measured against a fixture, it was wrong three ways AT ONCE, and in BOTH
+# directions — which is why no single number ever looked implausible enough to
+# investigate:
+#   - it counted a link that sat inside a ``` fence  (scored 1, truly 0)
+#   - it missed [[target]] against Target.md, and missed [[Target|alias]]
+#     entirely, because it matched neither case-folded nor up to the `|`
+#     terminator                                     (scored 0, truly 2)
+#   - it interpolated $NAME into a REGEX, so a note named `a.b` also matched a
+#     link to `axb`                                  (scored 2, truly 1)
+# Fences and case are the library's job; `grep -cxF` below — fixed-string and
+# whole-line — is what closes the third. `grep -v "$f"` had the same regex hole
+# on the exclusion side; self-links are now dropped by string comparison.
+#
+# Edges are built ONCE into a file and then counted per note, rather than
+# re-scanning the whole tree once per note. One line per (source file, distinct
+# target) pair: `grep -rl | wc -l` counted FILES, not link occurrences, and that
+# is the semantics being preserved.
+TMP_EDGE_SRC=$(mktemp) || exit 1
+TMP_EDGE_HITS=$(mktemp) || { rm -f "$TMP_EDGE_SRC"; exit 1; }
+TMP_EDGES=$(mktemp) || { rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS"; exit 1; }
+# The failure flag is a FILE, not a variable: this loop body runs in a subshell
+# (find | while), so an assignment would be discarded at the pipe and a broken
+# scan would read as "nothing links to anything". PIPESTATUS is bash-only.
+AUTHF="/tmp/graph-auth-err-$$"
+rm -f "$AUTHF"
+
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  SRC=$(basename "$f" .md | _fold_lower)
+  _strip_fences "$f" > "$TMP_EDGE_SRC" || { touch "$AUTHF"; continue; }
+  # rg runs as its own statement, not as a pipeline stage: $? would otherwise be
+  # sed's status. rc 1 means "this file has no links" and is normal; only rc >1
+  # is a failure.
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$TMP_EDGE_SRC" > "$TMP_EDGE_HITS"
+  if [ $? -gt 1 ]; then
+    touch "$AUTHF"; continue
+  fi
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$TMP_EDGE_HITS" \
+    | _fold_lower | sort -u | while IFS= read -r target; do
+      [ -n "$target" ] && [ "$target" != "$SRC" ] && printf '%s\n' "$target"
+    done >> "$TMP_EDGES"
+done
+
+if [ -e "$AUTHF" ]; then
+  rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS" "$TMP_EDGES" "$AUTHF"
   echo "error: authority scan failed; refusing to report an influence ranking" >&2
   exit 1
-}
+fi
+
+AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  NAME=$(basename "$f" .md)
+  FOLDED=$(printf '%s\n' "$NAME" | _fold_lower)
+  INCOMING=$(grep -cxF "$FOLDED" "$TMP_EDGES" || true)
+  echo "AUTH:$INCOMING:$NAME"
+done)
+rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS" "$TMP_EDGES" "$AUTHF"
 
 # Hub score: outgoing links per note.
 # The failure flag is a FILE, not a variable: the loop body runs in a subshell
