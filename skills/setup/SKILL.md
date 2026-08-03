@@ -1607,11 +1607,18 @@ Run all 15 primitive checks against the generated system. Use `${CLAUDE_PLUGIN_R
 13. **task-stack** -- ops/tasks.md exists? Queue file (ops/queue/queue.json) exists with schema_version >= 3 and maintenance_conditions section? **`ops/queue/.locks/` directory exists?** Context file references both in session-orient phase? /{DOMAIN:next} command exists with condition reconciliation?
 
     `ops/queue/.locks/` must be created here, empty. It is the parent for the qmd mutex that
-    `/{DOMAIN:reflect}` and `/{DOMAIN:reweave}` take: `while ! mkdir "ops/queue/.locks/qmd.lock"; do sleep 2; done`.
+    `/{DOMAIN:reflect}` and `/{DOMAIN:reweave}` take: `until mkdir "$LOCKDIR" 2>/dev/null; do … done`,
+    bounded at 60 seconds, then exiting 1 with the lock path and how to clear it.
     That `mkdir` deliberately omits `-p` — creating the lock directory atomically IS the mutex, and
     `-p` would return 0 when the lock is already held, destroying it. So the *parent* must already
-    exist. If it does not, the `mkdir` can never succeed, `2>/dev/null` hides the reason, and the
-    skill loops forever with no output. Create the parent; never add `-p` to the lock itself.
+    exist; the skills create it themselves with `mkdir -p "$(dirname "$LOCKDIR")"`, and creating it
+    here as well is the belt to that braces. Never add `-p` to the lock itself.
+
+    The bound is what makes a stale lock — one left by a run that died between `mkdir` and its
+    release — recoverable. Unbounded, that lock hung every subsequent run forever with no output.
+    Do not "fix" a stale lock by breaking it automatically on an old mtime: mtime is not proof the
+    holder is dead, and breaking a live lock reintroduces the corruption the mutex exists to
+    prevent. Fail, and tell the user the path.
 14. **methodology-folder** -- ops/methodology/ exists with methodology.md MOC? At least one derivation-rationale note exists? Context file references ops/methodology/ for meta-skill context?
 15. **session-capture** -- ops/sessions/ directory exists? Session-end hook template installed? Condition-based mining trigger exists for unprocessed sessions?
 

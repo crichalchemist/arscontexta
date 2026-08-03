@@ -138,12 +138,14 @@ build_fixture() {
   # fence fails on fixture shape rather than on anything it is being judged for.
   printf '{"tasks":[{"id":"one","status":"pending"},{"id":"two","status":"done"}]}\n' > "$v/ops/queue/queue.json"
   # The lock directory is created here because skill-sources/reflect and
-  # skill-sources/reweave spin on `while ! mkdir "$LOCKDIR"` and the PARENT of
-  # that lock is created by nothing in this repository — see the report's live
-  # findings. KNOWN BLIND SPOT: with the directory present the fixture is kinder
-  # than a real generated vault, so a reintroduced hang would not be caught here.
-  # It is created anyway because the alternative is a gate that reports a hang as
-  # its headline result on every run, which buries the defect class it is for.
+  # skill-sources/reweave once spun on an unbounded `while ! mkdir "$LOCKDIR"`
+  # and the PARENT of that lock was created by nothing in this repository — see
+  # the report's live findings. Both fences now bound the wait at 60s and create
+  # the parent themselves, so this no longer prevents a hang; it is kept because
+  # a fixture that omits it would exercise the parent-creation branch on every
+  # run rather than the acquisition path the fences are actually judged on.
+  # KNOWN BLIND SPOT, unchanged: with the directory present the fixture is
+  # kinder than a real generated vault.
   mkdir -p "$v/ops/queue/.locks" || return 1
   # `git init` because a fence in skills/reseed calls `git`, which exits 128
   # outside a work tree. Quiet, and with a local identity so a machine without
@@ -304,9 +306,12 @@ unset unmapped
 # stdin is /dev/null so a fence containing a bare `read` cannot hang the gate.
 #
 # WHY THERE IS A TIMEOUT AT ALL, AND WHY IT IS NOT `timeout(1)`:
-# skill-sources/reflect fence 2 spins on `while ! mkdir "$LOCKDIR"; do sleep 2;
-# done`, which never terminates when the lock's PARENT directory is absent.
-# Measured: the first run of this harness hung there indefinitely. A gate whose
+# skill-sources/reflect fence 2 used to spin on `while ! mkdir "$LOCKDIR"; do
+# sleep 2; done`, which never terminated when the lock's PARENT directory was
+# absent. Measured: the first run of this harness hung there indefinitely. That
+# specific spin is now bounded at 60s, so the timeout below is no longer aimed
+# at a known hang — it is the general guard that keeps ANY future one
+# reportable, which is why it stays. A gate whose
 # own failure mode is "hang until the CI job is killed at six hours" is the
 # loudest possible instance of the silence this branch exists to remove, so a
 # stuck fence must come back as a reportable status instead. `timeout(1)` is GNU

@@ -133,7 +133,23 @@ Before using semantic search, verify the index is current. This is self-healing:
 2. **If MCP unavailable** (tool fails or returns error): fall back to bash:
    ```bash
    LOCKDIR="{config.ops_dir}/queue/.locks/qmd.lock"
-   while ! mkdir "$LOCKDIR" 2>/dev/null; do sleep 2; done
+   # mkdir WITHOUT -p is the mutex: it fails when the directory already exists.
+   # `mkdir -p "$LOCKDIR"` would return 0 in that case and destroy mutual exclusion,
+   # trading a visible hang for concurrent qmd runs corrupting each other. Only the
+   # PARENT is created with -p — setup creates it, upgrade §5f restores it.
+   mkdir -p "$(dirname "$LOCKDIR")"
+   waited=0
+   until mkdir "$LOCKDIR" 2>/dev/null; do
+     if [ "$waited" -ge 60 ]; then
+       echo "error: could not acquire $LOCKDIR after ${waited}s" >&2
+       echo "       if no other run is active, remove it: rm -rf '$LOCKDIR'" >&2
+       exit 1
+     fi
+     sleep 2
+     waited=$((waited + 2))
+   done
+   # Releases on the error paths below too, which a trailing rm alone would skip.
+   trap 'rm -rf "$LOCKDIR"' EXIT
    qmd_count=$(qmd status 2>/dev/null | grep -A2 '{vocabulary.notes_collection}' | grep 'documents' | grep -oE '[0-9]+' | head -1)
    rm -rf "$LOCKDIR"
    ```
@@ -200,7 +216,23 @@ If you know the topic (check the {vocabulary.note}'s Topics footer), start with 
 **Tier 2 — bash qmd with lock serialization:** If MCP tools fail or are unavailable:
 ```bash
 LOCKDIR="{config.ops_dir}/queue/.locks/qmd.lock"
-while ! mkdir "$LOCKDIR" 2>/dev/null; do sleep 2; done
+# mkdir WITHOUT -p is the mutex: it fails when the directory already exists.
+# `mkdir -p "$LOCKDIR"` would return 0 in that case and destroy mutual exclusion,
+# trading a visible hang for concurrent qmd runs corrupting each other. Only the
+# PARENT is created with -p — setup creates it, upgrade §5f restores it.
+mkdir -p "$(dirname "$LOCKDIR")"
+waited=0
+until mkdir "$LOCKDIR" 2>/dev/null; do
+  if [ "$waited" -ge 60 ]; then
+    echo "error: could not acquire $LOCKDIR after ${waited}s" >&2
+    echo "       if no other run is active, remove it: rm -rf '$LOCKDIR'" >&2
+    exit 1
+  fi
+  sleep 2
+  waited=$((waited + 2))
+done
+# Releases on the error paths below too, which a trailing rm alone would skip.
+trap 'rm -rf "$LOCKDIR"' EXIT
 qmd query "[note's core concepts]" --collection {vocabulary.notes_collection} --limit 15 2>/dev/null
 rm -rf "$LOCKDIR"
 ```

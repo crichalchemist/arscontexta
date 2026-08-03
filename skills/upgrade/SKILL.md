@@ -331,13 +331,22 @@ Generated vaults carry their own copy of the link-extraction library at `ops/lib
 ### 5f. Restore the queue lock directory
 
 `/{DOMAIN:reflect}` and `/{DOMAIN:reweave}` serialize their qmd calls with
-`while ! mkdir "ops/queue/.locks/qmd.lock" 2>/dev/null; do sleep 2; done`. The `mkdir` deliberately
+`until mkdir "$LOCKDIR" 2>/dev/null; do … done`, bounded at 60 seconds. The `mkdir` deliberately
 omits `-p`, because creating that directory atomically *is* the mutex — with `-p` it would return 0
 while another run holds the lock. So the **parent** `ops/queue/.locks/` must already exist.
 
-Vaults generated before this was part of setup do not have it. In those vaults the `mkdir` can never
-succeed, `2>/dev/null` swallows the reason, and the skill loops every 2 seconds forever, printing
-nothing. It does not fail — it hangs.
+Vaults generated before this was part of setup do not have it, and the shape of that failure depends
+on which templates their skills were generated from:
+
+- **Skills carrying the old unbounded `while ! mkdir …; do sleep 2; done`.** The `mkdir` can never
+  succeed, `2>/dev/null` swallows the reason, and the skill loops every 2 seconds forever, printing
+  nothing. It does not fail — it hangs. This is the case this step exists for.
+- **Skills carrying the current bounded loop.** It creates the parent itself with
+  `mkdir -p "$(dirname "$LOCKDIR")"`, so a missing parent can no longer hang or abort. The repair
+  below is then a no-op.
+
+Perform the repair either way: it is idempotent, and this step cannot tell which generation of the
+templates a given vault's skills came from.
 
 1. Check whether `ops/queue/.locks/` exists.
 2. If absent, create it (the directory only — leave it empty).
