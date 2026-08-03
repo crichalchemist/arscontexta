@@ -161,10 +161,15 @@ place.
 
 ## Task 6 — E9 + E12: the two things only a real run can settle
 
-- [ ] **Step 1 — E9, run `/arscontexta:upgrade` against a copy of the field vault.** Never done. Copy
+- [x] **Step 1 — E9, run `/arscontexta:upgrade` against a copy of the field vault.** DONE with a
+      corrected verb: it was **carried out by hand**, not invoked — a slash command runs in the
+      session cwd and cannot be pointed at another tree. As-is + damaged halves. Six defects, five
+      fixed (`acb1ecf`); namespace question left open. Original text follows. Never done. Copy
       `~/second-brain` to a scratch path first — **do not run it against the live vault.** Record
       before/after for all three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`).
-- [ ] **Step 2 — E12, one clean discoverability rep.** Frozen tree, opus, prompt identical to Task 4's
+- [x] **Step 2 — E12, one clean discoverability rep.** DONE. Retrieved `reference/skill-authoring.md`
+      unprompted as its 2nd file, "load-bearing throughout" — found via the pointer, not a directory
+      listing. Entry closes. Probe artifact reverted, saved to the workspace. Original text follows. Frozen tree, opus, prompt identical to Task 4's
       in the previous plan, output file read only after the agent reports done. Test the hypothesis
       that search strategy is the determinant: if it greps task keywords and misses, add keywords a
       searcher would use; if it lists the directory and finds it, the pointer is not the mechanism and
