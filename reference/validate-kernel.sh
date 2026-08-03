@@ -27,6 +27,116 @@ pass() { echo -e "  ${GREEN}PASS${NC} $1"; PASS=$((PASS + 1)); }
 warn() { echo -e "  ${YELLOW}WARN${NC} $1"; WARN=$((WARN + 1)); }
 fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
 
+# ---------------------------------------------------------------------------
+# NOTE-BEARING DIRECTORY RESOLUTION
+#
+# A generated vault renames its directories -- reference/vocabulary-transforms.md
+# exists precisely because it does. Hardcoding canonical names inside a validator
+# for a generator whose entire purpose is renaming them is how primitive 2 spent
+# its life printing `WARN No wiki links found to check` beside a PASS on every
+# vault that took the rename. Derive the names from the vault; never list them.
+#
+# AUTHORITATIVE SOURCE: the vault's ops/derivation-manifest.md `vocabulary:`
+# block. platforms/claude-code/generator.md states that skills read that file at
+# runtime for vocabulary transformation, so it is the same mapping the vault's
+# own commands already obey, and it is what /upgrade is told to preserve. If this
+# validator disagreed with it, the validator would be the thing that is wrong.
+#
+# Order, first source that yields an EXISTING directory wins:
+#   1. ops/derivation-manifest.md  `vocabulary:` -> notes:, inbox:   AUTHORITATIVE
+#   2. ops/config.yaml             `vocabulary:` -> notes:, inbox:   fallback
+#   3. shape scan: top-level directories holding *.md, minus infrastructure
+#   4. nothing resolved -> the caller FAILs and says why. Never WARN, never PASS.
+#
+# A source that NAMES a directory which does not exist does not count as
+# resolved; it falls through to the next source. Resolution means a usable
+# directory, not a successfully parsed string. Those two look identical
+# downstream, and treating a parsed-but-absent name as success would reproduce
+# the original defect one layer up.
+#
+# WHAT IS DELIBERATELY OUT OF SCOPE: logs and operational records. The old list
+# carried `04_meta/logs`, and the vocabulary names no logs directory, so a
+# derived scan cannot restore it. That is a decision, not an oversight: a wiki
+# link inside a session log or a changelog entry is a historical citation, not an
+# assertion of graph structure, and it is *expected* to dangle once the note it
+# cites is renamed. Counting those as dangling edges would make this primitive
+# report a defect for a vault behaving correctly.
+# ---------------------------------------------------------------------------
+
+# _vocab_dir <file> <key> -> the directory name declared for <key>, or nothing.
+# Reads the `vocabulary:` block: the first `<key>:` line indented under it, with
+# optional surrounding quotes. Returns rc 1 when the file has no vocabulary
+# block, no such key, or an empty value -- an absent key and a key set to the
+# empty string must not look alike to the caller.
+#
+# The `:` is glued onto the key via -v rather than written as `$1 == key ":"`:
+# awk gives concatenation LOWER precedence than comparison, so that spelling
+# parses as `($1 == key) ":"` -- a non-empty string, hence always true, matching
+# every line in the block.
+_vocab_dir() {
+    [ -r "$1" ] || return 1
+    _vd_out=$(awk -v k="$2:" '
+        /^vocabulary:[[:space:]]*$/ { inb = 1; next }
+        inb && /^[^[:space:]]/     { inb = 0 }
+        inb && $1 == k             { v = $2; gsub(/^["'"'"']|["'"'"']$/, "", v); print v; exit }
+    ' "$1" 2>/dev/null)
+    [ -n "$_vd_out" ] || return 1
+    case "$_vd_out" in *..*) return 1 ;; esac   # never let a mapping walk upward
+    printf '%s' "$_vd_out"
+}
+
+# _dirs_from_vocab <vault> <file> -> existing note-bearing dirs named by <file>
+_dirs_from_vocab() {
+    _dv_found=""
+    [ -r "$2" ] || return 1
+    for _dv_key in notes inbox; do
+        _dv_name=$(_vocab_dir "$2" "$_dv_key") || continue
+        [ -d "$1/$_dv_name" ] || continue
+        _dv_found="$_dv_found$1/$_dv_name
+"
+    done
+    [ -n "$_dv_found" ] || return 1
+    printf '%s' "$_dv_found"
+}
+
+# resolve_note_dirs <vault> -> rc 0 and, on stdout, the source label on line 1
+# followed by one directory per line. rc 1 and no output when no source resolves
+# an existing directory.
+#
+# WHY THE LABEL RIDES ON STDOUT INSTEAD OF A VARIABLE: every caller runs this
+# inside $( ), which is a subshell, so a `NOTE_DIR_SOURCE=…` assigned in here is
+# discarded before the parent ever reads it. The first draft of this function did
+# exactly that and every message printed "directories via " with the name
+# missing -- the same swallowed-in-a-subshell defect this repo has shipped six
+# times. Returning the label through the one channel that does cross the boundary
+# removes the trap rather than documenting it.
+resolve_note_dirs() {
+    if _rn_out=$(_dirs_from_vocab "$1" "$1/ops/derivation-manifest.md"); then
+        printf 'ops/derivation-manifest.md vocabulary\n%s' "$_rn_out"; return 0
+    fi
+    if _rn_out=$(_dirs_from_vocab "$1" "$1/ops/config.yaml"); then
+        printf 'ops/config.yaml vocabulary\n%s' "$_rn_out"; return 0
+    fi
+
+    # Shape scan. `find -mindepth 1 -maxdepth 1` rather than a "$1"/*/ glob:
+    # an unmatched glob is an error under zsh's default nomatch, and this file
+    # must survive being invoked as `zsh validate-kernel.sh` -- bump-version.sh
+    # shipped a zsh fork for exactly that reason.
+    # The `while` runs in a subshell, so it accumulates nothing in a variable;
+    # its STDOUT is what the command substitution collects.
+    _rn_out=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r _rn_d; do
+        case "$(basename "$_rn_d")" in
+            .*|node_modules|ops|04_meta|archive|templates|_templates) continue ;;
+        esac
+        [ -n "$(find "$_rn_d" -type f -name '*.md' 2>/dev/null | head -1)" ] || continue
+        printf '%s\n' "$_rn_d"
+    done)
+    if [ -n "$_rn_out" ]; then
+        printf 'shape scan (top-level directories containing *.md)\n%s\n' "$_rn_out"; return 0
+    fi
+    return 1
+}
+
 echo "=== Kernel Validation: $VAULT ==="
 echo ""
 
@@ -78,24 +188,58 @@ existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | 
 dangling=0
 checked=0
 
-# Collect links from note directories only (using recursive variant to handle subdirs)
+# Collect links from note directories only (using recursive variant to handle subdirs).
+# The directories are DERIVED from the vault -- see the resolution block near the
+# top of this file. The list that used to sit here named canonical directories,
+# all four of which are absent from any vault that renamed them, which is why
+# this check reported "no wiki links" on a vault holding 2681 of them.
 link_candidates=""
-for d in "01_thinking" "notes" "00_inbox" "04_meta/logs"; do
-    if [ -d "$VAULT/$d" ]; then
-        new_links=$(extract_link_targets_recursive "$VAULT/$d")
+note_dirs_raw=$(resolve_note_dirs "$VAULT")
+resolve_rc=$?
+NOTE_DIR_SOURCE=""
+note_dirs=""
+if [ "$resolve_rc" -eq 0 ]; then
+    NOTE_DIR_SOURCE=$(printf '%s\n' "$note_dirs_raw" | head -1)
+    note_dirs=$(printf '%s\n' "$note_dirs_raw" | tail -n +2)
+fi
+
+if [ "$resolve_rc" -eq 0 ]; then
+    # Iterate with `while read`, not `for d in $note_dirs`: zsh does not
+    # word-split unquoted expansions, so the `for` spelling would hand the whole
+    # newline-joined list over as a single nonexistent path and scan nothing.
+    while IFS= read -r d; do
+        [ -z "$d" ] && continue
+        new_links=$(extract_link_targets_recursive "$d")
         if [ -n "$new_links" ]; then
             link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
         fi
+    done <<EOF
+$note_dirs
+EOF
+    # The self space lives INSIDE the vault. `$VAULT/../self` resolved to a
+    # sibling of the vault -- for a top-level vault, straight into $HOME -- and
+    # so never matched, while primitive 8 finds the same space at $VAULT/self and
+    # passes. Self is appended after resolution rather than being one of the
+    # sources: its absence must not make resolution fail, and its presence must
+    # not stand in for a notes directory.
+    if [ -d "$VAULT/self" ]; then
+        new_links=$(extract_link_targets_recursive "$VAULT/self")
+        [ -n "$new_links" ] && link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
     fi
-done
-# Also check parent self/ if it exists (using recursive variant)
-[ -d "$VAULT/../self" ] && {
-    new_links=$(extract_link_targets_recursive "$VAULT/../self")
-    [ -n "$new_links" ] && link_candidates=$(printf '%s\n%s' "$link_candidates" "$new_links")
-}
+fi
 
-# Deduplicate and sample
-link_candidates=$(echo "$link_candidates" | sort -u | head -100)
+# Deduplicate, then sample. The 100-link cap is pre-existing and is deliberately
+# left in place here -- changing what gets scanned in the same commit that
+# changed how directories are resolved would make the two effects impossible to
+# attribute. What is NOT left alone is the claim built on top of it: before this
+# fix the cap was harmless because the scan resolved nothing and the sample was
+# always empty, and now that the scan works, "No dangling wiki links" would
+# assert over 2681 links on the strength of 99. The totals below let the message
+# state its own scope instead. Full-scan cost is the open question; the
+# over-claim was not.
+link_candidates=$(echo "$link_candidates" | sort -u)
+link_total=$(printf '%s\n' "$link_candidates" | grep -c . || true)
+link_candidates=$(printf '%s\n' "$link_candidates" | head -100)
 
 while IFS= read -r link; do
     [ -z "$link" ] && continue
@@ -110,14 +254,26 @@ while IFS= read -r link; do
     fi
 done <<< "$link_candidates"
 
-if [ "$checked" -eq 0 ]; then
-    warn "No wiki links found to check"
+# THREE OUTCOMES, NOT TWO. "The check could not run" and "the check ran and
+# found nothing" are different facts, and collapsing them into one WARN is the
+# defect this primitive shipped: `WARN No wiki links found to check` sat directly
+# beneath `PASS 3786 of 5253 files contain wiki links` -- two lines of one run
+# contradicting each other -- and was read as a soft pass across several
+# sessions. A check that never executed must never be reported as a warning.
+if [ "$resolve_rc" -ne 0 ]; then
+    fail "Dangling-link check did NOT run: no note-bearing directory could be resolved in '$VAULT' (tried ops/derivation-manifest.md vocabulary, then ops/config.yaml vocabulary, then a scan for top-level directories containing *.md). This is a failure, not a warning -- nothing was checked."
+elif [ "$checked" -eq 0 ]; then
+    warn "Resolved note directories via $NOTE_DIR_SOURCE, but they contain no wiki links to check"
 elif [ "$dangling" -eq 0 ]; then
-    pass "No dangling wiki links (checked $checked unique links)"
+    if [ "$link_total" -gt "$checked" ]; then
+        pass "No dangling wiki links in a $checked-link sample of $link_total unique (directories via $NOTE_DIR_SOURCE)"
+    else
+        pass "No dangling wiki links (checked all $checked unique links; directories via $NOTE_DIR_SOURCE)"
+    fi
 else
     # Dangling links are common in mature vaults (examples, planned notes)
     # Report as info, not failure
-    warn "$dangling unresolved wiki links out of $checked unique (may include examples)"
+    warn "$dangling unresolved wiki links out of $checked unique checked of $link_total total (may include examples; directories via $NOTE_DIR_SOURCE)"
 fi
 
 # --- Primitive 3: MOC hierarchy ---

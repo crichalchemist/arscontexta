@@ -44,6 +44,15 @@ jobs:
         run: bash reference/test/guard-failure.test.sh
       - name: Guard failure-path tests (zsh)
         run: zsh reference/test/guard-failure.test.sh
+      # The kernel contract's own resolution logic. primitive 2 scanned a
+      # hardcoded list of canonical directory names inside a validator for a
+      # generator whose purpose is renaming them, so on every renamed vault the
+      # dangling-link check silently never ran and printed WARN beside a PASS.
+      # No other gate executes validate-kernel.sh at all.
+      - name: Kernel note-dir resolution (bash)
+        run: bash reference/test/kernel-note-dirs.test.sh
+      - name: Kernel note-dir resolution (zsh)
+        run: zsh reference/test/kernel-note-dirs.test.sh
       # Executes every ```bash fence in every SKILL.md as its OWN shell
       # invocation, which is how Claude runs them. The three gates above cannot
       # see a fence reading a variable or sourced function defined in a

@@ -46,8 +46,8 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are seven executable checks. Six run in CI (`.github/workflows/checks.yml`) on every push.
-Three defects shipped here were bash/zsh forks, so **the four test suites each run under both
+There are eight executable checks. Seven run in CI (`.github/workflows/checks.yml`) on every push.
+Three defects shipped here were bash/zsh forks, so **the five test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
 harness rather than its subject.
@@ -60,6 +60,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 28/28
+  $s reference/test/kernel-note-dirs.test.sh             # 21/21
 done
 ```
 
@@ -71,6 +72,7 @@ done
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
+| `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
@@ -96,8 +98,14 @@ therefore tests *the harness's own* portability, not the guard's.
 A shebang alone would not have justified that: `scripts/bump-version.sh` also carries a bash shebang
 and is also run as `bash …` in CI, and it shipped a zsh fork anyway, because a human typed
 `zsh bump-version.sh`. So `bump-version.test.sh` makes the opposite call and runs the script under
-whichever shell the harness is in. The fence gate is the one suite that genuinely runs the same code
-under both, because Claude really does invoke those fences under whatever shell the user has.
+whichever shell the harness is in. `kernel-note-dirs.test.sh` follows `bump-version`, for the same
+reason and one more: this file documents `./reference/validate-kernel.sh <vault>`, which is a
+shebang invocation a user can just as easily spell `zsh reference/validate-kernel.sh`, and the
+resolver it tests deliberately avoids a `"$dir"/*/` glob because zsh's default `nomatch` makes an
+unmatched glob an error rather than an empty list. Pinning that suite to bash would have left the
+one decision it exists to protect unexercised. The fence gate is the one suite that genuinely runs
+the same code under both, because Claude really does invoke those fences under whatever shell the
+user has.
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
@@ -119,7 +127,7 @@ visible rather than silent. Keying absorption on the message was rejected — it
 entry to the gate's own wording, so rewording a message would turn all entries stale, a new trap
 inside the mechanism built to drain them.
 
-The seventh check is kernel validation — the one that does **not** run in CI, because it needs a
+The eighth check is kernel validation — the one that does **not** run in CI, because it needs a
 generated vault to run against:
 
 ```bash
@@ -131,17 +139,28 @@ Pass criterion is 15/15 PASS. `WARN` is acceptable **only** for primitive 10 (se
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
 FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
 
-**Measured against the live vault, that criterion is currently violated and has been read as passing.**
-Primitives 8 and 10 both PASS there; the two WARNs are frontmatter coverage and a dangling-link check
-that never ran. `15 PASS / 2 WARN / 0 FAIL` has been recorded as acceptable across several sessions
-by reading the totals rather than the labels. See divergence 1.
+**Measured against the live vault, that criterion is still violated — by one item now, not two.**
+Re-measured 2026-08-03 on this branch: `16 PASS / 1 WARN / 0 FAIL`. Primitives 8 and 10 both PASS
+there, and the dangling-link WARN is gone because that check now runs (it resolves `nodes/` from the
+vault's own manifest and clears its sample). **The survivor is primitive 1, frontmatter coverage —
+`5094 with YAML, 159 without`.** Primitive 1 is not on the list of primitives permitted to WARN, so
+by the criterion above it is a real regression and remains open. It is recorded here rather than
+fixed because it is a content defect in the field vault, not a defect in this repo.
 
 **The criterion and the summary count different things, which is what made the labels skippable.**
 "15/15" is primitives; the summary counts *result lines*. On the field vault there are 15 primitives,
-16 numbered headers (1–15 plus 10A) and 17 result lines, because primitive 2 emits two. So `PASS: 15`
-is simply `17 − 2` — it is not independent evidence that fifteen primitives passed, and it would read
-`16` if either WARN cleared. Matching the target number against that total is a coincidence of
-arithmetic. **Read the labels.**
+16 numbered headers (1–15 plus 10A) and 17 result lines, because primitive 2 emits two. So `PASS: 16`
+is simply `17 − 1` — it is not independent evidence that fifteen primitives passed, and it would read
+`17` if the last WARN cleared. The total previously read `15`, which happened to equal the target
+number and was accepted as though it were the target being met. Matching the target against that
+total is a coincidence of arithmetic. **Read the labels.**
+
+Re-derive both numbers with:
+
+```bash
+./reference/validate-kernel.sh ~/second-brain 2>&1 \
+  | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -E '^ +(PASS|WARN|FAIL) '   # 17 result lines
+```
 
 **The blind spot that used to be here is closed.** Primitive 10 once checked only that `qmd` was on
 `PATH`, which is why 62 references to qmd tools removed from its MCP surface survived across 20
@@ -267,36 +286,10 @@ not a claim you should take on trust: it is what the seven checks above enforce,
 `grep -c '^      - name:'` returns one fewer than the true count, because `actions/checkout` carries
 no `name:`. Count step *items* (`^      - `), not names. What follows is what remains.
 
-**1. `validate-kernel.sh` soft-passes the dangling-link primitive, and its own output says so.**
-Highest blast radius: this is the kernel contract, run against every generated vault, and it has been
-reporting a soft pass on a check that never executed. Two consecutive lines of one run:
-
-```text
-PASS 3786 of 5253 files contain wiki links
-WARN No wiki links found to check
-```
-
-`reference/validate-kernel.sh:74` scans a hardcoded list — `01_thinking`, `notes`, `00_inbox`,
-`04_meta/logs`, plus `$VAULT/../self`. Measured against the field vault: **all five absent.** Its
-notes directory is `nodes/` (2,686 files), because that is what its derivation named it; pointing
-`extract_link_targets_recursive` at the real directory yields **2,681 link candidates**.
-`$VAULT/../self` is the same bug twice — for a top-level vault that resolves to `~/self`, while the
-vault's self space sits at `$VAULT/self`, where primitive 8 finds it and passes.
-
-Reproduce:
-
-```bash
-for d in 01_thinking notes 00_inbox 04_meta/logs; do
-  printf '%-14s ' "$d"; [ -d ~/second-brain/$d ] && echo PRESENT || echo ABSENT; done
-. reference/lib/link-extraction.sh
-extract_link_targets_recursive ~/second-brain/nodes | grep -c .   # 2681
-```
-
-**Same root cause as the primitive-10 defect closed on `fix/spec-c-primitive-10`:** canonical
-directory names hardcoded inside a validator for a generator whose whole purpose is renaming them.
-`reference/vocabulary-transforms.md` exists because vaults rename directories; the validator does not
-read it, and neither does anything else that names a path literally. Not fixed here because it
-surfaced during Task 6 prep on a branch whose tree was frozen for a review.
+**1. `validate-kernel.sh` soft-passed the dangling-link primitive — FIXED on
+`fix/spec-f-divergence-drain`.** Kept in place, and kept numbered, because the entries below are
+referenced by number from work in flight; renumbering them would invalidate those references. Full
+record in [Closed on `fix/spec-f-divergence-drain`](#closed-on-fixspec-f-divergence-drain).
 
 **2. `bump-version.sh` can leave a partial bump — the drift it exists to prevent.** `cmd_bump` calls
 `write_json_field` unguarded under `set -e`, so a failure on the second declared site aborts with the
@@ -468,6 +461,68 @@ same mistake was made twice: once by `741b2b7`, and again by the commit that fix
 said three review findings were "recorded for the whole-branch review" when they had been written
 only to that same gitignored ledger. Entries 6–10 exist because that was caught on re-reading this
 list, not because the earlier claims were true. **A record that does not ship is not a record.**
+
+**11. The dangling-link check samples 100 links and does not scan them all.** Surfaced by fixing
+divergence 1, and left open on purpose rather than folded into that commit. `validate-kernel.sh`
+caps `link_candidates` at 100 after dedup; on the field vault that is 99 of 2681 unique links, or
+3.7%. While the scan resolved nothing the cap could not mislead anyone, because the sample was
+always empty — it only became load-bearing once the check started running. The over-claim is
+already closed: the PASS now reads `in a 99-link sample of 2681 unique` rather than an unqualified
+`No dangling wiki links`, and `kernel-note-dirs.test.sh` pins both the above-cap and below-cap
+wordings. What is open is the cap itself.
+
+Lifting it is not free and not obviously right: the comparison is one `grep -qxF` per link against
+an index held in a shell variable, so a full scan is roughly 2681 process pairs on top of a run that
+already takes ~45s on the field vault. The honest fix is probably to replace the per-link loop with
+a single `comm` or `join` against a sorted index, which makes the cap unnecessary rather than merely
+larger. Re-derive the numbers with:
+
+```bash
+. reference/lib/link-extraction.sh
+extract_link_targets_recursive ~/second-brain/nodes | grep -c .    # 2681 unique
+```
+
+### Closed on `fix/spec-f-divergence-drain`
+
+- **`validate-kernel.sh` soft-passed the dangling-link primitive** — was divergence 1, and the
+  highest blast radius entry on the list: the kernel contract, run against every generated vault,
+  reporting a soft pass on a check that never executed. Two consecutive lines of one run read
+  `PASS 3786 of 5253 files contain wiki links` and `WARN No wiki links found to check`.
+
+  The scan named a hardcoded list — `01_thinking`, `notes`, `00_inbox`, `04_meta/logs`, plus
+  `$VAULT/../self`. Measured against the field vault: **all five absent.** Its notes directory is
+  `nodes/`, because that is what its derivation named it. Same root cause as the primitive-10 defect
+  closed on `fix/spec-c-primitive-10` — canonical directory names hardcoded inside a validator for a
+  generator whose whole purpose is renaming them.
+
+  The list is gone. `resolve_note_dirs` derives the directories from the vault, preferring the
+  vault's own `ops/derivation-manifest.md` `vocabulary:` block — authoritative because
+  `platforms/claude-code/generator.md` states that a vault's skills read that same file at runtime,
+  so the validator now obeys the mapping the vault already obeys — then `ops/config.yaml`, then a
+  shape scan for top-level directories containing `*.md`. A source that *names* a directory which
+  does not exist does not count as resolved and falls through, because a successful parse and a
+  usable directory look identical downstream. `$VAULT/../self` became `$VAULT/self`, where primitive
+  8 was already finding it. Logs and `ops/` are deliberately excluded and the header says why: a
+  wiki link in a changelog entry is a historical citation, not a graph edge, and it is *expected* to
+  dangle.
+
+  **Unresolvable is now FAIL, never WARN** — three outcomes where there were two, since "could not
+  run" and "ran and found nothing" are different facts.
+
+  Measured after, on the field vault: `16 PASS / 1 WARN / 0 FAIL`, the WARN being frontmatter
+  coverage. Guarded by `reference/test/kernel-note-dirs.test.sh`, 21 assertions in both shells, in
+  CI — every fixture uses the arbitrary directory name `zzz-arbitrary`, never `nodes`, because a fix
+  verified against the field vault only proves that `nodes` joined the hardcoded list. Confirmed to
+  fail 15 of 21 against the pre-fix validator.
+
+- **A new over-claim the fix would otherwise have minted.** The dangling loop samples the first 100
+  links, which was harmless while the scan resolved nothing and the sample was always empty. With
+  resolution working, `PASS No dangling wiki links` would have asserted over the field vault's 2681
+  unique links on the strength of 99. The cap is deliberately left alone — changing what is scanned
+  in the same commit that changed how directories are resolved would make the two effects
+  impossible to attribute — but the message now states its own scope: `in a 99-link sample of 2681
+  unique` above the cap, `checked all N unique links` below it. Whether to lift the cap is open; see
+  the note in the open list.
 
 ### Closed on `fix/spec-e-fourteen-items`
 
