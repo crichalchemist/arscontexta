@@ -259,7 +259,7 @@ find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
     touch "$ERRF"; continue
   fi
   LINKS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$TMP_LINKS" \
-    | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' | sort -u)
+    | _fold_lower | sort -u)
   echo "FROM:$NAME"
   printf '%s\n' "$LINKS" | while read -r target; do
     [ -n "$target" ] && echo "  TO:$target"

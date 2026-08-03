@@ -63,7 +63,16 @@ else
 fi
 
 # Build index of existing filenames for dangling link check
-existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | xargs -I{} basename {} .md | tr '[:upper:]' '[:lower:]' | sort -u)
+# Folds through the library's _fold_lower, NOT a bare `tr`. The library probes at
+# load time and picks tr/awk/sed/ascii because GNU `tr` cannot fold non-ASCII case
+# at all -- so a hardcoded `tr` here silently under-folds exactly the names the
+# probe exists to handle, and the dangling-link comparison below then treats
+# "Über" and "über" as different files.
+#
+# `xargs -I{}` is kept: it sets the delimiter to newline, so a filename containing
+# spaces stays one argument. (The review comment that prompted this change also
+# claimed xargs breaks on spaces; measured, it does not. Only the `tr` half was real.)
+existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | xargs -I{} basename {} .md | _fold_lower | sort -u)
 
 # Extract wiki links from note content (scan known note directories)
 dangling=0
@@ -91,7 +100,12 @@ link_candidates=$(echo "$link_candidates" | sort -u | head -100)
 while IFS= read -r link; do
     [ -z "$link" ] && continue
     checked=$((checked + 1))
-    if ! echo "$existing_files" | grep -qxF "$(printf '%s' "$link" | tr '[:upper:]' '[:lower:]')"; then
+    # BOTH SIDES OF THIS COMPARISON MUST FOLD THE SAME WAY. `existing_files` above
+    # folds through _fold_lower; folding the link with a bare `tr` here would make
+    # the two sides disagree on any non-ASCII name -- a mismatch that reports a
+    # real file as a dangling link. Fixing one side alone is worse than leaving
+    # both wrong, because at least a consistent `tr` compared like with like.
+    if ! echo "$existing_files" | grep -qxF "$(printf '%s' "$link" | _fold_lower)"; then
         dangling=$((dangling + 1))
     fi
 done <<< "$link_candidates"

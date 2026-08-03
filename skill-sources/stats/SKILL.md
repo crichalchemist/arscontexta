@@ -128,7 +128,7 @@ if [ -z "$TOPIC_RAW" ]; then
 else
   TOPIC_COUNT=$(printf '%s\n' "$TOPIC_RAW" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | LC_ALL="$_LINK_FOLD_LOCALE" tr '[:upper:]' '[:lower:]' \
+    | _fold_lower \
     | sort -u | wc -l | tr -d ' ')
 fi
 
