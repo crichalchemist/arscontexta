@@ -66,6 +66,21 @@ mkroot() {
 rc_of() { bash "$GUARD" "$1" >/dev/null 2>&1; printf '%s' "$?"; }
 out_of() { bash "$GUARD" "$1" 2>/dev/null; }
 
+# WHY `bash "$GUARD"` AND NOT `"$SELF" "$GUARD"` — asked and settled, not overlooked.
+# The guard carries a `#!/bin/bash` shebang and CI invokes it as
+# `bash reference/check-portability.sh`. Running it under zsh here would exercise a
+# configuration that never occurs in production and could only manufacture false
+# reds. What the zsh run of THIS file exercises is the harness's own portability —
+# CLAUDE.md's "each under both bash and zsh" reads as though the guard is being
+# tested under both shells, and it is not. The fence gate is the one that genuinely
+# runs the same code under both, because Claude really does invoke those fences
+# under whatever shell the user has.
+#
+# Pinned rather than narrated, so the decision survives its comment: change the
+# shebang and this assertion goes red, which forces whoever changed it back here
+# instead of leaving the hardcoded invocation quietly wrong.
+eq "the guard's shebang is bash (rc_of hardcodes that)" "#!/bin/bash" "$(head -1 "$GUARD")"
+
 # --- the failure path -------------------------------------------------------
 # All nine directories exist and are readable, so the guard's directory-existence
 # loop is provably silent. Only scan_or_die's return code can catch this. The
@@ -175,6 +190,22 @@ eq "frozen: modified file fails"      "1" "$(rc_of "$Z")"
 
 Z=$(mkfrozen); rm "$Z/platforms/shared/skill-blocks/b.md"
 eq "frozen: deleted file fails"       "1" "$(rc_of "$Z")"
+
+# The exit code alone does NOT reach the DELETED branch. `cksum < <missing>` yields
+# an empty digest, the comparison against the pinned one fails, and the file is
+# reported MODIFIED at the same rc 1 — so mutating `if [ ! -f "$FROZEN_DIR/$name" ]`
+# to `if false` leaves the assertion above green. Verified by that mutation: these
+# two go red, the one above does not.
+#
+# The mislabel is not merely lossy. A deletion counted as MODIFIED feeds the n_mod
+# tally in check-portability.sh, whose "suspect a differing cksum implementation
+# before suspecting N edits" NOTE fires when every pinned file reports MODIFIED —
+# so deleting the directory's contents would print a diagnosis pointing the reader
+# at their machine rather than at the missing files.
+eq "frozen: a deletion is reported as DELETED"      "yes" \
+   "$(out_of "$Z" | grep -q 'DELETED b.md' && echo yes || echo no)"
+eq "frozen: a deletion is NOT reported as MODIFIED" "yes" \
+   "$(out_of "$Z" | grep -q 'MODIFIED b.md' && echo no || echo yes)"
 
 # Nested, because a top-level *.md glob let sub/*.md through while the prose
 # claimed any edit was rejected — a contributor porting guards into a subdirectory

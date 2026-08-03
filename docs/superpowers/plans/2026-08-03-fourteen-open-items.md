@@ -36,18 +36,18 @@ checkboxes below. Tick as you go, or this plan becomes E11.
 
 Ships to every generated vault. Do this first.
 
-- [ ] **Step 1 — Read the field fix, then reverse both transforms.**
+- [x] **Step 1 — Read the field fix, then reverse both transforms.**
       `~/second-brain/.claude/skills/extract/SKILL.md:898-918`. The vault says `extract`; the template
       is `reduce`. The vault names `nodes/`; the template says `{vocabulary.notes}`. A verbatim
       copy-paste ships one user's vocabulary to everyone.
-- [ ] **Step 2 — Add the Width rule to `reduce`** after the `NNN is the claim number` line (`:897`).
+- [x] **Step 2 — Add the Width rule to `reduce`** after the `NNN is the claim number` line (`:897`).
       Seven digits minimum (author-directed; the spec text said three before that call), wider through unchanged. **Carry the re-padding warning** — it is
       the half that matters: widening `…-042.md` to `…-0042.md` renames the file and breaks every wiki
       link to it, because links resolve by filename.
-- [ ] **Step 3 — Make `seed` validate width-agnostically.** It must accept three **or more** digits
+- [x] **Step 3 — Make `seed` validate width-agnostically.** It must accept three **or more** digits
       and recognise a claim by its `# claim-NNN` heading rather than by filename shape, so timestamped
       and arXiv-ID files stay out of the numbering scan.
-- [ ] **Step 4 — Prove it on a fixture**, not by reading. Build a temp vault holding `x-998.md`,
+- [x] **Step 4 — Prove it on a fixture**, not by reading. Build a temp vault holding `x-998.md`,
       `x-999.md`, `x-1000.md` and a timestamped file. Confirm the `seed` scan sees the first three,
       excludes the fourth, and that nothing renames `x-042.md`.
 
@@ -60,16 +60,16 @@ absorbing a timestamped filename — demonstrated on the fixture, pasted into th
 
 **Files:** `skill-sources/next/SKILL.md`, `skill-sources/graph/SKILL.md`.
 
-- [ ] **Step 1 — Decide per field, and record the decision.** Four promised fields are unbacked:
+- [x] **Step 1 — Decide per field, and record the decision.** Four promised fields are unbacked:
       Orphans, Dangling, Stale, Queue. For each: compute it, or delete it from the contract. **Do not
       defer again** — the deferral is why it shipped. "Stale" has four definitions in play; pick the
       one `/health` already uses or drop the field.
-- [ ] **Step 2 — Source the library for anything link-shaped.**
+- [x] **Step 2 — Source the library for anything link-shaped.**
       `reference/lib/link-extraction.sh`, `*_recursive` variants. An inlined
       `grep -rl "[[$NAME]]"` counts links inside fenced blocks, does not case-fold, and matches the
       wrong direction for orphans — an accepted defect in two templates already.
-- [ ] **Step 3 — Same audit for `graph`**, which references orphans with zero `ORPHAN_COUNT=`.
-- [ ] **Step 4 — Add the assertion that would have caught this.** Every `[A-Z_]*` field named in an
+- [x] **Step 3 — Same audit for `graph`**, which references orphans with zero `ORPHAN_COUNT=`.
+- [x] **Step 4 — Add the assertion that would have caught this.** Every `[A-Z_]*` field named in an
       output-format contract must have an assignment in the same file. This is mechanically checkable
       and generalises past these two templates.
 
@@ -85,23 +85,23 @@ names, and Step 4's check fails when a field is removed from the code but left i
 
 Placed third because from here on it protects the rest of the work.
 
-- [ ] **Step 1 — `ln -s CLAUDE.md AGENTS.md`.** A symlink, never a copy. A copied file is a second
+- [x] **Step 1 — `ln -s CLAUDE.md AGENTS.md`.** A symlink, never a copy. A copied file is a second
       configuration surface that cannot see the first, which is E7 — do not create a new instance of
       the defect while fixing the old one. Verify with `ls -la` that git records a symlink
       (`git ls-files -s AGENTS.md` should show mode `120000`).
-- [ ] **Step 2 — `GEMINI.md` as a pointer file**, not a symlink: it needs different tool references.
+- [x] **Step 2 — `GEMINI.md` as a pointer file**, not a symlink: it needs different tool references.
       Model on `/Volumes/Containers/superpowers/GEMINI.md`, which is two `@./path` include lines.
-- [ ] **Step 3 — `.agents/plugins/marketplace.json`** for cross-runtime discovery, mirroring
+- [x] **Step 3 — `.agents/plugins/marketplace.json`** for cross-runtime discovery, mirroring
       `.claude-plugin/marketplace.json`. **Add it to `.version-bump.json`** or it becomes the next
       version-drift entry.
-- [ ] **Step 4 — `.pre-commit-config.yaml`** running `bash reference/check-portability.sh` (under a
+- [x] **Step 4 — `.pre-commit-config.yaml`** running `bash reference/check-portability.sh` (under a
       second) on every commit. Not the full gate set — the fence sweep takes two minutes and would be
       abandoned.
-- [ ] **Step 5 — Do NOT create `.pi/` or an Antigravity dot-dir.** Both platforms are queued, not
+- [x] **Step 5 — Do NOT create `.pi/` or an Antigravity dot-dir.** Both platforms are queued, not
       built. A `plugin.json` claiming a platform that does not exist is the availability defect this
       spec forbids. Note the uncommitted `README.md` change marking *"Antigravity CLI plugin |
       Available"* for the author.
-- [ ] **Step 6 — Extend `check-portability.sh`** with a check that `AGENTS.md` is a symlink resolving
+- [x] **Step 6 — Extend `check-portability.sh`** with a check that `AGENTS.md` is a symlink resolving
       to `CLAUDE.md`. Prove it non-vacuous: replace the symlink with a copy, confirm the check fails,
       restore. **Then re-run all four gates** — `guard-failure.test.sh` invokes
       `check-portability.sh`, and a new check that fails on synthetic roots broke it once already.
@@ -116,17 +116,17 @@ commit, and all four gates pass in both shells with the new check present.
 **Files:** `reference/test/fence-isolation.test.sh`, `reference/test/guard-failure.test.sh`,
 `reference/test/bump-version.test.sh` (new).
 
-- [ ] **Step 1 — E3, decide the allowlist keying.** Either entries key on stated reason as well as
+- [x] **Step 1 — E3, decide the allowlist keying.** Either entries key on stated reason as well as
       `(letter, label)`, or the shell filter that governs the stale-entry table also gates absorption.
       Reproduce the masking first (the probe is recorded in CLAUDE.md divergence 1), then fix, then
       confirm the probe now reports the failure.
-- [ ] **Step 2 — E4, pin the DELETED branch.** `if [ ! -f … ]` → `if false` currently leaves the suite
+- [x] **Step 2 — E4, pin the DELETED branch.** `if [ ! -f … ]` → `if false` currently leaves the suite
       green because `cksum < <missing>` yields an empty digest and reports MODIFIED. Add an assertion
       distinguishing the two, and **verify by mutation** that it goes red.
-- [ ] **Step 3 — E5, decide the shell question and write it down.** `rc_of` hardcodes
+- [x] **Step 3 — E5, decide the shell question and write it down.** `rc_of` hardcodes
       `bash "$GUARD"`. Either that is correct given the `#!/bin/bash` shebang — in which case say so in
       a comment — or the suite should invoke the guard under the shell it is running as.
-- [ ] **Step 4 — E6, give `bump-version.sh` a failure-path suite.** It rewrites release metadata and
+- [x] **Step 4 — E6, give `bump-version.sh` a failure-path suite.** It rewrites release metadata and
       no gate touches it. Assert: zsh and bash both reach rc 0 on `--check`; a `MISSING` row does not
       report agreement; a non-version value is rejected; an unanchored version string is rejected; the
       `SCAN FAILED` branch is reachable; a bump moves all declared sites together and leaves no
@@ -175,7 +175,7 @@ data point against a frozen tree.
 
 ## Task 7 — E10 + E11: close the two documentation entries
 
-- [ ] **Step 1 — E11, correct the stale divergence entry.** CLAUDE.md divergence 5 claims two plans
+- [ ] **Step 1 — E11, correct the stale divergence entry.** CLAUDE.md divergence 3 (was 5 before this branch renumbered the list) claims two plans
       show 0 of 93 steps complete. Measured: 16/16 and 22/22 ticked. Delete that half of the entry.
       **Then re-derive every other number in the divergence list** — the entry that names
       status-files-that-lie was one.
@@ -201,9 +201,9 @@ Ask each to adjudicate deliberate deviations rather than pre-judging them.
 bash reference/check-portability.sh                    # rc 0
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh            # 19/19
-  $s reference/test/guard-failure.test.sh              # >= 29/29
+  $s reference/test/guard-failure.test.sh              # 32/32
   $s reference/test/fence-isolation.test.sh            # PASS
-  $s reference/test/bump-version.test.sh               # new, both shells
+  $s reference/test/bump-version.test.sh               # 26/26
   $s scripts/bump-version.sh --check                   # rc 0
 done
 ./reference/validate-kernel.sh ~/second-brain          # 15/15

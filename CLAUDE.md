@@ -46,16 +46,17 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are five executable checks. Four run in CI (`.github/workflows/checks.yml`) on every push,
-**each under both bash and zsh** — two defects shipped here were bash/zsh forks, and a single-shell
-run could not have seen either:
+There are six executable checks. Five run in CI (`.github/workflows/checks.yml`) on every push,
+**each under both bash and zsh** — three defects shipped here were bash/zsh forks, and a single-shell
+run could not have seen any of them:
 
 ```bash
 bash reference/check-portability.sh                      # exit 0
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
-  $s reference/test/guard-failure.test.sh                # 19/19
+  $s reference/test/guard-failure.test.sh                # 32/32
   $s reference/test/fence-isolation.test.sh              # PASS
+  $s reference/test/bump-version.test.sh                 # 26/26
 done
 ```
 
@@ -65,6 +66,16 @@ done
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence |
+| `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
+
+**Two of these suites hardcode a shell and one does not, deliberately.**
+`guard-failure.test.sh` always invokes the guard as `bash "$GUARD"`, because
+`check-portability.sh` carries a `#!/bin/bash` shebang and CI runs it that way — running it under
+zsh would exercise a configuration that never occurs and could only manufacture false reds. Its zsh
+run therefore tests *the harness's own* portability, not the guard's, and an assertion pins the
+shebang so that decision resurfaces if anyone changes it. `bump-version.test.sh` makes the opposite
+call and runs the script under whichever shell the harness is in — that fork reached a release
+precisely because only the bash form was ever executed.
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
@@ -75,12 +86,18 @@ and not merely a healthy vault. It carries an allowlist of known-open defects �
 zsh-only, down from 8 — **checked in both directions**: a listed entry that starts passing, or whose
 fence no longer exists, fails the gate, so the list drains rather than rots.
 
-That two-directional check is load-bearing and has a hole in it. Absorption matches on
-`(letter, label)` only, ignoring the entry's stated reason and its `ZSH ONLY:` scope, so an entry
-listed for one reason will silently swallow a *different* failure on the same fence — measured, in
-the shell its own reason excludes. See divergence 1.
+That two-directional check had a hole in it, now closed: absorption matched on `(letter, label)`
+alone and ignored the entry's `ZSH ONLY:` / `BASH ONLY:` scope, while the staleness half honoured it.
+A `ZSH ONLY:` entry therefore swallowed a **bash** failure on the same fence and the gate printed
+PASS. Both halves now call one `in_scope` predicate — re-deriving the condition at the second site is
+how they came apart. What remains, by choice: absorption still keys on `(letter, label)` *within* a
+shell, so a listed fence failing for a different reason in its own shell is still absorbed. The gate
+now prints the **measured** failure beside the entry's stated reason, so the two disagreeing is
+visible rather than silent. Keying absorption on the message was rejected — it would couple every
+entry to the gate's own wording, so rewording a message would turn all entries stale, a new trap
+inside the mechanism built to drain them.
 
-The fifth check is kernel validation, run manually against a generated vault:
+The sixth check is kernel validation, run manually against a generated vault:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -204,56 +221,20 @@ point is the shape of the problem and where to look.
 not a claim you should take on trust: it is what the five checks above enforce, and CI is green on
 `main` across all 11 steps. What follows is what remains.
 
-**1. The fence-gate allowlist can hide an unrelated failure.** Highest priority, because it is the
-entry that lets the others recur unseen. Absorption keys on `(letter, label)` alone — it ignores
-both the entry's stated reason and its `ZSH ONLY:` scope.
-
-**Nothing is masked on the shipped tree** — re-checked: `seed f01` passes H under bash, so deleting
-its entry changes no result. The defect is the keying, and it was demonstrated at an intermediate
-state during Spec C: with seed's fences guarded but *before* the gate's fixture supplied
-`ARGUMENTS`, `seed f01` failed assertion H **under bash** and was silently absorbed by an `~H~`
-entry whose own reason is a zsh-only glob fork that cannot apply under bash. `f03`/`f04`/`f05`,
-carrying no `~H~` entry, reported the identical failure normally. To reproduce the mechanism, drop
-`ARGUMENTS=` from `run_fence`, then:
-
-```bash
-cp reference/test/fence-isolation.test.sh reference/test/.probe.sh
-sed -i '' '/^skill-sources\/seed f01~H~ZSH ONLY/d' reference/test/.probe.sh
-bash reference/test/.probe.sh   # -> H seed f01, invisible with the line present
-rm -f reference/test/.probe.sh
-```
-
-Any already-listed fence can therefore mask a new, unrelated failure. The fix is a design decision —
-whether entries key on reason, or whether the shell filter (which governs the stale table but not
-the absorption path) should gate absorption too — so it is recorded rather than patched in passing.
-
-**2. `/next` promises eight state fields and computes five — and it ships.** The only entry here that
-reaches users' machines. `skill-sources/next/SKILL.md` names `orphan_notes` in 8 places, `queue` in
-21, and its output-format contract — inherited by every generated vault — reads
-`Inbox | Notes | Orphans | Dangling | Stale | Obs | Tensions | Queue`. Enumerating every variable the
-file assigns gives `INBOX_COUNT NOTE_COUNT OBS_COUNT SESSION_COUNT TENSION_COUNT` plus `INBOX_DIR
-MAINT_MAX NEXT_MAINT NOTES_DIR OLDEST_INBOX TIMESTAMP`. **Orphans, Dangling, Stale and Queue are
-assigned nowhere, and no helper is sourced.** Claude reads the contract, emits the line, and invents
-four numbers — exit 0, plausible output, no error. `skill-sources/graph/SKILL.md` references orphans
-with zero `ORPHAN_COUNT=` occurrences, so the gap is not confined to `next`. Found by a control
-subagent asked to add an orphan count, which discovered the signal it was told to add was already
-promised. Left unfixed deliberately: the fix is a template change, not documentation work, and
-guessing which of four definitions of "stale" was meant would ship a fifth.
-
-**3. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
+**1. Two configuration surfaces that cannot see each other.** `hooks/scripts/read_config.sh` reads
 the top-level `.arscontexta` marker and handles **scalar top-level keys only**, so it structurally
 cannot reach a nested `ops/config.yaml` key. The SessionStart hook therefore carries hardcoded
 thresholds while three skills read `self_evolution.*` from `config.yaml`. Three sources currently
 disagree (skills 10/5, plugin hook 10/5, the field vault's patched hook 20/10). Surfaced
 deliberately rather than averaged.
 
-**4. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
+**2. Display counts that merge or omit a status filter.** `skills/help:49` counts observations and
 methodology notes as one total; `platforms/shared/skill-blocks/stats.md:94-95` documents unfiltered
 counts under the label "Pending". Both are display decisions rather than clear defects — but note
 that the *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those
 numbers drive a threshold.
 
-**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
+**3. Verification gaps in the loop itself.** `/arscontexta:upgrade` has never been run against a
 real vault, and it now performs three repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`)
 that are prose contracts CI cannot exercise. Separately, the two older plans in
 `docs/superpowers/plans/` show 0 of 93 steps complete while being fully executed — a status file
@@ -269,6 +250,31 @@ copy, so a green result would assert nothing while looking like assurance — th
 failure this file spends most of its length warning about, added to the gate set that warns about it.
 The honest interim check is a human diffing the two trees at release, which is why the version bump
 now makes them distinguishable at all. Revisit if a build step ever exists.
+
+### Closed on `fix/spec-e-fourteen-items`
+
+- **The fence-gate allowlist could hide an unrelated failure** — was divergence 1. Absorption keyed
+  on `(letter, label)` and ignored the `ZSH ONLY:` scope the staleness half already honoured, so a
+  zsh-only entry swallowed a **bash** failure and the gate printed PASS. Reproduced with a fabricated
+  entry against a deliberately-broken fence, then fixed by extracting one `in_scope` predicate that
+  both halves call. Same probe after the fix: bash blocks, zsh still absorbs. See the Verification
+  section above for the residual that was left open on purpose.
+- **`/next` promised eight state fields and computed five** — was divergence 2, and the only entry on
+  that list that reached users' machines. Orphans, Dangling, Stale and Queue are now computed, the
+  first two through `ops/lib/link-extraction.sh` rather than an inlined naive matcher; `graph` got the
+  same treatment. `stale_notes` was redefined in prose to the definition the code can actually
+  compute — "not modified in 30+ days" — instead of shipping a fifth reading of "stale".
+- **The claim counter truncated at three digits.** `{source}-999.md` was not a cap but a *collision*:
+  the scan matched exactly three digits, so the maximum went backwards once numbering passed 999.
+  Padding is now seven digits minimum, wider values pass through unchanged, and existing files are
+  never re-padded — re-padding renames a file and breaks every wiki link to it, because links resolve
+  by filename.
+- **Four gate-integrity gaps** (this task). The DELETED branch of the freeze check was untestable by
+  exit code alone — `cksum < <missing>` yields an empty digest and reports MODIFIED at the same rc 1,
+  which also mis-fires the "suspect a differing cksum implementation" note; two message assertions now
+  distinguish them. `guard-failure.test.sh`'s hardcoded `bash "$GUARD"` is now a stated decision with
+  a shebang assertion pinning it. `bump-version.sh` went from zero coverage to 26 assertions in both
+  shells, wired into CI.
 
 ### Closed on `fix/spec-c-primitive-10`
 

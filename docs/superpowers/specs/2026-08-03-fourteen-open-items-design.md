@@ -153,7 +153,7 @@ name. If no, the entry closes permanently rather than recurring.
 
 ### E11 — a divergence entry that is itself stale
 
-CLAUDE.md divergence 5 states *"the two older plans in `docs/superpowers/plans/` show 0 of 93 steps
+CLAUDE.md divergence 3 (was 5 before this branch renumbered the list) states *"the two older plans in `docs/superpowers/plans/` show 0 of 93 steps
 complete while being fully executed."* **Measured today: 16 of 16 and 22 of 22 ticked, none
 unchecked.** The plans were fixed; the entry describing them was not. A status file lying about status
 is this project's named defect — and the divergence list that names it is now doing it.

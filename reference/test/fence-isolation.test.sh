@@ -372,15 +372,41 @@ trailer_digit() {                   # trailer_digit <file>
   case "$(sed -n '/^___FENCE_TRAILER___$/,$p' "$1")" in *[0-9]*) return 0 ;; *) return 1 ;; esac
 }
 
+# THE SCOPE PREFIX IS HONOURED IN BOTH DIRECTIONS, OR THE TWO DISAGREE.
+# `ZSH ONLY:` / `BASH ONLY:` marks an entry that applies in one shell only. The
+# staleness check already honoured it — a fence that legitimately passes in the
+# other shell is not a rotten line. Absorption did NOT, so a `ZSH ONLY:` entry
+# silently swallowed a *bash* failure on the same fence. Measured, not argued: a
+# fabricated `.probe-skill f01~H~ZSH ONLY:` entry absorbed a fence that exited 1
+# writing to stderr, under bash, and the gate printed PASS. One predicate, two
+# call sites, agreeing by construction rather than by review — re-deriving the
+# condition at the second site is how the two came apart in the first place.
+in_scope() { # in_scope <reason> — does this entry apply in the shell we are in?
+  case "$1" in
+    'ZSH ONLY:'*)  [ "$SELF" = zsh ] ;;
+    'BASH ONLY:'*) [ "$SELF" = bash ] ;;
+    *) return 0 ;;
+  esac
+}
+
 # judge <letter> <label> <message> [detail-file]
 # Routes one failing assertion to either the KNOWN list or the blocking list.
 # Returns 0 when the site is a listed known-open defect, 1 when it blocks.
 judge() {
   reason=$(table_reason "$KNOWN_OPEN" "$2" "$1")
-  if [ -n "$reason" ]; then
+  if [ -n "$reason" ] && in_scope "$reason"; then
     known=$((known+1))
     printf '%s~%s\n' "$2" "$1" >> "$HIT_LOG"
     printf '  %s %s — %s\n' "$1" "$2" "$reason" >> "$KNOWN_LOG"
+    # THE MEASURED FAILURE, NOT ONLY THE STATED REASON. Absorption still keys on
+    # (label, letter) within a shell, so a listed fence that starts failing for a
+    # DIFFERENT reason in its own shell is still absorbed. Printing what actually
+    # happened beside what the entry claims makes that visible instead of silent:
+    # the two lines disagreeing is the signal. Keying absorption on the message
+    # itself was considered and rejected — it would couple every entry to this
+    # gate's wording, so rewording a message would turn all entries stale, which
+    # is a new trap inside the mechanism built to drain them.
+    printf '    measured: %s\n' "$3" >> "$KNOWN_LOG"
     return 0
   fi
   printf '%s %s — %s\n' "$1" "$2" "$3" >> "$FAIL_LOG"
@@ -573,10 +599,7 @@ printf '%s\n%s\n' "$KNOWN_OPEN" "$ILLUSTRATIVE" | while IFS='~' read -r l a r; d
     printf 'STALE %s — listed in a table but no such fence exists; delete the line\n' "$l" >> "$WORK/stale.txt"
     continue
   fi
-  case "$r" in
-    'ZSH ONLY:'*)  [ "$SELF" = zsh ]  || continue ;;
-    'BASH ONLY:'*) [ "$SELF" = bash ] || continue ;;
-  esac
+  in_scope "$r" || continue
   case "$a" in
     U|N|H)
       /usr/bin/grep -qxF "$l~$a" "$HIT_LOG" || \

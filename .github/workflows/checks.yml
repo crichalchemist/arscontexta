@@ -62,3 +62,13 @@ jobs:
       # and needs a human to judge each hit, so it stays a release-time tool.
       - name: Version manifests agree
         run: bash scripts/bump-version.sh --check
+
+      # --check above proves the manifests agree TODAY; it says nothing about what
+      # the script does when they do not. These exercise the failure paths against
+      # a fixture tree — MISSING rows, jq's "null" at exit 0, an unanchored version
+      # argument, an unreadable directory during the audit — and pin the $path/zsh
+      # fork that shipped because only the bash form was ever run.
+      - name: Version tool failure-path tests (bash)
+        run: bash reference/test/bump-version.test.sh
+      - name: Version tool failure-path tests (zsh)
+        run: zsh reference/test/bump-version.test.sh
