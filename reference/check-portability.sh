@@ -225,8 +225,15 @@ echo "4. platforms/shared/skill-blocks/ is frozen (content unchanged)"
 # guard into a portability defect. This detects accidental edits, not forgery.
 FROZEN_DIR="$ROOT/platforms/shared/skill-blocks"
 FROZEN_MANIFEST="$ROOT/reference/skill-blocks.frozen"
-frozen_report="$ROOT/.frozen-check.$$"
-: > "$frozen_report"
+# WHY VIOLATIONS ACCUMULATE IN A VARIABLE AND NOT A TEMP FILE:
+# This check used to write findings to "$ROOT/.frozen-check.$$" and decide with
+# [ -s ]. Nothing verified the write succeeded and `set -e` is not in effect, so on
+# a read-only $ROOT every `printf >>` failed to stderr, the file stayed empty, and
+# the check reported PASS on a modified template — rc 0, plausible line, no error
+# on stdout. The house defect, inside the guard written to prevent it. A read-only
+# checkout or mount is enough to trigger it, and this repo lives under /Volumes.
+# A read-only check has no business taking a write dependency on the tree it reads.
+frozen_bad=""
 # WHY THE MANIFEST IS THE KEY AND NOT THE DIRECTORY:
 # The first version of this check called red() whenever the frozen directory was
 # absent. That broke guard-failure.test.sh (19/19 -> 16/3) and the three broken
@@ -241,46 +248,85 @@ frozen_report="$ROOT/.frozen-check.$$"
 # discriminator. Absent manifest AND absent directory means nothing here claims to
 # be frozen: skip, and say so. Either one alone is a real failure, including the
 # dangerous case the README names — deleting the manifest to let an edit through.
-if [ ! -f "$FROZEN_MANIFEST" ] && [ ! -d "$FROZEN_DIR" ]; then
+#
+# The CLAUDE.md clause closes a deliberate escape: renaming the frozen directory
+# and deleting the manifest in one commit would otherwise skip, leaving the
+# templates live-editable with CI green. A tree with no manifest, no frozen
+# directory AND no CLAUDE.md is not an arscontexta root; a tree with CLAUDE.md
+# that dropped both is an arscontexta root that dropped its freeze.
+if [ ! -f "$FROZEN_MANIFEST" ] && [ ! -d "$FROZEN_DIR" ] && [ ! -f "$ROOT/CLAUDE.md" ]; then
   skip "no frozen manifest and no frozen directory — nothing here claims a freeze"
+elif [ ! -f "$FROZEN_MANIFEST" ] && [ ! -d "$FROZEN_DIR" ]; then
+  red "manifest and frozen directory are both gone from a tree that has CLAUDE.md — the freeze was removed, not absent"
 elif [ ! -f "$FROZEN_MANIFEST" ]; then
   red "frozen manifest missing: $FROZEN_MANIFEST — the directory is here with nothing pinning it"
 elif [ ! -d "$FROZEN_DIR" ]; then
   red "frozen directory missing: $FROZEN_DIR — the manifest pins files that are gone"
 else
   # Modified or deleted: every manifest entry must still hash to its recorded value.
-  while IFS=' ' read -r want name; do
-    [ -n "$name" ] || continue
+  # The `|| [ -n ... ]` continuation matters: `read` returns non-zero at EOF, so a
+  # manifest whose final line lacks a newline would silently skip its last entry —
+  # un-freezing exactly one file, without a word.
+  pinned=0
+  while IFS=' ' read -r want name || [ -n "${want:-}${name:-}" ]; do
+    [ -n "${name:-}" ] || continue
+    pinned=$((pinned + 1))
     if [ ! -f "$FROZEN_DIR/$name" ]; then
-      printf '  DELETED %s\n' "$name" >> "$frozen_report"
+      frozen_bad="$frozen_bad  DELETED $name
+"
       continue
     fi
     got=$(cksum < "$FROZEN_DIR/$name" | tr -s ' ' | tr ' ' '-')
-    [ "$got" = "$want" ] || printf '  MODIFIED %s\n' "$name" >> "$frozen_report"
+    [ "$got" = "$want" ] || frozen_bad="$frozen_bad  MODIFIED $name
+"
   done < "$FROZEN_MANIFEST"
-  # Added: a new template here would be unfrozen and invisible to the loop above.
+  # Added: anything here the manifest does not pin is unfrozen and invisible above.
+  # `find -type f` rather than a top-level *.md glob, because the glob let three
+  # things through — sub/evil.md, .hidden.md and newthing.txt each passed while the
+  # prose claimed any edit was rejected. A contributor porting guards into
+  # skill-blocks/sub/ is the exact scenario this freeze exists to stop.
   # README.md is the one file this directory is allowed to grow.
-  for f in "$FROZEN_DIR"/*.md; do
-    [ -f "$f" ] || continue
-    b=$(basename "$f")
-    [ "$b" = "README.md" ] && continue
-    "$GREP" -qF " $b" "$FROZEN_MANIFEST" || printf '  UNTRACKED %s\n' "$b" >> "$frozen_report"
-  done
-  if [ -s "$frozen_report" ]; then
+  pinned_names=$(cut -d' ' -f2- "$FROZEN_MANIFEST")
+  # Captured with $( ), not redirected to a file: `find | while` runs the body in a
+  # subshell, so appending to frozen_bad inside it would be discarded — and routing
+  # around that with a temp file is what C1 was.
+  untracked=$(find "$FROZEN_DIR" -type f | while IFS= read -r f; do
+    rel=${f#"$FROZEN_DIR"/}
+    [ "$rel" = "README.md" ] && continue
+    # -x, not a substring match: an unanchored search would miss a new file whose
+    # name is a proper prefix of a pinned one.
+    printf '%s\n' "$pinned_names" | "$GREP" -qxF "$rel" || printf '  UNTRACKED %s\n' "$rel"
+  done)
+  if [ -n "$untracked" ]; then
+    frozen_bad="$frozen_bad$untracked
+"
+  fi
+  if [ -n "$frozen_bad" ]; then
     red "platforms/shared/skill-blocks/ is frozen — nothing generates from it:"
-    sed 's/^/     /' "$frozen_report"
+    printf '%s' "$frozen_bad" | sed 's/^/   /'
+    # The manifest's digests were generated on one machine. If EVERY pinned file
+    # reports MODIFIED, a differing cksum implementation is far likelier than that
+    # many simultaneous edits — and without this line the two are indistinguishable.
+    n_mod=$(printf '%s' "$frozen_bad" | "$GREP" -c 'MODIFIED' || true)
+    if [ "$pinned" -gt 1 ] && [ "$n_mod" -eq "$pinned" ]; then
+      echo "       NOTE: all $pinned pinned files report MODIFIED. Suspect a differing"
+      echo "       cksum implementation on this machine before suspecting $pinned edits."
+    fi
     echo "       Nothing reads this directory (skills/setup/SKILL.md:1285 generates"
     echo "       from skill-sources/). See platforms/shared/skill-blocks/README.md."
     echo "       Intending this? Regenerate the manifest and say why in the commit:"
     echo "         for f in platforms/shared/skill-blocks/*.md; do \\"
-    echo "           [ \"\$(basename \$f)\" = README.md ] && continue; \\"
-    echo "           printf '%s %s\\n' \"\$(cksum < \$f | tr -s ' ' | tr ' ' -)\" \"\${f##*/}\"; \\"
+    echo "           [ \"\$(basename \"\$f\")\" = README.md ] && continue; \\"
+    echo "           printf '%s %s\\n' \"\$(cksum < \"\$f\" | tr -s ' ' | tr ' ' -)\" \"\${f##*/}\"; \\"
     echo "         done | sort > reference/skill-blocks.frozen"
   else
-    ok "16 frozen templates unchanged"
+    # Counted from the manifest, not written as a literal. A hardcoded "16" would
+    # still read 16 after a template and its manifest line were deleted together —
+    # a number that does not come from counting the thing it names is the defect
+    # this repo keeps finding.
+    ok "$pinned frozen templates unchanged"
   fi
 fi
-rm -f "$frozen_report"
 
 echo
 if [ "$fail" -eq 0 ]; then

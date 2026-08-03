@@ -139,5 +139,81 @@ eq "empty root passes after probes" "0" "$(rc_of "$V")"
 # --- a missing scan directory -----------------------------------------------
 eq "nonexistent root fails"        "1"   "$(rc_of "/nonexistent-root-xyz")"
 
+# --- check 4: the freeze ----------------------------------------------------
+# WHY THESE EXIST: check 4 shipped with zero automated coverage. Every mkroot()
+# above lands in its SKIP branch, so all four gates exercised the one path that
+# does nothing, and its three violation paths were evidenced only by a hand-run
+# probe table in a git-ignored ledger. That is the same trap the freeze itself was
+# added to close, from the other side: a check nothing tests can regress while
+# every gate stays green. It already did once — the first version failed on any
+# tree without the frozen directory, which broke the three assertions above that
+# prove this guard is not vacuous.
+#
+# A two-file fixture, not a copy of the real directory: these assert the check's
+# LOGIC, and pinning them to the shipped 16 would make every legitimate manifest
+# regeneration look like a test failure.
+mkfrozen() {
+  local d
+  d=$(mkroot)
+  mkdir -p "$d/platforms/shared/skill-blocks"
+  printf 'alpha\n' > "$d/platforms/shared/skill-blocks/a.md"
+  printf 'beta\n'  > "$d/platforms/shared/skill-blocks/b.md"
+  # Same format the check parses: "<cksum-with-dashes> <basename>", sorted.
+  ( cd "$d/platforms/shared/skill-blocks" && for f in a.md b.md; do
+      printf '%s %s\n' "$(cksum < "$f" | tr -s ' ' | tr ' ' '-')" "$f"
+    done | sort ) > "$d/reference/skill-blocks.frozen"
+  # CLAUDE.md marks this as an arscontexta root, so removing the freeze is a
+  # failure rather than a skip.
+  printf '# marker\n' > "$d/CLAUDE.md"
+  printf '%s' "$d"
+}
+
+Z=$(mkfrozen)
+eq "frozen: intact tree passes"       "0" "$(rc_of "$Z")"
+printf 'edited\n' >> "$Z/platforms/shared/skill-blocks/a.md"
+eq "frozen: modified file fails"      "1" "$(rc_of "$Z")"
+
+Z=$(mkfrozen); rm "$Z/platforms/shared/skill-blocks/b.md"
+eq "frozen: deleted file fails"       "1" "$(rc_of "$Z")"
+
+# Nested, because a top-level *.md glob let sub/*.md through while the prose
+# claimed any edit was rejected — a contributor porting guards into a subdirectory
+# is exactly the scenario the freeze exists to stop.
+Z=$(mkfrozen); mkdir -p "$Z/platforms/shared/skill-blocks/sub"
+printf 'x\n' > "$Z/platforms/shared/skill-blocks/sub/evil.md"
+eq "frozen: nested addition fails"    "1" "$(rc_of "$Z")"
+
+Z=$(mkfrozen); printf 'x\n' > "$Z/platforms/shared/skill-blocks/.hidden.md"
+eq "frozen: dotfile addition fails"   "1" "$(rc_of "$Z")"
+
+# Deleting the manifest is the documented way someone would "let an edit through".
+Z=$(mkfrozen); rm "$Z/reference/skill-blocks.frozen"
+eq "frozen: manifest deletion fails"  "1" "$(rc_of "$Z")"
+
+# Removing BOTH from a tree that still has CLAUDE.md is removal, not absence.
+Z=$(mkfrozen); rm -rf "$Z/platforms/shared/skill-blocks" "$Z/reference/skill-blocks.frozen"
+eq "frozen: removing both fails"      "1" "$(rc_of "$Z")"
+
+# ...but a tree that never claimed a freeze must still pass, or check 4 becomes
+# the every-tree-but-one guard it was the first time.
+Z=$(mkfrozen); rm -rf "$Z/platforms/shared/skill-blocks" "$Z/reference/skill-blocks.frozen" "$Z/CLAUDE.md"
+eq "frozen: unclaimed tree skips"     "0" "$(rc_of "$Z")"
+
+# A manifest whose last line has no newline must not silently un-freeze that entry:
+# `read` returns non-zero at EOF, so the loop body would never run for it.
+Z=$(mkfrozen)
+printf '%s' "$(cat "$Z/reference/skill-blocks.frozen")" > "$Z/reference/skill-blocks.frozen.tmp"
+mv "$Z/reference/skill-blocks.frozen.tmp" "$Z/reference/skill-blocks.frozen"
+printf 'edited\n' >> "$Z/platforms/shared/skill-blocks/b.md"
+eq "frozen: no-trailing-newline still checks last entry" "1" "$(rc_of "$Z")"
+
+# The violation channel must not depend on writing to ROOT. It once did, via a
+# temp file whose write nobody checked, so a read-only checkout reported PASS on a
+# modified template: rc 0, plausible line, no error on stdout.
+Z=$(mkfrozen); printf 'edited\n' >> "$Z/platforms/shared/skill-blocks/a.md"
+chmod a-w "$Z"
+eq "frozen: read-only root still reports the violation" "1" "$(rc_of "$Z")"
+chmod u+w "$Z"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -141,7 +141,11 @@ Supporting layers:
   is why `~/second-brain` has `/extract` where this repo has `skill-sources/reduce/`. Same command,
   renamed at generation time (line 14 of that file is the mapping table).
 - `platforms/` — platform adapters (`claude-code/`, `shared/`). **`platforms/shared/skill-blocks/`
-  is frozen and generates nothing** — `check-portability.sh` check 4 rejects any edit to it. It is a
+  is frozen and generates nothing** — `check-portability.sh` check 4 pins every file in it against a
+  `cksum` manifest and fails on any modification, deletion, or unpinned addition at any depth, with
+  its own `README.md` the single exception. A tree that carries neither the directory nor the manifest
+  reports SKIP rather than PASS — unless it has a `CLAUDE.md`, in which case the freeze was removed
+  and that is a failure. It is a
   read-only inventory of vocabulary points, and it holds the repo's most complete markup: counting
   `{vocabulary.*}`, `{config.*}` and `{DOMAIN:*}`, 146 markers in `verify` where `skill-sources` has
   27. `reference/skill-authoring.md` §2 carries the exact command — a placeholder tally that does not

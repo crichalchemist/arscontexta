@@ -59,7 +59,22 @@ only property this directory maintains is **placeholder coverage**.
 
 ## Frozen
 
-`reference/check-portability.sh` fails if any `.md` file here is modified, this README excepted.
+`reference/check-portability.sh` check 4 compares every file here against
+`reference/skill-blocks.frozen`, a manifest of `cksum` digests. **This README is the one file
+excepted** — it is not pinned, so it can be edited freely.
+
+Four outcomes, because "this tree does not claim a freeze" is not "this tree passed one":
+
+| manifest | directory | outcome |
+|---|---|---|
+| present | present | compared — **FAIL** on any modified, deleted, or unpinned file, at any depth, including dotfiles and non-`.md` |
+| present | absent | **FAIL** — the manifest pins files that are gone |
+| absent | present | **FAIL** — the documented way someone would "let an edit through" |
+| absent | absent | **SKIP** if the tree has no `CLAUDE.md` (not an arscontexta root); **FAIL** if it does (the freeze was removed) |
+
+`reference/test/guard-failure.test.sh` asserts all of these against a two-file fixture, so the check
+cannot regress while the gates stay green — which it did once already.
+
 That gate exists because the instruction it replaced — *"can drift from `skill-sources/`; check both
 when editing a shared behavior"* — drew four commits of guard-porting work into a directory that
 generates nothing. If you have a reason to change a template here, change the gate deliberately and
