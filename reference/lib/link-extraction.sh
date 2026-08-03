@@ -2,7 +2,16 @@
 # link-extraction.sh — the single definition of wiki-link counting and resolution.
 #
 # Sourced by skill templates and by validate-kernel.sh. Do NOT inline copies of
-# these functions anywhere; check-portability.sh enforces that.
+# these functions anywhere.
+#
+# NOTHING ENFORCES THAT SENTENCE. It used to end "check-portability.sh enforces
+# that", and that was false. That script runs five checks — PCRE grep, wiki-link
+# capture using negated classes, PCRE via ripgrep, the frozen skill-blocks
+# manifest, and AGENTS.md being a symlink — and none detects an inlined copy of
+# anything defined here. The rule is real and still binding; the enforcement is
+# convention. Believing otherwise is how a green run gets read as proof, which is
+# what happened: matcher sites survived four gates for months. Owner of the gap:
+# the CI-hardening spec.
 #
 # Writing or editing a SKILL.md? Read reference/skill-authoring.md — which tree
 # you are in, placeholder families, when a fail-loud guard fires, and what makes a

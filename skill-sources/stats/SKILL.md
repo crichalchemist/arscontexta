@@ -244,20 +244,53 @@ else
   COMPLIANCE="N/A"
 fi
 
-# MOC coverage.
-# The MOC file list is built once, outside the loop. Two reasons: rebuilding it
-# per note re-scanned the whole vault n times, and an EMPTY list left `xargs`
-# with no file arguments — GNU xargs then runs grep against the loop's own
-# stdin and swallows the `find` stream, while BSD xargs skips the run entirely.
-# The -n test makes a vault with no MOCs behave the same on both platforms.
+# MOC coverage: share of non-MOC notes linked from at least one MOC.
+# The replaced form ran `xargs grep -l` with the note name inside the pattern —
+# the same matcher removed from the orphan count above, merely spelled so that
+# the search string divergence 6 tracked could not see it. It carried the same
+# three defects, and here they bias the coverage % rather than a count: a link
+# inside a ``` block counted as coverage, a MOC linking [[Zettelkasten]] did not
+# cover `zettelkasten.md`, and a note named `a.b` was covered by any [[axb]].
+#
+# The MOC file list is still built once, outside any loop, for the reason the
+# previous comment recorded: an EMPTY list left `xargs` with no file arguments,
+# and GNU xargs then ran grep against the loop's own stdin and swallowed the
+# `find` stream, while BSD xargs skipped the run entirely. No xargs remains, but
+# the list is still built once because rebuilding it per note rescanned the
+# whole vault n times.
 MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
-COVERED=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  grep -q '^type: moc' "$f" 2>/dev/null && continue
-  if [ -n "$MOC_FILES" ] && printf '%s\n' "$MOC_FILES" | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
-    echo "$NAME"
-  fi
-done | wc -l | tr -d ' ')
+
+# Targets linked FROM MOCs. Extraction is inlined rather than delegated because
+# the library exposes directory-scoped functions only, and nothing that answers
+# "what does this particular SET of files link to" — see divergence 12.
+COV_SRC=$(mktemp) || exit 1
+COV_HITS=$(mktemp) || { rm -f "$COV_SRC"; exit 1; }
+COVF="/tmp/stats-cov-err-$$"
+rm -f "$COVF"
+printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
+  [ -n "$m" ] || continue
+  _strip_fences "$m" >> "$COV_SRC" || touch "$COVF"
+done
+if [ -e "$COVF" ]; then
+  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+  echo "error: MOC fence-stripping failed; refusing to report a coverage figure" >&2
+  exit 1
+fi
+# rc 1 is "no MOC links at all", a real answer; only rc >1 is a failure.
+rg -o '\[\[([^\]|#]+)' -r '$1' "$COV_SRC" > "$COV_HITS"
+if [ $? -gt 1 ]; then
+  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+  echo "error: MOC link extraction failed; refusing to report a coverage figure" >&2
+  exit 1
+fi
+MOC_TARGETS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$COV_HITS" | _fold_lower | sort -u)
+rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+
+# Denominator set is non-MOC notes, matching NOTE_COUNT, which also subtracts
+# MOCs. Both operands reach comm already folded and sorted.
+COVERED=$(comm -12 \
+  <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
+  <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
   COVERAGE=$(echo "scale=0; $COVERED * 100 / $NOTE_COUNT" | bc)
 else

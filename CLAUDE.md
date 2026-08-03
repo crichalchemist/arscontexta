@@ -66,7 +66,7 @@ done
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | non-portable constructs; inlined copies of the shared link library |
+| `check-portability.sh` | five checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence |
@@ -77,6 +77,16 @@ done
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
 the number it prints is *right* is not checked by anything here.
+
+**Nor does any gate enforce "do not inline the link library's functions."** That row used to claim
+`check-portability.sh` catches inlined copies, and `reference/lib/link-extraction.sh` said the same in
+its header. Both were false — the five checks are enumerated above and none of them looks for it. The
+cost was not hypothetical: inlined matchers sat in five `skill-sources` fences through four gates, a
+127 KB review and a live vault run, and the commit that removed them added a *sixth* inlined
+extraction (`skill-sources/graph/SKILL.md`, the `rg -o` edge builder) which likewise passed every
+gate. The rule is real and still binding; it is convention, not enforcement. See divergences 12 and
+13. Building the missing check is a gate-design question and belongs to the CI-hardening spec — do
+not bolt it on here.
 
 That is not a small caveat, because it is where this repo's defects actually live. Every correctness
 defect fixed on the branch that added this paragraph — the claim counter truncating at three digits,
@@ -410,7 +420,7 @@ The human diff of the two trees at release remains the only check on the full §
 these numbers and work is in flight; renumbering would invalidate those references. Full record in
 [Closed on `fix/spec-f-divergence-drain`](#closed-on-fixspec-f-divergence-drain).
 
-**Read divergence 10 before concluding anything from this.** What was fixed is two *loops*; what the
+**Read divergence 12 before concluding anything from this.** What was fixed is two *loops*; what the
 entry's title implied — that the naive-matcher class is gone — is still false, and the search string
 this entry shipped as its own reproduce command is what made that hard to see.
 
@@ -492,40 +502,80 @@ scanned union on top of a run that already takes ~45s on the field vault. The ho
 to replace the per-link loop with a single `comm` or `join` against a sorted index, which makes the
 cap unnecessary rather than merely larger.
 
-**10. The inlined-matcher search string is a proxy for the class, and six sites survive it.**
-Divergence 6 tracked the naive wiki-link matcher through the string `grep -rl "\[\[`. That string now
-returns 0 across `skill-sources/`, and **that is not evidence the class is gone.** The same matcher
-also ships spelled `xargs grep -l` and `-exec grep -l`, which the string cannot see. Six live sites
-remain, three of them inside `skill-sources/` — the very tree the criterion declared clean:
+**12. The matcher class outlives `skill-sources/`, and every search string tried so far has been
+narrower than the class.** This entry has now been wrong twice about its own scope, which is the part
+worth keeping.
+
+Divergence 6 tracked the matcher through `grep -rl "\[\[`. That string returns 0 across
+`skill-sources/`, and it never meant what it was read to mean: the same matcher ships as
+`xargs grep -l`, `-exec grep -l`, `rg -l`, `grep -r`, and single-quoted. The first widening of this
+entry listed "six sites" — also wrong, because that regex still required a **double** quote and so
+missed `skill-sources/reweave/SKILL.md` and `skill-sources/reflect/SKILL.md`, both single-quoted, both
+inside the governed tree. A criterion written specifically to stop a narrow search being reported as
+class-wide was itself narrow, and its blind spot landed inside the tree it governed.
+
+**Match the property, not a spelling.** What separates a matcher from the library's extraction is a
+*closed* `\]\]`: extraction captures with a negated class and never closes the brackets. So key on
+that, and the pattern stops caring about command, flags, or quote style:
+
+```bash
+grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' skill-sources/ skills/ platforms/claude-code/ reference/
+```
+
+Verified against the tree, not remembered: **10 raw hits**, of which **8 are executable** and **0 are
+in `skill-sources/`** (criterion 2 met on `fix/spec-f-divergence-drain`). The remaining executable
+sites, none of which this branch touched:
 
 | Site | Spelling | What it feeds |
 |---|---|---|
-| `skill-sources/graph/SKILL.md:145` | `xargs grep -l` | `/graph health` MOC coverage % |
-| `skill-sources/graph/SKILL.md:693` | `-exec grep -l` | `/graph backward` backlinks |
-| `skill-sources/stats/SKILL.md:257` | `xargs grep -l` | MOC coverage % |
+| `skills/health/SKILL.md:132` | `rg -l` | orphan detection |
+| `skills/health/SKILL.md:467` | `rg -l` | incoming-link count |
+| `skills/health/SKILL.md:520` | `rg -l` | MOC note count |
+| `skills/health/SKILL.md:543` | `rg` | MOC *list shape*, not a backlink — carries `portability-exempt` |
 | `skills/architect/SKILL.md:179` | `grep -rl` | link counts in evolution advice |
 | `platforms/claude-code/hooks/session-orient.sh.template:149` | `grep -rl` | SessionStart orientation |
 | `reference/testing-milestones.md:410` | `grep -rl` | a test spec's own MOC-ref check |
+| `reference/check-portability.sh:128` | — | a comment inside the gate, not code |
 
-Every one carries the three defects measured on the two that were fixed: it counts links inside
-fenced code blocks, it does not case-fold either side, and it interpolates the note name into a
-**regex**, so a note named `a.b` is "linked" by any `[[axb]]`.
+The two non-executable hits are `skill-sources/graph/SKILL.md:820` and `:825`, a documentation table
+of frontmatter query syntax (`rg '^topics:.*\[\[X\]\]'`) — a different operation, outside any fence,
+correctly out of scope.
 
-Use a pattern that spans the spellings, not the one divergence 6 shipped:
+**Known limitation of even this pattern:** `[^|]*` fails on any site where a pipe sits between the
+command and its pattern. No current site does. Start the next widening from that edge rather than
+rediscovering it.
 
-```bash
-grep -rnE 'grep (-rl|-l|-q|-c)[^|]*"\\\[\\\[' skill-sources/ skills/ platforms/claude-code/ reference/
-```
+**No gate catches any of them.** `check-portability.sh` check 2 flags a link capture whose negated
+class omits the `|`/`#` terminators — it keys on `[^` being *present*, and a fixed-name bracket grep
+has no negated class at all. See also the gate table near the top of this file: nothing enforces
+"do not inline the library's functions" either. Both belong to the CI-hardening spec.
 
-**`check-portability.sh` check 2 is structurally blind to all six.** It flags a link capture whose
-negated class omits the `|` and `#` terminators — it keys on `[^` being *present*. A fixed-name
-bracket grep contains no negated class at all, so the gate built to catch this class never sees its
-most common spelling, and none of the six carries a `portability-exempt` marker to hint otherwise.
+Not fixed here on purpose. The blast radii differ: `session-orient.sh.template` runs on **every**
+SessionStart, where a fail-loud version guard turns a missing library into a broken session rather
+than a wrong number. Porting the library into a shipped template unreviewed at the end of a branch is
+how the previous divergence in this family was made.
 
-Not fixed here on purpose. The blast radii differ enough to need separate review: the hook template
-runs on **every** SessionStart, where a fail-loud version guard turns a missing library into a broken
-session rather than a wrong number. Porting the library into a shipped template unreviewed at the end
-of a branch is how the previous divergence in this family was made.
+**13. Seven sites inline link extraction because the library has no function for "which files link
+to X".** `reference/lib/link-extraction.sh` exposes directory-scoped functions only — `count_links`,
+`extract_link_targets`, `existing_note_index` and their `_recursive` variants. Nothing answers
+per-file or per-target questions, so every caller that needs backlinks, per-note incoming counts, or
+"what does this SET of files link to" re-inlines the same three-stage pipeline:
+`_strip_fences` → `rg -o '\[\[([^\]|#]+)' -r '$1'` → `_fold_lower`.
+
+Count derived, not estimated: **7 sites** — `skill-sources/graph/SKILL.md` ×4, and one each in
+`stats`, `reflect`, `reweave`. One predates this branch (`graph`'s triangles fence); one arrived with
+the authority-loop fix; five arrived with the divergence-6 matcher conversions, which had no other
+way to spell the work.
+
+That is the cost of closing divergence 6 without an API change, and it is recorded rather than paid:
+adding an edges function is a library API addition needing its own fixture and a
+`LINK_EXTRACTION_VERSION` bump, and it was ruled out of scope for that branch deliberately —
+extraction and matching are different problems, and that branch closed matching. The argument for
+doing it is this number; if it grows, the argument gets stronger.
+
+Note the interaction with divergence 11: because these sites use `rg -o` with a negated class and no
+closing `\]\]`, the class-wide matcher pattern correctly does **not** flag them. They are a separate
+defect, not a residue of the same one.
 
 ### Closed on `fix/spec-f-divergence-drain`
 
@@ -549,8 +599,23 @@ of a branch is how the previous divergence in this family was made.
   (line 436, `f03`, opening at line 415) makes `fence-isolation.test.sh` report
   `H skill-sources/graph f03` and FAIL under bash; restoring it returns the suite to green.
 
-  **What this did not do is remove the class — see divergence 10.** The criterion it was tracked by
-  is a search string, and three sites in these same two files use a spelling that string cannot see.
+  **Round 2 finished the class inside `skill-sources/`.** The paragraph above used to end here,
+  saying three sites survived in these same two files under a spelling the criterion could not see.
+  That was itself an undercount, and the widened pattern in divergence 12 found **five**: MOC coverage
+  in `graph` and `stats` (`xargs grep -l`), `/graph backward` (`-exec grep -l`), plus two the first
+  widening still missed because it required a **double** quote — `reweave`'s backlink command and
+  `reflect`'s incoming-link count, both single-quoted. All five now resolve through the library;
+  `reweave` and `reflect` gained a `NOTES_DIR` guard and a library stanza they never had.
+
+  Measured, not assumed: the in-fence count across `skill-sources/` goes **5 → 0**, with the same scan
+  against the previous commit still returning 5 as a positive control. Gate coverage was mutation-
+  proved for the two fences that newly source the library — removing the `.`-source from each makes
+  `fence-isolation.test.sh` report `H skill-sources/reweave f03` and `H skill-sources/reflect f03`.
+
+  **What this still does not do is remove the class from the repo — see divergence 12**, which lists
+  the seven executable sites outside `skill-sources/`, and **divergence 13**, which counts the cost:
+  seven sites now inline link *extraction*, because the library answers directory-scoped questions
+  only and nothing asks "which files link to X".
 
 - **`validate-kernel.sh` soft-passed the dangling-link primitive** — was divergence 1, and the
   highest blast radius entry on the list: the kernel contract, run against every generated vault,
@@ -616,9 +681,10 @@ of a branch is how the previous divergence in this family was made.
   been wrong twice in opposite directions, which is the part worth keeping. It first read "`graph` got
   the same treatment" while a site remained; corrected, it read "still inlines" and is now stale the
   other way. Commit `741b2b7`'s claim that the spelling is "gone from executable code in both files"
-  overstated it then and would overstate it now: **the class is not gone from either file** — see
-  divergence 10, which lists three surviving sites in `skill-sources/` under spellings the search
-  string used here cannot match. `stale_notes` was redefined in prose to the definition the code can
+  overstated it then, because sites remained in both. It is finally true of these two files as of the
+  second round on `fix/spec-f-divergence-drain` — but only of `skill-sources/`, and only for
+  *matching*: see divergence 12 for the seven executable sites elsewhere, and divergence 13 for the
+  extraction the fix inlined. `stale_notes` was redefined in prose to the definition the code can
   actually compute — "not modified in 30+ days" — instead of shipping a fifth reading of "stale".
 - **The claim counter truncated at three digits.** `{source}-999.md` was not a cap but a *collision*:
   the scan matched exactly three digits, so the maximum went backwards once numbering passed 999.
