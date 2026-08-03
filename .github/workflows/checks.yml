@@ -49,3 +49,16 @@ jobs:
         run: bash reference/test/fence-isolation.test.sh
       - name: Fence isolation (zsh)
         run: zsh reference/test/fence-isolation.test.sh
+
+      # The manifests must agree with each other on every push, not only at
+      # release time. A published plugin and this tree once both called
+      # themselves 0.8.0 while differing materially, which made the version
+      # string useless for telling two artifacts apart. The script this was
+      # ported from is a manual release tool in a repo with no CI at all —
+      # precisely how a stale version survives.
+      #
+      # --check, not --audit: --check asserts the declared manifests agree, which
+      # is a machine-checkable invariant. --audit scans prose for a stale string
+      # and needs a human to judge each hit, so it stays a release-time tool.
+      - name: Version manifests agree
+        run: bash scripts/bump-version.sh --check

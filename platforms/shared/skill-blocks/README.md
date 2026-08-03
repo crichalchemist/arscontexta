@@ -36,7 +36,7 @@ The header on each file names a *"derivation engine"* that performs mechanical p
 substitution. That engine was never built; `/setup` has the model vocabulary-transform
 `skill-sources/` while reading the derivation manifest. These files are the more complete artifact of
 an abandoned mechanism — not a superseded predecessor of `skill-sources/`. Both directories were
-created in the same commit (`4be327e`, v0.8.0); neither replaced the other.
+created in the same commit (`4be327e`, the initial release); neither replaced the other.
 
 ## Two populations
 
