@@ -642,8 +642,26 @@ defect, not a residue of the same one.
   done                                  # 38/0, 27/0, 2476/15
   ```
 
-  The earlier entry's "14 matching files" is not reproducible against this vault at any scope and has
-  been replaced by the measurement above rather than carried forward.
+  **The earlier entry's "14 matching files" was a different quantity wearing that label.** 14 is the
+  number of observations whose status *is* `open` — the filtered count — not the number of files
+  matching `^status:`, which is 38. A filtered count read as a match count is the same substitution
+  this file records under divergence 4, and it is worth naming because it made the defect look two
+  orders of magnitude smaller than the surface it covered.
+
+  **The parser matches values exactly where the naive form matched prefixes** (`^status: pending` also
+  matches `pending-review`). That is a real semantic change, and it changes nothing here: measured
+  against the same 65 files, naive and library agree exactly — observations 14/14, tensions 8/8 — and
+  the distinct values present are `open`, `implemented`, `archived`, `resolved`, none of them a prefix
+  of another.
+
+  ```bash
+  . reference/lib/frontmatter.sh
+  for d in ~/second-brain/ops/observations ~/second-brain/ops/tensions; do
+    printf '%-24s naive=%s lib=%s\n' "$(basename "$d")" \
+      "$(grep -rl '^status: pending\|^status: open' "$d" 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(count_notes_by_field "$d" status pending open)"
+  done                                  # observations 14/14, tensions 8/8
+  ```
 
   **The fixture is why 7 and 8 could survive.** `reference/test/fence-isolation.test.sh` now builds a
   four-note discriminating set under `notes/status-probe/` — frontmatter `status`, a body-fenced

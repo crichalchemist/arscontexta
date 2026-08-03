@@ -104,14 +104,30 @@ fence that exits non-zero while writing stderr, which is what assertion H fails.
 applying it where nothing can be absent is the defect.
 
 **Counting wiki-links, orphans, or dangling links? Source the library; do not write the pattern.**
-`reference/lib/link-extraction.sh` is the single definition of link counting and resolution, and
-`check-portability.sh` rejects inlined copies of it. The naive spelling —
-`grep -rl "[[$NAME]]" | wc -l` — is the one every author reaches for and it is wrong in three ways at
-once: it counts links inside fenced code blocks, it does not case-fold, and it matches the wrong
-direction for orphan detection. That last one is a documented accepted defect in two shipped
+`reference/lib/link-extraction.sh` is the single definition of link counting and resolution. The naive
+spelling — `grep -rl "[[$NAME]]" | wc -l` — is the one every author reaches for and it is wrong in
+three ways at once: it counts links inside fenced code blocks, it does not case-fold, and it matches
+the wrong direction for orphan detection. That last one is a documented accepted defect in two shipped
 templates, which is exactly why it must not spread to a third. Prefer the `*_recursive` variants: a
 vault with no subdirectories today may grow one tomorrow, and the flat scan under-reports silently
 rather than failing.
+
+**Reading a frontmatter field? Same rule, same reason.** `reference/lib/frontmatter.sh` is the single
+definition. The naive spelling — `grep -rl '^status: pending' dir/` — matches a line-anchored
+`status:` ANYWHERE in the file, including inside a fenced block in the body, so a note that documents
+the schema by showing `status: pending` in an example counts itself. Eleven live sites had this
+before it was written; the gate's assertion **F** now pins the library three ways.
+
+Deployment matters for both: a template that sources one of these needs the vault to *have* it, so a
+new library is not finished until `skills/setup` copies it, `skills/upgrade` Step 6a refreshes it by
+its own version constant, and `skills/health` Category 9 checks it. A guard whose remedy message
+names a repair that does not perform it is worse than no guard.
+
+**Neither rule is enforced by anything.** This paragraph used to say `check-portability.sh` rejects
+inlined copies. It does not — that script runs five checks and none of them detects an inlined copy of
+anything, which `reference/lib/link-extraction.sh` states outright in its own header. The rule is real
+and still binding; the enforcement is convention. Believing otherwise is how matcher sites survived
+four gates for months.
 
 What the gate asserts, cited by letter so this table cannot drift from it:
 
