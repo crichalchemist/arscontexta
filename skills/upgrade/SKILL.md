@@ -431,12 +431,33 @@ been run against.
 1. Check whether `ops/config.yaml` contains a `self_evolution:` section.
 2. Check whether it declares the same thresholds under `maintenance.conditions:` as
    `pending_observations_threshold` / `pending_tensions_threshold`.
-3. **If either is present, write nothing.**
-   - `self_evolution:` present → `self_evolution: present [current]`.
-   - Only `maintenance.conditions.*` present → report the conflict, naming **both keys and both
-     values**, and stop: `self_evolution: absent, but maintenance.conditions declares 20/10 —
-     not seeded [conflict]`. A report that says only "not seeded" replaces a silent overwrite with a
-     silent skip, which is no better.
+3. **If either is present, write nothing — but which "present" it is decides what you report.**
+   There are four cases, not two. The both-present case is the one that actually occurs.
+   - **Neither present** → seed (step 4).
+   - **Only `self_evolution:`** → `self_evolution: present [current]`.
+   - **Only `maintenance.conditions.*`** → report the conflict naming **both keys and both values**,
+     and stop: `self_evolution: absent, but maintenance.conditions declares 20/10 — not seeded
+     [conflict]`. A report that says only "not seeded" replaces a silent overwrite with a silent
+     skip, which is no better.
+   - **Both present** → **compare the values.** Equal is fine: `self_evolution: present, agrees with
+     maintenance.conditions (20/10) [current]`. **Unequal is a live split and must be reported**:
+
+     ```text
+     self_evolution: 10/5 but maintenance.conditions declares 20/10 — surfaces disagree [split]
+       /{DOMAIN:rethink} reads maintenance.conditions -> 20/10
+       /{DOMAIN:next}, /{DOMAIN:remember}, SessionStart hook read self_evolution -> 10/5
+     ```
+
+     **Do not "fix" it by writing either value over the other.** Which pair is intended is the
+     user's call, and both are things they may have set deliberately.
+
+   **This case is not hypothetical, and reporting `present [current]` for it is the defect this step
+   was rewritten to stop.** The field vault carries exactly this state — `maintenance.conditions`
+   at 20/10 (lines 68-69 of its `ops/config.yaml`) and `self_evolution` at 10/5 thirteen lines below
+   (71-73), the latter byte-identical to the block step 4 seeds. At 14 open observations and 8 open
+   tensions it means `/rethink` reports the threshold unmet while `/next` and `/remember` recommend
+   running it. A check that tests only for the *presence* of `self_evolution:` sees a healthy vault
+   there.
 4. Only when **neither** is present, append the documented defaults, preserving the file's existing
    comment style:
 
