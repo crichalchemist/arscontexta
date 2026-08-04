@@ -81,9 +81,9 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all twelve, expect exactly these results
+## Verification — run all thirteen, expect exactly these results
 
-Eleven run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
+Twelve run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
@@ -109,6 +109,7 @@ for s in bash zsh; do
   $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=37 failed=0
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
+  $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=24 failed=0
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
@@ -133,7 +134,7 @@ primitive 2 for the opposite reason: it has no wiki links yet, and the check rep
 notes directory containing none. Neither is this repo failing; both are the validator describing
 the vault it was handed.
 
-**"Green" means all twenty-two CI steps ran and passed** — not that the previously-red step turned.
+**"Green" means all twenty-four CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
 
 ```bash
@@ -335,5 +336,5 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All twenty-two CI steps must pass. State in the PR what is **not** claimed —
+Branch from `main`. All twenty-four CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.

@@ -71,6 +71,21 @@ jobs:
         run: bash reference/test/placeholder-count.test.sh
       - name: Placeholder gate behavior (zsh)
         run: zsh reference/test/placeholder-count.test.sh
+      # hooks/scripts/ was four-fifths unprotected. Measured by mutating each
+      # script and running every other gate: killing read_config.sh's dotted-key
+      # routing IS caught (threshold-namespace, the positive control), but making
+      # an unparseable value return the default, making session-orient ignore its
+      # configured threshold, and INVERTING vaultguard's inertness were all
+      # caught by nothing at all.
+      #
+      # The first two are the exact defects CLAUDE.md divergence 3 documents.
+      # vaultguard is the widest: it decides whether every plugin hook runs, so
+      # inverting it fires auto-commit and write-validate in EVERY repository the
+      # plugin is installed in.
+      - name: Hook config behavior (bash)
+        run: bash reference/test/hook-config.test.sh
+      - name: Hook config behavior (zsh)
+        run: zsh reference/test/hook-config.test.sh
       - name: Shell syntax check
         run: |
           bash -n reference/validate-kernel.sh
