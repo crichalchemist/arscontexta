@@ -174,39 +174,31 @@ else
   red "rg PCRE scan could not run (see stderr) — cannot conclude anything"
 fi
 
-# KNOWN BLIND SPOT (matching direction):
-# This guard checks extraction direction only — it verifies that extracted links
-# terminate at | and #. It does NOT check matching direction — whether searches
-# for links correctly handle [[slug|alias]] and [[slug#heading]] patterns.
+# KNOWN BLIND SPOT (matching direction), NARROWED BY CHECK 6:
+# This guard checks the EXTRACTION direction — it verifies that captured links
+# terminate at | and #. The MATCHING direction is whether a search FOR a link
+# handles [[slug|alias]] and [[slug#heading]]. Check 6 below now closes the
+# sharpest edge of that gap, the one where a note name is interpolated into the
+# pattern and every character of it becomes a regex. What remains open is the
+# alias/heading half: a matcher spelled with a literal name still misses its own
+# aliased and anchored forms, and catching that would require evaluating a
+# template recursively, since it means parsing the link format and the file
+# search scope at the same time.
 #
-# The following 11 sites use rg -l or grep -rl with bare [[NAME]] patterns,
-# which miss [[NAME|alias]] and [[NAME#heading]] variations. These cause false
-# positives in orphan detection and MOC coverage reports. The guard does not flag
-# these because checking would require recursive template evaluation (matching
-# direction requires parsing both link format AND file search scope simultaneously).
-#
-# Sites with matching direction blind spot (by content type):
-#   Orphan detection in skill MOCs:
-#     skills/architect/SKILL.md (grep -rl, 1 instance)
-#     skills/health/SKILL.md (rg -l, 3 instances)
-#   Backlink counts in skill-sources:
-#     skill-sources/graph/SKILL.md (grep -rl, 4 instances)
-#     skill-sources/stats/SKILL.md (grep -rl, 2 instances)
-#   Milestone testing:
-#     reference/testing-milestones.md (grep -rl, 1 instance)
-#
-# Count this by enumeration, not from memory — it has been wrong twice. It read
-# "13 sites" (stale from the predecessor branch, citing line numbers that had
-# since moved or been deleted), then "9 sites" after a correction that dropped
-# skill-sources/stats entirely. Both undercounts made the blind spot look
-# smaller than it is, which defeats the only purpose this comment has. To
-# re-derive:
-#   /usr/bin/grep -nE '(rg -l|grep -rl|grep -l)[^|]*\\\[\\\[\$' <file>
-# across the five files above. Deliberately no line numbers here: they drift on
-# every edit, and a stale number is what produced both wrong counts.
-#
-# Future work: Add a separate guard for matching direction or migrate to unified
-# pattern that captures variants at extraction time (not search time).
+# THE ENUMERATION THAT USED TO LIVE HERE IS GONE, DELIBERATELY.
+# It listed the sites by file with a per-file count, plus a command to re-derive
+# them, plus a note that the count "has been wrong twice" — 13, then 9, both
+# undercounts. It was wrong a third time when check 6 was built: it claimed 11
+# sites across five files when the tree held 6, because it still named
+# skill-sources/graph (4) and skill-sources/stats (2) after both were converted
+# to the shared library on fix/spec-f-divergence-drain, and it never listed
+# session-orient.sh.template at all. That third error is the informative one. It
+# is the first OVERCOUNT, so unlike its predecessors it sends a reader to two
+# files where the defect no longer exists, where they cannot tell a rotted
+# comment from a mis-run command. And it rotted on a MERGE, not on an edit —
+# nothing in this file changed when that branch landed, so no diff existed for
+# review to catch. Care cannot close that; only a check that counts can.
+# Check 6's allowlist is that check, and it fails in both directions.
 
 echo "4. platforms/shared/skill-blocks/ is frozen (content unchanged)"
 # WHY A CONTENT MANIFEST AND NOT `git diff --name-only`:
@@ -372,6 +364,140 @@ elif [ "$(readlink "$ROOT/AGENTS.md")" != "CLAUDE.md" ]; then
   red "AGENTS.md points at $(readlink "$ROOT/AGENTS.md"), not CLAUDE.md"
 else
   ok "AGENTS.md -> CLAUDE.md"
+fi
+
+echo "6. Wiki-link matchers do not interpolate a note name into the pattern"
+# THE PROPERTY: a shell variable expanded directly after `\[\[` — the `$` in
+# `grep -rl "\[\[$title\]\]"`. Every character of the interpolated title is then a
+# REGEX, so a note named `a.b` also matches `axb` and one named `c++` is a syntax
+# error. Measured on an eight-note fixture when divergence 6 was closed: that
+# spelling scored a note with 2 incoming links as 0, a fenced link as 1, and `a.b`
+# as 2 when the truth was 1 — wrong in both directions at once, which is why the
+# orphan total came out identical before and after the fix. A check comparing
+# totals would have called that fix cosmetic.
+#
+# WHY THE PATTERN IS BARE AND CARRIES NO COMMAND PREFIX:
+# The interpolation is the defect; which command consumes it is incidental. The
+# blind-spot comment this check replaces re-derived its count with a pattern that
+# required an `-l` flag, so it could not see `rg -q` — the spelling of the site in
+# generators/features/maintenance.md, which that comment consequently never listed
+# in three revisions. Requiring a command spelling is how the enumeration went stale.
+#
+# WHY `*.template` IS SCANNED HERE:
+# checks 1-3 pass --include='*.md' --include='*.sh', which matches NEITHER
+# session-orient.sh.template nor its three siblings, so the highest-blast-radius
+# site in this class was invisible to every check in this file. All four includes
+# were widened together in a separate commit, after measuring the templates clean
+# for checks 1-3 first.
+#
+# THIS CHECK DOES NOT HONOUR `portability-exempt`, and the check-2 comment above
+# says why that marker's scope is stated rather than assumed: an allowlist entry
+# carries a reason and is reviewed, a marker carries nothing. Two exemption
+# mechanisms for one check is how they drift, so this one has exactly one.
+#
+# ALLOWLIST — "<path> <count> <reason>". Bidirectional, on check 4's model: an
+# unlisted hit FAILS, and an entry whose file is gone or whose count no longer
+# matches is STALE and also fails. The list drains rather than rots.
+#
+# WHY <path> <count> AND NOT <path>:<line>:
+# Line numbers drift on every edit — CLAUDE.md's divergence 12 table still says
+# session-orient.sh.template:149 for a site now at :160, and the comment this
+# replaces gave "no line numbers here" as a deliberate choice for the same reason.
+# A bare path without a count would let skills/health quietly grow a fourth site
+# behind its three.
+INTERP_ALLOW="
+skills/architect/SKILL.md 1 link counts in evolution advice; nothing acts on the number
+skills/health/SKILL.md 3 orphan, incoming and MOC counts; report-only, no threshold reads them
+platforms/claude-code/hooks/session-orient.sh.template 1 runs on EVERY SessionStart, where sourcing a library turns a missing file into a broken session rather than a wrong number
+reference/testing-milestones.md 1 a test SPEC's own example; teaching the pattern is not shipping it
+generators/features/maintenance.md 1 a recipe emitted into a generated vault's docs; a recipe cannot source a library the way a fence can, so converting it changes what generation emits
+"
+# ONE PREDICATE, CALLED BY BOTH HALVES.
+# The fence gate shipped exactly this defect and CLAUDE.md records it: absorption
+# keyed on (letter, label) and ignored the entry's shell scope while the staleness
+# half honoured it, so a zsh-only entry swallowed a bash failure and the gate
+# printed PASS. Re-deriving the condition at the second site is how they came apart.
+# Both halves below ask this one question and neither computes its own answer.
+#
+# -F is load-bearing: the paths contain `.`, which as a regex matches any character,
+# so `SKILL.md` would also count a hit in `SKILLxmd`. Divergence 13 records the same
+# flag being load-bearing for the same reason.
+interp_hits_in() {         # interp_hits_in <relative-path> -> hit count in that file
+  printf '%s\n' "$INTERP_RAW" | "$GREP" -cF "$ROOT/$1:" || true
+}
+interp_allowed_for() {     # interp_allowed_for <relative-path> -> declared count, or empty
+  printf '%s\n' "$INTERP_ALLOW" | while IFS= read -r e; do
+    [ -n "$e" ] || continue
+    [ "${e%% *}" = "$1" ] || continue
+    e=${e#* }; printf '%s' "${e%% *}"
+  done
+}
+if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
+                --include='*.md' --include='*.sh' --include='*.template' \
+                -E '\\\[\\\[\$' "${SCAN[@]}"); then
+  INTERP_RAW=$(printf '%s\n' "$INTERP_RAW" | "$GREP" -Ev "$EXEMPT_PATHS")
+  interp_paths=$(printf '%s\n' "$INTERP_ALLOW" | while IFS= read -r e; do
+                   [ -n "$e" ] || continue; printf '%s\n' "${e%% *}"; done)
+  # WHY `printf | while` AND NOT `for p in $interp_paths`:
+  # An unquoted parameter expansion in a `for` list word-splits under bash and does
+  # NOT under zsh, where it stays one string — the fork class this guard exists to
+  # catch, and one this file already carries a header comment about for $SCAN.
+  interp_present=$(printf '%s\n' "$interp_paths" | while IFS= read -r p; do
+                     [ -n "$p" ] || continue; [ -e "$ROOT/$p" ] && printf 'x\n'
+                   done | "$GREP" -c . || true)
+  interp_total=$(printf '%s\n' "$INTERP_RAW" | "$GREP" -c . || true)
+  # THE THREE-OUTCOME DISCRIMINATOR, and it is keyed on the TREE, not on this script.
+  # The allowlist is inline, so it is never absent; the files are what a tree either
+  # has or does not. guard-failure.test.sh's mkroot() builds the nine shipped
+  # directories empty to exercise the failure path, and a check that red()s there
+  # fails on every tree but this one — which is how check 4 took that suite from
+  # 19/19 to 16/3, breaking precisely the assertions proving this guard is not
+  # vacuous. A tree carrying none of these files and no hits claims nothing.
+  if [ "$interp_present" -eq 0 ] && [ "$interp_total" -eq 0 ]; then
+    skip "no allowlisted file present and no interpolated matcher found — nothing here claims this property"
+  else
+    interp_bad=$(printf '%s\n' "$INTERP_RAW" | while IFS= read -r line; do
+                   [ -n "$line" ] || continue
+                   rel=${line#"$ROOT"/}; printf '%s\n' "${rel%%:*}"
+                 done | LC_ALL=C sort -u | while IFS= read -r f; do
+                   [ -n "$f" ] || continue
+                   want=$(interp_allowed_for "$f")
+                   got=$(interp_hits_in "$f")
+                   if [ -z "$want" ]; then
+                     printf '  UNLISTED %s (%s site(s)) — a new interpolated matcher, or one moved here\n' "$f" "$got"
+                   elif [ "$want" != "$got" ]; then
+                     printf '  COUNT CHANGED %s — allowlist declares %s, tree has %s\n' "$f" "$want" "$got"
+                   fi
+                 done)
+    # THE OTHER DIRECTION. Without it the list rots instead of draining: a site
+    # fixed in another branch leaves its entry behind, and the next reader treats a
+    # closed defect as open. This is not hypothetical — it is what this check found
+    # on introduction, in the comment it replaces.
+    interp_stale=$(printf '%s\n' "$interp_paths" | while IFS= read -r f; do
+                     [ -n "$f" ] || continue
+                     [ "$(interp_hits_in "$f")" = "0" ] || continue
+                     if [ -e "$ROOT/$f" ]; then
+                       printf '  STALE %s — allowlisted but no longer matches; the site was fixed, so drop the entry\n' "$f"
+                     else
+                       printf '  STALE %s — allowlisted but the file is gone; drop the entry\n' "$f"
+                     fi
+                   done)
+    if [ -n "$interp_bad" ] || [ -n "$interp_stale" ]; then
+      red "interpolated wiki-link matcher allowlist does not match the tree:"
+      [ -n "$interp_bad" ] && printf '%s\n' "$interp_bad"
+      [ -n "$interp_stale" ] && printf '%s\n' "$interp_stale"
+      echo "    Interpolating a note name makes every character of it a regex."
+      echo "    Prefer reference/lib/link-extraction.sh; allowlist only with a stated reason."
+    else
+      # COUNTED, NOT WRITTEN. Check 4's comment states the principle this repo keeps
+      # re-learning: a number that does not come from counting the thing it names is
+      # the defect. A literal here would survive an entry being deleted.
+      interp_files=$(printf '%s\n' "$interp_paths" | "$GREP" -c . || true)
+      ok "$interp_total interpolated matcher(s) across $interp_files allowlisted file(s), all accounted for"
+    fi
+  fi
+else
+  red "interpolated matcher scan could not run (see stderr) — cannot conclude anything"
 fi
 
 echo
