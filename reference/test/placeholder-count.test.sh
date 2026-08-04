@@ -167,6 +167,23 @@ allow "$R2" "skill-sources/alpha/SKILL.md 9->8 an entry whose counts no longer m
 eq "allowlist: an entry that no longer matches is STALE" "1" "$(rc_of "$R2")"
 eq "allowlist: and says so"                            "yes" \
    "$(run "$R2" | grep -q 'STALE allowlist entry' && echo yes || echo no)"
+# EACH REMEDY WITH ITS OWN FINDING. A stale-only run used to print the hardcoding
+# advice too, sending the reader to reverse a transform nobody performed.
+#
+# THIS NEEDS ITS OWN FIXTURE. R2 above carries BOTH a real decrease and a stale
+# entry, so the hardcoding advice is correct there — asserting its absence
+# against R2 tested nothing about the split and failed for the right reason.
+# Stale-only means: the entry's file IS in the range (or staleness is scoped
+# away) and shows NO decrease at all.
+R5=$(mkrepo)
+( cd "$R5" && git checkout -qb work && printf 'harmless\n' >> skill-sources/alpha/SKILL.md \
+  && git commit -aqm "edit alpha without losing a marker" ) >/dev/null 2>&1
+allow "$R5" "skill-sources/alpha/SKILL.md 3->2 a decrease this range does not show"
+eq "allowlist: a stale-only run fails"                   "1" "$(rc_of "$R5")"
+eq "allowlist: a stale-only run does NOT print hardcoding advice" "yes" \
+   "$(run "$R5" | grep -q 'reverse-transforms are mandatory' && echo no || echo yes)"
+eq "allowlist: it prints the remedy that fits — delete the entry" "yes" \
+   "$(run "$R5" | grep -q 'that is the list draining' && echo yes || echo no)"
 
 # AN ENTRY MUST NOT REDDEN RANGES THAT DO NOT TOUCH ITS FILE. check 6's allowlist
 # keys on TREE state, where "no longer matches" is true from every angle; this one

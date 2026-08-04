@@ -231,6 +231,7 @@ CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][
 CONTRIBUTING.md|bump-version suite total|s/.*bump-version.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|bump-version
 CONTRIBUTING.md|kernel-note-dirs suite total|s/.*kernel-note-dirs.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|kernel-note-dirs
 CONTRIBUTING.md|threshold-namespace suite total|s/.*threshold-namespace.*expect: \([0-9][0-9]*\) passed,.*/\1/p|truth_suite|threshold-namespace
+CONTRIBUTING.md|placeholder-count suite total|s/.*placeholder-count.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|placeholder-count
 CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z-]*\) CI steps must pass.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z-]*\) CI steps ran.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z-]*\),.*/\1/p|truth_check_files|
@@ -244,6 +245,7 @@ CLAUDE.md|guard-failure fence total|s/^ *\$s reference\/test\/guard-failure\.tes
 CLAUDE.md|bump-version fence total|s/^ *\$s reference\/test\/bump-version\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|bump-version
 CLAUDE.md|kernel-note-dirs fence total|s/^ *\$s reference\/test\/kernel-note-dirs\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|kernel-note-dirs
 CLAUDE.md|threshold-namespace fence total|s/^ *\$s reference\/test\/threshold-namespace\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|threshold-namespace
+CLAUDE.md|placeholder-count fence total|s/^ *\$s reference\/test\/placeholder-count\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|placeholder-count
 CLAUDE.md|executable check count|s/^ls reference\/check-\*\.sh [^#]*# *\([0-9][0-9]*\).*/\1/p|truth_check_files|'
 
 while IFS='|' read -r file label extract truthfn arg; do

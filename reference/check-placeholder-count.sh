@@ -278,11 +278,22 @@ if [ "$rc2" -eq 1 ]; then
     echo; echo "PLACEHOLDER COUNT: CANNOT CONCLUDE"; exit 2
 fi
 if [ -n "$bad" ] || [ -n "$stale" ]; then
-    [ -n "$bad" ] && { echo "  a placeholder was replaced with a concrete value:"; printf '%s\n' "$bad"; }
-    [ -n "$stale" ] && printf '%s\n' "$stale"
-    echo "    skill-sources/ templates are copied into vaults. A concrete name here"
-    echo "    ships one user's vocabulary to every future system."
-    echo "    See CONTRIBUTING.md 'Two reverse-transforms are mandatory'."
+    # EACH REMEDY GOES WITH ITS OWN FINDING. Printing the hardcoding advice on a
+    # stale-only run tells the reader to reverse a transform nobody performed,
+    # and sends them looking for a defect that is not there. Two findings, two
+    # remedies, neither shown without its cause.
+    if [ -n "$bad" ]; then
+        echo "  a placeholder was replaced with a concrete value:"
+        printf '%s\n' "$bad"
+        echo "    skill-sources/ templates are copied into vaults. A concrete name here"
+        echo "    ships one user's vocabulary to every future system."
+        echo "    See CONTRIBUTING.md 'Two reverse-transforms are mandatory'."
+    fi
+    if [ -n "$stale" ]; then
+        printf '%s\n' "$stale"
+        echo "    The allowlist describes a decrease this range no longer shows."
+        echo "    Delete the entry — that is the list draining, which is the point of it."
+    fi
     fail=1
 fi
 
