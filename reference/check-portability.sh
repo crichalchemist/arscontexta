@@ -394,6 +394,16 @@ echo "6. Wiki-link matchers do not interpolate a note name into the pattern"
 # clean for checks 1-3 first, so the widening could not turn CI red on a
 # pre-existing defect and mask which change caused what.
 #
+# KNOWN LIMITATION — THE PROPERTY IS KEYED ON THE ESCAPED SPELLING `\[\[$`.
+# A matcher written with UNescaped brackets, `grep -rlF "[[$q]]"`, interpolates
+# just as dangerously and is not flagged. So does a pattern assembled in two
+# steps, `pat="[[$q]]"` then `grep -rl "$pat"`. Neither occurs in the tree today,
+# and both were measured rather than assumed. Worth knowing that the unescaped
+# form is not merely unflagged but is a second defect: without -F, `[[Target]]`
+# is a BRE bracket expression, so it matches any line containing one of those
+# letters followed by `]` — verified matching a fixture it has no business
+# matching. Widen from these two edges rather than rediscovering them.
+#
 # THIS CHECK DOES NOT HONOUR `portability-exempt`, and the check-2 comment above
 # says why that marker's scope is stated rather than assumed: an allowlist entry
 # carries a reason and is reviewed, a marker carries nothing. Two exemption
@@ -504,7 +514,15 @@ if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
       # COUNTED, NOT WRITTEN. Check 4's comment states the principle this repo keeps
       # re-learning: a number that does not come from counting the thing it names is
       # the defect. A literal here would survive an entry being deleted.
-      interp_files=$(printf '%s\n' "$interp_paths" | "$GREP" -c . || true)
+      # COUNT THE FILES THAT CONTRIBUTED HITS, not the allowlist's length. Those
+      # are equal on every tree that reaches this branch, but they are different
+      # QUANTITIES, and reporting one under the other's name is the mislabel this
+      # repo has now fixed in four places (skills/help, session-orient.sh,
+      # skills/health, and check 4's own $pinned).
+      interp_files=$(printf '%s\n' "$INTERP_RAW" | while IFS= read -r line; do
+                       [ -n "$line" ] || continue
+                       rel=${line#"$ROOT"/}; printf '%s\n' "${rel%%:*}"
+                     done | LC_ALL=C sort -u | "$GREP" -c . || true)
       ok "$interp_total interpolated matcher(s) across $interp_files allowlisted file(s), all accounted for"
     fi
   fi
