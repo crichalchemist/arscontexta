@@ -327,12 +327,28 @@ produce a commit with no tracked change without `--allow-empty`. A check that ca
 fail is not a gate.
 
 The nearest checkable variant — *must touch `CLAUDE.md` or `docs/superpowers/`* — was measured over
-the 60 commits ending at **`8218b4a`**, this task's base: 27 mention "record", 3 would fail. One of
-those three is a true positive (`741b2b7`).
-One is a false positive (`4c827a6`, whose message says a code comment "records it as an accepted
-defect" — the verb, not a claim of having made a record). And decisively, the variant **passes**
-`c122d9e`, the second and harder known instance, which did touch a plan file while the three
-findings it claimed to record went only to scratch. A gate that greens the harder of the two
+the 60 commits ending at **`8218b4a`**, this task's base: 27 mention "record", 3 would fail. **All
+three are classified below, because printing three failures and accounting for two invites the
+reading that the unnamed one was the inconvenient one.** Exactly one is a true positive
+(`741b2b7`).
+The second is a false positive (`4c827a6`, whose message says a code comment "records it as an
+accepted defect" — the verb, not a claim of having made a record). **So is the third**: `acb1ecf`
+says "Recorded for the whole-branch review" while touching only `skills/upgrade/SKILL.md`, but the
+namespace decision it deferred *did* ship afterwards, in `1d19542`, and is in `CLAUDE.md`'s
+divergence 5 today. The real ratio is therefore **1 true positive to 2 false**, which strengthens
+the rejection rather than weakening it — a gate wrong twice as often as it is right. And decisively,
+the variant **passes** `c122d9e`, the second and harder known instance, which did touch a plan file
+while the three findings it claimed to record went only to scratch.
+
+```bash
+git merge-base --is-ancestor acb1ecf 1d19542 && echo 'the deferred record shipped later'
+grep -n 'maintenance.conditions' CLAUDE.md | head -3    # where it landed: divergence 5
+```
+
+Note the consequence for wording elsewhere: this scan surfaces **three** commits matching the
+pattern, while D10 and `CONTRIBUTING.md` both speak of "the two instances". Two is the count of
+*genuine* failures, not of matches — and the gap between those two numbers is the entire reason the
+gate is not shippable. A gate that greens the harder of the two
 instances it exists to catch is asserting a proxy, not the property — the exact failure this
 repo's gate inventory spends its length warning about. Re-derive:
 
