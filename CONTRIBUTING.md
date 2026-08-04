@@ -109,15 +109,26 @@ for s in bash zsh; do
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
 done
 
-./reference/validate-kernel.sh ~/second-brain           # expect 15 PASS / 2 WARN / 0 FAIL
+./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
 ```
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
-disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message before
-concluding that. Against `~/second-brain` two other primitives WARN today, and both are content
-defects in that vault rather than regressions here: primitive 1 (frontmatter coverage) and
-primitive 2 (8 unresolved wiki links, surfaced only once the dangling scan stopped sampling 100
-of 2716 links). A vault you generated yourself should show neither.
+disabled). Any other WARN or FAIL is a regression.
+
+**That is a criterion about primitives, and it deliberately does not quote a total.** An earlier
+revision of this line replaced it with one private vault's result-line totals, which is a different
+quantity — `CLAUDE.md` explains at length that the summary counts result lines rather than
+primitives, that primitive 2 emits two of them, and that the total equalling 15 is a coincidence of
+arithmetic. Quoting a measurement here also mints a number no gate can check, because CI has no
+generated vault to measure: it would go stale the first time anyone fixed anything in the vault it
+described, and stay green. **Read the labels, not the total.**
+
+Two things a real run will show that are not regressions in this repo. A **mature** vault can WARN
+on content defects it has accumulated — the maintainer's own vault currently WARNs on primitive 1
+(frontmatter coverage) and primitive 2 (unresolved wiki links). A **brand-new** vault can WARN on
+primitive 2 for the opposite reason: it has no wiki links yet, and the check reports a resolved
+notes directory containing none. Neither is this repo failing; both are the validator describing
+the vault it was handed.
 
 **"Green" means all nineteen CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
