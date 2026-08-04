@@ -439,6 +439,17 @@ generators/features/maintenance.md 1 a recipe emitted into a generated vault's d
 interp_hits_in() {         # interp_hits_in <relative-path> -> hit count in that file
   printf '%s\n' "$INTERP_RAW" | "$GREP" -cF "$ROOT/$1:" || true
 }
+# The rel-path parse, extracted rather than written a third time. Two identical
+# copies is where the fence gate's absorption/staleness split began, and this
+# check's own header says re-deriving a condition at a second site is how they
+# came apart. Writing that and then inlining the same parse twice more is the
+# defect the comment warns about, committed inside the comment's own file.
+interp_files_hit() {       # interp_files_hit -> sorted unique relative paths with hits
+  printf '%s\n' "$INTERP_RAW" | while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    rel=${line#"$ROOT"/}; printf '%s\n' "${rel%%:*}"
+  done | LC_ALL=C sort -u
+}
 interp_allowed_for() {     # interp_allowed_for <relative-path> -> declared count, or empty
   printf '%s\n' "$INTERP_ALLOW" | while IFS= read -r e; do
     [ -n "$e" ] || continue
@@ -470,10 +481,7 @@ if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
   if [ "$interp_present" -eq 0 ] && [ "$interp_total" -eq 0 ]; then
     skip "no allowlisted file present and no interpolated matcher found — nothing here claims this property"
   else
-    interp_bad=$(printf '%s\n' "$INTERP_RAW" | while IFS= read -r line; do
-                   [ -n "$line" ] || continue
-                   rel=${line#"$ROOT"/}; printf '%s\n' "${rel%%:*}"
-                 done | LC_ALL=C sort -u | while IFS= read -r f; do
+    interp_bad=$(interp_files_hit | while IFS= read -r f; do
                    [ -n "$f" ] || continue
                    want=$(interp_allowed_for "$f")
                    got=$(interp_hits_in "$f")
@@ -519,10 +527,7 @@ if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
       # QUANTITIES, and reporting one under the other's name is the mislabel this
       # repo has now fixed in four places (skills/help, session-orient.sh,
       # skills/health, and check 4's own $pinned).
-      interp_files=$(printf '%s\n' "$INTERP_RAW" | while IFS= read -r line; do
-                       [ -n "$line" ] || continue
-                       rel=${line#"$ROOT"/}; printf '%s\n' "${rel%%:*}"
-                     done | LC_ALL=C sort -u | "$GREP" -c . || true)
+      interp_files=$(interp_files_hit | "$GREP" -c . || true)
       ok "$interp_total interpolated matcher(s) across $interp_files allowlisted file(s), all accounted for"
     fi
   fi

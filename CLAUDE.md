@@ -58,7 +58,7 @@ bash reference/check-prose-paths.sh                      # 0 missing (path count
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
-  $s reference/test/guard-failure.test.sh                # 51/51
+  $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
@@ -806,13 +806,20 @@ measuring the documentation:
 ```bash
 /usr/bin/grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' \
     skill-sources/ skills/ platforms/claude-code/ reference/ \
-  | /usr/bin/grep -Ev '(check-portability|guard-failure\.test)\.sh:'   # 9
+  | /usr/bin/grep -Ev 'reference/+(check-portability\.sh|test/guard-failure\.test\.sh):'   # 9
 ```
 
-Anchor the exclusion on the **basename**: `grep -r` emits `reference//check-portability.sh` with a
-doubled slash, so the path-anchored form `^[^:]*reference/(check-portability\.sh|…):` that works
-inside the guard silently matches nothing here and returns the unfiltered count — a wrong answer that
-looks like a plausible one, which is this repo's failure mode exactly.
+**`/+` is doing two jobs and both are load-bearing.** `grep -r` emits `reference//check-portability.sh`
+with a doubled slash, so the guard's own `reference/(…)` spelling matches nothing here and returns the
+unfiltered count — a wrong answer that looks plausible. `/+` absorbs the extra slash. It also keeps the
+exclusion **directory-anchored**, which a basename match is not: `-Ev '(check-portability|guard-failure\.test)\.sh:'
+reads correct and silently drops a real hit in any file named to resemble a gate — verified with a
+planted decoy under `skills/` whose basename ended in `-check-portability.sh`, which vanished from the
+count. (Named by shape rather than by path on purpose: `check-prose-paths.sh` resolves every repo path
+in this file, and a deleted probe file cited by name fails that gate — as this sentence did on its
+first draft.) That is the one-rename evasion
+`check-portability.sh`'s own header describes rejecting for `--exclude`, and it was reintroduced here in
+prose before this line was fixed.
 
 Verified against the tree, not remembered: **9 hits**, of which **7 are executable**, **2 are a
 documentation table**, and **0 executable sites are in `skill-sources/`** (the criterion above, met
@@ -821,6 +828,12 @@ revision of this entry said "8 are executable" here while saying "seven executab
 below. The two hits that *are* in `skill-sources/` are the documentation-table rows named below —
 which is exactly why the unqualified "0 are in `skill-sources/`" that stood here was wrong, and why
 `9 − 7 = 2` makes it measurable.
+
+**Divergence 13 also publishes `9 = 7 + 2`, about a different set — do not merge them.** Here the 9
+is *matcher* hits and the 2 are documentation-table rows; there the 9 is `rg -o '\[\['` hits and the
+2 are bracket **counters**, a different operation. The arithmetic coinciding is exactly the trap this
+file already records for the five literal `30`s and for `validate-kernel.sh`'s `PASS: 15` matching its
+target twice for two unrelated reasons. Read the subject, not the sum.
 
 **Six of these seven executable rows are now gated by check 6** — every one that interpolates a note
 name. The exception is `skills/health/SKILL.md:543`, which takes no title. None was touched by this
@@ -887,8 +900,10 @@ way to spell the work.
 The distinguishing property is the *capture*: this class extracts a target with `([^\]|#]+)' -r '$1'`.
 A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which is a link **count**, a
 different operation with none of the per-target problem this entry describes. Two such sites exist
-(`skill-sources/graph/SKILL.md:569`, `skill-sources/stats/SKILL.md:397`), so `9 = 7 + 2`. Match the
-capture, not the brackets:
+(`skill-sources/graph/SKILL.md:569`, `skill-sources/stats/SKILL.md:397`), so `9 = 7 + 2`. **Divergence
+12 publishes the same sum for a different set** — there the 9 is matcher hits and the 2 are
+documentation-table rows; here the 9 is `rg -o` hits and the 2 are bracket counters. Same arithmetic,
+different subject; do not merge them. Match the capture, not the brackets:
 
 ```bash
 grep -rnF "rg -o '\[\["      skill-sources/ skills/ | wc -l   # 9, both operations

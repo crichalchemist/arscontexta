@@ -144,6 +144,28 @@ truth_portability_checks() {
     printf '%s' "$_n"
 }
 
+# Divergence 12's matcher-site count -- the number this branch itself ratcheted
+# 10 -> 12 by adding check 6 and its coverage, because the published command had
+# no exemption and was counting the gate's own text. Gating it is the point: a
+# count that moves when someone DOCUMENTS the subject is measuring documentation.
+#
+# The exclusion is directory-anchored, not a basename match. `grep -r` emits a
+# doubled slash, which `/+` absorbs; a basename form silently drops a real hit in
+# any file named to resemble a gate, which is the one-rename evasion
+# check-portability.sh's own header rejects for --exclude.
+truth_divergence12_matchers() {
+    local _n
+    [ -d skill-sources ] && [ -d reference ] || return 1
+    _n=$(/usr/bin/grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' \
+           skill-sources/ skills/ platforms/claude-code/ reference/ 2>/dev/null \
+         | /usr/bin/grep -Ev 'reference/+(check-portability\.sh|test/guard-failure\.test\.sh):' \
+         | /usr/bin/grep -c . || true)
+    # Zero means the scan broke, never that the class is gone -- the allowlisted
+    # sites are load-bearing and deliberately unconverted.
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+
 truth_ci_run_checks() {
     local _n
     # Checks CI actually EXECUTES — distinct from checks that merely APPEAR in
@@ -195,6 +217,8 @@ reference/lib/frontmatter.sh|portability check count (word)|s/.*runs \([a-z][a-z
 reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
 skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
 CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
+CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
+CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
 CONTRIBUTING.md|bump-version suite total|s/.*bump-version.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|bump-version

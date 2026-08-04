@@ -394,5 +394,24 @@ eq "check 3 reaches a .template"              "1" "$(rc_of "$I")"
 eq "check 3 names the .template"            "yes" \
    "$(out_of "$I" | grep -q 'probe.sh.template' && echo yes || echo no)"
 
+# CHECK 2 HAS TWO PARTS AND BOTH NEED THEIR OWN ASSERTION. The first version of
+# this section covered checks 1 and 3 only, and the mutation used to justify it
+# stripped *.template from all four scans AT ONCE — a compound mutation cannot
+# tell which scans an assertion actually covers. Neutered independently, 2A and 2B
+# both stayed green at 51/0 while shipping narrowed. Same trap as a suite total
+# rising without any new row being able to fail.
+# 2A: a negated class that does not exclude the | and # boundaries.
+I=$(mkroot); mkdir -p "$I/platforms/claude-code/hooks"
+printf '%s\n' "rg -o '\\[\\[([^\\]]+)\\]\\]' notes/" > "$I/platforms/claude-code/hooks/probe.sh.template"
+eq "check 2A reaches a .template"             "1" "$(rc_of "$I")"
+eq "check 2A names the .template"           "yes" \
+   "$(out_of "$I" | grep -q 'probe.sh.template' && echo yes || echo no)"
+# 2B: a greedy dot quantifier between the brackets.
+I=$(mkroot); mkdir -p "$I/platforms/claude-code/hooks"
+printf '%s\n' "rg -o '\\[\\[.*\\]\\]' notes/" > "$I/platforms/claude-code/hooks/probe.sh.template"
+eq "check 2B reaches a .template"             "1" "$(rc_of "$I")"
+eq "check 2B names the .template"           "yes" \
+   "$(out_of "$I" | grep -q 'probe.sh.template' && echo yes || echo no)"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
