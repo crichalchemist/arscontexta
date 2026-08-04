@@ -58,7 +58,7 @@ bash reference/check-prose-paths.sh                      # 0 missing (path count
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
-  $s reference/test/guard-failure.test.sh                # 34/34
+  $s reference/test/guard-failure.test.sh                # 44/44
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
@@ -68,7 +68,7 @@ done
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | five checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink |
+| `check-portability.sh` | six checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally) |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
@@ -83,7 +83,10 @@ the number it prints is *right* is not checked by anything here.
 
 **Nor does any gate enforce "do not inline the link library's functions."** That row used to claim
 `check-portability.sh` catches inlined copies, and `reference/lib/link-extraction.sh` said the same in
-its header. Both were false — the five checks are enumerated above and none of them looks for it. The
+its header. Both were false — the six checks are enumerated above and none of them looks for it. Check
+6 is not that gate either, and the distinction is the one divergence 13 draws: it forbids
+*interpolating* a note name into a matcher, while the inlined sites spell `rg -o '\[\[([^\]|#]+)'` and
+interpolate nothing, so they are correctly outside it. The
 cost was not hypothetical: inlined matchers sat in five `skill-sources` fences through four gates, a
 127 KB review and a live vault run, and the commit that removed them added a *sixth* inlined
 extraction (`skill-sources/graph/SKILL.md`, the `rg -o` edge builder) which likewise passed every
@@ -809,7 +812,7 @@ comment that sits inside the gate itself. None was touched by this branch:
 | `skills/health/SKILL.md:520` | `rg -l` | MOC note count |
 | `skills/health/SKILL.md:543` | `rg` | MOC *list shape*, not a backlink — carries `portability-exempt` |
 | `skills/architect/SKILL.md:179` | `grep -rl` | link counts in evolution advice |
-| `platforms/claude-code/hooks/session-orient.sh.template:149` | `grep -rl` | SessionStart orientation |
+| `platforms/claude-code/hooks/session-orient.sh.template:160` | `grep -rl` | SessionStart orientation |
 | `reference/testing-milestones.md:410` | `grep -rl` | a test spec's own MOC-ref check |
 | `reference/check-portability.sh:128` | — | a comment inside the gate, not code |
 
@@ -821,15 +824,32 @@ correctly out of scope.
 command and its pattern. No current site does. Start the next widening from that edge rather than
 rediscovering it.
 
-**No gate catches any of them.** `check-portability.sh` check 2 flags a link capture whose negated
-class omits the `|`/`#` terminators — it keys on `[^` being *present*, and a fixed-name bracket grep
-has no negated class at all. See also the gate table near the top of this file: nothing enforces
-"do not inline the library's functions" either. Both belong to the CI-hardening spec.
+**The line numbers in that table drift, and one of them was wrong when check 6 was built** — the
+template's site read `:149` against a true `:160`, moved by an unrelated edit. Every other entry was
+re-verified at the same time and holds. Do not trust a number here without re-running the pattern
+above; check 6's allowlist deliberately keys on file and count rather than line for exactly this
+reason, and the guard comment it replaced gave "no line numbers here" as a considered choice.
 
-Not fixed here on purpose. The blast radii differ: `session-orient.sh.template` runs on **every**
-SessionStart, where a fail-loud version guard turns a missing library into a broken session rather
-than a wrong number. Porting the library into a shipped template unreviewed at the end of a branch is
-how the previous divergence in this family was made.
+**Six of the seven are now GATED, and the seventh is correctly outside.** That sentence read "No gate
+catches any of them" until `check-portability.sh` check 6 landed on `fix/ci-hardening`. Check 6 keys
+on the *interpolation* — a `$` expanded directly after `\[\[`, which makes every character of a note
+name a regex — and every executable site above carries one except `skills/health/SKILL.md:543`, which
+takes no note title at all and is the same site already carrying `portability-exempt`. Check 6 also
+gates a **seventh** site this table never listed, `generators/features/maintenance.md`, found because
+the table's own search string required an `-l` flag and that site spells `rg -q`.
+
+**Still ungated, and the distinction matters:** check 2 flags a link capture whose negated class omits
+the `|`/`#` terminators — it keys on `[^` being *present*, and a fixed-name bracket grep has no
+negated class at all. So a matcher that interpolates nothing (`grep -l '[[Index]]'`) is caught by
+neither check. And nothing enforces "do not inline the library's functions" — see the gate table near
+the top of this file, and divergence 13. Both belong to the CI-hardening spec.
+
+The sites themselves are **not converted**, on purpose, and check 6 allowlists each with a stated
+reason rather than pretending otherwise. The blast radii differ: `session-orient.sh.template` runs on
+**every** SessionStart, where a fail-loud version guard turns a missing library into a broken session
+rather than a wrong number. Porting the library into a shipped template unreviewed at the end of a
+branch is how the previous divergence in this family was made. What changed is that the list can no
+longer rot silently — an entry whose site is fixed, or whose count moves, now fails the gate.
 
 **13. Seven sites inline link extraction because the library has no function for "which files link
 to X".** `reference/lib/link-extraction.sh` exposes directory-scoped functions only — `count_links`,
