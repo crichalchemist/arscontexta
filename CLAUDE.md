@@ -339,11 +339,21 @@ stayed invisible.
 `DELIBERATELY FIXED, NOT MERELY UNDECLARED` (`:212` as of this commit — grep the heading, since
 adding that very comment drifted every line number this entry originally cited). The reason is
 deliberately *not*
-"nobody asked", which rots the moment someone does: `self_evolution.*` earned its keys because **four**
-surfaces read it and a wrong value makes a vault's own tools contradict each other about running
-`/rethink`. These three have **no second reader** — a wrong value mistimes a nudge and cannot produce
-disagreement. The comment carries a falsifiable trigger rather than a preference: *if a second surface
-ever compares against one of these numbers, that one becomes a config key.*
+"nobody asked", which rots the moment someone does: `self_evolution.*` earned its keys because **four
+independent consumers** read it — `next`, `remember`, `rethink` and the hook, each deciding on its own
+whether to recommend `/rethink` — so a wrong value makes a vault's own tools contradict each other
+about it. These three have **no second independent consumer**: a wrong value mistimes a nudge and
+cannot produce that contradiction, because there is no other decision-maker to contradict. The comment
+carries a falsifiable trigger rather than a preference, quoted here verbatim from the hook: *if a
+second **INDEPENDENT CONSUMER** — a distinct decision-maker, not another copy of this same SessionStart
+hook — ever compares against one of these numbers, that one becomes a config key.*
+
+**"Independent" is load-bearing, and this entry is the reason it had to be.** The trigger first read
+"a second surface", which the very next paragraph refutes by naming the template as exactly that — the
+entry contained both the claim and its refutation. The distinction that resolves it, and that governs
+the whole entry: **two copies of ONE consumer can DRIFT**, which a cross-reference fixes; **two
+DISTINCT consumers can DISAGREE**, which only a shared config key fixes. Different defects, different
+remedies — which is why the template below gets a cross-reference and not a key.
 
 **What that decision does not buy is single ownership, and the entry says so rather than claiming it.**
 Measured: `DAYS_STALE`'s 30 has **one** declaration repo-wide; `SESS_COUNT`'s 5 and `INBOX_COUNT`'s 3
@@ -750,6 +760,11 @@ doing it is this number; if it grows, the argument gets stronger.
 Note the interaction with divergence 12: because these sites use `rg -o` with a negated class and no
 closing `\]\]`, the class-wide matcher pattern correctly does **not** flag them. They are a separate
 defect, not a residue of the same one.
+
+**14 — pointer, not a new entry: the platform hook template's two threshold placeholders are
+substituted by nothing in this repo** — knobs that look configurable and are not. Filed inside
+divergence 3 (which is where it was found and where its evidence lives) rather than given an entry of
+its own; this line exists so a reader scanning headings finds it at all.
 
 ### Closed on `fix/spec-f-divergence-drain`
 
