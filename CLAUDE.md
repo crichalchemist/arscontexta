@@ -59,7 +59,7 @@ for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 40/40
+  $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 36/36
   $s reference/test/threshold-namespace.test.sh          # 52/52
 done
@@ -741,10 +741,10 @@ defect, not a residue of the same one.
   produced it at all.
 
   ```bash
-  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 40/40, was 28/28
+  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 41/41, was 28/28
   ```
 
-  **Twelve assertions added, each mutation-proved rather than counted** — the failure this repo has
+  **Thirteen assertions added, each mutation-proved rather than counted** — the failure this repo has
   already shipped is a suite whose total rises while the new rows cannot fail. Every mutation was
   asserted to have applied before its result was read:
 
@@ -758,6 +758,7 @@ defect, not a residue of the same one.
   | buffer the `SKIP (missing)` line into `$report` again | the SKIP-survives-abort assertion |
   | rename the temp suffix `.tmp.` → `.stg.` (4 sites, behaviour-identical) | the `$TMP_GLOB` coupling assertion |
   | that rename **plus** neutered temp removal (temps genuinely orphaned) | the same one, and only it |
+  | stop printing the `discarded:` line at both sites | all three of the new controls |
   | neutered temp removal alone, suffix unchanged | the 2 failure-path no-temp assertions |
 
   **The fix introduced a regression of the house class, and the last row is its pin.** Moving the

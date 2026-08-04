@@ -218,7 +218,17 @@ eq "harness: the temp search finds a temp that is there" "$F/pkg/plugin.json.tmp
    "$(find "$F" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
 
 F=$(mkfix); printf 'not json\n' > "$F/pkg/marketplace.json"
-disc=$(out_of "$F" 8.8.8 | sed -n 's/^  discarded: //p' | head -1)
+# `.work` names are excluded deliberately. The abort branch loops over both `$tmp` and
+# `$tmp.work`, and the four assertions this control underwrites search for the STAGED
+# TEMP — so pinning the glob against a `.work` name would still match, still go red
+# under a suffix rename, and still not be pinning the thing they look for. Today only
+# the staged temp survives to that branch (stage_json_field removes `.work` on failure
+# and `mv` consumes it on success), so the filter is a no-op; the count assertion below
+# is what makes a change in that invariant visible instead of silently absorbed.
+disc_all=$(out_of "$F" 8.8.8 | sed -n 's/^  discarded: //p')
+disc=$(printf '%s\n' "$disc_all" | grep -v '\.work$' | head -1)
+eq "harness: the aborted run discards exactly one staged temp" "1" \
+   "$(printf '%s\n' "$disc_all" | grep -c . || true)"
 # Positive half first: a discarded name was actually reported. Without it the glob
 # assertion below would pass on an empty string under some shells' pattern rules, and
 # would certainly pass for the wrong reason if the script stopped printing the line.
