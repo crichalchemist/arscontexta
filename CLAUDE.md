@@ -370,23 +370,43 @@ was made load-bearing by divergence 3's own fix on this branch — the hook now 
 writes.
 
 **Closed from that run: `self_evolution.*` is authoritative, and 6c now reconciles instead of
-reporting.** The field vault's generated `/rethink` read `maintenance.conditions.pending_*_threshold`
-(20/10) while `/next`, `/remember` and the SessionStart hook read `self_evolution.*` (10/5) — both
-pairs declared thirteen lines apart in one `ops/config.yaml`. Measured there, `/rethink` reported the
-threshold unmet while the other three recommended running it.
+reporting.** Both pairs were declared thirteen lines apart in one `ops/config.yaml`, and the field
+vault had **three** readers, not two — measured at 14 open observations and 8 open tensions:
 
-**Get the direction right, because the obvious phrasing is the wrong one and it shipped here once.**
-It is the *vault's* `/rethink` that reads the legacy pair; this repo's `skill-sources/rethink`
-template has always read `self_evolution.*`. Writing "`next`/`remember`/`rethink` read
-`self_evolution.*`" is true of the templates and false of the vault the sentence is about — and it is
-self-refuting besides, since at 10/5 fourteen open observations *fires*, so a `/rethink` reading that
-pair could not have been the silent one. Re-derive the counts and the direction (all drift):
+| Field-vault surface | Reads | Threshold | At 14 / 8 |
+|---|---|---|---|
+| its generated `/rethink` | `maintenance.conditions.pending_*_threshold` | 20 / 10 | silent |
+| `/next`, `/remember` | `self_evolution.*` | 10 / 5 | **FIRES** |
+| its SessionStart hook | **neither** — hardcoded `-gt 20` / `-gt 10` | 20 / 10 | silent |
+
+So the live split was **2 firing, 2 silent**, not three against one. That hook is the hand-patched one
+divergence 3 describes: it names no config key at all, which is *why* divergence 3 exists.
+
+**Get the direction right — the natural phrasing is wrong in two places, and each shipped here once.**
+Both errors are the same move: a clause true of this repo's files, kept while the sentence's subject
+changed to the vault.
+
+- **The reader.** It is the *vault's* `/rethink` that reads the legacy pair; this repo's
+  `skill-sources/rethink` template has always read `self_evolution.*`. "`next`/`remember`/`rethink`
+  read `self_evolution.*`" is true of the templates and false of the vault — and self-refuting
+  besides, since at 10/5 fourteen open observations *fires*, so a `/rethink` on that pair could not
+  have been the silent one.
+- **The hook.** This repo's `hooks/scripts/session-orient.sh` **does** read `self_evolution.*` —
+  divergence 3's fix on this branch made it do so. The *vault's* hook reads neither namespace. Writing
+  "and the hook read `self_evolution.*`" of the vault contradicts divergence 3 two entries below.
+
+Re-derive the counts and both directions (all four figures drift):
 
 ```bash
 . reference/lib/frontmatter.sh
 list_notes_by_field ~/second-brain/ops/observations status pending open | grep -c .   # 14
 list_notes_by_field ~/second-brain/ops/tensions      status pending open | grep -c .   #  8
-grep -rn 'maintenance\.conditions\|self_evolution' ~/second-brain/.claude/skills/     # who reads which
+# Scope must include hooks/, or the command cannot reach the clause about the hook:
+grep -rn 'maintenance\.conditions\|self_evolution' \
+     ~/second-brain/.claude/skills/ ~/second-brain/.claude/hooks/    # skills only; hooks: no match
+# Anchor on the variable, not on the number: `… | grep -E '20|10'` also matches the
+# unrelated capture-count line, because the LINE NUMBER `104:` contains "10".
+grep -nE 'PENDING_(OBS|TEN)" -gt' ~/second-brain/.claude/hooks/session-orient.sh   # 2 lines: 20, 10
 ```
 
 The vault's own write-up recommended the skills
@@ -397,6 +417,8 @@ the hook (deepening it means the general bash YAML parser its own header rejects
 has ever emitted the legacy pair; and it is not a live iterated namespace — the other seven keys under
 `maintenance.conditions:` have zero readers in the field vault, and the `maintenance_conditions` that
 `/next` iterates is a section of the **queue** file, a different structure in a different file.
+Re-derive both (the reader counts drift as the vault grows; the emission count should stay 0, and a
+non-zero result means a generator has started writing the legacy pair again):
 
 ```bash
 grep -rn 'maintenance\.conditions\.' generators/ skills/setup/            # 0 — never emitted here
