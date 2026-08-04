@@ -138,25 +138,49 @@ eq "after: observation surfaces AGREE"             "agree" \
    "$([ "$a_obs" = "$ar_obs" ] && echo agree || echo disagree)"
 eq "after: tension surfaces AGREE"                 "agree" \
    "$([ "$a_ten" = "$ar_ten" ] && echo agree || echo disagree)"
-# AGREEMENT IS THE PROPERTY, not any particular verdict. Swept across counts
-# either side of the tuned 20, the two surfaces must return the same answer at
-# every one — including 14, where the correct shared answer is now `silent`,
-# because the vault asked for 20. Asserting "all four fire at 14" would be
-# asserting the vault's tuning was ignored.
-for c in 0 9 10 14 19 20 25; do
-  eq "after: at $c obs, /rethink and the other three agree" \
-     "$(fires "$c" "$ar_obs")" "$(fires "$c" "$a_obs")"
+# EACH VERDICT IS PINNED TO A LITERAL, and each reader is asserted separately.
+#
+# The first draft of this sweep compared `fires "$c" "$ar_obs"` against
+# `fires "$c" "$a_obs"` and called the property "agreement". Both variables are
+# pinned to "20" by the two assertions directly above, so every one of those 14
+# assertions compared a function to ITSELF and could not redden: inverting
+# `fires` to `-lt` left all 14 green, and replacing its body with a constant
+# `echo FIRES` left all 14 green. Agreement between two values already proven
+# identical is not a property, it is a tautology.
+#
+# Agreement is still what matters, but it is now a CONSEQUENCE of both readers
+# being pinned to the same literal rather than an assertion about the pair. The
+# expected verdicts encode the point of the whole task: after 20/10 is carried
+# across, 14 observations is `silent` for everyone, because the vault asked for
+# 20. Asserting "all four fire at 14" would assert that the tuning was ignored.
+for c in 0 10 19; do
+  eq "after: at $c obs, /next,/remember,hook are silent" "silent" "$(fires "$c" "$a_obs")"
+  eq "after: at $c obs, /rethink is silent"              "silent" "$(fires "$c" "$ar_obs")"
 done
-for c in 0 4 5 8 9 10 12; do
-  eq "after: at $c tensions, /rethink and the other three agree" \
-     "$(fires "$c" "$ar_ten")" "$(fires "$c" "$a_ten")"
+for c in 20 25; do
+  eq "after: at $c obs, /next,/remember,hook fire" "FIRES" "$(fires "$c" "$a_obs")"
+  eq "after: at $c obs, /rethink fires"            "FIRES" "$(fires "$c" "$ar_obs")"
 done
-# And the before-state must FAIL that same sweep, or the sweep proves nothing.
+for c in 0 5 9; do
+  eq "after: at $c tensions, /next,/remember,hook are silent" "silent" "$(fires "$c" "$a_ten")"
+  eq "after: at $c tensions, /rethink is silent"              "silent" "$(fires "$c" "$ar_ten")"
+done
+for c in 10 12; do
+  eq "after: at $c tensions, /next,/remember,hook fire" "FIRES" "$(fires "$c" "$a_ten")"
+  eq "after: at $c tensions, /rethink fires"            "FIRES" "$(fires "$c" "$ar_ten")"
+done
+# The before-state must disagree at exactly the counts that fall between the two
+# thresholds — 10, 14 and 19 are >= 10 but < 20, so the two surfaces split there.
+#
+# ON ITS OWN THIS ONE DOES NOT DISCRIMINATE A BROKEN `fires`: inverting the
+# comparison flips both sides and the count stays 3. It is the four literal
+# `before:` verdicts above that catch that, which is why they are not redundant
+# with this and none of them may be collapsed into it.
 disagreements=0
 for c in 10 14 19; do
   [ "$(fires "$c" "$r_obs")" = "$(fires "$c" "$b_obs")" ] || disagreements=$((disagreements + 1))
 done
-eq "before: the same sweep finds 3 disagreements" "3" "$disagreements"
+eq "before: the surfaces split at exactly 3 of the swept counts" "3" "$disagreements"
 # Carrying across COPIES; the old pair must survive, or the stale /rethink in an
 # un-regenerated vault drops to its built-in default and re-opens the split from
 # the other side.

@@ -61,7 +61,7 @@ for s in bash zsh; do
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 28/28
   $s reference/test/kernel-note-dirs.test.sh             # 36/36
-  $s reference/test/threshold-namespace.test.sh          # 46/46
+  $s reference/test/threshold-namespace.test.sh          # 52/52
 done
 ```
 
@@ -370,10 +370,26 @@ was made load-bearing by divergence 3's own fix on this branch — the hook now 
 writes.
 
 **Closed from that run: `self_evolution.*` is authoritative, and 6c now reconciles instead of
-reporting.** The field vault declared these thresholds under `maintenance.conditions.*` (20/10) while
-`next`/`remember`/`rethink` and the hook read `self_evolution.*` (10/5), thirteen lines apart in one
-file. Measured there — 14 open observations, 8 open tensions — `/rethink` reported the threshold
-unmet while the other three recommended running it. The vault's own write-up recommended the skills
+reporting.** The field vault's generated `/rethink` read `maintenance.conditions.pending_*_threshold`
+(20/10) while `/next`, `/remember` and the SessionStart hook read `self_evolution.*` (10/5) — both
+pairs declared thirteen lines apart in one `ops/config.yaml`. Measured there, `/rethink` reported the
+threshold unmet while the other three recommended running it.
+
+**Get the direction right, because the obvious phrasing is the wrong one and it shipped here once.**
+It is the *vault's* `/rethink` that reads the legacy pair; this repo's `skill-sources/rethink`
+template has always read `self_evolution.*`. Writing "`next`/`remember`/`rethink` read
+`self_evolution.*`" is true of the templates and false of the vault the sentence is about — and it is
+self-refuting besides, since at 10/5 fourteen open observations *fires*, so a `/rethink` reading that
+pair could not have been the silent one. Re-derive the counts and the direction (all drift):
+
+```bash
+. reference/lib/frontmatter.sh
+list_notes_by_field ~/second-brain/ops/observations status pending open | grep -c .   # 14
+list_notes_by_field ~/second-brain/ops/tensions      status pending open | grep -c .   #  8
+grep -rn 'maintenance\.conditions\|self_evolution' ~/second-brain/.claude/skills/     # who reads which
+```
+
+The vault's own write-up recommended the skills
 conform to `maintenance.conditions.*` rather than a namespace be invented (Rule 12); that was sound
 advice *to a vault*, and this is the generator, where three measurements point the other way:
 `read_config.sh` resolves one level of nesting so the three-level key is structurally unreachable by
@@ -381,6 +397,16 @@ the hook (deepening it means the general bash YAML parser its own header rejects
 has ever emitted the legacy pair; and it is not a live iterated namespace — the other seven keys under
 `maintenance.conditions:` have zero readers in the field vault, and the `maintenance_conditions` that
 `/next` iterates is a section of the **queue** file, a different structure in a different file.
+
+```bash
+grep -rn 'maintenance\.conditions\.' generators/ skills/setup/            # 0 — never emitted here
+for k in orphan_nodes_threshold dangling_links_threshold draft_age_days \
+         draft_age_threshold unprocessed_captures_threshold \
+         stale_active_nodes_days stale_active_nodes_threshold; do
+  printf '%-32s %s\n' "$k" \
+    "$(grep -rl "$k" ~/second-brain/.claude ~/second-brain/.agents 2>/dev/null | wc -l)"
+done                                                                     # 0 readers each
+```
 
 The cost, which is real: a vault that tuned `maintenance.conditions.*` gains nothing until the value
 is carried across, so `/upgrade` 6c now ends in a write — copying the tuned pair into
@@ -390,8 +416,17 @@ deduplication: two declarations survive and can re-diverge if a user later edits
 deduplicable only once that vault's `/rethink` has been regenerated.
 
 ```bash
-bash reference/test/threshold-namespace.test.sh   # 46/46; before-state disagrees, after-state agrees
+bash reference/test/threshold-namespace.test.sh   # 52/52; before-state disagrees, after-state agrees
 ```
+
+**52 is the total, not the discriminating count, and the difference is the point.** The 20 threshold
+sweep assertions were reviewed as *tautologies* in their first form: they compared one reader's
+verdict against the other's, and both had already been pinned to the same literal two lines above, so
+inverting the comparison function left every one of them green. They now pin each reader to a literal
+expected verdict. Measured against the two mutations that exposed the defect: inverting `fires`
+reddens all 20; replacing it with a constant `FIRES` reddens 12, the other 8 being the assertions that
+legitimately expect `FIRES`. **An assertion counted in a total is not evidence it can fail** — that is
+the same substitution this file records for the kernel validator's `PASS: 16`.
 
 **What is not verified, since 6c is prose Claude executes:** the suite proves the reconciliation
 *operation* produces agreement across all four readers, and that the repo names one namespace. That
