@@ -175,35 +175,96 @@ eq "bump: rc 0 on a well-formed version"           "0"   "$(rc_of "$F" 8.8.8)"
 eq "bump: pkg/plugin.json moved"                   "8.8.8" "$(jq -r .version "$F/pkg/plugin.json")"
 eq "bump: metadata.version moved"                  "8.8.8" "$(jq -r .metadata.version "$F/pkg/marketplace.json")"
 eq "bump: plugins[0].version moved"                "8.8.8" "$(jq -r '.plugins[0].version' "$F/pkg/marketplace.json")"
-# SUCCESS PATH ONLY — `mv` consumes the temp whenever jq succeeds, so this cannot
-# say anything about the `|| { rm -f "$tmp"; }` branch. Deleting that `rm` leaves
-# this green. The failure path is asserted separately below; this line is here to
-# catch a future change that stops moving the temp at all.
+# SUCCESS PATH ONLY — the commit phase's `mv` consumes each staged temp whenever
+# every site stages cleanly, so this cannot say anything about the rollback branch.
+# Deleting the rollback leaves this green. The failure paths are asserted separately
+# below; this line is here to catch a future change that stops moving the temp at all.
 eq "bump: leaves no .tmp. behind when jq succeeds" ""    "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
 eq "bump: --check agrees afterwards"               "0"   "$(rc_of "$F" --check)"
+# LINE 176 IS THE SAME-FILE PIN, and it is worth naming because it looks redundant
+# beside 177. pkg/marketplace.json is declared twice, so staging is keyed on path:
+# the plugins.0.version edit is staged FROM the metadata.version temp. Staging both
+# from the original file instead — the obvious shape for an "atomic" fix — makes the
+# second temp carry only its own edit, and committing it discards metadata.version.
+# Verified by mutation: that change turns 176 red and leaves 175 and 177 green.
+
+# --- the .tmp. search can actually find something ----------------------------
+# POSITIVE CONTROL for the four ""-expecting assertions in this file. `find -name
+# '*.tmp.*'` returning nothing is what a satisfied negative check looks like AND what
+# a misspelled glob, a wrong root, or a find that never ran looks like. Without this,
+# renaming the temp suffix would make every one of them pass for free.
+F=$(mkfix); : > "$F/pkg/plugin.json.tmp.99999"
+eq "harness: the temp search finds a temp that is there" "$F/pkg/plugin.json.tmp.99999" \
+   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
 
 # --- a write that cannot complete fails loudly -------------------------------
 # An unparseable declared file makes read_json_field fail on the SECOND site, after
 # the first has already been rewritten.
 #
-# ASSERTED: the script does not report success. NOT ASSERTED: what it leaves on
-# disk. The bump is partial — pkg/plugin.json keeps the new version while
-# marketplace.json keeps the old — which manufactures precisely the drift this
-# script exists to prevent. That is a real finding and is recorded as one; pinning
-# the current on-disk state here would make an atomic-bump fix look like a
-# regression, so this assertion holds whether the bump is made atomic or merely
-# kept loud.
+# THIS BLOCK USED TO ASSERT ONLY THE rc, and said so: the bump was partial —
+# pkg/plugin.json kept the new version while marketplace.json kept the old — which
+# manufactured precisely the drift this script exists to prevent, and pinning that
+# on-disk state would have made an atomic-bump fix look like a regression. cmd_bump
+# now stages every site before committing any, so the on-disk state IS the property
+# and is pinned below. The rc assertion is left exactly as it was rather than
+# tightened, so it keeps holding whether the bump is atomic or merely loud.
 F=$(mkfix); printf 'not json\n' > "$F/pkg/marketplace.json"
 bad_rc=$(rc_of "$F" 8.8.8)
 eq "bump: an unparseable declared file is not reported as success" "yes" \
    "$([ "$bad_rc" -ne 0 ] && echo yes || echo no)"
+# The rc assertion above is unchanged and deliberately still only says "not success".
+# What follows is the atomicity property, added rather than folded into it: BEFORE the
+# two-phase rewrite this run left pkg/plugin.json at 8.8.8 and marketplace.json at the
+# old version — measured, not inferred. Non-vacuity: deleting the rollback loop from
+# cmd_bump leaves the version assertion green and turns the temp assertion red;
+# reverting the stage/commit split turns the version assertion red.
+eq "bump: inter-file failure leaves the FIRST site unmoved" "7.7.7" \
+   "$(jq -r .version "$F/pkg/plugin.json")"
+eq "bump: inter-file failure leaves no .tmp. behind" "" \
+   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+
+# --- a failure BETWEEN two fields of the SAME file ---------------------------
+# THE CASE A FILE-TO-FILE COMPARISON CANNOT SEE. pkg/marketplace.json is declared
+# twice, so a failure on the third site used to commit metadata.version and leave
+# plugins.0.version behind — one file disagreeing with itself. `--check` does catch
+# that state, because it iterates declared SITES rather than files (measured: DRIFT,
+# rc 1); what it defeats is any file-level diff, and the defect is that the bump
+# produced it at all.
+#
+# `plugins.0.version|length` reaches the third site's WRITE specifically: `jq -r
+# '.plugins[0].version|length'` returns 5 at rc 0, so staging gets past the read, while
+# `.plugins[0].version|length = $v` is an invalid path expression and exits 5. The two
+# sites before it stage cleanly, which is the point — the abort has something to roll
+# back. Measured before the fix: metadata.version 8.8.8, plugins[0].version 7.7.7.
+F=$(mkfix)
+cat > "$F/.version-bump.json" <<'EOF'
+{
+  "files": [
+    {"path": "pkg/plugin.json",      "field": "version"},
+    {"path": "pkg/marketplace.json", "field": "metadata.version"},
+    {"path": "pkg/marketplace.json", "field": "plugins.0.version|length"}
+  ],
+  "audit": { "exclude": [".git"] }
+}
+EOF
+intra_rc=$(rc_of "$F" 8.8.8)
+eq "bump: same-file failure is not reported as success" "yes" \
+   "$([ "$intra_rc" -ne 0 ] && echo yes || echo no)"
+eq "bump: same-file failure leaves metadata.version unmoved" "7.7.7" \
+   "$(jq -r .metadata.version "$F/pkg/marketplace.json")"
+eq "bump: same-file failure leaves plugins[0].version unmoved" "7.7.7" \
+   "$(jq -r '.plugins[0].version' "$F/pkg/marketplace.json")"
+eq "bump: same-file failure leaves the OTHER declared file unmoved" "7.7.7" \
+   "$(jq -r .version "$F/pkg/plugin.json")"
+eq "bump: same-file failure leaves no .tmp. behind" "" \
+   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
 
 # --- a jq that fails DURING the write leaves no temp -------------------------
-# The branch the success-path assertion above cannot reach. `write_json_field`'s
-# redirection creates $1.tmp.$$ before jq runs, so a jq that then fails skips the
-# `mv` and the temp survives unless the `|| { rm -f "$tmp"; }` branch removes it.
-# An orphaned .tmp.<pid> beside a manifest is a second copy of release metadata
-# that nothing declares — the drift condition, spelled differently.
+# The branch the success-path assertion above cannot reach. `stage_json_field`'s
+# redirection creates the .work file before jq runs, so a jq that then fails skips
+# the `mv` and that file survives unless the `|| { rm -f "$work"; }` branch removes
+# it. An orphaned temp beside a manifest is a second copy of release metadata that
+# nothing declares — the drift condition, spelled differently.
 #
 # REACHING IT TAKES A FIELD THAT READS BUT CANNOT BE ASSIGNED TO. cmd_bump calls
 # read_json_field first and `set -e` aborts on its failure, so every way of
@@ -211,8 +272,10 @@ eq "bump: an unparseable declared file is not reported as success" "yes" \
 # `jq -r '.version|length'` returns 5 at rc 0, while `.version|length = $v` is an
 # invalid path expression and exits 5 — with the temp already on disk.
 #
-# Non-vacuity: deleting `rm -f "$tmp"` from write_json_field:55 turns this red in
-# both shells and leaves every other assertion in the file green.
+# Non-vacuity: deleting `rm -f "$work"` from stage_json_field turns this red in both
+# shells and leaves every other assertion in the file green. Re-run that mutation if
+# the helper is renamed again — a non-vacuity note naming a function that no longer
+# exists is a record of a check nobody has performed.
 F=$(mkfix)
 cat > "$F/.version-bump.json" <<'EOF'
 {

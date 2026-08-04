@@ -59,7 +59,7 @@ for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 28/28
+  $s reference/test/bump-version.test.sh                 # 36/36
   $s reference/test/kernel-note-dirs.test.sh             # 36/36
   $s reference/test/threshold-namespace.test.sh          # 52/52
 done
@@ -71,7 +71,7 @@ done
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
-| `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
+| `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear", and a bump that moves some declared sites and not others (including two fields of the *same* file, which no file-to-file comparison sees) |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
 | `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
@@ -310,13 +310,10 @@ no `name:`. Count step *items* (`^      - `), not names. What follows is what re
 referenced by number from work in flight; renumbering them would invalidate those references. Full
 record in [Closed on `fix/spec-f-divergence-drain`](#closed-on-fixspec-f-divergence-drain).
 
-**2. `bump-version.sh` can leave a partial bump — the drift it exists to prevent.** `cmd_bump` calls
-`write_json_field` unguarded under `set -e`, so a failure on the second declared site aborts with the
-first already rewritten. Reproduced: with `pkg/marketplace.json` unparseable, `bump-version.sh 8.8.8`
-leaves `pkg/plugin.json` at `8.8.8` and `marketplace.json` at the old version.
-`reference/test/bump-version.test.sh` asserts the run does not *report success*, deliberately without
-pinning the on-disk state — pinning it would make an atomic fix look like a regression. A proper fix
-writes all sites to temps and commits them together.
+**2. `bump-version.sh` could leave a partial bump — the drift it exists to prevent — FIXED on
+`fix/spec-f-divergence-drain`.** Kept in place and kept numbered, for the same reason as 1: the
+entries below are referenced by number from work in flight. Full record in
+[Closed on `fix/spec-f-divergence-drain`](#closed-on-fixspec-f-divergence-drain).
 
 **3. Thresholds the hook cannot read are still undeclared — but the `self_evolution.*` half is
 fixed.** The entry that stood here was wrong on its own facts, which is worth recording: it claimed
@@ -689,6 +686,69 @@ closing `\]\]`, the class-wide matcher pattern correctly does **not** flag them.
 defect, not a residue of the same one.
 
 ### Closed on `fix/spec-f-divergence-drain`
+
+- **`bump-version.sh` could leave a partial bump** — divergence 2. `cmd_bump` called the write helper
+  unguarded under `set -e`, so a failure on a later declared site aborted with the earlier ones
+  already rewritten. It now **stages every declared site into a temp and commits nothing until all of
+  them have staged successfully.** That is the property, and it is the one worth stating — not
+  "atomic": the commit phase is a sequence of same-directory renames, so a `mv` failing after a clean
+  stage (ENOSPC/EROFS/EACCES) still leaves a partial tree, and now names the paths that did not land
+  instead of reporting a bump.
+
+  **The three declared sites live in two files, and two of them are the same file** —
+  `.claude-plugin/plugin.json` (`version`) and `.claude-plugin/marketplace.json` twice
+  (`metadata.version`, `plugins.0.version`). The suite's fixture mirrors that shape under `pkg/`,
+  which is why the previous version of this entry read as though `pkg/marketplace.json` were a repo
+  path: those are fixture paths, and nothing named `pkg/` exists in this checkout.
+
+  **The same-file pair is why staging is keyed on path rather than on site.** The second edit is
+  staged *from the first edit's temp*; staging both from the original file — the obvious shape for
+  this fix — leaves the second temp carrying only its own edit, so committing it silently discards
+  `metadata.version`. A fix that looks atomic and loses data.
+
+  **Both halves of the defect were reproduced before it was touched**, and the second is the one a
+  file-to-file comparison cannot see:
+
+  | failure | before | after |
+  |---|---|---|
+  | inter-file: `marketplace.json` unparseable | `plugin.json` → `8.8.8`, `marketplace.json` old | both old |
+  | intra-file: third site unassignable | one file **disagreeing with itself** — `metadata.version` `8.8.8`, `plugins[0].version` `7.7.7` | both old |
+
+  `--check` does catch the intra-file state (measured: `DRIFT`, rc 1) because it iterates declared
+  *sites*, not files. What that case defeats is a file-level diff; the defect is that the bump
+  produced it at all.
+
+  ```bash
+  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 36/36, was 28/28
+  ```
+
+  **Eight assertions added, each mutation-proved rather than counted** — the failure this repo has
+  already shipped is a suite whose total rises while the new rows cannot fail. Every mutation was
+  asserted to have applied before its result was read:
+
+  | mutation | turns red |
+  |---|---|
+  | full revert of `scripts/bump-version.sh` to `f38ebc8` | the 3 unmoved-site assertions |
+  | delete the rollback loop | the 2 failure-path no-temp assertions |
+  | stage every site from the original file | `metadata.version moved`, `--check agrees afterwards` |
+  | delete `rm -f "$work"` from `stage_json_field` | the write-time no-temp assertion |
+  | don't create the temp the positive control looks for | the harness control |
+
+  **Coverage is partial in one place and is not rounded up.** The two failure-path "leaves no `.tmp.`
+  behind" assertions stay **green** under the full revert, because the pre-fix helper also removed its
+  temp on that path. They are guarded by the rollback-deletion mutation only; they are not evidence of
+  the barrier.
+
+  The rc-only assertion that stood here was **left exactly as it was** rather than tightened, per the
+  brief — it holds whether the bump is atomic or merely loud. The new state assertions were added
+  beside it. Two non-vacuity comments naming `write_json_field:55` and `rm -f "$tmp"` were rewritten
+  to name `stage_json_field` and `rm -f "$work"`, and the new mutation re-run: a non-vacuity note
+  naming a function that no longer exists records a check nobody has performed.
+
+  A **positive control** was added for the four `""`-expecting temp assertions. `find -name
+  '*.tmp.*'` returning nothing is what a satisfied negative check looks like *and* what a misspelled
+  glob or a wrong root looks like; without it, renaming the temp suffix would make all four pass for
+  free.
 
 - **No shared frontmatter parser, a split `status` enum, and a fixture blind to both** — divergences
   7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1`) is now the single definition,
