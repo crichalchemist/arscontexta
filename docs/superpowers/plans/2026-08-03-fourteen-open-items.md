@@ -69,12 +69,21 @@ absorbing a timestamped filename — demonstrated on the fixture, pasted into th
       `grep -rl "[[$NAME]]"` counts links inside fenced blocks, does not case-fold, and matches the
       wrong direction for orphans — an accepted defect in two templates already.
 - [x] **Step 3 — Same audit for `graph`**, which references orphans with zero `ORPHAN_COUNT=`.
-- [x] **Step 4 — Add the assertion that would have caught this.** Every `[A-Z_]*` field named in an
-      output-format contract must have an assignment in the same file. This is mechanically checkable
-      and generalises past these two templates.
+- [x] ~~**Step 4 — Add the assertion that would have caught this.** Every `[A-Z_]*` field named in an
+      output-format contract must have an assignment in the same file.~~ — *superseded during
+      execution: **not shipped**.* The check was built and it mis-fired on three **healthy**
+      templates — `graph`, `next` and `remember` — which name fields in a contract that are computed
+      in another fence. It cannot separate that from a stale field without an explicit contract
+      marker in the templates, so it was dropped. `741b2b7` describes this as "recorded in the
+      ledger"; the ledger is `.superpowers/`, which is **gitignored**, so no record shipped and the
+      tick above stood for nothing a reader could check. Carried as divergence 10 in `CLAUDE.md`;
+      the marker convention is deferred to `docs/superpowers/plans/2026-08-04-ci-hardening.md`
+      (item 18). The `[x]` is deliberately **not** untucked — Steps 1–3 shipped, and retro-ticking
+      or retro-unticking is how this plan's status stopped matching its ledger in the first place.
 
 **Done when:** enumerating assignments in each file accounts for every field its output contract
-names, and Step 4's check fails when a field is removed from the code but left in the prose.
+names. ~~and Step 4's check fails when a field is removed from the code but left in the prose~~ —
+that half is void with Step 4: no such check exists, and the plan must not read as though one does.
 
 ---
 

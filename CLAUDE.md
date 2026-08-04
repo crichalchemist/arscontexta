@@ -162,7 +162,7 @@ FAIL is a real regression. Full test specs live in `reference/testing-milestones
 Re-measured 2026-08-03 on this branch: `16 PASS / 1 WARN / 0 FAIL`. Primitives 8 and 10 both PASS
 there, and the dangling-link WARN is gone because that check now runs (it resolves `nodes/` from the
 vault's own manifest and clears its sample). **The survivor is primitive 1, frontmatter coverage —
-`5094 with YAML, 159 without`.** Primitive 1 is not on the list of primitives permitted to WARN, so
+`5104 with YAML, 159 without`.** Primitive 1 is not on the list of primitives permitted to WARN, so
 by the criterion above it is a real regression and remains open. It is recorded here rather than
 fixed because it is a content defect in the field vault, not a defect in this repo.
 
@@ -297,13 +297,37 @@ And one entry described a defect that had since been fixed in the files it named
 live in a file it did not — see divergence 5. **A divergence list is itself a status file, and this
 one had begun to lie in the way it warns about.**
 
+The end-of-branch sweep repeated the exercise and found the same three shapes again, which is the
+argument for doing it every time rather than once. The live-vault count moved a third time, to
+`3792 of 5263`; frontmatter coverage moved with it, `5094` → `5104` files with YAML against a
+stationary `159` without. The CI step count moved because *this* branch changed it again. And a
+count that stated a defect class — divergence 13's seven inlined extractions — was re-derived
+against a broader pattern that returns **9**, of which two are a different operation: `graph:569`
+and `stats:397` spell `rg -o '\[\['` to *count* brackets rather than capture a target, so the class
+is still 7 and the decomposition `9 = 7 + 2` is now published with it rather than left to be
+rediscovered as a number that grew. **Do not read a number here without running the command beside
+it.**
+
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the seven checks above enforce, and CI is green on
-`main` across all **11** steps — and **14** on this branch, which added three
-(`bump-version.test.sh` under both shells, plus `check-prose-paths.sh`). Counting them takes care:
-`grep -c '^      - name:'` returns one fewer than the true count, because `actions/checkout` carries
-no `name:`. Count step *items* (`^      - `), not names. What follows is what remains.
+not a claim you should take on trust: it is what the **nine** checks above enforce — eight of them in
+CI, `validate-kernel.sh` being the one that needs a vault — and CI is green on `main` across all
+**14** steps, and **18** on this branch, which added four: `kernel-note-dirs.test.sh` and
+`threshold-namespace.test.sh`, each under both shells.
+
+That "seven" stood here until the end-of-branch sweep, three lines below a Verification section
+opening "There are nine executable checks", and the two never agreed. It is the cheapest kind of
+drift to catch and it survived anyway, because nobody reads a prose numeral as a claim to check.
+Counting the CI steps takes the same care: `grep -c '^      - name:'` returns one fewer than the true
+count, because `actions/checkout` carries no `name:`. Count step *items* (`^      - `), not names:
+
+```bash
+grep -c '^      - ' .github/workflows/checks.yml                      # 18, this branch
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 14
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 9
+```
+
+What follows is what remains.
 
 **1. `validate-kernel.sh` soft-passed the dangling-link primitive — FIXED on
 `fix/spec-f-divergence-drain`.** Kept in place, and kept numbered, because the entries below are
@@ -415,14 +439,26 @@ grep -rn 'SESS_COUNT" -ge\|INBOX_COUNT" -ge\|DAYS_STALE" -ge' hooks/ platforms/ 
 grep -rn 'OBS_THRESHOLD\|TENSION_THRESHOLD' . --exclude-dir=.git --exclude-dir=.superpowers
 ```
 
-**4. Display counts that merge or omit a status filter.** `platforms/shared/skill-blocks/stats.md:94-95`
-documents unfiltered counts under the label "Pending" — frozen, so it stays. `skills/help` is fixed:
-its merged observations-plus-methodology total was named `obs_count` and displayed as *"N pending
-observations — approaching /rethink threshold"*, two claims it could not support, since methodology
-notes are not observations and no status filter ran. Renamed to `learning_file_count` and relabelled;
-the arithmetic is deliberately unchanged, because /help is orientation and that number gates nothing.
-The *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because those numbers
-cross a threshold.
+**4. Display counts that merge or omit a status filter — the live half is FIXED, the frozen half is
+reclassified won't-fix.** Kept in place and kept numbered, for the same reason as 1 and 2. `skills/help`
+is fixed: its merged observations-plus-methodology total was named `obs_count` and displayed as
+*"N pending observations — approaching /rethink threshold"*, two claims it could not support, since
+methodology notes are not observations and no status filter ran. Renamed to `learning_file_count` and
+relabelled; the arithmetic is deliberately unchanged, because /help is orientation and that number
+gates nothing. The *same* mislabel in `session-orient.sh` and `skills/health` WAS a defect, because
+those numbers cross a threshold. The one remaining instance is in the frozen tree and cannot be
+fixed there — see [Won't fix](#wont-fix).
+
+```bash
+grep -c 'learning_file_count' skills/help/SKILL.md         # >= 1: the rename shipped
+grep -c 'obs_count' skills/help/SKILL.md                   # 1 -- and it is a comment, not a use
+sed 's/#.*$//' skills/help/SKILL.md | grep -c 'obs_count'  # 0: no live site remains
+```
+
+The two `obs_count` numbers differ on purpose, and the decomposition is the point: `1 = 0 live + 1
+comment`, the comment being the line that records what the old name claimed. Reading the raw count
+as a surviving defect is the error; deleting the comment to make one command suffice would delete
+the only in-file account of why the rename happened.
 
 **5. Verification gaps in the loop itself.** `/arscontexta:upgrade` **has still never been invoked as
 a slash command against a real vault** — a slash command runs in the session's working directory and
@@ -630,10 +666,36 @@ templates; without one the check cannot distinguish a documented-but-computed-el
 stale one.
 
 **This entry is the reason to distrust the phrase "recorded" in this repo's commit messages.** The
-same mistake was made twice: once by `741b2b7`, and again by the commit that fixed it, whose message
-said three review findings were "recorded for the whole-branch review" when they had been written
-only to that same gitignored ledger. Entries 6–10 exist because that was caught on re-reading this
+same mistake was made twice: once by `741b2b7`, and again by `c122d9e`, whose message said three
+review findings were "recorded for the whole-branch review" when they had been written only to that
+same gitignored ledger. Entries 6–10 exist because that was caught on re-reading this
 list, not because the earlier claims were true. **A record that does not ship is not a record.**
+
+The two instances differ in a way worth keeping, because it is what defeats the obvious gate.
+`741b2b7` touched no tracked record at all — only two `skill-sources` templates. `c122d9e` **did**
+touch a tracked file, `docs/superpowers/plans/2026-08-03-fourteen-open-items.md`, and its diff is
+seven lines ticking two Task 6 checkboxes; not one of the three findings appears in it. So the
+checkable proposition is not "did a tracked file change" — one instance passes that — but "is the
+record *in* the change", which needs a reader. Re-derive both:
+
+```bash
+git show --stat --format='' 741b2b7   # skill-sources/graph, skill-sources/next: no record anywhere
+git show --format='' c122d9e          # a plan file, 7 lines, two checkbox ticks, zero findings
+```
+
+**Two structural repairs shipped on `fix/spec-f-divergence-drain`; the assertion itself is still
+not built.** `CONTRIBUTING.md` used to say the git-ignored `.superpowers/sdd/` ledgers "are the
+authoritative record" — a false licence, since both authors already knew the directory was ignored
+and the tracked guidance told them that was fine. That sentence now says the opposite and names
+where a record actually goes. And every plan under `docs/superpowers/plans/` now carries a required
+`## Deferrals` slot whose value is one line per deferral naming the tracked file it landed in, or
+the literal word `none`. A commit-message gate was assessed and **rejected**, measured in both
+directions — the reasoning and the numbers are in
+`docs/superpowers/plans/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
+plan-file gate that would replace it is deferred to the CI-hardening spec. The original subject of
+this entry — an assertion tying contract fields to assignments — still needs a contract marker in
+the templates and is deferred to `docs/superpowers/plans/2026-08-04-ci-hardening.md`, item 18. The
+Spec E plan step is now annotated `not shipped` rather than reading as a delivered check.
 
 **11. The dangling-link check samples 100 links and does not scan them all.** Surfaced by fixing
 divergence 1, and left open on purpose rather than folded into that commit. `validate-kernel.sh`
@@ -750,6 +812,24 @@ Count derived, not estimated: **7 sites** — `skill-sources/graph/SKILL.md` ×4
 `stats`, `reflect`, `reweave`. One predates this branch (`graph`'s triangles fence); one arrived with
 the authority-loop fix; five arrived with the divergence-6 matcher conversions, which had no other
 way to spell the work.
+
+**Re-derive it, and expect 9 rather than 7 — the difference is the entry's own scope, not drift.**
+The distinguishing property is the *capture*: this class extracts a target with `([^\]|#]+)' -r '$1'`.
+A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which is a link **count**, a
+different operation with none of the per-target problem this entry describes. Two such sites exist
+(`skill-sources/graph/SKILL.md:569`, `skill-sources/stats/SKILL.md:397`), so `9 = 7 + 2`. Match the
+capture, not the brackets:
+
+```bash
+grep -rnF "rg -o '\[\["      skill-sources/ skills/ | wc -l   # 9, both operations
+grep -rnF "rg -o '\[\[([^"   skill-sources/ skills/ | wc -l   # 7, this class
+grep -rnF "rg -o '\[\[' "    skill-sources/ skills/ | wc -l   # 2, the bracket counters
+```
+
+`-F` is load-bearing in all three. Without it the middle pattern's `[^` opens a bracket expression
+and the command returns **2** — a wrong answer that looks like a plausible count rather than an
+error, which is this repo's failure mode exactly. The trailing space in the third pattern is also
+load-bearing: it is what separates `'\[\['` from `'\[\[([^…'`.
 
 That is the cost of closing divergence 6 without an API change, and it is recorded rather than paid:
 adding an edges function is a library API addition needing its own fixture and a
@@ -1101,7 +1181,9 @@ its own; this line exists so a reader scanning headings finds it at all.
   which also mis-fires the "suspect a differing cksum implementation" note; two message assertions now
   distinguish them. `guard-failure.test.sh`'s hardcoded `bash "$GUARD"` is now a stated decision with
   a shebang assertion pinning it. `bump-version.sh` went from zero coverage to 28 assertions in both
-  shells, wired into CI.
+  shells, wired into CI — **28 was that branch's number; the suite is at 41 today**, raised by
+  divergence 2's fix. The historical figure is kept because this section records what that branch
+  delivered, but a reader who takes it as current will be 13 assertions behind.
 
 ### Closed on `fix/spec-c-primitive-10`
 
@@ -1121,6 +1203,41 @@ the same status-that-lies defect in miniature.
 - **The stale-lock retry was unbounded** (`7765504`). Bounded at 60s, then exits 1 naming the lock
   path. The lock is still never broken automatically on mtime, and `mkdir` still omits `-p` on the
   lock itself — that atomic create *is* the mutex.
+
+### Won't fix
+
+Distinct from both lists above, and the distinction is what the section is for. An **open**
+divergence is work someone should do. A **closed** one is work someone did. A won't-fix is a real
+defect that will not be repaired, with the reason stated — and it sits here rather than in the open
+list because an entry nobody may act on, left among entries that invite action, is a standing
+invitation to try. Removing it entirely would be worse: the next reader finds the defect, assumes it
+is unrecorded, and rediscovers the reason from scratch.
+
+- **A display count in the frozen tree merges statuses under a filtered label.** Was divergence 4's
+  first half. `platforms/shared/skill-blocks/stats.md:94-95` documents unfiltered counts under
+  the label "Pending" — two `ls -1 … | wc -l` rows that count files, not open items — the same
+  unsupportable-label defect fixed in `skills/help`,
+  `hooks/scripts/session-orient.sh` and `skills/health`.
+
+  **It cannot be fixed where it is.** `platforms/shared/skill-blocks/` is frozen: every file in it
+  is pinned against a `cksum` manifest by `check-portability.sh` check 4, which fails CI on any
+  modification, deletion, or unpinned addition at any depth. Editing the line to correct the label
+  would turn the gate red, and re-pinning the manifest to accommodate the edit would defeat the
+  freeze — the tree's whole purpose is to be a read-only inventory of vocabulary points, and its
+  guard and logic parity with `skill-sources/` is explicitly not maintained.
+
+  **The blast radius is zero, which is why won't-fix is the right answer rather than a reluctant
+  one.** That tree generates nothing: no vault is produced from it, so no user has ever seen this
+  count. It is documentation of a vocabulary surface, not a computation anyone runs. Verify both
+  halves — that the defect is there, and that the freeze is what stops the repair:
+
+  ```bash
+  sed -n '94,95p' platforms/shared/skill-blocks/stats.md          # the unfiltered "Pending" label
+  grep -n 'skill-blocks' reference/check-portability.sh | head -3 # check 4 pins the tree
+  ```
+
+  Reopening this is a decision about the freeze, not about the label. If the freeze is ever lifted,
+  the fix is the `skills/help` one: name the variable what it counts, and label it what it is.
 
 ### The cross-cutting pattern
 

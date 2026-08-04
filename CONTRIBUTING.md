@@ -212,7 +212,20 @@ threshold fire.
 ## Specs, plans, commits
 
 Substantial work goes **spec → plan → execution** in `docs/superpowers/`. Execution ledgers live
-under `.superpowers/sdd/` (git-ignored) and are the authoritative record.
+under `.superpowers/sdd/` — **git-ignored, therefore working notes and never the record.** This
+sentence used to end "and are the authoritative record", and that was a false licence: it told
+contributors that a directory `git check-ignore` rejects was where findings belonged. Two commits
+took it at its word (`741b2b7`, `c122d9e`), each claiming in its message that something was
+"recorded" when the only copy was in scratch. Neither author was confused about `.superpowers/`
+being ignored; the tracked guidance had said that was fine.
+
+**Where a record actually goes:** `CLAUDE.md`'s divergence list for a defect that survives the
+branch, the plan's `## Deferrals` section for work consciously not done, the spec for a decision.
+Each plan under `docs/superpowers/plans/` carries a required `## Deferrals` slot whose value is
+either one line per deferral naming the tracked file it landed in, or the literal word `none` —
+an empty slot is a failure, not a default. The slot exists because the two failures above were not
+caused by anyone forgetting the rule, so another statement of the rule could not have prevented
+them; what was missing was a place in the artifact where the omission is *visible*.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
 executed and merged. A status file that lies about status is this project's own defect class wearing

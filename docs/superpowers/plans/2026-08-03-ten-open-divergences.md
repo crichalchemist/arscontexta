@@ -286,9 +286,76 @@ correct — now stated in `CLAUDE.md`, still unbuilt), and any Minor findings pa
 `none`. An empty section is a failure, not a default** — that is Task 7's entire subject, and this
 slot is the fix for it. `.superpowers/` is gitignored; a deferral recorded only there does not exist.
 
+This section is itself a tracked file, so "recorded here" is a valid answer where a deferral has no
+better home. It is not a valid answer for a *defect*, which belongs in `CLAUDE.md`'s divergence list
+where the next contributor will actually read it.
+
 ```text
-none
+1. check-prose-paths.sh SCOPE omits hooks/scripts/session-orient.sh and
+   platforms/claude-code/hooks/session-orient.sh.template, so cross-references added to
+   those two files are checked by nothing. Scope is a stated list by design (a shrinking
+   discovered scope must not read as clean), so widening it is a deliberate edit, not an
+   oversight to correct. Recorded in CLAUDE.md, the check-prose-paths paragraph.
+2. No CI gate exercises bump-version.sh's COMMIT FAILED branch: forcing a git commit to
+   fail needs chflags (macOS) or chattr +i (Linux), neither portable nor available to the
+   CI runner without root. Recorded here.
+3. Task 2's title says "atomic"; what shipped is the weaker and accurate property "no
+   declared file is modified unless every site staged". Retitle the entry — do not build a
+   journal to make the stronger word true. Recorded here; the entry to retitle is in this
+   plan.
+4. Converting the generators/ status recipes to the shared parser moves a count 13 -> 12
+   over ops/methodology/, and the whole difference is one field-vault file with an unclosed
+   frontmatter block. Which answer is right (fix the file, or let the library tolerate an
+   unclosed block) is a decision with a different owner, not a port. Recorded in CLAUDE.md,
+   the D7/D8/D9 remainder paragraph, with both re-derivation commands.
+5. Nothing on this branch has run on Linux. Every measurement in CLAUDE.md and in this plan
+   was taken on darwin, against BSD coreutils and a grep that is ugrep in-session. CI
+   covers the gates on ubuntu; the hand-run numbers are not covered. Recorded here.
+6. skills/architect/SKILL.md:179 still inlines a wiki-link matcher. Out of scope for Task 6,
+   which closed the class inside skill-sources/ only. Recorded in CLAUDE.md, divergence 12's
+   table of executable sites.
+7. The commit-message gate assessed in Step 2.2 is NOT shipped, and the plan-file gate that
+   would replace it is deferred to the CI-hardening spec. Measurements and reasoning in this
+   plan, under Task 7 Step 2.2's outcome below.
 ```
+
+**Step 2.2 outcome — the gate is not viable, measured both directions.**
+
+The literal proposal ("a commit message containing *recorded* must also touch a tracked file")
+cannot be tested in the failing direction, because that state is not constructible: git will not
+produce a commit with no tracked change without `--allow-empty`. A check that cannot be made to
+fail is not a gate.
+
+The nearest checkable variant — *must touch `CLAUDE.md` or `docs/superpowers/`* — was measured over
+60 commits: 27 mention "record", 3 would fail. One of those three is a true positive (`741b2b7`).
+One is a false positive (`4c827a6`, whose message says a code comment "records it as an accepted
+defect" — the verb, not a claim of having made a record). And decisively, the variant **passes**
+`c122d9e`, the second and harder known instance, which did touch a plan file while the three
+findings it claimed to record went only to scratch. A gate that greens the harder of the two
+instances it exists to catch is asserting a proxy, not the property — the exact failure this
+repo's gate inventory spends its length warning about. Re-derive:
+
+```bash
+for c in $(git log --format=%h -60); do
+  git log -1 --format=%B "$c" | grep -qi 'record' || continue
+  git show --name-only --format='' "$c" | grep -q '^CLAUDE.md$\|^docs/superpowers/' \
+    || echo "would FAIL: $c $(git log -1 --format=%s "$c")"
+done                                    # 741b2b7 (true), acb1ecf, 4c827a6 (false positive)
+git show --name-only --format='' c122d9e   # touches a plan file; the variant passes it
+```
+
+One gate **is** viable and is deferred rather than dropped: *every file in
+`docs/superpowers/plans/*.md` must contain a `## Deferrals` section with at least one non-blank
+line.* It keys on document structure rather than on a word's sense, so it has no false-positive
+surface. It is not built here for two reasons. Gate design is assigned to
+`docs/superpowers/plans/2026-08-04-ci-hardening.md` and `CLAUDE.md` says not to bolt one on
+elsewhere. And it would fail today on the six older plans, whose only fix would be retrofitting
+`none` into plans nobody has audited for deferrals — manufacturing records to satisfy a check,
+which is the defect this task exists to close.
+
+Propagation of the slot, meanwhile, is empirical rather than enforced: the two most recent plans
+(this one and `2026-08-04-ci-hardening.md:255`) both carry it, and a plan here is written by
+copying the shape of the last one.
 
 ---
 
@@ -301,11 +368,17 @@ for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 28/28 + Task 5's additions
+  $s reference/test/bump-version.test.sh                 # 41/41
+  $s reference/test/kernel-note-dirs.test.sh             # 36/36
+  $s reference/test/threshold-namespace.test.sh          # 52/52
 done
-./reference/validate-kernel.sh ~/second-brain            # 15 PASS, and read the LABELS
+./reference/validate-kernel.sh ~/second-brain            # read the LABELS, not the total
 ```
 
-Counts above are the state at `769c221`; Tasks 3 and 5 add assertions, so update these numbers in the
-same commit that adds them. That rule was violated once already — Spec E's plan still said `32/32`
-and `26/26` after `ce57b25` raised them.
+Counts above were `769c221`'s state when this plan was written; they are now re-derived at Task 7 and
+match the run above. Tasks 3 and 5 added assertions, so update these numbers in the same commit that
+adds them. That rule was violated once already — Spec E's plan still said `32/32` and `26/26` after
+`ce57b25` raised them, and this plan still said `28/28` after Task 5 raised it to `41`. Two suites
+were also missing from this fence entirely: `kernel-note-dirs` arrived with Task 1 and
+`threshold-namespace` with Task 5, and a verification list that omits a suite is a weaker lie in the
+same family as one that misstates its count.
