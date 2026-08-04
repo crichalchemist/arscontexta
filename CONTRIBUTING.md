@@ -97,12 +97,16 @@ defect with its sign flipped.
 
 ```bash
 bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
+bash reference/check-prose-paths.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-doc-claims.sh  ;  echo "expect rc=0, got rc=$?"
 
 for s in bash zsh; do
-  $s reference/test/link-extraction.test.sh | tail -1   # expect: passed=19 failed=0
-  $s reference/test/guard-failure.test.sh   | tail -1   # expect: passed=34 failed=0
-  $s reference/test/fence-isolation.test.sh | tail -1   # expect: FENCE ISOLATION: PASS
+  $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=19 failed=0
+  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=34 failed=0
+  $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
+  $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0
+  $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=37 failed=0
+  $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
 done
 
 ./reference/validate-kernel.sh ~/second-brain           # expect 15/15

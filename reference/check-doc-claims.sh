@@ -91,7 +91,13 @@ truth_ci_steps() {
     # Count step ITEMS, not `name:` keys. `actions/checkout` carries no name:,
     # so `grep -c '^      - name:'` returns one fewer and reads as plausible.
     [ -r .github/workflows/checks.yml ] || return 1
-    grep -c '^      - ' .github/workflows/checks.yml
+    _n=$(grep -c '^      - ' .github/workflows/checks.yml || true)
+    # ZERO IS NOT AN ANSWER HERE. `grep -c .` prints 0 and returns 1 on no
+    # match; discarding that rc turns a shape change (a workflow rewritten
+    # with `run: |`, an emptied directory) into `tree measures 0`, and the
+    # gate would then instruct writing 0 into the document. Could-not-run.
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
 }
 
 truth_ci_steps_main() {
@@ -105,8 +111,13 @@ truth_ci_steps_main() {
 
 truth_check_files() {
     [ -d reference/test ] || return 1
-    ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh 2>/dev/null \
-        | grep -c .
+    _n=$(ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh 2>/dev/null  | grep -c . || true)
+    # ZERO IS NOT AN ANSWER HERE. `grep -c .` prints 0 and returns 1 on no
+    # match; discarding that rc turns a shape change (a workflow rewritten
+    # with `run: |`, an emptied directory) into `tree measures 0`, and the
+    # gate would then instruct writing 0 into the document. Could-not-run.
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
 }
 
 truth_ci_run_checks() {
@@ -115,8 +126,13 @@ truth_ci_run_checks() {
     # a grep for its name counts that mention as a run. This session made exactly
     # that error before catching it.
     [ -r .github/workflows/checks.yml ] || return 1
-    grep -oE 'run: (bash|zsh) reference/(check-[a-z-]+\.sh|test/[a-z-]+\.test\.sh|validate-kernel\.sh)' \
-        .github/workflows/checks.yml | sed 's/.*reference\///' | sort -u | grep -c .
+    _n=$(grep -oE 'run: (bash|zsh) reference/(check-[a-z-]+\.sh|test/[a-z-]+\.test\.sh|validate-kernel\.sh)'  .github/workflows/checks.yml | sed 's/.*reference\///' | sort -u | grep -c . || true)
+    # ZERO IS NOT AN ANSWER HERE. `grep -c .` prints 0 and returns 1 on no
+    # match; discarding that rc turns a shape change (a workflow rewritten
+    # with `run: |`, an emptied directory) into `tree measures 0`, and the
+    # gate would then instruct writing 0 into the document. Could-not-run.
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
 }
 
 # word2num — documents state small counts as English words ("run all ten",
@@ -246,7 +262,7 @@ check_list_len() {  # <file> <label> <awk program selecting the list> <expected 
 }
 
 check_list_len CONTRIBUTING.md "verification list is complete" \
-    '/^## Verification/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{b=0} b&&/reference\//' \
+    '/^## Verification/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{exit} b&&/reference\//' \
     truth_check_files
 # CLAUDE.md's fence deliberately OMITS validate-kernel.sh -- it needs a generated
 # vault and is documented in its own fence directly below. Comparing this list
