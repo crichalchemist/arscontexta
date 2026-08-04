@@ -347,7 +347,7 @@ ever compares against one of these numbers, that one becomes a config key.*
 
 **What that decision does not buy is single ownership, and the entry says so rather than claiming it.**
 Measured: `DAYS_STALE`'s 30 has **one** declaration repo-wide; `SESS_COUNT`'s 5 and `INBOX_COUNT`'s 3
-have **two each** — the plugin's own hook (`:241`, `:244`) and
+have **two each** — the plugin's own hook (`:263`, `:266`) and
 `platforms/claude-code/hooks/session-orient.sh.template:143,149`, the hook a *generated vault* gets,
 which can fire alongside it. Both sites now name each other, because a cross-reference is the only
 thing that stops an edit to one from silently splitting them.
@@ -361,10 +361,22 @@ a change to what generation emits.
 
 Also measured, and the reason Step 2's warning stands: there are **five** literal 30s across **two**
 subjects, not two. Four are note staleness (`skill-sources/next:242`, `skill-sources/reweave:130`,
-`skills/health:469`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:262` is
+`skills/health:469`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:284` is
 methodology-notes-behind-config drift. Same number, different subject — **do not merge them.**
-Re-derive all three counts (`5` / `5` / `4`; cmd3's two non-template hits are a same-named shell
-variable at `:200`, not a substitution, so **4 hits is** the "nothing substitutes it" result):
+**Read the decomposition below, not the totals — and note why it is a decomposition.** Each command
+matches the very prose that states its result, so the commit that states a count is the commit that
+changes it. This entry first shipped `5 / 5 / 4`: true when taken, stale the moment they landed.
+Fixed by stating sums rather than by adding `grep` exclusions, per the idiom divergence 12 already
+uses — an exclusion rots silently and can quietly match nothing (shipped here twice), whereas a sum
+fails loudly the moment it stops adding up:
+
+| | total | = real | + self-match / added prose |
+|---|---|---|---|
+| cmd1 | **6** | 5 declarations | 1 — the command's own line in the hook comment |
+| cmd2 | **6** | 5 declarations | 1 — the command's own line in the hook comment |
+| cmd3 | **10** | 2 placeholder declarations (`template:120,126`) + 2 same-named shell variable, **not** a substitution (`session-orient.sh:200,206`) | 6 — this entry, the hook's decision comment, the template's cross-reference |
+
+**Substitutions found: ZERO.** That, not any total, is the figure the placeholder claim rests on.
 
 ```bash
 grep -rn -- '-ge 30\|-gt 30\|mtime +30' skill-sources/ skills/ platforms/ hooks/

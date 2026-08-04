@@ -212,29 +212,51 @@ fi
 # DELIBERATELY FIXED, NOT MERELY UNDECLARED. These two, and the 30 in the staleness
 # check below, are not configurable on purpose. The reason is structural, not "nobody
 # asked" — that rots the moment someone does. `self_evolution.*` earned its config keys
-# because FOUR surfaces read it (`next`, `remember`, `rethink`, this hook) and a wrong
-# value makes a vault's own tools contradict each other about whether to run /rethink.
-# These three have no second reader. A wrong value here mistimes a nudge; it cannot
-# produce disagreement, because there is nothing to disagree with.
-# TRIGGER: if a second surface ever compares against one of these numbers, that one
+# because FOUR INDEPENDENT CONSUMERS read it (`next`, `remember`, `rethink`, this hook),
+# each deciding on its own whether to recommend /rethink, so a wrong value makes a vault's
+# own tools contradict each other about it. These three have no second independent
+# consumer. A wrong value here mistimes a nudge; it cannot produce that contradiction,
+# because there is no other decision-maker to contradict.
+# TRIGGER: if a second INDEPENDENT CONSUMER — a distinct decision-maker, not another copy
+# of this same SessionStart hook — ever compares against one of these numbers, that one
 # becomes a config key. That is the condition to re-open this — not taste.
+# "Independent" is load-bearing, not padding: the template named below IS a second file
+# comparing against these same two numbers, so a trigger phrased as merely "a second
+# surface" would have been satisfied the moment it was written. Two copies of ONE consumer
+# can DRIFT, which a cross-reference fixes; two DISTINCT consumers can DISAGREE, which
+# only a shared config key fixes. Different defects, different remedies.
 #
 # Single ownership holds for exactly ONE of the three. Claiming it for all three would
 # be the status-file-that-lies defect this repo's divergence list exists to drain:
-#   DAYS_STALE 30 — one declaration repo-wide (:262), subject "methodology notes behind
+#   DAYS_STALE 30 — one declaration repo-wide (:284), subject "methodology notes behind
 #     config changes". The other four literal 30s (`skill-sources/next:242`,
 #     `skill-sources/reweave:130`, `skills/health:469`,
 #     `platforms/shared/skill-blocks/reweave.md:144`) are note staleness — a different
 #     subject sharing the number. Do NOT merge them.
 #   SESS_COUNT 5 / INBOX_COUNT 3 — TWO declarations each. The second is
-#     `platforms/claude-code/hooks/session-orient.sh.template:143,149`, the hook a
-#     generated vault gets, which can fire alongside this one. Edit one without the
-#     other and they split. Deliberately NOT unified via a generation placeholder: that
+#     `platforms/claude-code/hooks/session-orient.sh.template:143,149`. That template is
+#     the SessionStart hook a generated vault WOULD get — stated that way on purpose:
+#     nothing in this repo is shown to copy it, no generator and no `skills/setup` step
+#     references it at all, so treat it as an unwired second declaration rather than a
+#     proven live one. Either way, edit one without the other and they split, which is a
+#     drift hazard, not the disagreement hazard a config key exists to prevent (see the
+#     trigger above). Deliberately NOT unified via a generation placeholder: that
 #     template's two existing threshold placeholders, `{{OBS_THRESHOLD:-10}}` and
 #     `{{TENSION_THRESHOLD:-5}}`, are substituted by nothing in this repo, so copying
 #     the pattern ships two more knobs that look configurable and are not.
-# Re-derive (5 / 5 / 4 hits). cmd3's two non-template hits are a same-named shell
-# variable at :200, not a substitution — 4 hits is the "nothing substitutes it" result:
+# RE-DERIVE — and read the decomposition, not the totals. Each command below now MATCHES
+# THIS COMMENT, because the commit that states a count is the commit that changes it. The
+# first draft shipped 5/5/4, which were the true figures when taken and were stale the
+# moment they landed. Stated as sums rather than fixed with grep exclusions: an exclusion
+# rots silently and can quietly match nothing, which this repo has shipped twice, whereas
+# a sum fails loudly the moment it stops adding up.
+#   cmd1 -> 6 = 5 real declarations + 1 self-match (its own line below)
+#   cmd2 -> 6 = 5 real declarations + 1 self-match (its own line below)
+#   cmd3 -> 10 = 2 placeholder declarations (template:120,126)
+#              + 2 same-named shell variable, NOT a substitution (:200, :206)
+#              + 6 prose mentions added by this commit (this block, the template's
+#                cross-reference comment, and CLAUDE.md's divergence 3 entry)
+#          SUBSTITUTIONS FOUND: ZERO. That, not the total, is the load-bearing figure.
 #   grep -rn -- '-ge 30\|-gt 30\|mtime +30' skill-sources/ skills/ platforms/ hooks/
 #   grep -rn 'SESS_COUNT" -ge\|INBOX_COUNT" -ge\|DAYS_STALE" -ge' hooks/ platforms/ skill-sources/ skills/
 #   grep -rn 'OBS_THRESHOLD\|TENSION_THRESHOLD' . --exclude-dir=.git --exclude-dir=.superpowers
