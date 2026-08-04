@@ -225,7 +225,7 @@ fi
 # `xargs -I{}` is kept: it sets the delimiter to newline, so a filename containing
 # spaces stays one argument. (The review comment that prompted this change also
 # claimed xargs breaks on spaces; measured, it does not. Only the `tr` half was real.)
-existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | xargs -I{} basename {} .md | _fold_lower | sort -u)
+existing_files=$(find "$VAULT" -name "*.md" -not -path "*/.git/*" 2>/dev/null | xargs -I{} basename {} .md | _fold_lower | LC_ALL=C sort -u)
 
 # Extract wiki links from note content (scan known note directories)
 dangling=0
@@ -284,38 +284,49 @@ fi
 SCANNED_NAMES=$(printf '%s' "$SCANNED_NAMES" | grep -v '^$' \
     | awk '{ printf "%s%s", (NR > 1 ? ", " : ""), $0 } END { if (NR) print "" }')
 
-# Deduplicate, then sample. The 100-link cap is pre-existing and is deliberately
-# left in place here -- changing what gets scanned in the same commit that
-# changed how directories are resolved would make the two effects impossible to
-# attribute. What is NOT left alone is the claim built on top of it: before this
-# fix the cap was harmless because the scan resolved nothing and the sample was
-# always empty, and now that the scan works, "No dangling wiki links" would
-# assert over 2681 links on the strength of 99. The totals below let the message
-# state its own scope instead. Full-scan cost is the open question; the
-# over-claim was not.
+# THE CAP IS GONE, and the reasoning that kept it is worth recording, because one
+# premise inside it was never tested. This block used to explain why a `head -100`
+# sample stayed: lifting it looked like it would cost a full per-link loop on top
+# of an already-slow run, so the sample remained and the message disclosed its own
+# scope instead. The untested premise was that the only alternative to sampling
+# was a BIGGER LOOP. Replacing the loop with a set difference made the cap
+# unnecessary rather than merely larger, and measured faster than the sample it
+# replaced. The disclosure machinery that premise justified -- percentage checked,
+# unchecked remainder -- is gone with it: a message stating a sample size would
+# now describe a sample that does not exist, which is the same class of false
+# statement the disclosure was added to prevent.
 #
-# `grep -v '^$'` before the cap is load-bearing, not tidying. link_candidates is
+# `grep -v '^$'` is still load-bearing, and still not tidying. link_candidates is
 # seeded empty and grown with `printf '%s\n%s'`, so it carries a leading empty
-# line that survives sort -u and consumed one of the hundred slots: the field
-# vault reported a 99-link sample from a `head -100`. The cap now means what it
-# says, and the sample size is asserted in kernel-note-dirs.test.sh rather than
-# left to be read off a message.
+# line that survives sort -u. Under the old cap that blank ate one of the hundred
+# slots and the field vault reported a 99-link sample from a `head -100`. There is
+# no cap left to mis-fill, but the blank would still inflate every count below by
+# one and be compared against existing_files as though it were a link target.
 link_candidates=$(echo "$link_candidates" | grep -v '^$' | sort -u)
 link_total=$(printf '%s\n' "$link_candidates" | grep -c . || true)
-link_candidates=$(printf '%s\n' "$link_candidates" | head -100)
 
-while IFS= read -r link; do
-    [ -z "$link" ] && continue
-    checked=$((checked + 1))
-    # BOTH SIDES OF THIS COMPARISON MUST FOLD THE SAME WAY. `existing_files` above
-    # folds through _fold_lower; folding the link with a bare `tr` here would make
-    # the two sides disagree on any non-ASCII name -- a mismatch that reports a
-    # real file as a dangling link. Fixing one side alone is worse than leaving
-    # both wrong, because at least a consistent `tr` compared like with like.
-    if ! echo "$existing_files" | grep -qxF "$(printf '%s' "$link" | _fold_lower)"; then
-        dangling=$((dangling + 1))
-    fi
-done <<< "$link_candidates"
+# EXHAUSTIVE, NOT SAMPLED -- and coverage was never the thing being traded away.
+# This was `head -100` over ~2.7k links: a 3.7% sample whose PASS read as a
+# statement about the whole graph. The fix is a set difference, NOT a larger cap.
+# Measured on the field vault before changing it: the per-link loop took 32.0s to
+# check all 2716 links and 1.0s to check 100, while `comm` checks all of them in
+# under a second and returns the identical dangling count (30). The exhaustive
+# version is therefore FASTER than the sample it replaces. There was no
+# coverage/time tradeoff to defend -- only a loop shape. Re-derive with:
+#   time (comm -23 <(...folded links...) <(...existing...) | grep -c .)
+#
+# BOTH SIDES MUST FOLD *AND* SORT THE SAME WAY -- two requirements, not one.
+# Folding was already required (see existing_files above: a bare `tr` under-folds
+# non-ASCII, so a real file reads as a dangling link). `comm` adds a second and
+# sharper requirement the loop did not have: it consumes two SORTED streams and
+# silently emits nonsense when their collations differ. Default `sort` is
+# locale-dependent, so `existing_files` and this side both pin LC_ALL=C. Changing
+# the sort on one side alone would make every non-ASCII name a spurious dangling
+# link -- and it would do so quietly, which is this repo's whole failure mode.
+link_folded=$(printf '%s\n' "$link_candidates" | _fold_lower | LC_ALL=C sort -u)
+checked=$(printf '%s\n' "$link_folded" | grep -c . || true)
+dangling=$(comm -23 <(printf '%s\n' "$link_folded") <(printf '%s\n' "$existing_files") \
+           | grep -c . || true)
 
 # THREE OUTCOMES, NOT TWO. "The check could not run" and "the check ran and
 # found nothing" are different facts, and collapsing them into one WARN is the
@@ -329,19 +340,21 @@ elif [ "$checked" -eq 0 ]; then
     warn "Resolved note directories via $NOTE_DIR_SOURCE, but they contain no wiki links to check [scanned: $SCANNED_NAMES]"
 elif [ "$dangling" -eq 0 ]; then
     if [ "$link_total" -gt "$checked" ]; then
-        # A disclosed sample stays a PASS, but the percentage is printed beside
-        # the counts on purpose: "100 of 2711" skims as near-complete and "3.7%"
-        # does not. The unchecked remainder is named too, so the reader is told
-        # the size of what this PASS does not cover.
-        pct=$(awk -v c="$checked" -v t="$link_total" 'BEGIN { printf "%.1f", (c * 100) / t }')
-        pass "No dangling links among $checked links checked -- but that is only ${pct}% of $link_total unique links; $((link_total - checked)) were NOT checked [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
+        # NOT A SAMPLE -- and this branch exists precisely to stop it reading as
+        # one, because its previous occupant WAS a sample and said so here. The
+        # scan is exhaustive now; `checked` sits below `link_total` only because
+        # case-folding merges targets differing by case alone, and those resolve
+        # to one file, so they are one check rather than two. Both arms below
+        # therefore say "checked all". Neither prints a percentage or an
+        # unchecked remainder, because there is no unchecked remainder to name.
+        pass "No dangling wiki links (checked all $checked case-folded targets from $link_total raw links) [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
     else
         pass "No dangling wiki links (checked all $checked unique links) [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
     fi
 else
     # Dangling links are common in mature vaults (examples, planned notes)
     # Report as info, not failure
-    warn "$dangling unresolved wiki links out of $checked unique checked of $link_total total (may include examples) [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
+    warn "$dangling unresolved wiki links out of $checked unique checked -- exhaustive scan, no sampling (may include examples) [via $NOTE_DIR_SOURCE; scanned: $SCANNED_NAMES]"
 fi
 
 # --- Primitive 3: MOC hierarchy ---

@@ -158,23 +158,37 @@ Pass criterion is 15/15 PASS. `WARN` is acceptable **only** for primitive 10 (se
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
 FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
 
-**Measured against the live vault, that criterion is still violated — by one item now, not two.**
-Re-measured 2026-08-03 on this branch: `16 PASS / 1 WARN / 0 FAIL`. Primitives 8 and 10 both PASS
-there, and the dangling-link WARN is gone because that check now runs (it resolves `nodes/` from the
-vault's own manifest and clears its sample). **The survivor is primitive 1, frontmatter coverage —
-`5104 with YAML, 159 without`.** Primitive 1 is not on the list of primitives permitted to WARN, so
-by the criterion above it is a real regression and remains open. It is recorded here rather than
-fixed because it is a content defect in the field vault, not a defect in this repo.
+**Measured against the live vault, that criterion is violated by two items — and one of them only
+became visible when a check stopped sampling.** Re-measured on `fix/exhaustive-dangling-scan`:
+`15 PASS / 2 WARN / 0 FAIL`. Primitives 8 and 10 both PASS there.
+
+**The two survivors are primitive 1, frontmatter coverage — `5112 with YAML, 160 without` — and
+primitive 2, `8 unresolved wiki links out of 2716 unique checked`.** Neither is on the list of
+primitives permitted to WARN, so by the criterion above both are real findings. Both are content
+defects in the field vault rather than defects in this repo, which is why they are recorded here
+rather than fixed. **All four figures in that sentence are live-vault measurements and drift as the
+vault grows** — the one command below re-derives every one of them, since it prints each result line
+in full; do not quote them without running it.
+
+**Primitive 2's WARN is not the one this file used to describe, and the label is the same in both
+directions — read the message, not the level.** The old WARN meant *the check did not run*: it
+printed `No wiki links found to check` beside a PASS, on a vault whose directories it had failed to
+resolve. That one is gone and stays gone. The current WARN is its opposite: an exhaustive scan ran
+and found eight genuinely unresolved targets. A previous revision of this paragraph said "the
+dangling-link WARN is gone because that check now runs" — true when written, and it would now be
+read as covering a WARN that means something else entirely.
 
 **The criterion and the summary count different things, which is what made the labels skippable.**
 "15/15" is primitives; the summary counts *result lines*. On the field vault there are 15 primitives,
-16 numbered headers (1–15 plus 10A) and 17 result lines, because primitive 2 emits two. So `PASS: 16`
-is simply `17 − 1` — it is not independent evidence that fifteen primitives passed, and it would read
-`17` if the last WARN cleared. The total previously read `15`, which happened to equal the target
-number and was accepted as though it were the target being met. Matching the target against that
-total is a coincidence of arithmetic. **Read the labels.**
+16 numbered headers (1–15 plus 10A) and 17 result lines, because primitive 2 emits two. So `PASS: 15`
+is simply `17 − 2` — it is not independent evidence that fifteen primitives passed, and it would read
+`17` if both WARNs cleared. It has now equalled the target number `15` **twice, for two different
+reasons**: once as `15 − 0` when the scan resolved nothing, and now as `17 − 2`. Matching the target
+against that total is a coincidence of arithmetic, and it is a coincidence that recurs. **Read the
+labels.**
 
-Re-derive both numbers with:
+Re-derive every number above with — it prints each result line, so the totals, the frontmatter
+counts and the dangling counts all come out of this one run:
 
 ```bash
 ./reference/validate-kernel.sh ~/second-brain 2>&1 \
@@ -191,9 +205,22 @@ rewriting history. *qmd absent* stays WARN; *qmd present but declaring names tha
 is FAIL.
 
 `tree` and `ripgrep` are required (per the README's prerequisite table) — by generated systems at
-runtime and by `validate-kernel.sh` here. Fences additionally invoke `jq`, `bc` and `git`, which are
-**not** in that table; the fence gate asserts their presence and halts loudly rather than letting a
-missing tool's 127 read as a defect.
+runtime and by `validate-kernel.sh` here. Fences additionally invoke `awk`, `sed`, `jq`, `bc` and
+`git`; the fence gate asserts their presence and halts loudly rather than letting a missing tool's
+127 read as a defect.
+
+**Those six and the README's prerequisite table are now deliberately the same set** — that sentence
+used to read "which are **not** in that table", and the table has since been widened to cover every
+tool the gate asserts. The relationship, not either list alone, is what to check when one side moves.
+The table carries **7** shell-tool rows rather than 6: the decomposition is `7 = 6 gate-asserted +
+tree`, `tree` being a SessionStart-hook dependency that no fence invokes. Stated as a sum rather than
+as a `grep -v tree` exclusion, per the idiom divergence 12 already uses — an exclusion rots silently
+and can quietly match nothing, which this repo has shipped twice.
+
+```bash
+grep -o 'for t in [a-z ]*' reference/test/fence-isolation.test.sh   # rg awk jq bc git sed
+grep -cE '^\| `(ripgrep|awk|sed|jq|bc|git|tree)' README.md          # 7 = 6 + tree
+```
 
 ## Architecture: three generation paths
 
@@ -557,7 +584,7 @@ inverting the comparison function left every one of them green. They now pin eac
 expected verdict. Measured against the two mutations that exposed the defect: inverting `fires`
 reddens all 20; replacing it with a constant `FIRES` reddens 12, the other 8 being the assertions that
 legitimately expect `FIRES`. **An assertion counted in a total is not evidence it can fail** — that is
-the same substitution this file records for the kernel validator's `PASS: 16`.
+the same substitution this file records for the kernel validator's `PASS: 15`.
 
 **What is not verified, since 6c is prose Claude executes:** the suite proves the reconciliation
 *operation* produces agreement across all four readers, and that the repo names one namespace. That
@@ -723,40 +750,11 @@ this entry — an assertion tying contract fields to assignments — still needs
 the templates and is deferred to `docs/superpowers/plans/2026-08-04-ci-hardening.md`, item 18. The
 Spec E plan step is now annotated `not shipped` rather than reading as a delivered check.
 
-**11. The dangling-link check samples 100 links and does not scan them all.** Surfaced by fixing
-divergence 1, and left open on purpose rather than folded into that commit. `validate-kernel.sh`
-caps `link_candidates` at 100 after dedup. While the scan resolved nothing the cap could not mislead
-anyone, because the sample was always empty — it only became load-bearing once the check started
-running. The over-claim is already closed: the PASS states the sample size, the true total, the
-percentage and the unchecked remainder, and `kernel-note-dirs.test.sh` pins all four. What is open
-is the cap itself.
-
-**Two different counts are in play here and they are easy to swap by accident** — an earlier version
-of this entry did exactly that, quoting one figure beside a command that measured the other. Both
-drift as the vault grows, so read them as shapes, not constants:
-
-| count | what it measures | 2026-08-03 (drifts) |
-|---|---|---|
-| notes-only | unique link targets in `nodes/` alone | 2681 |
-| **scanned union** | **unique targets across every directory the validator resolves** — `nodes` + `capture` + `self` — **this is what primitive 2 prints** | **2711** |
-
-The two differ by 30 because `nodes/` dominates, which is precisely why substituting one for the
-other went unnoticed: the wrong figure was close enough to look right. Re-derive both — the second
-is the one any statement about the validator's output must use:
-
-```bash
-. reference/lib/link-extraction.sh
-extract_link_targets_recursive ~/second-brain/nodes | grep -c .        # notes only (counts drift)
-{ for d in nodes capture self; do extract_link_targets_recursive ~/second-brain/$d; done; } \
-  | sort -u | grep -c .                                               # scanned union (counts drift)
-./reference/validate-kernel.sh ~/second-brain 2>&1 | grep 'unique links'   # what it actually prints
-```
-
-Lifting the cap is not free and not obviously right: the comparison is one `grep -qxF` per link
-against an index held in a shell variable, so a full scan is one process pair per link in the
-scanned union on top of a run that already takes ~45s on the field vault. The honest fix is probably
-to replace the per-link loop with a single `comm` or `join` against a sorted index, which makes the
-cap unnecessary rather than merely larger.
+**11. The dangling-link check sampled 100 links and did not scan them all — FIXED on
+`fix/exhaustive-dangling-scan`.** Kept in place and kept numbered, for the same reason as 1, 2, 4, 6
+and 7–9: entries are referenced by number from work in flight, and renumbering invalidates those
+references. Full record in
+[Closed on `fix/exhaustive-dangling-scan`](#closed-on-fixexhaustive-dangling-scan).
 
 **12. The matcher class outlives `skill-sources/`, and every search string tried so far has been
 narrower than the class.** This entry has now been wrong twice about its own scope, which is the part
@@ -871,6 +869,100 @@ defect, not a residue of the same one.
 substituted by nothing in this repo** — knobs that look configurable and are not. Filed inside
 divergence 3 (which is where it was found and where its evidence lives) rather than given an entry of
 its own; this line exists so a reader scanning headings finds it at all.
+
+### Closed on `fix/exhaustive-dangling-scan`
+
+- **The dangling-link check sampled 100 links and reported the result as a property of the graph** —
+  divergence 11. `validate-kernel.sh` capped `link_candidates` at `head -100`. On the field vault
+  that is **100 of 2716 unique link targets — 3.7%**, and the PASS it produced read as a statement
+  about all of them.
+
+  **The cap was hiding real defects, which is the part worth stating rather than the percentage.**
+  Measured on the field vault immediately before the change, replicating the old path exactly:
+
+  | scan | coverage | dangling found | verdict |
+  |---|---|---|---|
+  | old, `head -100` | 100 of 2716 (3.7%) | **0** | `PASS No dangling wiki links` |
+  | new, exhaustive | 2716 (100%) | **8** | `WARN 8 unresolved wiki links` |
+
+  So the primitive was printing a clean PASS over a graph with eight broken links, and had been for
+  as long as directory resolution worked.
+
+  **The fix is a set difference, NOT a bigger cap — and the premise that kept the cap was simply
+  untested.** The entry reasoned that lifting it "is not free": one `grep -qxF` per link on top of a
+  run already taking ~45s. That much was true — measured, the per-link loop costs **32.0s** for all
+  2716 links against **1.0s** for 100. What was never checked is that a loop was the only
+  alternative. `comm -23` over two sorted, folded streams checks **all 2716 in under a second** and
+  returns the identical count. **The exhaustive version is faster than the sample it replaced**, so
+  there was no coverage/time tradeoff to defend — only a loop shape. Equivalence was verified against
+  the loop on the validator's own inputs, not on a convenient subset: both return 8.
+
+  **Beware the two different "existing" sets — they produce different dangling counts and the
+  difference is not a bug.** A first benchmark built the existing-file index from `nodes/` alone
+  (2686 files) and found **30** dangling; the validator builds it from every `*.md` in the vault
+  (5251 folded basenames) and finds **8**. Both are internally consistent; only the second describes
+  what the validator does. Re-derive:
+
+  ```bash
+  . reference/lib/link-extraction.sh
+  V=~/second-brain
+  existing=$(find "$V" -name '*.md' -not -path '*/.git/*' | xargs -I{} basename {} .md \
+             | _fold_lower | LC_ALL=C sort -u)
+  links=$({ for d in nodes capture self; do extract_link_targets_recursive $V/$d; done; } \
+          | grep -v '^$' | sort -u | _fold_lower | LC_ALL=C sort -u)
+  comm -23 <(printf '%s\n' "$links") <(printf '%s\n' "$existing") | grep -c .   # 8 (drifts)
+  ```
+
+  **`comm` adds a requirement the loop did not have, and it fails silently.** The loop folded each
+  link at comparison time and cared nothing about order. `comm` consumes two **sorted** streams and
+  emits nonsense when their collations disagree — and default `sort` is locale-dependent.
+  `existing_files` was sorted with a bare `sort -u`, so pinning only the new side would have made
+  every non-ASCII name a spurious dangling link, quietly. **Both sides now pin `LC_ALL=C`**, and the
+  suite asserts that both do.
+
+  **The disclosure machinery went with the cap, deliberately.** The PASS used to print sample size,
+  true total, percentage and unchecked remainder — added on the previous branch precisely so a
+  sampled PASS could not read as complete. With an exhaustive scan those phrasings would describe a
+  sample that no longer exists, which is the same class of false statement they were built to
+  prevent. Both PASS arms now say `checked all`. The one surviving two-number case is **not** a
+  sample: case-folding merges targets differing only by case, which resolve to one file, and that
+  arm says so in words.
+
+  ```bash
+  for s in bash zsh; do $s reference/test/kernel-note-dirs.test.sh | tail -1; done   # 37/37, was 36/36
+  ```
+
+  **Five assertions were deleted and six added, and the deletions are the point.** Section 9 existed
+  to pin the sample's disclosure — "the sample is a full 100, not 99", "states the unchecked
+  remainder", "discloses the percentage", "does not claim to have checked all". Those pinned
+  machinery that no longer exists; keeping them green would have required keeping the cap. The
+  120-note fixture is **kept**, because it sits above the old cap and is exactly the case that used
+  to be truncated and called clean.
+
+  **Both new guards were mutation-proved rather than counted**, per this repo's own rule that a row
+  in a total is not evidence it can fail:
+
+  | mutation | turns red |
+  |---|---|
+  | reinstate `head -100` on `link_folded` | `checks all 120, not 100` **and** `no scan cap survives on the link pipeline` |
+  | drop `LC_ALL=C` from the `existing_files` side only | `both comm inputs pin LC_ALL=C`, and only it |
+
+  The structural guard keys on `link_(candidates|folded).*head -`, not on `head -[0-9]`. The broad
+  form was written first and failed against three legitimate `head -1` uses — find-first-file,
+  read-first-line, take-first-of-list. A guard that fires on correct code gets deleted, not fixed.
+
+  **Consequence for the pass criterion, and it is a content defect rather than a regression here:**
+  the field vault now reports **15 PASS / 2 WARN / 0 FAIL**, the new WARN being these 8 unresolved
+  links. Primitive 2 is not on the list permitted to WARN, so by the criterion above it is a real
+  finding — in the vault's content, not in this repo. It joins primitive 1 (frontmatter coverage) as
+  a standing item the validator now surfaces instead of hiding.
+
+  **What is NOT fixed:** `generators/features/*.md` still emit line-anchored `rg` recipes into
+  generated vaults' documentation, and `skill-sources/seed/SKILL.md:83` caps duplicate candidates at
+  `head -5`. The latter was assessed and left: it feeds a human-facing "proceed anyway?" prompt where
+  five examples are illustrative, and it does not present itself as a complete result. If that prompt
+  ever becomes an automated decision, it becomes the same defect.
+
 
 ### Closed on `fix/spec-f-divergence-drain`
 

@@ -283,36 +283,50 @@ eq "8a's detector fires here -- proving its grep is live, not dead wording" "con
    "$(if printf '%s' "$OUT" | grep -q 'PASS .* contain wiki links' && printf '%s' "$OUT" | grep -q 'no wiki links to check'; then echo contradiction; else echo "detector-dead:$OUT"; fi)"
 rm -rf "$ROOT2"
 
-# --- 9. a PASS must state its own scope when the 100-link cap truncates ------
-# The cap predates this fix and is left in place, but it used to be harmless:
-# nothing resolved, so the sample was always empty. Now that resolution works,
-# an unqualified "No dangling wiki links" would assert over every link in the
-# vault on the strength of the first hundred. Below and above the cap must read
-# differently.
+# --- 9. the dangling scan is exhaustive, not sampled -------------------------
+# This section used to assert the OPPOSITE: that a `head -100` sample disclosed
+# its own scope (percentage checked, unchecked remainder). The cap is gone,
+# replaced by a `comm` set difference that is exhaustive AND faster than the
+# sample it replaced, so those five assertions pinned machinery that no longer
+# exists. The 120-note fixture is kept deliberately -- it sits ABOVE the old cap,
+# so it is precisely the case that used to be truncated and reported as clean.
 V=$(mkvault); ROOT=$(dirname "$V")
 rm -f "$V"/zzz-arbitrary/*.md
 i=1
 while [ "$i" -le 120 ]; do
-  printf -- '---\nd: n\n---\nself ref [[n%03d]]\n' "$i" > "$V/zzz-arbitrary/n$(printf '%03d' "$i").md"
-  i=$((i + 1))
+    printf -- '---\nd: n\n---\nself ref [[n%03d]]\n' "$i" > "$V/zzz-arbitrary/n$(printf '%03d' "$i").md"
+    i=$((i + 1))
 done
 OUT=$(p2 "$V")
-eq "over the cap: names the true total" "120" \
-   "$(printf '%s' "$OUT" | sed -n 's/.*% of \([0-9][0-9]*\) unique links.*/\1/p')"
-# The sample size itself was never asserted, and it was wrong: link_candidates
-# is seeded empty, so a leading blank line survived sort -u and ate one of the
-# hundred slots. `head -100` delivered 99. Pinning the number is what makes the
-# cap mean what it says.
-eq "over the cap: the sample is a full 100, not 99" "100" \
-   "$(printf '%s' "$OUT" | sed -n 's/.*among \([0-9][0-9]*\) links checked.*/\1/p')"
-eq "over the cap: states the unchecked remainder" "20" \
+eq "above the old cap: checks all 120, not 100" "120" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*checked all \([0-9][0-9]*\) unique links.*/\1/p')"
+eq "above the old cap: claims complete coverage" "all" \
+   "$(printf '%s' "$OUT" | grep -q 'checked all' && echo all || echo "notall:$OUT")"
+# The two sample-disclosure phrasings must be GONE, not merely unused. Each ""
+# expectation is paired with the positive assertions above: an empty grep result
+# and a broken search are indistinguishable, and the "120" assertion is what
+# proves $OUT holds real output rather than an empty string that trivially
+# lacks both phrasings.
+eq "above the old cap: no unchecked remainder" "" \
    "$(printf '%s' "$OUT" | sed -n 's/.*; \([0-9][0-9]*\) were NOT checked.*/\1/p')"
-# The percentage is the disclosure the lead required: "100 of 120" skims as
-# near-complete, "83.3%" does not.
-eq "over the cap: discloses the percentage" "83.3" \
+eq "above the old cap: no percentage disclosure" "" \
    "$(printf '%s' "$OUT" | sed -n 's/.*only \([0-9.]*\)% of.*/\1/p')"
-eq "over the cap: does not claim to have checked all" "scoped" \
-   "$(printf '%s' "$OUT" | grep -q 'checked all' && echo "overclaimed:$OUT" || echo scoped)"
+# STRUCTURAL: the cap must not return as a merely larger number. Keyed on the
+# executable form only -- comments in this file and in the validator legitimately
+# still discuss the old `head -100`, and keying on those would make the guard
+# unfixable without rewriting the record of why it exists.
+eq "no scan cap survives on the link pipeline" "0" \
+   "$(sed 's/#.*$//' "$VALIDATOR" | grep -cE 'link_(candidates|folded).*head -' || true)"
+# COLLATION. `comm` consumes two sorted streams and emits nonsense when their
+# collations differ; the per-link `grep -qxF` loop it replaced had no such
+# requirement, so this risk is NEW as of the cap removal and nothing else pins
+# it. Both sides must therefore sort under LC_ALL=C. Asserted structurally
+# because the behavioural version is not portable: the inputs that discriminate
+# C from a locale collation involve punctuation or non-ASCII names, and macOS
+# normalises the latter on the filesystem, which would make the test flaky
+# rather than wrong -- and a flaky gate is worse here than an explicit one.
+eq "both comm inputs pin LC_ALL=C" "2" \
+   "$(grep -c 'LC_ALL=C sort' "$VALIDATOR" || true)"
 
 rm -f "$V"/zzz-arbitrary/*.md
 printf -- '---\nd: a\n---\n[[beta]]\n' > "$V/zzz-arbitrary/alpha.md"
