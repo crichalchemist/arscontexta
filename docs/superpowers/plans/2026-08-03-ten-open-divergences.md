@@ -327,7 +327,8 @@ produce a commit with no tracked change without `--allow-empty`. A check that ca
 fail is not a gate.
 
 The nearest checkable variant — *must touch `CLAUDE.md` or `docs/superpowers/`* — was measured over
-60 commits: 27 mention "record", 3 would fail. One of those three is a true positive (`741b2b7`).
+the 60 commits ending at **`8218b4a`**, this task's base: 27 mention "record", 3 would fail. One of
+those three is a true positive (`741b2b7`).
 One is a false positive (`4c827a6`, whose message says a code comment "records it as an accepted
 defect" — the verb, not a claim of having made a record). And decisively, the variant **passes**
 `c122d9e`, the second and harder known instance, which did touch a plan file while the three
@@ -336,12 +337,29 @@ instances it exists to catch is asserting a proxy, not the property — the exac
 repo's gate inventory spends its length warning about. Re-derive:
 
 ```bash
-for c in $(git log --format=%h -60); do
+for c in $(git log --format=%h 8218b4a~60..8218b4a); do          # PINNED, not -60
   git log -1 --format=%B "$c" | grep -qi 'record' || continue
   git show --name-only --format='' "$c" | grep -q '^CLAUDE.md$\|^docs/superpowers/' \
     || echo "would FAIL: $c $(git log -1 --format=%s "$c")"
 done                                    # 741b2b7 (true), acb1ecf, 4c827a6 (false positive)
 git show --name-only --format='' c122d9e   # touches a plan file; the variant passes it
+```
+
+**The range is pinned to `8218b4a` on purpose, and the first draft of this measurement was not.**
+It said `-60`, a window relative to a moving `HEAD`, so `a46cc54` — a commit of *this* task, whose
+message contains the word "record" — slid into the window and the published `27` read `28` five
+lines below the number. Re-pinning is the fix rather than writing `28`, which would re-break on the
+next commit and again at merge. The conclusion does not move either way: `3 would fail` is stable
+across the shift, and `c122d9e` still passes the variant, which is the fact the rejection rests on.
+Verify the shift itself is real rather than taking it on trust:
+
+```bash
+for c in $(git log --format=%h 8218b4a~60..8218b4a); do git log -1 --format=%B "$c"; done \
+  | grep -ci '^.*record' >/dev/null; \
+  printf 'pinned:   %s\n' "$(for c in $(git log --format=%h 8218b4a~60..8218b4a); do \
+    git log -1 --format=%B "$c" | grep -qi record && echo x; done | grep -c .)"   # 27
+printf 'moving:   %s\n' "$(for c in $(git log --format=%h -60); do \
+  git log -1 --format=%B "$c" | grep -qi record && echo x; done | grep -c .)"     # 28 and rising
 ```
 
 One gate **is** viable and is deferred rather than dropped: *every file in
@@ -355,7 +373,27 @@ which is the defect this task exists to close.
 
 Propagation of the slot, meanwhile, is empirical rather than enforced: the two most recent plans
 (this one and `2026-08-04-ci-hardening.md:255`) both carry it, and a plan here is written by
-copying the shape of the last one.
+copying the shape of the last one. **This task added the slot to exactly one plan** — the other was
+added by `a1665b7`, which predates the branch. Two of eight, and the six older plans are left alone
+on purpose.
+
+**Step 2.1's second clause — "and to the plan template" — is unsatisfiable, and saying so here is
+the point.** Step 2.2's gate clause got a full section arguing it was defective as written while
+this one was silently dropped, and inconsistent disclosure is worse than either outcome: a reader
+comparing the two concludes the template was simply forgotten. There is no plan template in this
+repo to edit. `docs/superpowers/` contains `plans/` and `specs/` and nothing else; no file matching
+`*template*` exists anywhere in it; and plans here are produced by the `superpowers:writing-plans`
+skill, which lives in the plugin marketplace cache outside every path this repo can commit to.
+Editing it would change the author's machine, not the repository, and would not survive a plugin
+update. Verify both halves rather than taking the claim:
+
+```bash
+find docs/superpowers -iname '*template*' | grep -c .   # 0: no template to add a slot to
+ls docs/superpowers                                     # plans, specs -- that is all
+```
+
+What replaces it is the two-of-eight propagation above and the deferred structural gate. If a plan
+template is ever vendored into this repo, the slot belongs in it and this clause becomes live.
 
 ---
 

@@ -701,9 +701,21 @@ git show --format='' c122d9e          # a plan file, 7 lines, two checkbox ticks
 not built.** `CONTRIBUTING.md` used to say the git-ignored `.superpowers/sdd/` ledgers "are the
 authoritative record" — a false licence, since both authors already knew the directory was ignored
 and the tracked guidance told them that was fine. That sentence now says the opposite and names
-where a record actually goes. And every plan under `docs/superpowers/plans/` now carries a required
+where a record actually goes. And **every plan written from this branch forward** carries a required
 `## Deferrals` slot whose value is one line per deferral naming the tracked file it landed in, or
-the literal word `none`. A commit-message gate was assessed and **rejected**, measured in both
+the literal word `none`.
+
+**That is forward-binding, not a description of the directory — it is 2 of 8 today.** The six older
+plans have no such section, and retrofitting `none` into plans nobody has audited for deferrals
+would manufacture the exact kind of record this entry exists to stop. The wording here first read
+"every plan under `docs/superpowers/plans/` now carries", which was false by one command inside the
+commit whose subject is records not matching reality:
+
+```bash
+for p in docs/superpowers/plans/*.md; do
+  printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
+done                                    # 2 of 8 carry it; the other six predate the convention
+``` A commit-message gate was assessed and **rejected**, measured in both
 directions — the reasoning and the numbers are in
 `docs/superpowers/plans/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
 plan-file gate that would replace it is deferred to the CI-hardening spec. The original subject of

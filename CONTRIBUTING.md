@@ -221,11 +221,27 @@ being ignored; the tracked guidance had said that was fine.
 
 **Where a record actually goes:** `CLAUDE.md`'s divergence list for a defect that survives the
 branch, the plan's `## Deferrals` section for work consciously not done, the spec for a decision.
-Each plan under `docs/superpowers/plans/` carries a required `## Deferrals` slot whose value is
-either one line per deferral naming the tracked file it landed in, or the literal word `none` —
-an empty slot is a failure, not a default. The slot exists because the two failures above were not
-caused by anyone forgetting the rule, so another statement of the rule could not have prevented
-them; what was missing was a place in the artifact where the omission is *visible*.
+**Plans from this branch forward** carry a required `## Deferrals` slot whose value is either one
+line per deferral naming the tracked file it landed in, or the literal word `none` — an empty slot
+is a failure, not a default. The slot exists because the two failures above were not caused by
+anyone forgetting the rule, so another statement of the rule could not have prevented them; what was
+missing was a place in the artifact where the omission is *visible*.
+
+**Expect to find plans without one — that is the convention's age, not its optionality.** Two of the
+eight plans carry the slot today; the six older ones predate it and are deliberately left alone,
+because writing `none` into a plan nobody has audited for deferrals manufactures the very kind of
+record this section exists to prevent. Copy the convention from the newest plan, not from whichever
+one you happen to open:
+
+```bash
+for p in docs/superpowers/plans/*.md; do
+  printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
+done
+```
+
+Nothing enforces this. A gate keyed on plan structure is the one viable candidate and is deferred to
+`docs/superpowers/plans/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
+next author copies the last plan.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
 executed and merged. A status file that lies about status is this project's own defect class wearing
