@@ -794,8 +794,15 @@ defect, not a residue of the same one.
   The second control closes it. Both failure branches now **print each temp they discard**, so a
   filename built by the script crosses the boundary, and the test asserts `$TMP_GLOB` matches *that*
   — using `find` with the same pattern the four assertions use, not a shell `case`, which matched
-  under bash and not under zsh. `$TMP_GLOB` is single-sourced across all five uses. Both mutations
-  above now turn it red in both shells.
+  under bash and not under zsh. `$TMP_GLOB` is single-sourced across all six `find` uses — of which
+  **five** are assertions that depend on the pattern matching what the script names, the sixth being
+  the planted control that deliberately does not
+  (`grep -c '\$(find .*-name "\$TMP_GLOB"' reference/test/bump-version.test.sh` → 6; anchor on the
+  `$(find` invocation, since `grep -c 'find .*\$TMP_GLOB'` also matches two comment lines and
+  returns 7). The two counts differ by exactly that control, which is the
+  defect this fix closed; a re-review read them as one number and reported an off-by-one in the test
+  comment that says "five assertions", where that sentence is correct. Both mutations above now turn
+  it red in both shells.
 
   ```bash
   # Re-derive any row of the table above: apply the mutation, ASSERT IT APPLIED, run, restore.
