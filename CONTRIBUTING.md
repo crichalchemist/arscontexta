@@ -113,7 +113,8 @@ done
 ```
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
-disabled). Any other WARN or FAIL is a regression.
+disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message first,
+because two WARNs described below are properties of the vault being scanned, not of this codebase.
 
 **That is a criterion about primitives, and it deliberately does not quote a total.** An earlier
 revision of this line replaced it with one private vault's result-line totals, which is a different
