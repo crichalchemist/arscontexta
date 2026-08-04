@@ -193,6 +193,13 @@ word2num() {
         eleven) echo 11;; twelve) echo 12;; thirteen) echo 13;; fourteen) echo 14;;
         fifteen) echo 15;; sixteen) echo 16;; seventeen) echo 17;; eighteen) echo 18;;
         nineteen) echo 19;; twenty) echo 20;;
+        # Hyphenated forms, because documents write "all twenty-two CI steps"
+        # and a missing entry here is an rc-2 ERROR, not a silent pass — which
+        # is right, but it stalls a correct edit until the word is added.
+        twenty-one) echo 21;; twenty-two) echo 22;; twenty-three) echo 23;;
+        twenty-four) echo 24;; twenty-five) echo 25;; twenty-six) echo 26;;
+        twenty-seven) echo 27;; twenty-eight) echo 28;; twenty-nine) echo 29;;
+        thirty) echo 30;;
         *) return 1;;
     esac
 }
@@ -212,23 +219,23 @@ word2num() {
 #
 # `[^#]*` rather than `.*` before ` # ` binds to the FIRST comment marker on the
 # line, not the last.
-CLAIMS='reference/lib/link-extraction.sh|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
-reference/lib/frontmatter.sh|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
-reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
-skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
-CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
+CLAIMS='reference/lib/link-extraction.sh|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
+reference/lib/frontmatter.sh|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
+reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
+skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
+CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z-]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
 CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
-CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z]*\) checks:.*/\1/p|truth_portability_checks|
+CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
 CONTRIBUTING.md|bump-version suite total|s/.*bump-version.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|bump-version
 CONTRIBUTING.md|kernel-note-dirs suite total|s/.*kernel-note-dirs.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|kernel-note-dirs
 CONTRIBUTING.md|threshold-namespace suite total|s/.*threshold-namespace.*expect: \([0-9][0-9]*\) passed,.*/\1/p|truth_suite|threshold-namespace
-CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z]*\) CI steps must pass.*/\1/p|truth_ci_steps|
-CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z]*\) CI steps ran.*/\1/p|truth_ci_steps|
-CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z]*\),.*/\1/p|truth_check_files|
+CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z-]*\) CI steps must pass.*/\1/p|truth_ci_steps|
+CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z-]*\) CI steps ran.*/\1/p|truth_ci_steps|
+CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z-]*\),.*/\1/p|truth_check_files|
 CONTRIBUTING.md|checks in CI (word form)|s/^\([A-Z][a-z]*\) run in CI on every push.*/\1/p|truth_ci_run_checks|
-CLAUDE.md|check inventory (word form)|s/^There are \([a-z][a-z]*\) executable checks\..*/\1/p|truth_check_files|
+CLAUDE.md|check inventory (word form)|s/^There are \([a-z][a-z-]*\) executable checks\..*/\1/p|truth_check_files|
 CLAUDE.md|checks in CI (word form)|s/^There are [a-z]* executable checks\. \([A-Z][a-z]*\) run in CI.*/\1/p|truth_ci_run_checks|
 CLAUDE.md|CI step items (this branch)|s/^grep -c .\^      - . \.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps|
 CLAUDE.md|CI step items (main)|s/^git show main:\.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps_main|

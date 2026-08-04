@@ -46,7 +46,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are eleven executable checks. Ten run in CI (`.github/workflows/checks.yml`) on every push.
+There are twelve executable checks. Eleven run in CI (`.github/workflows/checks.yml`) on every push.
 Three defects shipped here were bash/zsh forks, so **the six test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
@@ -64,6 +64,7 @@ for s in bash zsh; do
   $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
   $s reference/test/threshold-namespace.test.sh          # 52/52
+  $s reference/test/placeholder-count.test.sh            # 27/27
 done
 ```
 
@@ -360,9 +361,9 @@ Counting the CI steps takes the same care: `grep -c '^      - name:'` returns on
 count, because `actions/checkout` carries no `name:`. Count step *items* (`^      - `), not names:
 
 ```bash
-grep -c '^      - ' .github/workflows/checks.yml                      # 20, this branch
+grep -c '^      - ' .github/workflows/checks.yml                      # 22, this branch
 git show main:.github/workflows/checks.yml | grep -c '^      - '      # 18
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 11
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 12
 ```
 
 What follows is what remains.

@@ -61,6 +61,16 @@ jobs:
       # to main the range is empty and the gate says so rather than passing mutely.
       - name: Templates did not lose placeholders (bash)
         run: bash reference/check-placeholder-count.sh origin/main
+      # The gate above ships an EMPTY allowlist, so every branch behind it is
+      # unexercised by any real run — the condition under which its first draft's
+      # `set -- $e` bug survived review. These build real git repos, because the
+      # subject is a git RANGE: both Criticals found in review (a two-dot range
+      # blaming files the branch never touched; a rename laundering a hardcode)
+      # are invisible to any test that does not construct history.
+      - name: Placeholder gate behavior (bash)
+        run: bash reference/test/placeholder-count.test.sh
+      - name: Placeholder gate behavior (zsh)
+        run: zsh reference/test/placeholder-count.test.sh
       - name: Shell syntax check
         run: |
           bash -n reference/validate-kernel.sh

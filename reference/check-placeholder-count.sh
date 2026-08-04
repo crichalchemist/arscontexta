@@ -90,14 +90,20 @@ elif [ "${total_markers:-0}" -eq 0 ]; then
 fi
 
 # THE MERGE BASE MUST ACTUALLY RESOLVE, and `git rev-parse --verify` is NOT that
-# test. A ref can exist locally while its history does not: in a depth-1 clone
-# rev-parse succeeds, `git show "$BASE:$f"` then returns EMPTY, that reads as
-# was=0, and `now >= 0` is true for every file — a silent PASS on the whole diff.
-# actions/checkout defaults to depth 1, so that is the DEFAULT CI state, not an
-# edge case. merge-base is the test that fails there.
+# test — but get the mechanism right, because the obvious story is wrong and this
+# comment told it for one commit. `git show "$BASE:$f"` does NOT return empty in a
+# shallow clone: the blob is present, and it returns 27 markers of real content.
+#
+# What actually breaks is that there is no common ancestor to diff FROM. Neutered
+# on a base with no shared history, the gate prints `PASS 32 template(s) changed
+# … no count decreased`, rc 0, over a genuine hardcode — because the range itself
+# is meaningless, not because any single lookup returned nothing. That is the
+# silent PASS, and merge-base is the test that catches it. actions/checkout
+# defaults to depth 1, so an unfetched base ref is the DEFAULT CI state.
+MB=""
 if ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
     die2 "base ref '$BASE' does not resolve — pass a ref that exists (CI needs fetch-depth: 0)"
-elif ! git merge-base "$BASE" HEAD >/dev/null 2>&1; then
+elif ! MB=$(git merge-base "$BASE" HEAD 2>/dev/null) || [ -z "$MB" ]; then
     die2 "no merge base between '$BASE' and HEAD — shallow clone? CI needs fetch-depth: 0"
 fi
 
@@ -131,35 +137,90 @@ allow_entry_for() {        # allow_entry_for <path> <old> <new> -> the entry, or
 }
 
 # --- the scan ----------------------------------------------------------------
-changed=$(git diff --name-only -z "$BASE"..HEAD 2>/dev/null | tr '\0' '\n' | /usr/bin/grep '^skill-sources/' || true)
-n_changed=$(printf '%s\n' "$changed" | /usr/bin/grep -c . || true)
+# THE RANGE IS THE MERGE BASE, NOT THE BASE REF. `git diff A..HEAD` compares the
+# two TIPS, so every file the base branch moved ahead on appears here with its
+# base-side content — and a placeholder ADDED on main reads as one REMOVED here.
+# Reproduced: main adds 3 markers to verify/SKILL.md, a branch that never touched
+# that file reports `HARDCODED A PLACEHOLDER: verify/SKILL.md (30 -> 27)`, rc 1.
+# origin/main is routinely ahead in CI, so this fired on ordinary branches. The
+# script already computed the merge base as a guard and then did not use it.
+#
+# RENAMES ARE FOLLOWED (-M), because otherwise a `git mv` plus a hardcode escapes
+# completely: the new path has no base-side counterpart, so `was` is 0 and any
+# count clears it. Measured before this change: renaming verify/SKILL.md and
+# hardcoding ALL 27 of its markers reported `PASS 2 template(s) changed, no count
+# decreased`, rc 0. Comparing the OLD path at the merge base against the NEW path
+# now is what closes it.
+#
+# --name-status without -z, because -z's rename records are three NUL-separated
+# fields against two for everything else, and mis-parsing that silently shifts
+# every subsequent record. Tab separation handles spaces; a path containing a
+# newline or a quote is QUOTED by git, which is detected below and reported as
+# rc 2 rather than skipped — this repo has no such path, and a silent skip is how
+# a scan that covered nothing would report clean.
+if ! raw_status=$(git diff --name-status -M "$MB" HEAD 2>/dev/null); then
+    die2 "git diff failed against merge base $MB — cannot enumerate changed templates"
+fi
+[ "$rc2" -eq 1 ] && { echo; echo "PLACEHOLDER COUNT: CANNOT CONCLUDE"; exit 2; }
+
+# THE SET-DEFINING MEASUREMENT NEEDS ITS OWN GUARD. Before the line above, this
+# was `$(git diff … || true)`: on failure it produced an empty list and the gate
+# printed "PASS no skill-sources/ templates … nothing to check", rc 0 — a positive
+# claim about the tree derived from a measurement that did not run. It was the one
+# measurement here without an rc-2 guard, and it defined the set all the others read.
+pairs=$(printf '%s\n' "$raw_status" | while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    st=${line%%	*}; rest=${line#*	}
+    case "$st" in
+      R*) old=${rest%%	*}; new=${rest#*	} ;;
+      # A DELETION GIT DID NOT PAIR. Deleting a template is not a hardcoding, so
+      # this is not a failure — but it must not be silent either. `-M` pairs a
+      # rename with a heavy edit only while the two sides stay similar: measured,
+      # a realistic template renamed with EVERY marker hardcoded still scores
+      # R098 and is caught, while a one-line file rewritten end to end has no
+      # similarity left and git reports A + D. In that shape the added path has
+      # no base-side counterpart, was=0, and any count clears it. Naming the
+      # deletion turns a silent escape into a visible one for a human to judge.
+      D*) case "$rest" in skill-sources/*) printf 'DEL\t%s\n' "$rest" ;; esac; continue ;;
+      *)  old=$rest; new=$rest ;;
+    esac
+    case "$new" in skill-sources/*) ;; *) case "$old" in skill-sources/*) ;; *) continue ;; esac ;; esac
+    case "$old$new" in \"*|*\"*) printf 'ERR git quoted a path (newline or quote in name): %s\n' "$line"; continue ;; esac
+    printf '%s\t%s\n' "$old" "$new"
+done)
+deleted=$(printf '%s\n' "$pairs" | /usr/bin/grep '^DEL	' | cut -f2- || true)
+pairs=$(printf '%s\n' "$pairs" | /usr/bin/grep -v '^DEL	' || true)
+n_changed=$(printf '%s\n' "$pairs" | /usr/bin/grep -c . || true)
 
 findings=""
 if [ "${n_changed:-0}" -gt 0 ]; then
-    findings=$(printf '%s\n' "$changed" | while IFS= read -r f; do
-        [ -n "$f" ] || continue
-        # A file DELETED in this range has no current count; that is a removal,
-        # not a hardcoding, and is out of this gate's scope.
-        [ -f "$f" ] || continue
-        now=$(count_markers < "$f")
-        # A file ADDED in this range does not exist at base. That is legitimately
-        # was=0, and must not be confused with `git show` failing — which is why
-        # existence is tested separately rather than inferred from empty output.
-        if git cat-file -e "$BASE:$f" 2>/dev/null; then
-            if ! was_raw=$(git show "$BASE:$f" 2>/dev/null); then
-                printf 'ERR git show failed for %s at %s\n' "$f" "$BASE"
+    findings=$(printf '%s\n' "$pairs" | while IFS= read -r pair; do
+        [ -n "$pair" ] || continue
+        case "$pair" in ERR*) printf '%s\n' "$pair"; continue ;; esac
+        old=${pair%%	*}; new=${pair#*	}
+        [ -f "$new" ] || continue
+        now=$(count_markers < "$new")
+        # A file ADDED in this range does not exist at the merge base. That is
+        # legitimately was=0, and must not be confused with `git show` failing,
+        # which is why existence is tested separately rather than inferred from
+        # empty output.
+        if git cat-file -e "$MB:$old" 2>/dev/null; then
+            if ! was_raw=$(git show "$MB:$old" 2>/dev/null); then
+                printf 'ERR git show failed for %s at %s\n' "$old" "$MB"
                 continue
             fi
             was=$(printf '%s' "$was_raw" | count_markers)
         else
             was=0
         fi
+        case "$now$was" in *[!0-9]*|"") printf 'ERR non-numeric count for %s (was=%s now=%s)\n' "$new" "$was" "$now"; continue ;; esac
         [ "$now" -lt "$was" ] || continue
-        entry=$(allow_entry_for "$f" "$was" "$now")
+        label="$new"; [ "$old" = "$new" ] || label="$old -> $new"
+        entry=$(allow_entry_for "$new" "$was" "$now")
         if [ -n "$entry" ]; then
-            printf 'OK  allowlisted decrease %s (%s -> %s)\n' "$f" "$was" "$now"
+            printf 'OK  allowlisted decrease %s (%s -> %s)\n' "$label" "$was" "$now"
         else
-            printf 'BAD HARDCODED A PLACEHOLDER: %s (%s -> %s)\n' "$f" "$was" "$now"
+            printf 'BAD HARDCODED A PLACEHOLDER: %s (%s -> %s)\n' "$label" "$was" "$now"
         fi
     done)
 fi
@@ -178,16 +239,40 @@ fi
 
 bad=$(printf '%s\n' "$findings" | /usr/bin/grep '^BAD ' | sed 's/^BAD /  /' || true)
 
-# THE OTHER DIRECTION. Without it the list rots rather than drains: a decrease
-# corrected in a later commit leaves its entry behind, and the next reader treats
-# a closed defect as a standing exception.
+# THE OTHER DIRECTION — BUT SCOPED TO FILES ACTUALLY IN THIS RANGE, which is the
+# difference between a range-relative gate and a tree-relative one.
+#
+# check 6's allowlist is keyed on TREE STATE, so "this entry no longer matches"
+# is a fact about the repository and is true from every angle. This gate's key is
+# RANGE-RELATIVE, and the first version copied check 6's shape without noticing
+# that. The result: any entry made every unrelated branch red, because a range
+# that touches no skill-sources/ file cannot exhibit the decrease the entry
+# excuses. No entry could survive the merge of the change it was written for —
+# CI would stay red until someone deleted it, which is a mechanism that punishes
+# its own correct use.
+#
+# Scoping to files present in the range keeps the drain and drops the false red:
+# an entry whose file IS in the range and no longer shows that decrease is stale
+# and fails; an entry whose file is simply absent from the range says nothing.
+# The cost, stated rather than hidden: a fully obsolete entry survives until a
+# range touches its file again. That is the price of a range-relative key.
 stale=$(printf '%s\n' "$PLACEHOLDER_ALLOW" | while IFS= read -r e; do
     [ -n "$e" ] || continue
-    epath=$(printf '%s' "$e" | cut -d' ' -f1)
-    ecount=$(printf '%s' "$e" | cut -d' ' -f2)
+    epath=${e%% *}
+    rest=${e#* }; ecount=${rest%% *}
+    case "$ecount" in *-\>*) ;; *) printf '  MALFORMED allowlist entry (want "<path> <old>-><new> <reason>"): %s\n' "$e"; continue ;; esac
+    printf '%s\n' "$pairs" | /usr/bin/grep -qF "	$epath" || continue
     printf '%s\n' "$findings" | /usr/bin/grep -qF "allowlisted decrease $epath (${ecount%%->*} -> ${ecount##*->})" \
         || printf '  STALE allowlist entry no longer matches the tree: %s %s\n' "$epath" "$ecount"
 done)
+
+if [ -n "$deleted" ]; then
+    printf '%s\n' "$deleted" | sed 's|^|  NOTE template deleted, not compared: |'
+    echo "    Deleting a template is not a hardcoding, so this does not fail. But git"
+    echo "    pairs a rename with an edit only while the two stay similar, so a file"
+    echo "    renamed AND rewritten arrives as a delete plus an unrelated add, where"
+    echo "    the added path has no base-side count to fall short of. Check by eye."
+fi
 
 if [ "$rc2" -eq 1 ]; then
     echo; echo "PLACEHOLDER COUNT: CANNOT CONCLUDE"; exit 2
@@ -215,11 +300,11 @@ if [ "$fail" -eq 0 ]; then
     n_absorbed=$(printf '%s\n' "$absorbed" | /usr/bin/grep -c . || true)
     [ -n "$absorbed" ] && printf '%s\n' "$absorbed"
     if [ "${n_changed:-0}" -eq 0 ]; then
-        echo "  PASS no skill-sources/ templates in $BASE..HEAD — nothing to check"
+        echo "  PASS no skill-sources/ templates changed since the merge base with $BASE ($MB) — nothing to check"
     elif [ "${n_absorbed:-0}" -gt 0 ]; then
-        echo "  PASS $n_changed template(s) changed in $BASE..HEAD; $n_absorbed decrease(s) allowlisted, none unexplained"
+        echo "  PASS $n_changed template(s) changed since the merge base with $BASE ($MB); $n_absorbed decrease(s) allowlisted, none unexplained"
     else
-        echo "  PASS $n_changed template(s) changed in $BASE..HEAD, no count decreased"
+        echo "  PASS $n_changed template(s) changed since the merge base with $BASE ($MB), no count decreased"
     fi
     echo; echo "PLACEHOLDER COUNT: PASS"; exit 0
 fi
