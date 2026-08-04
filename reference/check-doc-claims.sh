@@ -2,10 +2,10 @@
 # check-doc-claims.sh — do the numbers our own documents state still match reality?
 #
 # WHAT THIS CHECKS, AND WHAT IT DOES NOT. This repo's documents quote counts —
-# suite totals, CI step counts — and those counts rot the moment anything moves.
-# The rot is invisible: nobody reads a prose numeral as a claim to verify, so
-# "There are nine executable checks" sat three lines above "seven" for a whole
-# branch without either being noticed.
+# suite totals, CI step counts, check inventories — and those counts rot the
+# moment anything moves. The rot is invisible: nobody reads a prose numeral as a
+# claim to verify, so "There are nine executable checks" sat three lines above
+# "seven" for a whole branch without either being noticed.
 #
 # SCOPE IS DELIBERATELY NARROW, AND THE BANNER SAYS SO ON EVERY RUN:
 #   * DECLARED CLAIMS ONLY. The CLAIMS table below is a stated list, not a
@@ -13,17 +13,27 @@
 #     green run is NOT evidence that every number in every document is right.
 #   * BASH-RUN TOTALS ONLY. Suite totals are taken under bash. A suite that
 #     passes under bash and forks under zsh is this repo's most-shipped defect
-#     class, and this gate does not see it -- the per-suite CI steps do.
+#     class, and this gate does not see it — the per-suite CI steps do.
 #
 # The narrowness is the point. A gate whose green is read as the broader claim
 # is worse than no gate, which is the failure this repo documents most often.
 #
+# WHY THE SCRIPT ITSELF RUNS UNDER BOTH SHELLS EVEN THOUGH ITS TOTALS ARE
+# BASH-RUN. Those are two different claims and conflating them shipped a defect
+# here: the first version stored "fn arg" in one field and called $truthfn
+# unquoted, which bash word-splits and zsh does not, so `zsh check-doc-claims.sh`
+# exited 2 with two rows unevaluated while bash exited 0. The file is executable
+# and carries a shebang, so nothing stops a contributor typing `zsh` in front of
+# it — exactly how `bump-version.sh` acquired its own zsh fork. The table now
+# carries the argument in its own field and every call is quoted.
+#
 # EXIT CODES, THREE STATES NOT TWO:
 #   0  every declared claim matches
-#   1  a claim disagrees with reality  -- the document is stale, fix the document
-#   2  a claim could not be evaluated  -- the ANCHOR moved (document reworded,
-#      claim deleted) or a truth source would not run. NOT the same as clean, and
-#      emphatically not the same as a mismatch: rc 2 means this gate does not know.
+#   1  a claim disagrees with reality  — the document is stale, fix the document
+#   2  a claim could not be evaluated  — the ANCHOR moved (document reworded,
+#      claim deleted), or a truth source would not run. NOT the same as clean,
+#      and emphatically not the same as a mismatch: rc 2 means this gate does
+#      not know. It outranks rc 1 for that reason.
 #
 # rc 2 exists because "the scan found nothing" and "the scan could not run" are
 # different facts. This repo has twice shipped a scan that matched nothing and
@@ -43,18 +53,38 @@ echo "=== check-doc-claims ==="
 echo "property: numbers our documents DECLARE still match what the tree measures"
 echo "scope:    DECLARED CLAIMS ONLY (the table in this file), BASH-RUN TOTALS ONLY"
 echo "NOT checked: any number not listed here; zsh-run totals; whether a number is"
-echo "             meaningful -- only whether it is current"
+echo "             meaningful — only whether it is current"
 echo
 
 # --- truth sources ----------------------------------------------------------
-# Each prints one bare number on stdout, or nothing at all on failure. Printing
-# nothing is load-bearing: the caller turns an empty truth into rc 2 rather than
+# Each prints one bare number on stdout, or NOTHING on failure. Printing nothing
+# is load-bearing: the caller turns an empty truth into rc 2 rather than
 # comparing against an empty string, which would silently equal a failed extract.
+# Every one of them guards its input and returns 1 — a missing file is a
+# could-not-run, never a mismatch. (truth_check_files lacked that guard and
+# reported "document says 10, tree measures 4" when run from the wrong root.)
 
-truth_suite() {   # truth_suite <suite-basename> -> passed=N
-    local f="reference/test/$1.test.sh"
+truth_suite() {   # truth_suite <suite-basename> -> passed count, ONLY if failed=0
+    local f="reference/test/$1.test.sh" line passed failed
     [ -r "$f" ] || return 1
-    bash "$f" 2>/dev/null | tr ' ' '\n' | sed -n 's/^passed=\([0-9][0-9]*\)$/\1/p' | tail -1
+    line=$(bash "$f" 2>/dev/null | tail -1)
+    # TWO TOTAL FORMATS EXIST IN THIS REPO. Most suites print
+    # `passed=N failed=M`; threshold-namespace prints `NAME: N passed, M failed`.
+    # Handling only the first yields an empty passed for the second, which this
+    # gate would report as a could-not-run on a perfectly healthy suite.
+    passed=$(printf '%s' "$line" | sed -n 's/.*passed=\([0-9][0-9]*\).*/\1/p')
+    failed=$(printf '%s' "$line" | sed -n 's/.*failed=\([0-9][0-9]*\).*/\1/p')
+    [ -n "$passed" ] || passed=$(printf '%s' "$line" | sed -n 's/.*[: ]\([0-9][0-9]*\) passed,.*/\1/p')
+    [ -n "$failed" ] || failed=$(printf '%s' "$line" | sed -n 's/.*, \([0-9][0-9]*\) failed.*/\1/p')
+    [ -n "$passed" ] || return 1
+    # A FAILING SUITE MUST NOT PRODUCE A TRUTH VALUE. The extract anchors on
+    # `failed=0` in the document but nothing asserted the tree agreed, so a suite
+    # at `passed=34 failed=1` returned 34 and this gate printed `ok`, vouching for
+    # a red suite. Worse at `passed=33 failed=1`: it reported "document says 34,
+    # tree measures 33 — fix the document", which would have encoded a regression
+    # into CONTRIBUTING.md as though it were the new expectation.
+    [ "${failed:-0}" = "0" ] || { echo "SUITE_FAILING:$line"; return 0; }
+    printf '%s' "$passed"
 }
 
 truth_ci_steps() {
@@ -64,45 +94,81 @@ truth_ci_steps() {
     grep -c '^      - ' .github/workflows/checks.yml
 }
 
-truth_check_files() {
-    ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh 2>/dev/null \
-        | grep -c .
-}
-
 truth_ci_steps_main() {
-    # A claim about `main` rots on MERGE, not on edit -- nothing in the working
+    # A claim about `main` rots on MERGE, not on edit — nothing in the working
     # tree changes when a branch lands, so the number goes stale with no diff to
     # notice. That is exactly how "14 on main" survived its own branch merging
-    # four more steps into main. Skipped rather than failed off-main-having
-    # clones: absent `main` is a could-not-run, not a mismatch.
+    # four more steps into main. Absent `main` is a could-not-run, not a mismatch.
     git rev-parse --verify main >/dev/null 2>&1 || return 1
     git show main:.github/workflows/checks.yml 2>/dev/null | grep -c '^      - '
 }
 
-# --- the declared claim table ----------------------------------------------
-# One row per claim:  <file>|<label>|<sed extract producing the CLAIMED number>|<truth fn>
-#
-# The extract must yield exactly the number the document states. If it yields
-# nothing, the anchor moved -> rc 2. If it yields several, they must agree with
-# each other AND with truth; a document stating one number twice and updating
-# only one copy is precisely the drift this gate exists to catch.
-# EACH SUITE ROW MUST NAME ITS SUITE IN THE EXTRACT. A bare
-# `s/.*passed=\([0-9]*\) failed=0.*/\1/p` matches EVERY suite's expectation line
-# in the document. Today it happens to work only because two suites both state
-# 19; the moment they legitimately differ, the extract yields two values and this
-# gate reports "document states 2 DIFFERENT values" -- a false mismatch on a
-# correct document. link-extraction is listed too, and is CURRENTLY CORRECT on
-# purpose: it is the positive control proving these rows can come back ok rather
-# than the gate simply firing on everything.
-CLAIMS='CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite guard-failure
-CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite link-extraction
-CLAUDE.md|CI step items (this branch)|s/^grep -c .\^      - . \.github\/workflows\/checks\.yml *# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps
-CLAUDE.md|executable check count|s/^ls reference\/check-\*\.sh .* # *\([0-9][0-9]*\).*/\1/p|truth_check_files
-CLAUDE.md|CI step items (main)|s/^git show main:\.github\/workflows\/checks\.yml.* # *\([0-9][0-9]*\).*/\1/p|truth_ci_steps_main'
+truth_check_files() {
+    [ -d reference/test ] || return 1
+    ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh 2>/dev/null \
+        | grep -c .
+}
 
-while IFS='|' read -r file label extract truthfn; do
+truth_ci_run_checks() {
+    # Checks CI actually EXECUTES — distinct from checks that merely APPEAR in
+    # the workflow. `validate-kernel.sh` is named there only under `bash -n`, and
+    # a grep for its name counts that mention as a run. This session made exactly
+    # that error before catching it.
+    [ -r .github/workflows/checks.yml ] || return 1
+    grep -oE 'run: (bash|zsh) reference/(check-[a-z-]+\.sh|test/[a-z-]+\.test\.sh|validate-kernel\.sh)' \
+        .github/workflows/checks.yml | sed 's/.*reference\///' | sort -u | grep -c .
+}
+
+# word2num — documents state small counts as English words ("run all ten",
+# "Nine run in CI", "all nineteen CI steps"). Two of the five stale claims this
+# gate was built from were in word form, and correcting them into ungated prose
+# would have left half the found defects free to re-rot.
+word2num() {
+    case "$1" in
+        one) echo 1;; two) echo 2;; three) echo 3;; four) echo 4;; five) echo 5;;
+        six) echo 6;; seven) echo 7;; eight) echo 8;; nine) echo 9;; ten) echo 10;;
+        eleven) echo 11;; twelve) echo 12;; thirteen) echo 13;; fourteen) echo 14;;
+        fifteen) echo 15;; sixteen) echo 16;; seventeen) echo 17;; eighteen) echo 18;;
+        nineteen) echo 19;; twenty) echo 20;;
+        *) return 1;;
+    esac
+}
+
+# --- the declared claim table ----------------------------------------------
+# <file>|<label>|<sed extract yielding the CLAIMED value>|<truth fn>|<arg>
+#
+# The argument lives in its OWN field. Packing "fn arg" into one field and
+# calling it unquoted is the zsh fork described in the header.
+#
+# EACH SUITE ROW MUST NAME ITS SUITE IN THE EXTRACT. A bare
+# `s/.*passed=\([0-9]*\).*/\1/p` matches EVERY suite's expectation line in the
+# document; the moment two suites legitimately differ it yields two values and
+# this gate reports a false mismatch on a correct document. link-extraction is
+# listed and is CURRENTLY CORRECT on purpose — it is the positive control
+# proving these rows can return ok rather than the gate firing on everything.
+#
+# `[^#]*` rather than `.*` before ` # ` binds to the FIRST comment marker on the
+# line, not the last.
+CLAIMS='CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
+CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
+CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z]*\) CI steps must pass.*/\1/p|truth_ci_steps|
+CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z]*\) CI steps ran.*/\1/p|truth_ci_steps|
+CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z]*\),.*/\1/p|truth_check_files|
+CONTRIBUTING.md|checks in CI (word form)|s/^\([A-Z][a-z]*\) run in CI on every push.*/\1/p|truth_ci_run_checks|
+CLAUDE.md|check inventory (word form)|s/^There are \([a-z][a-z]*\) executable checks\..*/\1/p|truth_check_files|
+CLAUDE.md|checks in CI (word form)|s/^There are [a-z]* executable checks\. \([A-Z][a-z]*\) run in CI.*/\1/p|truth_ci_run_checks|
+CLAUDE.md|CI step items (this branch)|s/^grep -c .\^      - . \.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps|
+CLAUDE.md|CI step items (main)|s/^git show main:\.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps_main|
+CLAUDE.md|link-extraction fence total|s/^ *\$s reference\/test\/link-extraction\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|link-extraction
+CLAUDE.md|guard-failure fence total|s/^ *\$s reference\/test\/guard-failure\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|guard-failure
+CLAUDE.md|bump-version fence total|s/^ *\$s reference\/test\/bump-version\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|bump-version
+CLAUDE.md|kernel-note-dirs fence total|s/^ *\$s reference\/test\/kernel-note-dirs\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|kernel-note-dirs
+CLAUDE.md|threshold-namespace fence total|s/^ *\$s reference\/test\/threshold-namespace\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|threshold-namespace
+CLAUDE.md|executable check count|s/^ls reference\/check-\*\.sh [^#]*# *\([0-9][0-9]*\).*/\1/p|truth_check_files|'
+
+while IFS='|' read -r file label extract truthfn arg; do
     [ -n "${file:-}" ] || continue
-    printf '  %-28s %-34s ' "$file" "$label"
+    printf '  %-18s %-30s ' "$file" "$label"
 
     if [ ! -r "$file" ]; then
         echo "ERROR  file not readable"
@@ -113,7 +179,7 @@ while IFS='|' read -r file label extract truthfn; do
     n_claimed=$(printf '%s\n' "$claimed" | grep -c . || true)
 
     if [ "$n_claimed" -eq 0 ]; then
-        echo "ERROR  claim anchor not found -- document reworded, or claim removed"
+        echo "ERROR  claim anchor not found — document reworded, or claim removed"
         errors=$((errors + 1)); continue
     fi
     if [ "$n_claimed" -gt 1 ]; then
@@ -121,13 +187,27 @@ while IFS='|' read -r file label extract truthfn; do
         mismatches=$((mismatches + 1)); continue
     fi
 
-    actual=$($truthfn 2>/dev/null)
-    if [ -z "${actual:-}" ]; then
-        echo "ERROR  truth source '$truthfn' produced nothing"
-        errors=$((errors + 1)); continue
-    fi
+    # word form -> number, so "all nineteen CI steps" is gated like `# 19`
+    case "$claimed" in
+        [0-9]*) claimed_n="$claimed" ;;
+        *) claimed_n=$(word2num "$(printf '%s' "$claimed" | tr '[:upper:]' '[:lower:]')") || {
+               echo "ERROR  claimed value '$claimed' is neither a number nor a known number-word"
+               errors=$((errors + 1)); continue
+           } ;;
+    esac
 
-    if [ "$claimed" = "$actual" ]; then
+    if [ -n "$arg" ]; then actual=$("$truthfn" "$arg" 2>/dev/null); else actual=$("$truthfn" 2>/dev/null); fi
+
+    case "${actual:-}" in
+        "")
+            echo "ERROR  truth source '$truthfn ${arg:-}' produced nothing"
+            errors=$((errors + 1)); continue ;;
+        SUITE_FAILING:*)
+            echo "ERROR  suite is RED (${actual#SUITE_FAILING:}) — a claim about a failing suite cannot be validated"
+            errors=$((errors + 1)); continue ;;
+    esac
+
+    if [ "$claimed_n" = "$actual" ]; then
         echo "ok     $claimed"
     else
         echo "MISMATCH  document says $claimed, tree measures $actual"
@@ -137,10 +217,51 @@ done <<EOF
 $CLAIMS
 EOF
 
+# --- a stated count must match the LIST it heads ----------------------------
+# A count can be current while the list beneath it is short, and then both the
+# number and the gate are right and the document is still wrong. "run all ten"
+# sat above nine commands, and "There are ten executable checks" above an
+# eight-command fence — because the previous pass corrected the numbers without
+# touching the lists they introduce. Comparing a number against `ls` can never
+# see that; only comparing it against the list can.
+check_list_len() {  # <file> <label> <awk program selecting the list> <expected fn>
+    local file="$1" label="$2" prog="$3" fn="$4" n expect
+    printf '  %-18s %-30s ' "$file" "$label"
+    [ -r "$file" ] || { echo "ERROR  file not readable"; errors=$((errors + 1)); return; }
+    n=$(awk "$prog" "$file" | grep -c . || true)
+    expect=$("$fn" 2>/dev/null)
+    if [ -z "${expect:-}" ]; then
+        echo "ERROR  truth source '$fn' produced nothing"; errors=$((errors + 1)); return
+    fi
+    if [ "$n" -eq 0 ]; then
+        echo "ERROR  extracted an EMPTY list — the block's shape changed, not the list cleaned"
+        errors=$((errors + 1)); return
+    fi
+    if [ "$n" = "$expect" ]; then
+        echo "ok     $n listed"
+    else
+        echo "MISMATCH  $n listed, $expect exist"
+        mismatches=$((mismatches + 1))
+    fi
+}
+
+check_list_len CONTRIBUTING.md "verification list is complete" \
+    '/^## Verification/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{b=0} b&&/reference\//' \
+    truth_check_files
+# CLAUDE.md's fence deliberately OMITS validate-kernel.sh -- it needs a generated
+# vault and is documented in its own fence directly below. Comparing this list
+# against the raw file count would demand an entry that does not belong here, so
+# the expectation is the count minus that one, and the reason is stated rather
+# than left as an unexplained -1.
+truth_checks_no_vault() { local n; n=$(truth_check_files) || return 1; echo $((n - 1)); }
+check_list_len CLAUDE.md "verification fence is complete" \
+    '/^bash reference\/check-portability/{f=1} f&&/^```/{exit} f&&/reference\//' \
+    truth_checks_no_vault
+
 # --- divergence-number uniqueness -------------------------------------------
 # SCOPED TO THE DIVERGENCE LIST, NOT THE WHOLE FILE, and that scoping is the
 # whole correctness of this sub-check. CLAUDE.md carries at least two unrelated
-# bold-numbered lists -- `## Architecture: three generation paths` numbers 1..3,
+# bold-numbered lists — `## Architecture: three generation paths` numbers 1..3,
 # and `## Known open divergences` numbers 1..13. An unscoped `^\*\*[0-9]+\.`
 # extraction reports 1, 2 and 3 as duplicates ON A CLEAN TREE. A gate that fires
 # on correct documents gets deleted rather than fixed.
@@ -148,8 +269,8 @@ EOF
 # A GAP IS NOT A DEFECT. The list legitimately skips numbers when entries are
 # collapsed (8 and 9 folded into 7) or closed. Only a REPEATED number is a
 # defect, because entries are cross-referenced by number and two entries sharing
-# one makes every reference to it ambiguous.
-printf '  %-28s %-34s ' "CLAUDE.md" "divergence numbers unique"
+# one makes every reference ambiguous.
+printf '  %-18s %-30s ' "CLAUDE.md" "divergence numbers unique"
 if [ ! -r CLAUDE.md ]; then
     echo "ERROR  CLAUDE.md not readable"; errors=$((errors + 1))
 else
@@ -157,8 +278,7 @@ else
     nums=$(printf '%s\n' "$section" | sed -n 's/^\*\*\([0-9][0-9]*\)[.,].*/\1/p')
     n_nums=$(printf '%s\n' "$nums" | grep -c . || true)
     if [ "$n_nums" -eq 0 ]; then
-        echo "ERROR  zero divergence headers extracted -- the section heading or the"
-        echo "         '**N.' header form changed. The extractor is broken, not the list clean."
+        echo "ERROR  zero divergence headers extracted — the section heading or the '**N.' form changed"
         errors=$((errors + 1))
     else
         dupes=$(printf '%s\n' "$nums" | sort -n | uniq -d)
@@ -176,11 +296,11 @@ echo
 [ "$errors" -gt 0 ] && RC=2      # could-not-run outranks mismatch: an unevaluated
                                  # claim means this gate does not know its own scope
 if [ "$RC" -eq 0 ]; then
-    echo "DOC CLAIMS: PASS (declared claims only -- bash-run totals only)"
+    echo "DOC CLAIMS: PASS (declared claims only — bash-run totals only)"
 elif [ "$RC" -eq 1 ]; then
-    echo "DOC CLAIMS: FAIL -- $mismatches stale claim(s). Fix the document, not the gate."
+    echo "DOC CLAIMS: FAIL — $mismatches stale claim(s). Fix the document, not the gate."
 else
-    echo "DOC CLAIMS: ERROR -- $errors claim(s) could not be evaluated ($mismatches mismatch(es) also seen)."
+    echo "DOC CLAIMS: ERROR — $errors claim(s) could not be evaluated ($mismatches mismatch(es) also seen)."
     echo "  This is NOT a clean run. An anchor that moved means the claim is unchecked."
 fi
 exit "$RC"

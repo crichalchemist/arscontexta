@@ -97,6 +97,7 @@ defect with its sign flipped.
 
 ```bash
 bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
+bash reference/check-doc-claims.sh  ;  echo "expect rc=0, got rc=$?"
 
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh | tail -1   # expect: passed=19 failed=0

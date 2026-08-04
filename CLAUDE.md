@@ -55,12 +55,13 @@ harness rather than its subject.
 ```bash
 bash reference/check-portability.sh                      # exit 0
 bash reference/check-prose-paths.sh                      # 0 missing (path count drifts)
+bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 36/36
+  $s reference/test/kernel-note-dirs.test.sh             # 37/37
   $s reference/test/threshold-namespace.test.sh          # 52/52
 done
 ```
