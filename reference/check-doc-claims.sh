@@ -88,49 +88,56 @@ truth_suite() {   # truth_suite <suite-basename> -> passed count, ONLY if failed
 }
 
 truth_ci_steps() {
+    local _n
     # Count step ITEMS, not `name:` keys. `actions/checkout` carries no name:,
     # so `grep -c '^      - name:'` returns one fewer and reads as plausible.
     [ -r .github/workflows/checks.yml ] || return 1
     _n=$(grep -c '^      - ' .github/workflows/checks.yml || true)
-    # ZERO IS NOT AN ANSWER HERE. `grep -c .` prints 0 and returns 1 on no
-    # match; discarding that rc turns a shape change (a workflow rewritten
-    # with `run: |`, an emptied directory) into `tree measures 0`, and the
-    # gate would then instruct writing 0 into the document. Could-not-run.
+    # Zero step ITEMS means checks.yml was restructured or truncated, not that
+    # CI has no steps. `grep -c` prints 0 and returns 1; reported as an answer it
+    # would instruct 0 into the documents.
     [ "${_n:-0}" -gt 0 ] || return 1
     printf '%s' "$_n"
 }
 
 truth_ci_steps_main() {
+    local _n
     # A claim about `main` rots on MERGE, not on edit — nothing in the working
     # tree changes when a branch lands, so the number goes stale with no diff to
     # notice. That is exactly how "14 on main" survived its own branch merging
     # four more steps into main. Absent `main` is a could-not-run, not a mismatch.
     git rev-parse --verify main >/dev/null 2>&1 || return 1
-    git show main:.github/workflows/checks.yml 2>/dev/null | grep -c '^      - '
+    _n=$(git show main:.github/workflows/checks.yml 2>/dev/null | grep -c '^      - ' || true)
+    # Zero here means main's workflow could not be read or has no steps -- a
+    # could-not-run. Reporting it as 0 produced "document says 18, tree measures
+    # 0 -- fix the document", instructing a wrong number into CLAUDE.md.
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
 }
 
 truth_check_files() {
+    local _n
     [ -d reference/test ] || return 1
     _n=$(ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh 2>/dev/null  | grep -c . || true)
-    # ZERO IS NOT AN ANSWER HERE. `grep -c .` prints 0 and returns 1 on no
-    # match; discarding that rc turns a shape change (a workflow rewritten
-    # with `run: |`, an emptied directory) into `tree measures 0`, and the
-    # gate would then instruct writing 0 into the document. Could-not-run.
+    # Zero files means the glob matched nothing -- wrong cwd, or a moved
+    # reference/ tree. It is never a true inventory of zero, since this script
+    # is itself one of the files being counted.
     [ "${_n:-0}" -gt 0 ] || return 1
     printf '%s' "$_n"
 }
 
 truth_ci_run_checks() {
+    local _n
     # Checks CI actually EXECUTES — distinct from checks that merely APPEAR in
     # the workflow. `validate-kernel.sh` is named there only under `bash -n`, and
     # a grep for its name counts that mention as a run. This session made exactly
     # that error before catching it.
     [ -r .github/workflows/checks.yml ] || return 1
     _n=$(grep -oE 'run: (bash|zsh) reference/(check-[a-z-]+\.sh|test/[a-z-]+\.test\.sh|validate-kernel\.sh)'  .github/workflows/checks.yml | sed 's/.*reference\///' | sort -u | grep -c . || true)
-    # ZERO IS NOT AN ANSWER HERE. `grep -c .` prints 0 and returns 1 on no
-    # match; discarding that rc turns a shape change (a workflow rewritten
-    # with `run: |`, an emptied directory) into `tree measures 0`, and the
-    # gate would then instruct writing 0 into the document. Could-not-run.
+    # Zero means the workflow no longer spells its runs as one-line
+    # `run: <shell> reference/...` -- a `run: |` block scalar or a matrix, both
+    # shapes checks.yml already uses elsewhere. The checks still run; only this
+    # pattern stopped seeing them, which is a could-not-run, not a count of 0.
     [ "${_n:-0}" -gt 0 ] || return 1
     printf '%s' "$_n"
 }
@@ -167,6 +174,9 @@ word2num() {
 # line, not the last.
 CLAIMS='CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
+CONTRIBUTING.md|bump-version suite total|s/.*bump-version.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|bump-version
+CONTRIBUTING.md|kernel-note-dirs suite total|s/.*kernel-note-dirs.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|kernel-note-dirs
+CONTRIBUTING.md|threshold-namespace suite total|s/.*threshold-namespace.*expect: \([0-9][0-9]*\) passed,.*/\1/p|truth_suite|threshold-namespace
 CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z]*\) CI steps must pass.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z]*\) CI steps ran.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z]*\),.*/\1/p|truth_check_files|

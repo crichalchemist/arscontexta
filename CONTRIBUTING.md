@@ -109,11 +109,15 @@ for s in bash zsh; do
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
 done
 
-./reference/validate-kernel.sh ~/second-brain           # expect 15/15
+./reference/validate-kernel.sh ~/second-brain           # expect 15 PASS / 2 WARN / 0 FAIL
 ```
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
-disabled). Any other WARN or FAIL is a regression.
+disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message before
+concluding that. Against `~/second-brain` two other primitives WARN today, and both are content
+defects in that vault rather than regressions here: primitive 1 (frontmatter coverage) and
+primitive 2 (8 unresolved wiki links, surfaced only once the dangling scan stopped sampling 100
+of 2716 links). A vault you generated yourself should show neither.
 
 **"Green" means all nineteen CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
