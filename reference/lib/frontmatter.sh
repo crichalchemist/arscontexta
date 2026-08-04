@@ -56,9 +56,24 @@
 #
 #   A. VALUES MATCH EXACTLY, where the naive form matched prefixes. `^status: pending`
 #      also matches `pending-review`; this library compares with `=`. Measured on the
-#      field vault's 65 observation and tension files: no disagreement (observations
-#      14/14, tensions 8/8), because the values in use -- open, implemented, archived,
-#      resolved -- are none of them a prefix of another. Latent, but real.
+#      field vault: no disagreement (observations 14/14, tensions 8/8), because no value
+#      in use is a prefix of another. Latent, but real.
+#
+#      Re-derive BOTH halves. Note the `find` -- these helpers are recursive, and an
+#      earlier version of this list was taken with a flat `"$d"/*.md` glob, which missed
+#      ops/tensions/archive/ entirely and omitted `promoted`. A flat probe of a recursive
+#      function is the same class of error this library exists to remove:
+#
+#        . reference/lib/frontmatter.sh
+#        for d in ~/second-brain/ops/observations ~/second-brain/ops/tensions; do
+#          printf '%-14s naive=%s lib=%s\n' "$(basename "$d")" \
+#            "$(grep -rl '^status: pending\|^status: open' "$d" | wc -l | tr -d ' ')" \
+#            "$(count_notes_by_field "$d" status pending open)"
+#          find "$d" -type f -name '*.md' | while IFS= read -r f; do
+#            frontmatter_field "$f" status; done
+#        done | sort | uniq -c
+#        # observations naive=14 lib=14; tensions naive=8 lib=8
+#        # values: open 22, implemented 22, promoted 8, archived 8, resolved 5
 #
 #   B. AN UNCLOSED FRONTMATTER BLOCK IS NOT FRONTMATTER (rule 1 above), where the
 #      naive form did not care. **This one changes a count on real data today.**
