@@ -209,10 +209,35 @@ fi
 if [ -n "$TENS_COUNT" ] && [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
   echo "CONDITION: $TENS_COUNT unresolved tensions (of $TENS_TOTAL total). Consider /rethink."
 fi
-# UNDECLARED THRESHOLDS. These two, and the 30 in the staleness check below, appear in
-# no config file — `ops/config.yaml` declares only `self_evolution.*`. They are left
-# hardcoded rather than given invented config keys, but "one surface owns each
-# threshold" is not yet true of them. Recorded in the ledger, not silently equalised.
+# DELIBERATELY FIXED, NOT MERELY UNDECLARED. These two, and the 30 in the staleness
+# check below, are not configurable on purpose. The reason is structural, not "nobody
+# asked" — that rots the moment someone does. `self_evolution.*` earned its config keys
+# because FOUR surfaces read it (`next`, `remember`, `rethink`, this hook) and a wrong
+# value makes a vault's own tools contradict each other about whether to run /rethink.
+# These three have no second reader. A wrong value here mistimes a nudge; it cannot
+# produce disagreement, because there is nothing to disagree with.
+# TRIGGER: if a second surface ever compares against one of these numbers, that one
+# becomes a config key. That is the condition to re-open this — not taste.
+#
+# Single ownership holds for exactly ONE of the three. Claiming it for all three would
+# be the status-file-that-lies defect this repo's divergence list exists to drain:
+#   DAYS_STALE 30 — one declaration repo-wide (:262), subject "methodology notes behind
+#     config changes". The other four literal 30s (`skill-sources/next:242`,
+#     `skill-sources/reweave:130`, `skills/health:469`,
+#     `platforms/shared/skill-blocks/reweave.md:144`) are note staleness — a different
+#     subject sharing the number. Do NOT merge them.
+#   SESS_COUNT 5 / INBOX_COUNT 3 — TWO declarations each. The second is
+#     `platforms/claude-code/hooks/session-orient.sh.template:143,149`, the hook a
+#     generated vault gets, which can fire alongside this one. Edit one without the
+#     other and they split. Deliberately NOT unified via a generation placeholder: that
+#     template's two existing threshold placeholders, `{{OBS_THRESHOLD:-10}}` and
+#     `{{TENSION_THRESHOLD:-5}}`, are substituted by nothing in this repo, so copying
+#     the pattern ships two more knobs that look configurable and are not.
+# Re-derive (5 / 5 / 4 hits). cmd3's two non-template hits are a same-named shell
+# variable at :200, not a substitution — 4 hits is the "nothing substitutes it" result:
+#   grep -rn -- '-ge 30\|-gt 30\|mtime +30' skill-sources/ skills/ platforms/ hooks/
+#   grep -rn 'SESS_COUNT" -ge\|INBOX_COUNT" -ge\|DAYS_STALE" -ge' hooks/ platforms/ skill-sources/ skills/
+#   grep -rn 'OBS_THRESHOLD\|TENSION_THRESHOLD' . --exclude-dir=.git --exclude-dir=.superpowers
 if [ "$SESS_COUNT" -ge 5 ]; then
   echo "CONDITION: $SESS_COUNT unprocessed sessions. Consider /remember --mine-sessions."
 fi

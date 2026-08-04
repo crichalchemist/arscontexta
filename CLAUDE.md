@@ -333,11 +333,44 @@ reads both thresholds instead of hardcoding them. A key that is present but unpa
 says so rather than returning the default — returning the default is exactly how the hardcoded 10
 stayed invisible.
 
-**What is still open:** three thresholds are declared in no config file at all — `SESS_COUNT ≥ 5`,
-`INBOX_COUNT ≥ 3`, and `DAYS_STALE ≥ 30` in `session-orient.sh`. They were left hardcoded rather than
-given invented config keys, so "one surface owns each threshold" is not yet true of them. (That 30 is
-methodology-notes-behind-config drift; it is **not** the same 30 as `/next`'s `stale_notes`, which is
-"not modified in 30+ days". Same number, different subject.)
+**The other half — three thresholds declared in no config file — is now DECIDED rather than open.**
+`SESS_COUNT ≥ 5`, `INBOX_COUNT ≥ 3` and `DAYS_STALE ≥ 30` in `session-orient.sh` stay hardcoded, and
+`hooks/scripts/session-orient.sh` states why in the file itself, under the greppable heading
+`DELIBERATELY FIXED, NOT MERELY UNDECLARED` (`:212` as of this commit — grep the heading, since
+adding that very comment drifted every line number this entry originally cited). The reason is
+deliberately *not*
+"nobody asked", which rots the moment someone does: `self_evolution.*` earned its keys because **four**
+surfaces read it and a wrong value makes a vault's own tools contradict each other about running
+`/rethink`. These three have **no second reader** — a wrong value mistimes a nudge and cannot produce
+disagreement. The comment carries a falsifiable trigger rather than a preference: *if a second surface
+ever compares against one of these numbers, that one becomes a config key.*
+
+**What that decision does not buy is single ownership, and the entry says so rather than claiming it.**
+Measured: `DAYS_STALE`'s 30 has **one** declaration repo-wide; `SESS_COUNT`'s 5 and `INBOX_COUNT`'s 3
+have **two each** — the plugin's own hook (`:241`, `:244`) and
+`platforms/claude-code/hooks/session-orient.sh.template:143,149`, the hook a *generated vault* gets,
+which can fire alongside it. Both sites now name each other, because a cross-reference is the only
+thing that stops an edit to one from silently splitting them.
+
+**Do not "fix" that duplication with a generation placeholder** — the obvious move, matching the
+neighbouring `{{OBS_THRESHOLD:-10}}` and `{{TENSION_THRESHOLD:-5}}`, would ship two more knobs that
+look configurable and are not: **nothing in this repo substitutes either placeholder.** Found while
+closing this entry; it is a live instance of this file's own cross-cutting pattern (a plausible-looking
+surface that does nothing) and is recorded here rather than fixed, because wiring or removing them is
+a change to what generation emits.
+
+Also measured, and the reason Step 2's warning stands: there are **five** literal 30s across **two**
+subjects, not two. Four are note staleness (`skill-sources/next:242`, `skill-sources/reweave:130`,
+`skills/health:469`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:262` is
+methodology-notes-behind-config drift. Same number, different subject — **do not merge them.**
+Re-derive all three counts (`5` / `5` / `4`; cmd3's two non-template hits are a same-named shell
+variable at `:200`, not a substitution, so **4 hits is** the "nothing substitutes it" result):
+
+```bash
+grep -rn -- '-ge 30\|-gt 30\|mtime +30' skill-sources/ skills/ platforms/ hooks/
+grep -rn 'SESS_COUNT" -ge\|INBOX_COUNT" -ge\|DAYS_STALE" -ge' hooks/ platforms/ skill-sources/ skills/
+grep -rn 'OBS_THRESHOLD\|TENSION_THRESHOLD' . --exclude-dir=.git --exclude-dir=.superpowers
+```
 
 **4. Display counts that merge or omit a status filter.** `platforms/shared/skill-blocks/stats.md:94-95`
 documents unfiltered counts under the label "Pending" — frozen, so it stays. `skills/help` is fixed:
