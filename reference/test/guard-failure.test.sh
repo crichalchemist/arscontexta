@@ -291,5 +291,70 @@ chmod a-w "$Z"
 eq "frozen: read-only root still reports the violation" "1" "$(rc_of "$Z")"
 chmod u+w "$Z"
 
+# --- check 6: interpolated wiki-link matchers ---------------------------------
+# WHY THESE EXIST: check 4 shipped with zero automated coverage and this file's
+# freeze section says so in its own header. Check 6 arrived with four hand-run
+# probes in a scratch copy, which is the same evidence-in-a-ledger the freeze
+# section was written to replace: a hand-run probe proves the check worked once,
+# on one machine, on a tree nobody kept.
+#
+# WHY THE FIXTURES DO NOT RECREATE THE SHIPPED ALLOWLIST:
+# The allowlist lives in check-portability.sh, not in the tree, so a fixture that
+# reproduced all five entries would fail the moment a sixth site is legitimately
+# allowlisted — the brittleness mkfrozen() avoids by pinning two files instead of
+# the shipped sixteen. These assert the check's LOGIC: an unlisted hit fails, an
+# entry that no longer matches fails, a declared count that moved fails, and a
+# tree claiming nothing skips. Each holds whatever the shipped list contains.
+INTERP='LINKS=$(grep -rl "\[\[$NAME\]\]" notes/ | wc -l)'
+
+# A tree with none of the allowlisted files and no interpolated matcher claims
+# nothing. This is the assertion that keeps check 6 from doing what check 4 once
+# did to this suite (19/19 -> 16/3): every mkroot() above lands here, so a check
+# that red()s on a clean synthetic tree fails on every tree but the repo itself.
+I=$(mkroot)
+eq "interp: a tree claiming nothing passes"  "0" "$(rc_of "$I")"
+eq "interp: and says SKIP, not PASS"       "yes" \
+   "$(out_of "$I" | grep -q 'SKIP no allowlisted file present' && echo yes || echo no)"
+
+# An interpolated matcher in a file no entry covers.
+I=$(mkroot); printf '%s\n' "$INTERP" > "$I/skill-sources/zzz-arbitrary.md"
+eq "interp: an unlisted site fails"          "1" "$(rc_of "$I")"
+eq "interp: and is named UNLISTED"         "yes" \
+   "$(out_of "$I" | grep -q 'UNLISTED skill-sources/zzz-arbitrary.md' && echo yes || echo no)"
+# The GONE half must stay quiet here. $ROOT is an argument, so this guard runs
+# against fixture trees and can be run against a generated vault; neither has any
+# reason to hold skills/architect/SKILL.md. Reporting every entry GONE would bury
+# the real finding above under five lines about files never expected here.
+eq "interp: absent entries are not reported GONE in a tree carrying none" "yes" \
+   "$(out_of "$I" | grep -q 'the file is gone' && echo no || echo yes)"
+
+# An allowlisted file that is present but no longer matches — the direction that
+# makes the list drain instead of rot. Without it a site fixed on another branch
+# leaves its entry behind, and the next reader treats a closed defect as open.
+# That is not hypothetical: it is what check 6 found on introduction, in the
+# hand-maintained comment it replaced, which still named two files converted on
+# fix/spec-f-divergence-drain.
+I=$(mkroot); printf 'no matcher here\n' > "$I/reference/testing-milestones.md"
+eq "interp: a listed site that was fixed fails" "1" "$(rc_of "$I")"
+eq "interp: and is named STALE"               "yes" \
+   "$(out_of "$I" | grep -q 'STALE reference/testing-milestones.md' && echo yes || echo no)"
+
+# A declared count that no longer matches. This is why entries carry a count and
+# not a bare path: with a path alone, a file could quietly grow a second site
+# behind its first and absorb it.
+I=$(mkroot); { printf '%s\n' "$INTERP"; printf '%s\n' "$INTERP"; } > "$I/reference/testing-milestones.md"
+eq "interp: a count that moved fails"          "1" "$(rc_of "$I")"
+eq "interp: and reports COUNT CHANGED with both numbers" "yes" \
+   "$(out_of "$I" | grep -q 'COUNT CHANGED reference/testing-milestones.md — allowlist declares 1, tree has 2' \
+      && echo yes || echo no)"
+
+# The scan must reach *.template. Until check 6 was written every scan here passed
+# --include='*.md' --include='*.sh', which matches no template at all, so the
+# highest-blast-radius site in this class was invisible to the whole file.
+I=$(mkroot); mkdir -p "$I/platforms/claude-code/hooks"
+printf '%s\n' "$INTERP" > "$I/platforms/claude-code/hooks/probe.sh.template"
+eq "interp: a .template is scanned, not skipped by --include" "yes" \
+   "$(out_of "$I" | grep -q 'UNLISTED platforms/claude-code/hooks/probe.sh.template' && echo yes || echo no)"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

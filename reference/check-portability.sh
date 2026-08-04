@@ -482,7 +482,15 @@ if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
                      [ "$(interp_hits_in "$f")" = "0" ] || continue
                      if [ -e "$ROOT/$f" ]; then
                        printf '  STALE %s — allowlisted but no longer matches; the site was fixed, so drop the entry\n' "$f"
-                     else
+                     elif [ "$interp_present" -gt 0 ]; then
+                       # GONE is only meaningful in a tree that carries SOME of these
+                       # files. $ROOT is an argument — this guard is run against
+                       # fixture trees and can be run against a generated vault, and
+                       # neither has any reason to hold skills/architect/SKILL.md.
+                       # Reporting every entry GONE there buries a real UNLISTED hit
+                       # under five lines of noise about files that were never
+                       # expected. Full strength is retained where it matters: on a
+                       # tree carrying even one of them, a deletion still fails.
                        printf '  STALE %s — allowlisted but the file is gone; drop the entry\n' "$f"
                      fi
                    done)
