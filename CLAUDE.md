@@ -64,7 +64,7 @@ for s in bash zsh; do
   $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
   $s reference/test/threshold-namespace.test.sh          # 52/52
-  $s reference/test/placeholder-count.test.sh            # 30/30
+  $s reference/test/placeholder-count.test.sh            # 40/40
 done
 ```
 

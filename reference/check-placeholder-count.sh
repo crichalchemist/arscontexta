@@ -268,6 +268,18 @@ done)
 
 if [ -n "$deleted" ]; then
     printf '%s\n' "$deleted" | sed 's|^|  NOTE template deleted, not compared: |'
+    # Name any skill-sources/ path ADDED in the same range beside it. In the
+    # add+delete shape a rename is exactly that pair, and reporting the two
+    # separately leaves the reader to notice the pairing themselves. Still rc 0 —
+    # this is legibility, not a verdict, and failing a legitimate deletion is the
+    # "fires on a correct edit" condition this file warns about elsewhere.
+    added_here=$(printf '%s\n' "$pairs" | while IFS= read -r pr; do
+        [ -n "$pr" ] || continue
+        po=${pr%%	*}; pn=${pr#*	}
+        [ "$po" = "$pn" ] || continue
+        git cat-file -e "$MB:$pn" 2>/dev/null || printf '%s\n' "$pn"
+    done)
+    [ -n "$added_here" ] && printf '%s\n' "$added_here" | sed 's|^|       added in the same range: |'
     echo "    Deleting a template is not a hardcoding, so this does not fail. But git"
     echo "    pairs a rename with an edit only while the two stay similar, so a file"
     echo "    renamed AND rewritten arrives as a delete plus an unrelated add, where"

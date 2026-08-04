@@ -53,7 +53,35 @@ mkrepo() {              # mkrepo -> path to a repo with a base commit on `base`
     printf 'beta %s %s\n' "$V" "$V" > "$d/skill-sources/beta/SKILL.md"
     ( cd "$d" && git init -q . && git config user.email t@t && git config user.name t \
       && git add -A && git commit -qm base && git branch -M base ) >/dev/null 2>&1
+    # THE FIXTURE MUST ASSERT ITS OWN SETUP. Every setup block here ends in
+    # `>/dev/null 2>&1`, so a git command that fails is INVISIBLE and the
+    # assertion afterwards measures a tree that was never built — which reads as
+    # a mysterious intermittent failure rather than as a broken fixture. Observed:
+    # this suite went 30/30, 28/2, 29/1 across runs while the subject never
+    # changed. Silent setup is the house defect, and a test suite is not exempt
+    # from it just because it is the thing doing the checking.
+    if ! ( cd "$d" && git rev-parse --verify base >/dev/null 2>&1 ) \
+       || [ ! -f "$d/skill-sources/alpha/SKILL.md" ]; then
+        printf 'FIXTURE SETUP FAILED (no base branch or missing file) in %s\n' "$d" >&2
+        failed=$((failed+1))
+    fi
     printf '%s' "$d"
+}
+
+# Assert a fixture reached the state its setup intended, BEFORE measuring it.
+# Called after each setup block whose failure would otherwise be silent.
+staged() {              # staged <repo> <expected-branch> [<file-that-must-exist>]
+    local d="$1" want="$2" f="${3:-}"
+    local got; got=$( cd "$d" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
+    if [ "$got" != "$want" ]; then
+        printf 'FIXTURE NOT STAGED: %s is on [%s], expected [%s]\n' "$d" "$got" "$want" >&2
+        failed=$((failed+1)); return 1
+    fi
+    if [ -n "$f" ] && [ ! -f "$d/$f" ]; then
+        printf 'FIXTURE NOT STAGED: %s missing %s\n' "$d" "$f" >&2
+        failed=$((failed+1)); return 1
+    fi
+    return 0
 }
 run()  { ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" 2>&1 ); }
 rc_of(){ ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" >/dev/null 2>&1; echo $? ); }
@@ -68,9 +96,20 @@ open(p, 'w').write(s.replace(old, 'PLACEHOLDER_ALLOW="\n%s\n"' % entries))
 PY
 }
 
+bust(){ # bust <repo> <old> <new>  — patch the fixture's own script copy
+    python3 - "$1/reference/check-placeholder-count.sh" "$2" "$3" <<'PY'
+import sys
+p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(p).read()
+assert s.count(old) == 1, "bust anchor matched %d times: %r" % (s.count(old), old)
+open(p, "w").write(s.replace(old, new))
+PY
+}
+
 # --- the clean case, and it must not be vacuous ------------------------------
 R=$(mkrepo); ( cd "$R" && git checkout -qb work && printf 'note\n' >> skill-sources/alpha/SKILL.md \
    && git commit -aqm "edit that adds no marker" ) >/dev/null 2>&1
+staged "$R" work || true
 eq "clean: an edit that keeps every marker passes"  "0" "$(rc_of "$R")"
 eq "clean: and names the range it checked"        "yes" \
    "$(run "$R" | grep -q 'changed since the merge base' && echo yes || echo no)"
@@ -88,6 +127,7 @@ p='skill-sources/alpha/SKILL.md'; m=sys.argv[1]
 s=open(p).read(); assert m in s, 'fixture lacks '+m
 open(p,'w').write(s.replace(m,'nodes/'))" "$marker" \
        && git commit -aqm "hardcode a $name marker" ) >/dev/null 2>&1
+    staged "$R" work || true
     eq "decrease: hardcoding a {$name} marker fails"        "1" "$(rc_of "$R")"
     eq "decrease: and names the file and both counts"     "yes" \
        "$(run "$R" | grep -q 'HARDCODED A PLACEHOLDER: skill-sources/alpha/SKILL.md (3 -> 2)' && echo yes || echo no)"
@@ -103,9 +143,28 @@ R=$(mkrepo)
   && git commit -aqm "work touches alpha only" \
   && git checkout -q base && printf 'more %s\n' "$V" >> skill-sources/beta/SKILL.md \
   && git commit -aqm "base gains a marker in beta" && git checkout -q work ) >/dev/null 2>&1
+staged "$R" work || true
 eq "range: a base that moved ahead is not blamed on us"  "0" "$(rc_of "$R")"
 eq "range: and beta/ is not named"                     "yes" \
    "$(run "$R" | grep -q 'beta' && echo no || echo yes)"
+
+# THE SAME FILE ON BOTH SIDES — which the fixture above never exercises, because
+# the branch touches alpha/ and the base touches beta/, so the file list and the
+# base-side read can never disagree about one file. With them separated, reverting
+# EITHER site alone leaves this suite green; only reverting both reproduces C1.
+# Here the branch appends a harmless comment to the very file the base adds
+# markers to, so the base-side read is exercised ON a file that is genuinely in
+# the range. Reverting the base-read alone now yields rc 1 "(3 -> 3)"-style
+# blame on an innocent edit.
+R=$(mkrepo)
+( cd "$R" && git checkout -qb work && printf 'a harmless comment\n' >> skill-sources/alpha/SKILL.md \
+  && git commit -aqm "branch edits alpha harmlessly" \
+  && git checkout -q base && printf 'more %s %s\n' "$V" "$V" >> skill-sources/alpha/SKILL.md \
+  && git commit -aqm "base adds markers to THE SAME file" && git checkout -q work ) >/dev/null 2>&1
+staged "$R" work || true
+eq "range: base and branch touching ONE file is not blamed" "0" "$(rc_of "$R")"
+eq "range: and alpha/ is not reported as a decrease"      "yes" \
+   "$(run "$R" | grep -q 'HARDCODED' && echo no || echo yes)"
 
 # --- a rename must not launder a hardcode ------------------------------------
 # Without -M the new path has no base-side counterpart, so was=0 and ANY count
@@ -125,6 +184,7 @@ s=open(p).read()
 for m in ('{vocabulary.notes}','{config.processing}','{DOMAIN:notes}'): s=s.replace(m,'nodes/')
 open(p,'w').write(s)" \
   && git add -A && git commit -qm "rename and hardcode everything" ) >/dev/null 2>&1
+staged "$R" work || true
 eq "rename: a rename plus a hardcode still fails"        "1" "$(rc_of "$R")"
 eq "rename: and the message shows old -> new"          "yes" \
    "$(run "$R" | grep -q 'SKILL.md -> skill-sources/alpha/RENAMED.md' && echo yes || echo no)"
@@ -136,9 +196,30 @@ eq "rename: and the message shows old -> new"          "yes" \
 R=$(mkrepo)
 ( cd "$R" && git checkout -qb work && git rm -q skill-sources/alpha/SKILL.md \
   && git commit -qm "delete a template" ) >/dev/null 2>&1
+staged "$R" work || true
 eq "deletion: a deleted template does not fail the gate"  "0" "$(rc_of "$R")"
 eq "deletion: but IS named rather than passed over"     "yes" \
    "$(run "$R" | grep -q 'NOTE template deleted, not compared: skill-sources/alpha/SKILL.md' && echo yes || echo no)"
+
+# THE add+delete SHAPE — a rename git could not pair. Both halves must be legible
+# TOGETHER, or the reader has to notice the pairing themselves. Still rc 0: this
+# is legibility, not a verdict.
+R=$(mkrepo)
+# mkdir -p is load-bearing: `git rm` of the only file in a directory removes the
+# DIRECTORY too, so writing the replacement into it fails — and the first version
+# of this fixture did exactly that, silently, then asserted against a range that
+# contained no add at all. staged() did not catch it because it was called
+# without the file argument, which is the whole point of that argument.
+( cd "$R" && git checkout -qb work && git rm -q skill-sources/alpha/SKILL.md \
+  && mkdir -p skill-sources/alpha \
+  && printf 'wholly new %s\n' "$V" > skill-sources/alpha/REPLACEMENT.md \
+  && git add -A && git commit -qm "delete one, add another" ) >/dev/null 2>&1
+staged "$R" work skill-sources/alpha/REPLACEMENT.md || true
+eq "deletion: add+delete does not fail"                   "0" "$(rc_of "$R")"
+eq "deletion: the deleted half is named"                "yes" \
+   "$(run "$R" | grep -q 'NOTE template deleted, not compared: skill-sources/alpha/SKILL.md' && echo yes || echo no)"
+eq "deletion: and the added half is named beside it"    "yes" \
+   "$(run "$R" | grep -q 'added in the same range: skill-sources/alpha/REPLACEMENT.md' && echo yes || echo no)"
 
 # --- the allowlist, both directions ------------------------------------------
 # Every assertion below runs code that the shipped empty list never reaches.
@@ -147,6 +228,7 @@ R=$(mkrepo)
 p='skill-sources/alpha/SKILL.md'; s=open(p).read()
 open(p,'w').write(s.replace('{DOMAIN:notes}','nodes/'))" \
   && git commit -aqm "a decrease we will excuse" ) >/dev/null 2>&1
+staged "$R" work || true
 eq "allowlist: without an entry the decrease fails"      "1" "$(rc_of "$R")"
 allow "$R" "skill-sources/alpha/SKILL.md 3->2 a deliberate, reviewed decrease"
 eq "allowlist: a matching entry absorbs it"              "0" "$(rc_of "$R")"
@@ -164,6 +246,7 @@ p='skill-sources/alpha/SKILL.md'; s=open(p).read()
 open(p,'w').write(s.replace('{DOMAIN:notes}','nodes/'))" \
   && git commit -aqm "a decrease" ) >/dev/null 2>&1
 allow "$R2" "skill-sources/alpha/SKILL.md 9->8 an entry whose counts no longer match"
+staged "$R2" work || true
 eq "allowlist: an entry that no longer matches is STALE" "1" "$(rc_of "$R2")"
 eq "allowlist: and says so"                            "yes" \
    "$(run "$R2" | grep -q 'STALE allowlist entry' && echo yes || echo no)"
@@ -179,6 +262,7 @@ R5=$(mkrepo)
 ( cd "$R5" && git checkout -qb work && printf 'harmless\n' >> skill-sources/alpha/SKILL.md \
   && git commit -aqm "edit alpha without losing a marker" ) >/dev/null 2>&1
 allow "$R5" "skill-sources/alpha/SKILL.md 3->2 a decrease this range does not show"
+staged "$R5" work || true
 eq "allowlist: a stale-only run fails"                   "1" "$(rc_of "$R5")"
 eq "allowlist: a stale-only run does NOT print hardcoding advice" "yes" \
    "$(run "$R5" | grep -q 'reverse-transforms are mandatory' && echo no || echo yes)"
@@ -194,6 +278,7 @@ R3=$(mkrepo)
 ( cd "$R3" && git checkout -qb work && printf 'x\n' >> README.md 2>/dev/null || true
   cd "$R3" && printf 'x\n' > unrelated.txt && git add -A && git commit -qm "touch nothing in skill-sources" ) >/dev/null 2>&1
 allow "$R3" "skill-sources/alpha/SKILL.md 3->2 an entry for a file not in this range"
+staged "$R3" work || true
 eq "allowlist: an entry does not redden an unrelated range" "0" "$(rc_of "$R3")"
 
 R4=$(mkrepo); ( cd "$R4" && git checkout -qb work && printf 'x\n' >> skill-sources/alpha/SKILL.md \
@@ -202,9 +287,19 @@ allow "$R4" "skill-sources/alpha/SKILL.md this-is-not-a-count malformed on purpo
 eq "allowlist: a malformed entry is reported, not ignored" "yes" \
    "$(run "$R4" | grep -q 'MALFORMED allowlist entry' && echo yes || echo no)"
 
-# --- the three rc-2 states ---------------------------------------------------
+# --- the rc-2 states ---------------------------------------------------------
 # "could not run" and "ran and found nothing" are different facts, and this repo
 # has twice shipped a scan that matched nothing and reported green.
+#
+# THE SCRIPT HAS EIGHT rc-2 SITES AND THIS SECTION ONCE ASSERTED THREE, under a
+# heading reading "the three rc-2 states" — a header describing the TEST rather
+# than its SUBJECT. Three of the unasserted five arrived as fixes in the same
+# round that added them, so each could be reverted with this suite green. Two
+# guards fire only on conditions that cannot be staged from tree state alone (a
+# `git diff` that fails, a non-numeric count); those are exercised by patching
+# the fixture's own copy, which tests the wiring where the natural trigger cannot
+# be arranged. `cd "$ROOT"` failing is NOT asserted, and is named here rather
+# than left to be found later as a silent gap.
 R=$(mkrepo)
 eq "rc2: a base ref that does not resolve"               "2" "$(rc_of "$R" no-such-ref)"
 
@@ -226,6 +321,39 @@ PY
 eq "rc2: an extractor that matches zero markers"         "2" "$(rc_of "$R")"
 eq "rc2: and says the pattern is stale, not the tree clean" "yes" \
    "$(run "$R" | grep -q 'matched ZERO markers' && echo yes || echo no)"
+
+
+# The set-DEFINING measurement. Reverting its guard to `|| true` — the shipped
+# state one commit ago — makes an unrunnable diff print "PASS no skill-sources/
+# templates ... nothing to check", rc 0: a positive claim about the tree from a
+# measurement that did not run.
+R=$(mkrepo); ( cd "$R" && git checkout -qb work && printf 'x\n' >> skill-sources/alpha/SKILL.md \
+   && git commit -aqm edit ) >/dev/null 2>&1
+bust "$R" 'git diff --name-status -M "$MB" HEAD 2>/dev/null' 'false'
+eq "rc2: an unrunnable git diff"                         "2" "$(rc_of "$R")"
+eq "rc2: and does not claim the tree is clean"         "yes" \
+   "$(run "$R" | grep -q 'nothing to check' && echo no || echo yes)"
+
+# A count that is not a number would make `[ "$now" -lt "$was" ]` error, and under
+# the old `|| continue` it was swallowed entirely.
+R=$(mkrepo); ( cd "$R" && git checkout -qb work && printf 'x\n' >> skill-sources/alpha/SKILL.md \
+   && git commit -aqm edit ) >/dev/null 2>&1
+bust "$R" '    /usr/bin/grep -o "$PLACEHOLDER_PAT" 2>/dev/null | /usr/bin/grep -c . || true' '    echo not-a-number'
+eq "rc2: a non-numeric count is reported, not swallowed"  "2" "$(rc_of "$R")"
+
+# skill-sources/ absent entirely — a moved layout, or the wrong root. This one is
+# reachable from tree state, unlike the two above.
+R=$(mkrepo); ( cd "$R" && git checkout -qb work && git rm -rq skill-sources \
+   && git commit -qm "remove the whole tree" ) >/dev/null 2>&1
+eq "rc2: skill-sources/ missing is not a clean run"       "2" "$(rc_of "$R")"
+# THE rc ALONE CANNOT DISCRIMINATE HERE, and asserting it alone was a row that
+# passed for the wrong reason: with the directory gone the extractor also matches
+# zero markers, so removing THIS guard entirely still yields rc 2 via the next
+# one. Two guards, one exit code. The message is what separates "the tree has no
+# such directory" from "the pattern no longer matches anything", and those send a
+# reader to different places.
+eq "rc2: and says the DIRECTORY is missing, not the pattern" "yes" \
+   "$(run "$R" | grep -q 'skill-sources/ does not exist in this tree' && echo yes || echo no)"
 
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
