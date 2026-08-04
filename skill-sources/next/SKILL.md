@@ -207,7 +207,7 @@ SESSION_COUNT=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null | wc -l | 
 
 # Sourced, never re-implemented — a rule enforced by convention, NOT by a gate. This
 # comment used to claim `check-portability.sh` rejects inlined copies; it does not.
-# That script runs five checks and none of them detects an inlined copy of anything,
+# That script runs six checks and none of them detects an inlined copy of anything,
 # which `reference/lib/link-extraction.sh` states outright in its own header. The
 # reason to source it is the naive `grep -rl "[[$NAME]]"` spelling: it counts links
 # inside fenced blocks, does not case-fold, and matches the wrong direction for orphans.

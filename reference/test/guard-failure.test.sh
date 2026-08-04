@@ -336,8 +336,23 @@ eq "interp: absent entries are not reported GONE in a tree carrying none" "yes" 
 # fix/spec-f-divergence-drain.
 I=$(mkroot); printf 'no matcher here\n' > "$I/reference/testing-milestones.md"
 eq "interp: a listed site that was fixed fails" "1" "$(rc_of "$I")"
-eq "interp: and is named STALE"               "yes" \
-   "$(out_of "$I" | grep -q 'STALE reference/testing-milestones.md' && echo yes || echo no)"
+eq "interp: and is named STALE, by the FIXED arm"  "yes" \
+   "$(out_of "$I" | grep -q 'STALE reference/testing-milestones.md — allowlisted but no longer matches' \
+      && echo yes || echo no)"
+
+# The OTHER stale arm: entry present in the allowlist, file absent from a tree that
+# carries at least one of the others. Without this the arm had no positive assertion
+# at all — deleting it outright left the suite green while a repo copy missing an
+# allowlisted file went from FAIL to PASS. The two arms also have to be told apart,
+# so each assertion greps its own wording rather than the shared 'STALE <path>'.
+I=$(mkroot); printf '%s\n' "$INTERP" > "$I/reference/testing-milestones.md"
+eq "interp: a listed file that is GONE fails"     "1" "$(rc_of "$I")"
+eq "interp: and is named STALE, by the GONE arm"  "yes" \
+   "$(out_of "$I" | grep -q 'STALE skills/architect/SKILL.md — allowlisted but the file is gone' \
+      && echo yes || echo no)"
+# ...and the file that IS present with its declared count must NOT be reported.
+eq "interp: a correct entry is not reported"      "yes" \
+   "$(out_of "$I" | grep -q 'testing-milestones' && echo no || echo yes)"
 
 # A declared count that no longer matches. This is why entries carry a count and
 # not a bare path: with a path alone, a file could quietly grow a second site
@@ -355,6 +370,29 @@ I=$(mkroot); mkdir -p "$I/platforms/claude-code/hooks"
 printf '%s\n' "$INTERP" > "$I/platforms/claude-code/hooks/probe.sh.template"
 eq "interp: a .template is scanned, not skipped by --include" "yes" \
    "$(out_of "$I" | grep -q 'UNLISTED platforms/claude-code/hooks/probe.sh.template' && echo yes || echo no)"
+
+# --- checks 1-3 reach *.template ----------------------------------------------
+# WHY THESE EXIST: until check 6 was written every scan in the guard passed
+# --include='*.md' --include='*.sh', which matches no template at all, so a
+# `grep -P` or `rg -P` in any of the four platform hook templates was reported by
+# nothing. The widening that fixed it had zero coverage of its own: stripping
+# *.template from checks 1, 2A, 2B and 3 left this suite green and the repo run
+# PASSing, which is the same untested-widening shape check 4 shipped with.
+#
+# The adapter READS those templates during generation (generator.md:27), so a
+# construct there can reach a derived vault's hook. That is why they are scanned
+# rather than treated as inert documentation.
+I=$(mkroot); mkdir -p "$I/platforms/claude-code/hooks"
+printf '%s\n' 'x=$(grep -P "^\d+" "$LOG")' > "$I/platforms/claude-code/hooks/probe.sh.template"
+eq "check 1 reaches a .template"              "1" "$(rc_of "$I")"
+eq "check 1 names the .template"            "yes" \
+   "$(out_of "$I" | grep -q 'probe.sh.template' && echo yes || echo no)"
+
+I=$(mkroot); mkdir -p "$I/platforms/claude-code/hooks"
+printf '%s\n' 'x=$(rg -P "^\d+" "$LOG")' > "$I/platforms/claude-code/hooks/probe.sh.template"
+eq "check 3 reaches a .template"              "1" "$(rc_of "$I")"
+eq "check 3 names the .template"            "yes" \
+   "$(out_of "$I" | grep -q 'probe.sh.template' && echo yes || echo no)"
 
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

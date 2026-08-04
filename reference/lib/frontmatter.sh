@@ -5,9 +5,10 @@
 # of these functions anywhere.
 #
 # NOTHING ENFORCES THAT SENTENCE, for the same reason it enforces nothing for
-# reference/lib/link-extraction.sh: check-portability.sh runs five checks — PCRE
+# reference/lib/link-extraction.sh: check-portability.sh runs six checks — PCRE
 # grep, wiki-link capture using negated classes, PCRE via ripgrep, the frozen
-# skill-blocks manifest, and AGENTS.md being a symlink — and none of them detects
+# skill-blocks manifest, AGENTS.md being a symlink, and
+# interpolated wiki-link matchers — and none of them detects
 # an inlined copy of anything. The rule is real and still binding; the enforcement
 # is convention. Owner of the gap: the CI-hardening spec.
 #

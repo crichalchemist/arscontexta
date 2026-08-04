@@ -102,7 +102,7 @@ bash reference/check-doc-claims.sh  ;  echo "expect rc=0, got rc=$?"
 
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=19 failed=0
-  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=44 failed=0
+  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=51 failed=0
   $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
   $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0
   $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=37 failed=0

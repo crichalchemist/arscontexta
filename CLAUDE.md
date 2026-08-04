@@ -58,7 +58,7 @@ bash reference/check-prose-paths.sh                      # 0 missing (path count
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
-  $s reference/test/guard-failure.test.sh                # 44/44
+  $s reference/test/guard-failure.test.sh                # 51/51
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
@@ -793,17 +793,38 @@ comments, which are prose about matchers rather than matchers that run. That wor
 both directions: drop it and the claim below is false by the entry's own arithmetic; widen it to all
 text and the entry would have to flag its own explanatory prose.
 
-Verified against the tree, not remembered: **10 raw hits**, of which **7 are executable**, **1 is a
-comment inside a gate**, **2 are a documentation table**, and **0 executable sites are
-in `skill-sources/`** (the criterion above, met on `fix/spec-f-divergence-drain`). The split is
-`10 = 7 + 1 + 2`; keep it that way, because an earlier revision of this entry said "8 are executable"
-here while saying "seven executable sites" twice below, and the table has always had eight rows of
-which one is a comment. The two hits that *are* in `skill-sources/` are the documentation-table rows
-named below — which is exactly why the unqualified "0 are in `skill-sources/`" that stood here was
-wrong, and why `10 − 8 = 2` makes it measurable.
+**The command above must carry the gate exclusion, and the reason is that this entry's own number
+ratcheted without it.** `check-portability.sh` and `reference/test/guard-failure.test.sh` have to
+*contain* matcher text to do their jobs — the guard states the patterns it searches for, and the
+suite plants them into fixtures. `check-portability.sh` applies exactly this exclusion to itself via
+`EXEMPT_PATHS` and says why in its header. The published command did not, so writing about matchers
+inside a gate incremented the count: `fix/ci-hardening` took it from **10 to 12** (`check-portability.sh`
+1→2, `guard-failure.test.sh` 0→1) purely by adding check 6 and its coverage. Measured with the
+exclusion, the same branch moves it **9 → 9**. A count that rises when a gate is documented is
+measuring the documentation:
 
-All eight rows the pattern flags outside `skill-sources/` — the seven executable ones, plus the
-comment that sits inside the gate itself. None was touched by this branch:
+```bash
+/usr/bin/grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' \
+    skill-sources/ skills/ platforms/claude-code/ reference/ \
+  | /usr/bin/grep -Ev '(check-portability|guard-failure\.test)\.sh:'   # 9
+```
+
+Anchor the exclusion on the **basename**: `grep -r` emits `reference//check-portability.sh` with a
+doubled slash, so the path-anchored form `^[^:]*reference/(check-portability\.sh|…):` that works
+inside the guard silently matches nothing here and returns the unfiltered count — a wrong answer that
+looks like a plausible one, which is this repo's failure mode exactly.
+
+Verified against the tree, not remembered: **9 hits**, of which **7 are executable**, **2 are a
+documentation table**, and **0 executable sites are in `skill-sources/`** (the criterion above, met
+on `fix/spec-f-divergence-drain`). The split is `9 = 7 + 2`; keep it that way, because an earlier
+revision of this entry said "8 are executable" here while saying "seven executable sites" twice
+below. The two hits that *are* in `skill-sources/` are the documentation-table rows named below —
+which is exactly why the unqualified "0 are in `skill-sources/`" that stood here was wrong, and why
+`9 − 7 = 2` makes it measurable.
+
+**Six of these seven executable rows are now gated by check 6** — every one that interpolates a note
+name. The exception is `skills/health/SKILL.md:543`, which takes no title. None was touched by this
+branch:
 
 | Site | Spelling | What it feeds |
 |---|---|---|
@@ -814,7 +835,6 @@ comment that sits inside the gate itself. None was touched by this branch:
 | `skills/architect/SKILL.md:179` | `grep -rl` | link counts in evolution advice |
 | `platforms/claude-code/hooks/session-orient.sh.template:160` | `grep -rl` | SessionStart orientation |
 | `reference/testing-milestones.md:410` | `grep -rl` | a test spec's own MOC-ref check |
-| `reference/check-portability.sh:128` | — | a comment inside the gate, not code |
 
 The two hits in `skill-sources/` are `skill-sources/graph/SKILL.md:820` and `:825`, a documentation table
 of frontmatter query syntax (`rg '^topics:.*\[\[X\]\]'`) — a different operation, outside any fence,

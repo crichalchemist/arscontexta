@@ -5,9 +5,10 @@
 # these functions anywhere.
 #
 # NOTHING ENFORCES THAT SENTENCE. It used to end "check-portability.sh enforces
-# that", and that was false. That script runs five checks — PCRE grep, wiki-link
+# that", and that was false. That script runs six checks — PCRE grep, wiki-link
 # capture using negated classes, PCRE via ripgrep, the frozen skill-blocks
-# manifest, and AGENTS.md being a symlink — and none detects an inlined copy of
+# manifest, AGENTS.md being a symlink, and
+# interpolated wiki-link matchers — and none detects an inlined copy of
 # anything defined here. The rule is real and still binding; the enforcement is
 # convention. Believing otherwise is how a green run gets read as proof, which is
 # what happened: matcher sites survived four gates for months. Owner of the gap:

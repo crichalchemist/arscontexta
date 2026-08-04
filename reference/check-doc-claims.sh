@@ -126,6 +126,24 @@ truth_check_files() {
     printf '%s' "$_n"
 }
 
+# The NUMBERED checks inside check-portability.sh, which is a different quantity
+# from truth_check_files above: that counts gate FILES, this counts checks within
+# one file. Five prose sites enumerate them, four of which sat at "five checks"
+# after a sixth shipped — including reference/lib/link-extraction.sh and
+# reference/lib/frontmatter.sh, whose headers name each check individually, and
+# skill-sources/next/SKILL.md, which is a template that ships into vaults.
+#
+# Anchored on `^echo "<n>. `, the form every check header uses, so adding a check
+# updates this without anyone remembering to. A count of zero means the anchor
+# moved, not that the guard lost its checks.
+truth_portability_checks() {
+    local _n
+    [ -f reference/check-portability.sh ] || return 1
+    _n=$(/usr/bin/grep -cE '^echo "[0-9]+\. ' reference/check-portability.sh || true)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+
 truth_ci_run_checks() {
     local _n
     # Checks CI actually EXECUTES — distinct from checks that merely APPEAR in
@@ -172,7 +190,12 @@ word2num() {
 #
 # `[^#]*` rather than `.*` before ` # ` binds to the FIRST comment marker on the
 # line, not the last.
-CLAIMS='CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
+CLAIMS='reference/lib/link-extraction.sh|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
+reference/lib/frontmatter.sh|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
+reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
+skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z]*\) checks.*/\1/p|truth_portability_checks|
+CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
+CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
 CONTRIBUTING.md|bump-version suite total|s/.*bump-version.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|bump-version
 CONTRIBUTING.md|kernel-note-dirs suite total|s/.*kernel-note-dirs.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|kernel-note-dirs
