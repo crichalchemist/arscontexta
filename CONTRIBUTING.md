@@ -245,7 +245,16 @@ next author copies the last plan.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
 executed and merged. A status file that lies about status is this project's own defect class wearing
-a different hat. Tick as you go, or delete the checkboxes and point at the ledger.
+a different hat. Tick as you go, or delete the checkboxes and point at a **tracked** record — a
+completion note in the plan itself, or the divergence entry in `CLAUDE.md`.
+
+This sentence used to end "point at the ledger", which contradicted the paragraph above: ledgers
+under `.superpowers/sdd/` are git-ignored, so pointing a status file at one reintroduces exactly the
+defect that paragraph exists to prevent. A remedy that routes the record somewhere it cannot ship is
+not a remedy. Ticking a box means the step was **executed** — where the outcome was a measured
+rejection rather than a change (this plan's Step 2.2 gate, assessed and declined on 1 true positive
+against 2 false positives), the rejection and its measurement are recorded in the file the step
+names.
 
 Commit messages state **what the failure looked like**, not just what changed. "Fixed grep" is
 useless; "the failure surfaced as 0, never as an error, because every site piped into `wc -l`" tells

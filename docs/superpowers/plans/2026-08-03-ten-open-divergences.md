@@ -48,27 +48,27 @@ twice; see Task 7.
 
 The centrepiece. This is the only entry actively reporting a false pass on every generated vault.
 
-- [ ] **Step 1 — Reproduce the soft pass first.** Run `./reference/validate-kernel.sh ~/second-brain`
+- [x] **Step 1 — Reproduce the soft pass first.** Run `./reference/validate-kernel.sh ~/second-brain`
       and capture the two consecutive lines (`PASS … files contain wiki links` /
       `WARN No wiki links found to check`). A fix with no recorded "before" cannot be shown to have
       changed anything.
-- [ ] **Step 2 — Confirm the root cause, not the symptom.** For each of `01_thinking`, `notes`,
+- [x] **Step 2 — Confirm the root cause, not the symptom.** For each of `01_thinking`, `notes`,
       `00_inbox`, `04_meta/logs` and `$VAULT/../self`, record PRESENT/ABSENT against the field vault.
       Expect all five ABSENT. Then show the real directory yields work:
       `. reference/lib/link-extraction.sh && extract_link_targets_recursive ~/second-brain/nodes | grep -c .`
       → expect **2681**.
-- [ ] **Step 3 — Do NOT add `nodes/` to the list.** That makes this vault pass and the next one fail.
+- [x] **Step 3 — Do NOT add `nodes/` to the list.** That makes this vault pass and the next one fail.
       Derive the notes directory from the vault itself. Candidate sources, in preference order:
       the vault's `ops/derivation-manifest.md` vocabulary mapping (authoritative — it is what
       `/upgrade` 5b is told to preserve), then `ops/config.yaml`, then a shape-based scan. State in
       the script's header which source is authoritative and what happens when it is absent.
-- [ ] **Step 4 — Fix `$VAULT/../self` too.** It resolves outside the vault; primitive 8 finds the self
+- [x] **Step 4 — Fix `$VAULT/../self` too.** It resolves outside the vault; primitive 8 finds the self
       space at `$VAULT/self` and passes. Same bug, same line.
-- [ ] **Step 5 — Prove it on a fixture with an arbitrary directory name**, not on `~/second-brain`.
+- [x] **Step 5 — Prove it on a fixture with an arbitrary directory name**, not on `~/second-brain`.
       Build a vault whose notes live in `zzz-arbitrary/`, containing one note with a valid link, one
       with a dangling link, and one link inside a fenced code block that must NOT count. A fix
       verified only against the field vault proves the list now contains `nodes/`.
-- [ ] **Step 6 — Make "never ran" impossible to print as a pass.** If the notes directory cannot be
+- [x] **Step 6 — Make "never ran" impossible to print as a pass.** If the notes directory cannot be
       resolved, the primitive must FAIL with the reason, not WARN. `WARN No wiki links found to
       check` beside `PASS 3786 of 5253 files contain wiki links` is the defect.
 
@@ -80,17 +80,17 @@ vault's two contradictory lines no longer both appear.
 
 ## Task 2 — D6: remove the last inlined wiki-link matcher
 
-- [ ] **Step 1 — Count both trees before touching anything.**
+- [x] **Step 1 — Count both trees before touching anything.**
       `grep -cF 'grep -rl "\[\[' skill-sources/graph/SKILL.md` → 1;
       `git show 5a4ab28:skill-sources/graph/SKILL.md | grep -cF 'grep -rl "\[\['` → 2.
-- [ ] **Step 2 — Confirm the library is sourced in that fence.** Line 434 sits in a fence that must
+- [x] **Step 2 — Confirm the library is sourced in that fence.** Line 434 sits in a fence that must
       source `ops/lib/link-extraction.sh` itself. If it does not, the fix is to add the sourcing and
       guard, not to reach across the boundary.
-- [ ] **Step 3 — Replace the loop**, matching how the orphan loop was converted in Spec E.
-- [ ] **Step 4 — Prove the change is behavioural, not cosmetic.** Build a fixture where the naive form
+- [x] **Step 3 — Replace the loop**, matching how the orphan loop was converted in Spec E.
+- [x] **Step 4 — Prove the change is behavioural, not cosmetic.** Build a fixture where the naive form
       and the library disagree: a note whose **body** contains `[[Target]]` inside a fenced block, and
       a link differing only by case. Record both counts before and after.
-- [ ] **Step 5 — Then correct the prose.** CLAUDE.md's closed entry and divergence 6 both describe
+- [x] **Step 5 — Then correct the prose.** CLAUDE.md's closed entry and divergence 6 both describe
       this as open; both must move in this commit.
 
 **Done when:** the fixture's naive count and library count differ, the shipped fence produces the
@@ -100,33 +100,33 @@ library count, and `grep -cF 'grep -rl "\[\['` over `skill-sources/` returns 0.
 
 ## Task 3 — D7 + D8 (absorbing D9): one frontmatter parser, one status vocabulary
 
-- [ ] **Step 0 — RED: build the discriminating fixture and watch the current code fail on it.**
+- [x] **Step 0 — RED: build the discriminating fixture and watch the current code fail on it.**
       Before writing a parser, create the four-note case from Step 5 and run today's
       `grep -rl '^status:'` against it. Record the number. It must be **1** where the true answer is
       **2** — the body-fenced `status: pending` is counted as frontmatter. **If it returns 2, the
       naive form is not broken on this fixture and the fixture is wrong; fix the fixture before
       writing the parser.** A parser built without a failing baseline cannot be shown to have fixed
       anything.
-- [ ] **Step 1 — Enumerate the status vocabulary by command, not by reading.** Spec B's enumeration
+- [x] **Step 1 — Enumerate the status vocabulary by command, not by reading.** Spec B's enumeration
       was incomplete, which is how D7 survived. Produce a single command that lists every declared
       `status` value across `generators/` with its file and line, and paste its output into the
       commit. Expect the `schema.md` / `atomic-notes.md` disagreement to appear in it.
-- [ ] **Step 2 — Resolve the enum in one direction and say which.** `schema.md:30` and `:137` include
+- [x] **Step 2 — Resolve the enum in one direction and say which.** `schema.md:30` and `:137` include
       `open`; `atomic-notes.md:94` does not. Pick one, change the other, and state why in the file
       that changes.
-- [ ] **Step 3 — Build the shared frontmatter-field extractor.** One implementation, alongside
+- [x] **Step 3 — Build the shared frontmatter-field extractor.** One implementation, alongside
       `reference/lib/link-extraction.sh`, versioned the same way, failing loud the same way. It must
       distinguish a frontmatter field from a same-named line in the body — including inside a fenced
       block.
-- [ ] **Step 4 — Convert the three naive sites**: `OBS_COUNT`, `TENSION_COUNT`, and `skills/health`.
+- [x] **Step 4 — Convert the three naive sites**: `OBS_COUNT`, `TENSION_COUNT`, and `skills/health`.
       Assert each mutation applied *and* that nothing else changed.
-- [ ] **Step 5 — Grow the fence-gate fixture in the same commit (this is D9).** Add to
+- [x] **Step 5 — Grow the fence-gate fixture in the same commit (this is D9).** Add to
       `reference/test/fence-isolation.test.sh` a discriminating set in the **notes** directory: one
       note with `status: active`; one whose body carries `status: pending` inside a fenced block; one
       nested a directory down with `status: archived`; one with no frontmatter at all. True answer for
       "notes missing a status field" is **2**. Against it the correct parser returns 2, the naive
       `grep -rl` returns 1, and a wrong-field parser returns 4.
-- [ ] **Step 6 — Record that D8 was latent, not manifest.** All 14 matching files in the field vault
+- [x] **Step 6 — Record that D8 was latent, not manifest.** All 14 matching files in the field vault
       carry the line inside frontmatter. The fix is right; the claim "this was producing wrong
       numbers" would not be.
 
@@ -139,20 +139,20 @@ shells, and no `grep -rl '^status:'` remains in `skill-sources/` or `skills/`.
 
 Parked twice. This task resolves it or states, in a tracked file, why it cannot be.
 
-- [ ] **Step 1 — Record the live contradiction before changing anything.** In the field vault: 14 open
+- [x] **Step 1 — Record the live contradiction before changing anything.** In the field vault: 14 open
       observations, 8 open tensions; `/rethink` reads `maintenance.conditions.*` (20/10) and stays
       silent; `/next` and `/remember` read `self_evolution.*` (10/5) and both fire. Capture that.
-- [ ] **Step 2 — Decide, with the reader's limit as an input.** `read_config.sh` resolves **one** level
+- [x] **Step 2 — Decide, with the reader's limit as an input.** `read_config.sh` resolves **one** level
       of nesting. `maintenance.conditions.*` is three. Choosing it means deepening the reader or
       accepting the hook cannot read it; choosing `self_evolution.*` means the field vault's tuned
       20/10 keeps losing to a seeded 10/5. Neither is free — state the trade-off taken.
-- [ ] **Step 3 — Whatever is chosen, the generator must emit only that namespace.** The split exists
+- [x] **Step 3 — Whatever is chosen, the generator must emit only that namespace.** The split exists
       because two generations disagreed. Check `generators/` and `skills/setup` for what is written at
       generation time.
-- [ ] **Step 4 — Update `/upgrade` 6c to match.** It currently reports `[split]` and refuses to act.
+- [x] **Step 4 — Update `/upgrade` 6c to match.** It currently reports `[split]` and refuses to act.
       Once one namespace is authoritative, 6c should migrate rather than merely report — but it must
       still never overwrite a tuned value with a default.
-- [ ] **Step 5 — If the decision cannot be made here, park it in `CLAUDE.md`**, not in the ledger,
+- [x] **Step 5 — If the decision cannot be made here, park it in `CLAUDE.md`**, not in the ledger,
       with the trade-off written out.
 
 **Done when:** one namespace is read by `/next`, `/remember`, `/rethink` and the hook; a vault
@@ -163,16 +163,16 @@ contradiction is reproducible as a before-state and absent as an after-state.
 
 ## Task 5 — D2: make the version bump atomic
 
-- [ ] **Step 1 — Reproduce the partial bump.** Make `pkg/marketplace.json` unparseable, run
+- [x] **Step 1 — Reproduce the partial bump.** Make `pkg/marketplace.json` unparseable, run
       `bump-version.sh 8.8.8`, and record that `pkg/plugin.json` moved while `marketplace.json` did
       not.
-- [ ] **Step 2 — Write all declared sites to temps, then commit them together.** A failure anywhere
+- [x] **Step 2 — Write all declared sites to temps, then commit them together.** A failure anywhere
       leaves every site unchanged.
-- [ ] **Step 3 — Do not pin on-disk state in the existing assertions.**
+- [x] **Step 3 — Do not pin on-disk state in the existing assertions.**
       `reference/test/bump-version.test.sh` deliberately asserts only that the run does not *report
       success*, so that an atomic fix does not read as a regression. Add new assertions for the
       atomic property rather than tightening the old ones.
-- [ ] **Step 4 — Assert no temp files survive either path** — success or failure. Spec E shipped a
+- [x] **Step 4 — Assert no temp files survive either path** — success or failure. Spec E shipped a
       vacuous version of exactly this assertion, which passed because the branch it named was
       unreachable.
 
@@ -184,13 +184,13 @@ temp-and-commit logic is reverted.
 
 ## Task 6 — D3: the three thresholds declared nowhere
 
-- [ ] **Step 1 — Decide whether each threshold should be configurable at all.** `SESS_COUNT ≥ 5`,
+- [x] **Step 1 — Decide whether each threshold should be configurable at all.** `SESS_COUNT ≥ 5`,
       `INBOX_COUNT ≥ 3`, `DAYS_STALE ≥ 30`. Inventing config keys nobody asked for is its own defect;
       so is a hardcoded number that three surfaces disagree about. Answer per threshold.
-- [ ] **Step 2 — Do not merge the two 30s.** `DAYS_STALE` is methodology-notes-behind-config drift;
+- [x] **Step 2 — Do not merge the two 30s.** `DAYS_STALE` is methodology-notes-behind-config drift;
       `/next`'s `stale_notes` is "not modified in 30+ days". Same number, different subject. If both
       become configurable they need different keys.
-- [ ] **Step 3 — Whatever is decided, one surface owns each threshold**, and grepping its value finds
+- [x] **Step 3 — Whatever is decided, one surface owns each threshold**, and grepping its value finds
       it in exactly one place.
 
 **Done when:** for each of the three, either a config key exists and the hook reads it, or the file
@@ -200,17 +200,17 @@ states in a comment that it is deliberately fixed and why — and `CLAUDE.md` di
 
 ## Task 7 — D10 + D4: make a deferral land somewhere it survives, and stop listing what cannot be done
 
-- [ ] **Step 0 — RED: capture the baseline verbatim before writing any guidance.** The failure has
+- [x] **Step 0 — RED: capture the baseline verbatim before writing any guidance.** The failure has
       occurred twice and was never recorded in the form that would let anyone check a fix. Extract
       both instances: `git log --format=%B` for `741b2b7` and for the Spec E review-fix commit,
       quoting the exact sentence each uses ("Recorded in the ledger rather than…", "recorded for the
       whole-branch review"). Then show what a reader would find: `git log --stat` for each, proving
       no tracked file changed. **If both commits turn out to have touched a tracked record, there is
       no failure here and this task collapses to Step 3 — stop and say so.**
-- [ ] **Step 1 — Annotate plan Task 2 Step 4 in the Spec E plan.** It is ticked `[x]` for a check that
+- [x] **Step 1 — Annotate plan Task 2 Step 4 in the Spec E plan.** It is ticked `[x]` for a check that
       mis-fired on `graph`, `next` and `remember` and was never shipped. Annotate it the way that
       plan's other superseded steps were annotated, and correct its done-when.
-- [ ] **Step 2 — Fix this STRUCTURALLY, not with a prose rule.**
+- [x] **Step 2 — Fix this STRUCTURALLY, not with a prose rule.**
 
       **The form matters and the first draft of this plan got it wrong.** Classified against
       `superpowers:writing-skills` → *Match the Form to the Failure*, this is
@@ -233,10 +233,10 @@ states in a comment that it is deliberately fixed and why — and `CLAUDE.md` di
          commits, do not ship it** — say so in the report and fall back to the structural slot alone.
          A gate that cries wolf is worse than the prose it replaced.
       3. Only after 1 and 2, write prose — and only to explain *why* the slot exists.
-- [ ] **Step 3 — Reclassify D4 as won't-fix.** `platforms/shared/skill-blocks/stats.md:94-95` is in a
+- [x] **Step 3 — Reclassify D4 as won't-fix.** `platforms/shared/skill-blocks/stats.md:94-95` is in a
       frozen tree that generates nothing and is gated by `check-portability.sh` check 4. Move it out
       of "Known open divergences" into a stated won't-fix with the reason. Do not touch the file.
-- [ ] **Step 4 — Re-derive every remaining number in the divergence list**, as Spec E's Task 7 did,
+- [x] **Step 4 — Re-derive every remaining number in the divergence list**, as Spec E's Task 7 did,
       and update the header date. The list drifted three ways in one week: a live-vault count moved,
       a repo count moved because a branch changed it, and an entry described a defect fixed in the
       files it named while live in one it did not.
@@ -299,7 +299,8 @@ where the next contributor will actually read it.
 2. No CI gate exercises bump-version.sh's COMMIT FAILED branch: forcing a git commit to
    fail needs chflags (macOS) or chattr +i (Linux), neither portable nor available to the
    CI runner without root. Recorded here.
-3. Task 2's title says "atomic"; what shipped is the weaker and accurate property "no
+3. Task 5's title says "atomic" (D2's entry, not plan Task 2 — that one is D6, the
+   matcher); what shipped is the weaker and accurate property "no
    declared file is modified unless every site staged". Retitle the entry — do not build a
    journal to make the stronger word true. Recorded here; the entry to retitle is in this
    plan.
