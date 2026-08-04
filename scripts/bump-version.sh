@@ -196,15 +196,24 @@ cmd_bump() {
     # to know a declared file was absent.
     if [ ! -f "$REPO_ROOT/$vpath" ]; then printf '  SKIP (missing) %s\n' "$vpath"; continue; fi
     tmp="$REPO_ROOT/$vpath.tmp.$BUMP_PID"
-    if [ -f "$tmp" ]; then src="$tmp"; else src="$REPO_ROOT/$vpath"; fi
+    # THE SOURCE IS CHOSEN BY WHAT THIS RUN HAS STAGED, NOT BY WHAT IS ON DISK. Chain
+    # onto our own temp so a file with two declared fields keeps both edits — but a
+    # temp we did NOT write is debris, and reading it would bump a stale base and say
+    # nothing. `$$` is recycled by the OS, so a temp bearing our PID can be the
+    # leftover of an earlier run that was killed before it could roll back.
+    # -x and -F are both load-bearing below: a path is appended once, and matching must
+    # be whole-line and literal. Plain `grep -F` would treat an already-staged path as
+    # covering any path it is a substring of, and never stage the second file.
+    if printf '%s\n' "$staged_paths" | grep -qxF "$vpath"; then
+      src="$tmp"; already_staged=yes
+    else
+      src="$REPO_ROOT/$vpath"; rm -f "$tmp" "$tmp.work"; already_staged=no
+    fi
     was=$(read_json_field "$src" "$field") || {
       stage_fail="$vpath ($field) could not be read"; break; }
     stage_json_field "$src" "$field" "$new" "$tmp" || {
       stage_fail="$vpath ($field) could not be written"; break; }
-    # -x and -F are both load-bearing: a path is appended once, and matching must be
-    # whole-line and literal. Plain `grep -F` would treat an already-staged path as
-    # covering any path it is a substring of, and never stage the second file.
-    printf '%s\n' "$staged_paths" | grep -qxF "$vpath" || staged_paths="$staged_paths$vpath
+    [ "$already_staged" = yes ] || staged_paths="$staged_paths$vpath
 "
     report="$report$(printf '  %-46s %s -> %s' "$vpath ($field)" "$was" "$new")
 "
@@ -215,14 +224,21 @@ EOF
   if [ -n "$stage_fail" ]; then
     # Discard every staged temp. One left beside a manifest is a second copy of release
     # metadata that nothing declares — the drift condition again, spelled differently.
+    printf 'ABORTED: %s\n' "$stage_fail" >&2
+    echo '  no declared file was modified; every staged write was discarded' >&2
     while IFS= read -r spath; do
       [ -n "$spath" ] || continue
-      rm -f "$REPO_ROOT/$spath.tmp.$BUMP_PID" "$REPO_ROOT/$spath.tmp.$BUMP_PID.work"
+      # Named, not merely removed. A cleanup nobody can see is indistinguishable from
+      # one that did not happen — and printing the real filename is the only place the
+      # script's own temp naming is observable from outside, which is what lets a test
+      # confirm its `find` pattern matches what this script actually writes.
+      for dead in "$REPO_ROOT/$spath.tmp.$BUMP_PID" "$REPO_ROOT/$spath.tmp.$BUMP_PID.work"; do
+        [ -e "$dead" ] || continue
+        rm -f "$dead" && printf '  discarded: %s\n' "${dead#"$REPO_ROOT"/}" >&2
+      done
     done <<EOF
 $staged_paths
 EOF
-    printf 'ABORTED: %s\n' "$stage_fail" >&2
-    echo '  no declared file was modified; every staged write was discarded' >&2
     return 1
   fi
 
@@ -233,14 +249,30 @@ EOF
   commit_fail=""
   while IFS= read -r spath; do
     [ -n "$spath" ] || continue
-    mv "$REPO_ROOT/$spath.tmp.$BUMP_PID" "$REPO_ROOT/$spath" || commit_fail="$commit_fail  $spath
-"
+    # STOP AT THE FIRST FAILURE. Continuing would move MORE declared files away from
+    # the state they share with the one that failed, maximising the divergence instead
+    # of bounding it.
+    mv "$REPO_ROOT/$spath.tmp.$BUMP_PID" "$REPO_ROOT/$spath" || { commit_fail="$spath"; break; }
   done <<EOF
 $staged_paths
 EOF
   if [ -n "$commit_fail" ]; then
-    echo 'COMMIT FAILED — these declared paths did NOT move:' >&2
-    printf '%s' "$commit_fail" >&2
+    printf 'COMMIT FAILED: %s could not be moved into place\n' "$commit_fail" >&2
+    echo '  stopped at the first failure; any declared path earlier in this run already moved' >&2
+    # EVERY SURVIVING TEMP IS DISCARDED HERE, and that is not tidiness. A staged temp
+    # beside a manifest is a complete, undeclared copy of the release metadata — the
+    # same drift condition the rollback above exists to prevent — and `--check`, which
+    # this message goes on to recommend, iterates declared SITES and cannot see it. A
+    # remedy blind to the wreckage its own branch created is worse than no remedy.
+    # Each temp is redundant with the file it did not replace, so nothing is lost.
+    while IFS= read -r spath; do
+      [ -n "$spath" ] || continue
+      dead="$REPO_ROOT/$spath.tmp.$BUMP_PID"
+      [ -e "$dead" ] || continue
+      rm -f "$dead" && printf '  discarded: %s\n' "${dead#"$REPO_ROOT"/}" >&2
+    done <<EOF
+$staged_paths
+EOF
     echo '  the tree is partially bumped; run --check' >&2
     return 1
   fi

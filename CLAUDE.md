@@ -59,7 +59,7 @@ for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 38/38
+  $s reference/test/bump-version.test.sh                 # 40/40
   $s reference/test/kernel-note-dirs.test.sh             # 36/36
   $s reference/test/threshold-namespace.test.sh          # 52/52
 done
@@ -692,8 +692,30 @@ defect, not a residue of the same one.
   already rewritten. It now **stages every declared site into a temp and commits nothing until all of
   them have staged successfully.** That is the property, and it is the one worth stating — not
   "atomic": the commit phase is a sequence of same-directory renames, so a `mv` failing after a clean
-  stage (ENOSPC/EROFS/EACCES) still leaves a partial tree, and now names the paths that did not land
-  instead of reporting a bump.
+  stage (ENOSPC/EROFS/EACCES) still leaves a partial tree. It **stops at the first failure** —
+  continuing would move more declared files away from the state they share with the one that failed,
+  maximising the divergence rather than bounding it — names the path that could not move, and
+  discards every surviving temp.
+
+  **That last clause was a defect in the first version of this fix, and it is the drift condition
+  from one paragraph below.** `COMMIT FAILED` left the staged temps on disk: complete, undeclared
+  copies of the release metadata beside the manifests — exactly what the rollback branch's own
+  comment calls "a second copy of the release metadata that nothing declares". The message then sent
+  the user to `--check`, which iterates declared **sites** and cannot see a temp. A remedy blind to
+  the wreckage its own branch created. Each temp is redundant with the file it failed to replace, so
+  discarding it loses nothing. Reproduced with `chflags uchg` on the target in both shells: before,
+  a `…marketplace.json.tmp.<pid>` survived; after, it is named as discarded and the tree has none.
+
+  **No gate exercises that branch.** Forcing a same-directory `mv` to fail needs a read-only target
+  inside a writable directory — `chflags` on macOS, `chattr +i` as root on Linux — and neither is
+  portable to CI. The check above is a hand-run reproduction, not a test. What *is* covered is the
+  `discarded:` mechanism, which the abort branch shares and the suite exercises.
+
+  **The staging source is chosen by what the run has staged, not by what is on disk.** It was
+  `[ -f "$tmp" ]`, which answers a different question: `$$` is recycled by the OS, so a temp bearing
+  this run's PID can be debris from an earlier run killed before it could roll back, and staging from
+  it would bump a stale base and say nothing. The decision now consults the run's own staged-path
+  list, and a same-PID leftover is deleted before first use rather than read.
 
   **The three declared sites live in two files, and two of them are the same file** —
   `.claude-plugin/plugin.json` (`version`) and `.claude-plugin/marketplace.json` twice
@@ -719,10 +741,10 @@ defect, not a residue of the same one.
   produced it at all.
 
   ```bash
-  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 38/38, was 28/28
+  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 40/40, was 28/28
   ```
 
-  **Ten assertions added, each mutation-proved rather than counted** — the failure this repo has
+  **Twelve assertions added, each mutation-proved rather than counted** — the failure this repo has
   already shipped is a suite whose total rises while the new rows cannot fail. Every mutation was
   asserted to have applied before its result was read:
 
@@ -734,6 +756,9 @@ defect, not a residue of the same one.
   | delete `rm -f "$work"` from `stage_json_field` | the write-time no-temp assertion |
   | don't create the temp the positive control looks for | the harness control |
   | buffer the `SKIP (missing)` line into `$report` again | the SKIP-survives-abort assertion |
+  | rename the temp suffix `.tmp.` → `.stg.` (4 sites, behaviour-identical) | the `$TMP_GLOB` coupling assertion |
+  | that rename **plus** neutered temp removal (temps genuinely orphaned) | the same one, and only it |
+  | neutered temp removal alone, suffix unchanged | the 2 failure-path no-temp assertions |
 
   **The fix introduced a regression of the house class, and the last row is its pin.** Moving the
   per-site rows into a buffer printed after the commit is right for the `old -> new` rows, which
@@ -753,10 +778,35 @@ defect, not a residue of the same one.
   to name `stage_json_field` and `rm -f "$work"`, and the new mutation re-run: a non-vacuity note
   naming a function that no longer exists records a check nobody has performed.
 
-  A **positive control** was added for the four `""`-expecting temp assertions. `find -name
-  '*.tmp.*'` returning nothing is what a satisfied negative check looks like *and* what a misspelled
-  glob or a wrong root looks like; without it, renaming the temp suffix would make all four pass for
-  free.
+  **Two controls guard the four `""`-expecting temp assertions, and the first one alone was not
+  enough — the sentence that stood here claimed the opposite of what was measured.** It said "without
+  it, renaming the temp suffix would make all four pass for free." Measured: **with** it, renaming
+  the suffix (`.tmp.` → `.stg.`, behaviour-identical, 4 sites) left the suite fully green in both
+  shells — and so did the same rename with temp removal neutered, which genuinely orphans staged
+  temps beside the manifests. A tracked claim that a check covers something it does not, in the file
+  whose purpose is recording where this repo's checks fall short.
+
+  The first control plants a file and proves the **search** works — right root, pattern can match.
+  That is all it proves; it observes nothing about `bump-version.sh`, and the two were linked only by
+  a string typed into both files and checked in neither.
+
+  The second control closes it. Both failure branches now **print each temp they discard**, so a
+  filename built by the script crosses the boundary, and the test asserts `$TMP_GLOB` matches *that*
+  — using `find` with the same pattern the four assertions use, not a shell `case`, which matched
+  under bash and not under zsh. `$TMP_GLOB` is single-sourced across all five uses. Both mutations
+  above now turn it red in both shells.
+
+  ```bash
+  # Re-derive any row of the table above: apply the mutation, ASSERT IT APPLIED, run, restore.
+  S=scripts/bump-version.sh; B=$(mktemp); cp $S $B
+  perl -pi -e 's/\.tmp\.\$BUMP_PID/.stg.\$BUMP_PID/g' $S          # the suffix-rename row
+  cmp -s $B $S && echo 'MUTATION DID NOT APPLY — result meaningless' || \
+    for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done
+  cp $B $S
+  ```
+
+  A mutation that silently fails to match reports the same all-green as a robust assertion, which is
+  why the `cmp` guard is part of the recipe rather than a note beside it.
 
 - **No shared frontmatter parser, a split `status` enum, and a fixture blind to both** — divergences
   7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1`) is now the single definition,

@@ -98,6 +98,14 @@ EOF
 rc_of()  { local d; d="$1"; shift; "$SELF" "$d/scripts/bump-version.sh" "$@" >/dev/null 2>&1; printf '%s' "$?"; }
 out_of() { local d; d="$1"; shift; "$SELF" "$d/scripts/bump-version.sh" "$@" 2>&1; }
 
+# The pattern every "leaves no temp behind" assertion searches for. Single-sourced on
+# purpose: five assertions depend on it matching what bump-version.sh actually names
+# its staged temps, and that dependency used to exist only as the same string typed
+# into two files and checked in neither. Renaming the suffix in the script left all
+# five green — including a run that genuinely orphaned temps. The assertion below
+# ties this pattern to a filename the script itself prints.
+TMP_GLOB='*.tmp.*'
+
 # --- --check on a healthy fixture -------------------------------------------
 # THE REGRESSION PIN FOR THE $path FORK. Renaming `vpath` back to `path` in the
 # fixture's copy takes this from 0 to 127 under zsh — verified by that mutation —
@@ -179,7 +187,7 @@ eq "bump: plugins[0].version moved"                "8.8.8" "$(jq -r '.plugins[0]
 # every site stages cleanly, so this cannot say anything about the rollback branch.
 # Deleting the rollback leaves this green. The failure paths are asserted separately
 # below; this line is here to catch a future change that stops moving the temp at all.
-eq "bump: leaves no .tmp. behind when jq succeeds" ""    "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+eq "bump: leaves no .tmp. behind when jq succeeds" ""    "$(find "$F" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
 eq "bump: --check agrees afterwards"               "0"   "$(rc_of "$F" --check)"
 # LINE 176 IS THE SAME-FILE PIN, and it is worth naming because it looks redundant
 # beside 177. pkg/marketplace.json is declared twice, so staging is keyed on path:
@@ -188,14 +196,43 @@ eq "bump: --check agrees afterwards"               "0"   "$(rc_of "$F" --check)"
 # second temp carry only its own edit, and committing it discards metadata.version.
 # Verified by mutation: that change turns 176 red and leaves 175 and 177 green.
 
-# --- the .tmp. search can actually find something ----------------------------
-# POSITIVE CONTROL for the four ""-expecting assertions in this file. `find -name
-# '*.tmp.*'` returning nothing is what a satisfied negative check looks like AND what
-# a misspelled glob, a wrong root, or a find that never ran looks like. Without this,
-# renaming the temp suffix would make every one of them pass for free.
+# --- $TMP_GLOB matches what the script actually names its temps --------------
+# TWO CONTROLS, AND THEY PROVE DIFFERENT THINGS. Four assertions in this file expect
+# `find -name "$TMP_GLOB"` to come back empty, and an empty result is what a satisfied
+# negative check looks like AND what a misspelled glob, a wrong root, or a find that
+# never ran looks like.
+#
+# The first control below plants a file and proves the SEARCH works — the root is
+# right and the pattern can match. That is all it proves. It observes nothing about
+# bump-version.sh, and on its own it left a real defect invisible: renaming the temp
+# suffix in the script (`.tmp.` -> `.stg.`, behaviour-identical) kept the whole suite
+# green at 38/38 in both shells, and so did the same rename with the rollback deleted,
+# which genuinely orphans staged temps beside the manifests.
+#
+# The second control closes that. On an abort the script now PRINTS each temp it
+# discards, so the filename crossing the boundary is one the script built rather than
+# one this file typed. Asserting $TMP_GLOB matches that name couples the pattern to
+# the subject: rename the suffix in the script and this goes red.
 F=$(mkfix); : > "$F/pkg/plugin.json.tmp.99999"
 eq "harness: the temp search finds a temp that is there" "$F/pkg/plugin.json.tmp.99999" \
-   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+   "$(find "$F" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
+
+F=$(mkfix); printf 'not json\n' > "$F/pkg/marketplace.json"
+disc=$(out_of "$F" 8.8.8 | sed -n 's/^  discarded: //p' | head -1)
+# Positive half first: a discarded name was actually reported. Without it the glob
+# assertion below would pass on an empty string under some shells' pattern rules, and
+# would certainly pass for the wrong reason if the script stopped printing the line.
+eq "harness: an aborted run reports the temp it discarded" "yes" \
+   "$([ -n "$disc" ] && echo yes || echo no)"
+# The oracle is `find` with $TMP_GLOB — the same tool and the same pattern the four
+# assertions use, not a shell `case`. That is deliberate on two counts: it removes any
+# gap between what this control validates and what they rely on, and `case "$x" in
+# $GLOB)` is not portable here — it matched under bash and did not under zsh, which is
+# the fork class this repo keeps shipping.
+probe=$(mktemp -d); : > "$probe/$(basename "$disc")"
+eq "harness: \$TMP_GLOB matches the name the script itself built" "$probe/$(basename "$disc")" \
+   "$(find "$probe" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
+rm -rf "$probe"
 
 # --- a write that cannot complete fails loudly -------------------------------
 # An unparseable declared file makes read_json_field fail on the SECOND site, after
@@ -221,7 +258,7 @@ eq "bump: an unparseable declared file is not reported as success" "yes" \
 eq "bump: inter-file failure leaves the FIRST site unmoved" "7.7.7" \
    "$(jq -r .version "$F/pkg/plugin.json")"
 eq "bump: inter-file failure leaves no .tmp. behind" "" \
-   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+   "$(find "$F" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
 
 # --- a failure BETWEEN two fields of the SAME file ---------------------------
 # THE CASE A FILE-TO-FILE COMPARISON CANNOT SEE. pkg/marketplace.json is declared
@@ -257,7 +294,7 @@ eq "bump: same-file failure leaves plugins[0].version unmoved" "7.7.7" \
 eq "bump: same-file failure leaves the OTHER declared file unmoved" "7.7.7" \
    "$(jq -r .version "$F/pkg/plugin.json")"
 eq "bump: same-file failure leaves no .tmp. behind" "" \
-   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+   "$(find "$F" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
 
 # --- a SKIP survives a later abort -------------------------------------------
 # REGRESSION PIN, and the regression was introduced by the atomicity fix itself.
@@ -313,7 +350,7 @@ tmp_rc=$(rc_of "$F" 8.8.8)
 eq "bump: a write-time jq failure is not reported as success" "yes" \
    "$([ "$tmp_rc" -ne 0 ] && echo yes || echo no)"
 eq "bump: a write-time jq failure leaves no .tmp. behind" ""   \
-   "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
+   "$(find "$F" -name "$TMP_GLOB" | tr '\n' ' ' | sed 's/ *$//')"
 
 # --- argument handling -------------------------------------------------------
 F=$(mkfix)
