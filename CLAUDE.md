@@ -609,6 +609,20 @@ scope must not read as clean. And extracting **zero** paths exits `2` with "the 
 not that prose is clean", distinct from `1` for a genuine miss: this repo has twice shipped a scan
 that matched nothing and reported green.
 
+**The stated list is eight documents, and two files that carry cross-references are not among
+them** — `hooks/scripts/session-orient.sh` and `platforms/claude-code/hooks/session-orient.sh.template`.
+Both name repo paths in comments and in warning messages a user reads at SessionStart, and both were
+edited on `fix/spec-f-divergence-drain`; a path that rots in either is checked by nothing. This is a
+gap in coverage, not a bug in the design — widening a *stated* list is a deliberate edit, which is
+the property that makes a shrinking scope impossible to mistake for a clean one. Left open on
+purpose; recorded here rather than in a plan, because a deferral in a git-ignored ledger is not a
+record. Re-derive the list and the gap:
+
+```bash
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 8 in scope
+grep -c 'session-orient' reference/check-prose-paths.sh                    # 0: neither is listed
+```
+
 The human diff of the two trees at release remains the only check on the full §4 rule.
 
 **6. `graph`'s authority loop still inlines the naive matcher — FIXED on
