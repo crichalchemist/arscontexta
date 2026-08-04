@@ -347,10 +347,31 @@ ever compares against one of these numbers, that one becomes a config key.*
 
 **What that decision does not buy is single ownership, and the entry says so rather than claiming it.**
 Measured: `DAYS_STALE`'s 30 has **one** declaration repo-wide; `SESS_COUNT`'s 5 and `INBOX_COUNT`'s 3
-have **two each** — the plugin's own hook (`:263`, `:266`) and
-`platforms/claude-code/hooks/session-orient.sh.template:143,149`, the hook a *generated vault* gets,
-which can fire alongside it. Both sites now name each other, because a cross-reference is the only
-thing that stops an edit to one from silently splitting them.
+have **two each** — the plugin's own hook (`:271`, `:274`) and
+`platforms/claude-code/hooks/session-orient.sh.template:143,149`. Both sites now name each other,
+because a cross-reference is the only thing that stops an edit to one from silently splitting them.
+
+**The mechanism is worth stating precisely, because "the hook a generated vault gets" — what this
+entry said first — is imprecise in a way that changes the claim.** No skill copies that template.
+`platforms/claude-code/generator.md:27` points Claude at `platforms/claude-code/hooks/` for *"hook
+template documentation"*, so it is reference material the adapter **reads** during generation;
+nothing under `skills/` or `generators/` names the `platforms/` tree at all. What reaches a vault is
+therefore whatever Claude **derives**, which is not a copy and is arguably worse — a copy at least
+tracks its source. The field vault proves the difference: its hook is **179 lines to the template's
+200**, contains **none** of these three checks, and hardcodes its own `-gt 20` observation threshold.
+So a generated vault may or may not inherit these two values verbatim, and the duplication is a
+**drift** hazard between two declarations rather than two copies that ship together. This does not
+contradict divergence 12's "runs on **every** SessionStart" — that is about what a *derived* hook
+does once it exists, not about the template being copied verbatim.
+
+```bash
+# 9 = 3 CLAUDE.md + 5 docs/superpowers/ + 1 the hook's own comment. ZERO are code that reads or
+# copies the template — that, not the total, is the claim. (The line below does not self-match:
+# its dots are escaped, so it matches a literal `.` and not the `\.` it is written with.)
+grep -rn 'session-orient\.sh\.template' --include='*.md' --include='*.sh' --include='*.json' .
+grep -rln 'platforms/claude-code' skills/ generators/            # no hits, rc 1 — nothing generates from that tree
+grep -nE 'hooks/|\.template' platforms/claude-code/generator.md  # :27 names the directory as documentation
+```
 
 **Do not "fix" that duplication with a generation placeholder** — the obvious move, matching the
 neighbouring `{{OBS_THRESHOLD:-10}}` and `{{TENSION_THRESHOLD:-5}}`, would ship two more knobs that
@@ -361,7 +382,7 @@ a change to what generation emits.
 
 Also measured, and the reason Step 2's warning stands: there are **five** literal 30s across **two**
 subjects, not two. Four are note staleness (`skill-sources/next:242`, `skill-sources/reweave:130`,
-`skills/health:469`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:284` is
+`skills/health:469`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:292` is
 methodology-notes-behind-config drift. Same number, different subject — **do not merge them.**
 **Read the decomposition below, not the totals — and note why it is a decomposition.** Each command
 matches the very prose that states its result, so the commit that states a count is the commit that

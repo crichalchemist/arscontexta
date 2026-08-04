@@ -128,7 +128,7 @@ if [ "$TENS_COUNT" -ge {{TENSION_THRESHOLD:-5}} ]; then
 fi
 
 # SECOND DECLARATION — the 5 below and the 3 further down are each declared twice: here,
-# and in the plugin's own hook at `hooks/scripts/session-orient.sh:263,266`. Both can fire
+# and in the plugin's own hook at `hooks/scripts/session-orient.sh:271,274`. Both can fire
 # on SessionStart in a generated vault. Change one and you must change the other; they are
 # fixed by decision, and that decision with its re-derivation commands is written in that
 # same file under the heading `DELIBERATELY FIXED, NOT MERELY UNDECLARED` — grep for it

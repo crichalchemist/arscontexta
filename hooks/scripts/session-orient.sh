@@ -228,19 +228,27 @@ fi
 #
 # Single ownership holds for exactly ONE of the three. Claiming it for all three would
 # be the status-file-that-lies defect this repo's divergence list exists to drain:
-#   DAYS_STALE 30 — one declaration repo-wide (:284), subject "methodology notes behind
+#   DAYS_STALE 30 — one declaration repo-wide (:292), subject "methodology notes behind
 #     config changes". The other four literal 30s (`skill-sources/next:242`,
 #     `skill-sources/reweave:130`, `skills/health:469`,
 #     `platforms/shared/skill-blocks/reweave.md:144`) are note staleness — a different
 #     subject sharing the number. Do NOT merge them.
 #   SESS_COUNT 5 / INBOX_COUNT 3 — TWO declarations each. The second is
-#     `platforms/claude-code/hooks/session-orient.sh.template:143,149`. That template is
-#     the SessionStart hook a generated vault WOULD get — stated that way on purpose:
-#     nothing in this repo is shown to copy it, no generator and no `skills/setup` step
-#     references it at all, so treat it as an unwired second declaration rather than a
-#     proven live one. Either way, edit one without the other and they split, which is a
-#     drift hazard, not the disagreement hazard a config key exists to prevent (see the
-#     trigger above). Deliberately NOT unified via a generation placeholder: that
+#     `platforms/claude-code/hooks/session-orient.sh.template:143,149`. State the
+#     MECHANISM, because "the hook a generated vault gets" is imprecise in a way that
+#     matters here: NO SKILL COPIES THAT FILE. `platforms/claude-code/generator.md:27`
+#     points Claude at `platforms/claude-code/hooks/` for "hook template documentation",
+#     so the template is reference material the adapter READS during generation — and
+#     nothing under `skills/` or `generators/` names the `platforms/` tree at all.
+#     What reaches a vault is therefore whatever Claude DERIVES from it, which is not a
+#     copy and is arguably worse, because a copy at least tracks its source. The field
+#     vault is the proof: its hook is 179 lines to this template's 200, contains NONE of
+#     these three checks, and hardcodes its own `-gt 20` observation threshold. So a
+#     generated vault may or may not inherit these two values verbatim.
+#     The duplication still stands and still needs disclosing: edit one declaration
+#     without the other and they split, which is a drift hazard, not the disagreement
+#     hazard a config key exists to prevent (see the trigger above).
+#     Deliberately NOT unified via a generation placeholder: that
 #     template's two existing threshold placeholders, `{{OBS_THRESHOLD:-10}}` and
 #     `{{TENSION_THRESHOLD:-5}}`, are substituted by nothing in this repo, so copying
 #     the pattern ships two more knobs that look configurable and are not.
