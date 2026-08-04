@@ -212,11 +212,49 @@ threshold fire.
 ## Specs, plans, commits
 
 Substantial work goes **spec → plan → execution** in `docs/superpowers/`. Execution ledgers live
-under `.superpowers/sdd/` (git-ignored) and are the authoritative record.
+under `.superpowers/sdd/` — **git-ignored, therefore working notes and never the record.** This
+sentence used to end "and are the authoritative record", and that was a false licence: it told
+contributors that a directory `git check-ignore` rejects was where findings belonged. Two commits
+took it at its word (`741b2b7`, `c122d9e`), each claiming in its message that something was
+"recorded" when the only copy was in scratch. Neither author was confused about `.superpowers/`
+being ignored; the tracked guidance had said that was fine.
+
+**Where a record actually goes:** `CLAUDE.md`'s divergence list for a defect that survives the
+branch, the plan's `## Deferrals` section for work consciously not done, the spec for a decision.
+**Plans from this branch forward** carry a required `## Deferrals` slot whose value is either one
+line per deferral naming the tracked file it landed in, or the literal word `none` — an empty slot
+is a failure, not a default. The slot exists because the two failures above were not caused by
+anyone forgetting the rule, so another statement of the rule could not have prevented them; what was
+missing was a place in the artifact where the omission is *visible*.
+
+**Expect to find plans without one — that is the convention's age, not its optionality.** Two of the
+eight plans carry the slot today; the six older ones predate it and are deliberately left alone,
+because writing `none` into a plan nobody has audited for deferrals manufactures the very kind of
+record this section exists to prevent. Copy the convention from the newest plan, not from whichever
+one you happen to open:
+
+```bash
+for p in docs/superpowers/plans/*.md; do
+  printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
+done
+```
+
+Nothing enforces this. A gate keyed on plan structure is the one viable candidate and is deferred to
+`docs/superpowers/plans/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
+next author copies the last plan.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
 executed and merged. A status file that lies about status is this project's own defect class wearing
-a different hat. Tick as you go, or delete the checkboxes and point at the ledger.
+a different hat. Tick as you go, or delete the checkboxes and point at a **tracked** record — a
+completion note in the plan itself, or the divergence entry in `CLAUDE.md`.
+
+This sentence used to end "point at the ledger", which contradicted the paragraph above: ledgers
+under `.superpowers/sdd/` are git-ignored, so pointing a status file at one reintroduces exactly the
+defect that paragraph exists to prevent. A remedy that routes the record somewhere it cannot ship is
+not a remedy. Ticking a box means the step was **executed** — where the outcome was a measured
+rejection rather than a change (this plan's Step 2.2 gate, assessed and declined on 1 true positive
+against 2 false positives), the rejection and its measurement are recorded in the file the step
+names.
 
 Commit messages state **what the failure looked like**, not just what changed. "Fixed grep" is
 useless; "the failure surfaced as 0, never as an error, because every site piped into `wc -l`" tells

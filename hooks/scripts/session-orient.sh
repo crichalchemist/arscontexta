@@ -122,10 +122,49 @@ done
 # Accept BOTH spellings: generated vaults write `status: open`, older templates
 # write `status: pending`. Matching one alone yields 0 on half the vaults in
 # existence, and a threshold that reads 0 can never fire.
+#
+# The FIELD is read from frontmatter, not matched line-anchored anywhere in the file.
+# The `grep -rl '^status: pending'` spelling this replaced also matched a `status:`
+# line in the BODY, including inside a fenced block, so an observation that quoted a
+# schema example counted itself as open. Sourced, never re-implemented — a rule held
+# by convention, not by a gate. See reference/lib/frontmatter.sh.
+#
+# THIS HOOK DOES NOT `exit 1` THE WAY THE SLASH COMMANDS DO. It runs at SessionStart,
+# where aborting costs the user the entire orientation block over one missing file. It
+# follows `threshold()` below instead: say the condition on stderr, OMIT the signal,
+# let the session start. Omitting is visible. Substituting 0 would not be — and 0 is
+# precisely the value that stops a threshold from ever firing.
+FM_LIB="ops/lib/frontmatter.sh"
+FM_OK=0
+if [ -r "$FM_LIB" ] && . "$FM_LIB" 2>/dev/null; then
+  FM_OK=1
+else
+  echo "CONDITION: ops/lib/frontmatter.sh missing or unreadable — observation and tension" >&2
+  echo "  signals omitted this session. Run /arscontexta:upgrade to restore it." >&2
+fi
+
+# A directory that does not exist means that feature is not active — valid state, 0.
+# A scan that FAILS over a directory that DOES exist omits the signal rather than
+# reporting 0, for the reason stated above.
+count_open_items() { # count_open_items <dir>
+  [ -d "$1" ] || { printf '0'; return 0; }
+  count_notes_by_field "$1" status pending open
+}
+
 OBS_TOTAL=$(ls -1 ops/observations/*.md 2>/dev/null | wc -l | tr -d ' ')
-OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
 TENS_TOTAL=$(ls -1 ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
-TENS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_COUNT=""
+TENS_COUNT=""
+if [ "$FM_OK" -eq 1 ]; then
+  OBS_COUNT=$(count_open_items ops/observations) || {
+    echo "CONDITION: observation scan failed — signal omitted this session." >&2
+    OBS_COUNT=""
+  }
+  TENS_COUNT=$(count_open_items ops/tensions) || {
+    echo "CONDITION: tension scan failed — signal omitted this session." >&2
+    TENS_COUNT=""
+  }
+fi
 # NO `|| echo 0` HERE. `grep -c` prints `0` AND exits 1 when nothing matches, so a
 # `|| echo 0` fallback fires *in addition* to the 0 already printed and the variable
 # becomes the two-line string "0\n0". Every session start then emits
@@ -161,16 +200,74 @@ threshold() { # threshold <dotted-key> <default>
 OBS_THRESHOLD=$(threshold self_evolution.observation_threshold 10)
 TENS_THRESHOLD=$(threshold self_evolution.tension_threshold 5)
 
-if [ "$OBS_COUNT" -ge "$OBS_THRESHOLD" ]; then
+# The -n guards are the omission path, not defensive padding: an unmeasured count is
+# the empty string, and `[ "" -ge 10 ]` is an `integer expected` error, not a false.
+# The condition was already reported on stderr where the count could not be taken.
+if [ -n "$OBS_COUNT" ] && [ "$OBS_COUNT" -ge "$OBS_THRESHOLD" ]; then
   echo "CONDITION: $OBS_COUNT pending observations (of $OBS_TOTAL total). Consider /rethink."
 fi
-if [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
+if [ -n "$TENS_COUNT" ] && [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
   echo "CONDITION: $TENS_COUNT unresolved tensions (of $TENS_TOTAL total). Consider /rethink."
 fi
-# UNDECLARED THRESHOLDS. These two, and the 30 in the staleness check below, appear in
-# no config file — `ops/config.yaml` declares only `self_evolution.*`. They are left
-# hardcoded rather than given invented config keys, but "one surface owns each
-# threshold" is not yet true of them. Recorded in the ledger, not silently equalised.
+# DELIBERATELY FIXED, NOT MERELY UNDECLARED. These two, and the 30 in the staleness
+# check below, are not configurable on purpose. The reason is structural, not "nobody
+# asked" — that rots the moment someone does. `self_evolution.*` earned its config keys
+# because FOUR INDEPENDENT CONSUMERS read it (`next`, `remember`, `rethink`, this hook),
+# each deciding on its own whether to recommend /rethink, so a wrong value makes a vault's
+# own tools contradict each other about it. These three have no second independent
+# consumer. A wrong value here mistimes a nudge; it cannot produce that contradiction,
+# because there is no other decision-maker to contradict.
+# TRIGGER: if a second INDEPENDENT CONSUMER — a distinct decision-maker, not another copy
+# of this same SessionStart hook — ever compares against one of these numbers, that one
+# becomes a config key. That is the condition to re-open this — not taste.
+# "Independent" is load-bearing, not padding: the template named below IS a second file
+# comparing against these same two numbers, so a trigger phrased as merely "a second
+# surface" would have been satisfied the moment it was written. Two copies of ONE consumer
+# can DRIFT, which a cross-reference fixes; two DISTINCT consumers can DISAGREE, which
+# only a shared config key fixes. Different defects, different remedies.
+#
+# Single ownership holds for exactly ONE of the three. Claiming it for all three would
+# be the status-file-that-lies defect this repo's divergence list exists to drain:
+#   DAYS_STALE 30 — one declaration repo-wide (:292), subject "methodology notes behind
+#     config changes". The other four literal 30s (`skill-sources/next:242`,
+#     `skill-sources/reweave:130`, `skills/health:469`,
+#     `platforms/shared/skill-blocks/reweave.md:144`) are note staleness — a different
+#     subject sharing the number. Do NOT merge them.
+#   SESS_COUNT 5 / INBOX_COUNT 3 — TWO declarations each. The second is
+#     `platforms/claude-code/hooks/session-orient.sh.template:143,149`. State the
+#     MECHANISM, because "the hook a generated vault gets" is imprecise in a way that
+#     matters here: NO SKILL COPIES THAT FILE. `platforms/claude-code/generator.md:27`
+#     points Claude at `platforms/claude-code/hooks/` for "hook template documentation",
+#     so the template is reference material the adapter READS during generation — and
+#     nothing under `skills/` or `generators/` names the `platforms/` tree at all.
+#     What reaches a vault is therefore whatever Claude DERIVES from it, which is not a
+#     copy and is arguably worse, because a copy at least tracks its source. The field
+#     vault is the proof: its hook is 179 lines to this template's 200, contains NONE of
+#     these three checks, and hardcodes its own `-gt 20` observation threshold. So a
+#     generated vault may or may not inherit these two values verbatim.
+#     The duplication still stands and still needs disclosing: edit one declaration
+#     without the other and they split, which is a drift hazard, not the disagreement
+#     hazard a config key exists to prevent (see the trigger above).
+#     Deliberately NOT unified via a generation placeholder: that
+#     template's two existing threshold placeholders, `{{OBS_THRESHOLD:-10}}` and
+#     `{{TENSION_THRESHOLD:-5}}`, are substituted by nothing in this repo, so copying
+#     the pattern ships two more knobs that look configurable and are not.
+# RE-DERIVE — and read the decomposition, not the totals. Each command below now MATCHES
+# THIS COMMENT, because the commit that states a count is the commit that changes it. The
+# first draft shipped 5/5/4, which were the true figures when taken and were stale the
+# moment they landed. Stated as sums rather than fixed with grep exclusions: an exclusion
+# rots silently and can quietly match nothing, which this repo has shipped twice, whereas
+# a sum fails loudly the moment it stops adding up.
+#   cmd1 -> 6 = 5 real declarations + 1 self-match (its own line below)
+#   cmd2 -> 6 = 5 real declarations + 1 self-match (its own line below)
+#   cmd3 -> 10 = 2 placeholder declarations (template:120,126)
+#              + 2 same-named shell variable, NOT a substitution (:200, :206)
+#              + 6 prose mentions added by this commit (this block, the template's
+#                cross-reference comment, and CLAUDE.md's divergence 3 entry)
+#          SUBSTITUTIONS FOUND: ZERO. That, not the total, is the load-bearing figure.
+#   grep -rn -- '-ge 30\|-gt 30\|mtime +30' skill-sources/ skills/ platforms/ hooks/
+#   grep -rn 'SESS_COUNT" -ge\|INBOX_COUNT" -ge\|DAYS_STALE" -ge' hooks/ platforms/ skill-sources/ skills/
+#   grep -rn 'OBS_THRESHOLD\|TENSION_THRESHOLD' . --exclude-dir=.git --exclude-dir=.superpowers
 if [ "$SESS_COUNT" -ge 5 ]; then
   echo "CONDITION: $SESS_COUNT unprocessed sessions. Consider /remember --mine-sessions."
 fi

@@ -130,22 +130,56 @@ comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") \
   | while read -r NAME; do [ -n "$NAME" ] && echo "ORPHAN: $NAME"; done
 
 # MOC coverage: % of notes appearing in at least one MOC's Core Ideas.
-# The MOC file list is built once, outside the loop. Two reasons: rebuilding it
-# per note re-scanned the whole vault n times, and an EMPTY list left `xargs`
-# with no file arguments — GNU xargs then runs grep against the loop's own
-# stdin and swallows the `find` stream, while BSD xargs skips the run entirely.
-# COVERED is counted through `wc -l` because `find | while` bodies run in a
-# subshell, so an incremented variable would be discarded at the pipe.
+# The replaced form ran `xargs grep -l` with the note name inside the pattern —
+# the same matcher removed from the orphan comparison above, spelled so that the
+# search string divergence 6 tracked could not see it. Here its three defects
+# bias a PERCENTAGE rather than a count: a link inside a ``` block counted as
+# coverage, a MOC linking [[Zettelkasten]] did not cover `zettelkasten.md`, and
+# a note named `a.b` was covered by any [[axb]].
+#
+# The MOC file list is still built once, outside any loop, for the reason the
+# previous comment recorded: an EMPTY list left `xargs` with no file arguments,
+# and GNU xargs then ran grep against the loop's own stdin and swallowed the
+# `find` stream, while BSD xargs skipped the run entirely. No xargs remains, but
+# building it once still matters — per-note rebuilds rescanned the vault n times.
 MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
-COVERED=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  # Skip MOCs themselves
-  grep -q '^type: moc' "$f" 2>/dev/null && continue
-  # Check if any MOC links to this note
-  if [ -n "$MOC_FILES" ] && printf '%s\n' "$MOC_FILES" | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
-    echo "$NAME"
-  fi
-done | wc -l | tr -d ' ')
+
+# Folded MOC basenames, so MOCs can be removed from the denominator set the same
+# way NOTE_COUNT already subtracts them from the total.
+MOC_INDEX=$(printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
+  [ -n "$m" ] && basename "$m" .md
+done | _fold_lower | sort -u)
+
+# Targets linked FROM MOCs. Extraction is inlined rather than delegated because
+# the library exposes directory-scoped functions only, and nothing that answers
+# "what does this particular SET of files link to" — see divergence 12.
+COV_SRC=$(mktemp) || exit 1
+COV_HITS=$(mktemp) || { rm -f "$COV_SRC"; exit 1; }
+COVF="/tmp/graph-cov-err-$$"
+rm -f "$COVF"
+printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
+  [ -n "$m" ] || continue
+  _strip_fences "$m" >> "$COV_SRC" || touch "$COVF"
+done
+if [ -e "$COVF" ]; then
+  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+  echo "error: MOC fence-stripping failed; refusing to report a coverage figure" >&2
+  exit 1
+fi
+# rc 1 is "no MOC links at all", a real answer; only rc >1 is a failure.
+rg -o '\[\[([^\]|#]+)' -r '$1' "$COV_SRC" > "$COV_HITS"
+if [ $? -gt 1 ]; then
+  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+  echo "error: MOC link extraction failed; refusing to report a coverage figure" >&2
+  exit 1
+fi
+MOC_TARGETS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$COV_HITS" | _fold_lower | sort -u)
+rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+
+# Both operands reach comm already folded and sorted, which is what makes it valid.
+COVERED=$(comm -12 \
+  <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
+  <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
 echo "Coverage: $COVERED / $NOTE_COUNT"
 ```
 
@@ -413,9 +447,10 @@ Rank {vocabulary.note_plural} by influence — most-linked-to (authorities) and 
 **Step 1: Count links**
 
 ```bash
-# Each fenced block is a SEPARATE shell invocation: NOTES_DIR does not survive
-# from the blocks above. Left undefined, `find ""` scans nothing and the ranking
-# comes back empty — which reads exactly like a vault with no links.
+# Each fenced block is a SEPARATE shell invocation: neither NOTES_DIR nor the
+# link-extraction library survives from the blocks above. Left undefined,
+# `find ""` scans nothing and the ranking comes back empty — which reads exactly
+# like a vault with no links. Both must be re-established here.
 NOTES_DIR="{vocabulary.notes}"
 
 # An EMPTY vault is a legitimate empty ranking; a MISSING directory is a failure
@@ -425,18 +460,94 @@ NOTES_DIR="{vocabulary.notes}"
   exit 1
 }
 
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 # Authority score: incoming links per note.
 # Captured FIRST, then sorted. `done | sort | head` yields HEAD's status, so a
 # failed scan rendered as an empty ranking with exit 0 — indistinguishable from
 # a vault that genuinely has no links.
-AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
-  echo "AUTH:$INCOMING:$NAME"
-done) || {
+#
+# The replaced spelling recursively grepped the whole tree for this note's own
+# name wrapped in brackets, then filtered that hit list with `grep -v` on the
+# file path. It was the last inlined wiki-link matcher in this tree. It is
+# DESCRIBED rather than quoted: the literal spelling is the search pattern used
+# to prove this class is gone from skill-sources/, so a comment reproducing it
+# would answer that search with itself.
+#
+# Measured against a fixture, it was wrong three ways AT ONCE, and in BOTH
+# directions — which is why no single number ever looked implausible enough to
+# investigate:
+#   - it counted a link that sat inside a ``` fence  (scored 1, truly 0)
+#   - it missed [[target]] against Target.md, and missed [[Target|alias]]
+#     entirely, because it matched neither case-folded nor up to the `|`
+#     terminator                                     (scored 0, truly 2)
+#   - it interpolated $NAME into a REGEX, so a note named `a.b` also matched a
+#     link to `axb`                                  (scored 2, truly 1)
+# Fences and case are the library's job; `grep -cxF` below — fixed-string and
+# whole-line — is what closes the third. `grep -v "$f"` had the same regex hole
+# on the exclusion side; self-links are now dropped by string comparison.
+#
+# Edges are built ONCE into a file and then counted per note, rather than
+# re-scanning the whole tree once per note. One line per (source file, distinct
+# target) pair: `grep -rl | wc -l` counted FILES, not link occurrences, and that
+# is the semantics being preserved.
+TMP_EDGE_SRC=$(mktemp) || exit 1
+TMP_EDGE_HITS=$(mktemp) || { rm -f "$TMP_EDGE_SRC"; exit 1; }
+TMP_EDGES=$(mktemp) || { rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS"; exit 1; }
+# The failure flag is a FILE, not a variable: this loop body runs in a subshell
+# (find | while), so an assignment would be discarded at the pipe and a broken
+# scan would read as "nothing links to anything". PIPESTATUS is bash-only.
+AUTHF="/tmp/graph-auth-err-$$"
+rm -f "$AUTHF"
+
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  SRC=$(basename "$f" .md | _fold_lower)
+  _strip_fences "$f" > "$TMP_EDGE_SRC" || { touch "$AUTHF"; continue; }
+  # rg runs as its own statement, not as a pipeline stage: $? would otherwise be
+  # sed's status. rc 1 means "this file has no links" and is normal; only rc >1
+  # is a failure.
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$TMP_EDGE_SRC" > "$TMP_EDGE_HITS"
+  if [ $? -gt 1 ]; then
+    touch "$AUTHF"; continue
+  fi
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$TMP_EDGE_HITS" \
+    | _fold_lower | sort -u | while IFS= read -r target; do
+      [ -n "$target" ] && [ "$target" != "$SRC" ] && printf '%s\n' "$target"
+    done >> "$TMP_EDGES"
+done
+
+if [ -e "$AUTHF" ]; then
+  rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS" "$TMP_EDGES" "$AUTHF"
   echo "error: authority scan failed; refusing to report an influence ranking" >&2
   exit 1
-}
+fi
+
+AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  NAME=$(basename "$f" .md)
+  FOLDED=$(printf '%s\n' "$NAME" | _fold_lower)
+  INCOMING=$(grep -cxF "$FOLDED" "$TMP_EDGES" || true)
+  echo "AUTH:$INCOMING:$NAME"
+done)
+rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS" "$TMP_EDGES" "$AUTHF"
 
 # Hub score: outgoing links per note.
 # The failure flag is a FILE, not a variable: the loop body runs in a subshell
@@ -612,8 +723,62 @@ NOTES_DIR="{vocabulary.notes}"
   exit 1
 }
 
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 NAME="[note name]"
-find "$NOTES_DIR" -type f -name '*.md' -exec grep -l "\[\[$NAME\]\]" {} + 2>/dev/null
+# Replaced an `-exec grep -l` whose pattern was this note's name in brackets.
+# (Described, not quoted: the literal spelling is what the class is searched for,
+# so a comment containing it answers that search with itself.)
+# A backlink list is not a count, so
+# its failure mode is worse than a wrong number: a note reached through
+# [[Name|alias]], or spelled in different case, was simply ABSENT from the
+# traversal, and an absent row looks like a note that legitimately has no
+# backlinks. Resolution is delegated; only the per-file test is local.
+TARGET=$(printf '%s\n' "$NAME" | _fold_lower)
+BL_SRC=$(mktemp) || exit 1
+BL_HITS=$(mktemp) || { rm -f "$BL_SRC"; exit 1; }
+BLF="/tmp/graph-backlink-err-$$"
+rm -f "$BLF"
+
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  _strip_fences "$f" > "$BL_SRC" || { touch "$BLF"; continue; }
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$BL_SRC" > "$BL_HITS"
+  if [ $? -gt 1 ]; then
+    touch "$BLF"; continue
+  fi
+  # grep -qxF, not a regex: a note named `a.b` must not be reported as a
+  # backlink source merely because the file links to [[axb]].
+  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$BL_HITS" \
+       | _fold_lower | grep -qxF "$TARGET"; then
+    printf '%s\n' "$f"
+  fi
+done
+
+if [ -e "$BLF" ]; then
+  rm -f "$BL_SRC" "$BL_HITS" "$BLF"
+  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
+  exit 1
+fi
+rm -f "$BL_SRC" "$BL_HITS" "$BLF"
 ```
 
 If `ops/scripts/graph/recursive-backlinks.sh` exists, use it with the note and depth arguments.

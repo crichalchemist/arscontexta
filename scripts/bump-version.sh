@@ -35,6 +35,11 @@
 #
 set -eu
 
+# Captured once at top level. Staged temps are named from it and removed by name,
+# and `$$` read inside a subshell is not guaranteed to be the same number in every
+# shell — the staging and rollback loops must agree on the filename.
+BUMP_PID=$$
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG="$REPO_ROOT/.version-bump.json"
@@ -46,13 +51,21 @@ command -v jq >/dev/null 2>&1 || { echo "error: jq is required" >&2; exit 1; }
 jq_path() { printf '.%s' "$1" | sed -E 's/\.([0-9]+)(\.|$)/[\1]\2/g'; }
 
 read_json_field()  { jq -r "$(jq_path "$2")" "$1"; }
-write_json_field() {
-  tmp="$1.tmp.$$"
-  # --arg, not string interpolation: splicing $3 into the jq program makes a value
-  # containing a quote into jq source. `bump-version.sh '1.2.3" as $v | halt_error(9) #'`
-  # exited 9. The rm keeps a failed jq from leaving a .tmp.<pid> behind, since the
-  # redirection creates the file before jq runs and && skips the mv.
-  jq --arg v "$3" "$(jq_path "$2") = \$v" "$1" > "$tmp" && mv "$tmp" "$1" || { rm -f "$tmp"; return 1; }
+# stage_json_field <source> <field> <value> <destination>
+# Reads $1, sets $2 to $3, leaves the result at $4. Nothing else on disk moves.
+#
+# --arg, not string interpolation: splicing $3 into the jq program makes a value
+# containing a quote into jq source. `bump-version.sh '1.2.3" as $v | halt_error(9) #'`
+# exited 9.
+#
+# THE .work INTERMEDIATE IS NOT REDUNDANT WITH $4. Two of the three declared sites
+# are fields in the SAME file, so the second edit is staged FROM the first edit's
+# temp — $1 and $4 are then the same path, and redirecting straight into $4 would
+# truncate the file jq is reading. The rm keeps a failed jq from leaving a .work
+# behind, since the redirection creates it before jq runs and && skips the mv.
+stage_json_field() {
+  work="$4.work"
+  jq --arg v "$3" "$(jq_path "$2") = \$v" "$1" > "$work" && mv "$work" "$4" || { rm -f "$work"; return 1; }
 }
 declared_files() { jq -r '.files[] | "\(.path)\t\(.field)"' "$CONFIG"; }
 declared_paths() { jq -r '.files[].path' "$CONFIG" | sort -u; }
@@ -155,14 +168,118 @@ cmd_bump() {
     echo "error: '$new' is not X.Y.Z" >&2; exit 1; }
   old=$(current_version)
   printf 'Bumping declared files %s -> %s\n' "$old" "$new"
+
+  # TWO PHASES, AND THE BARRIER BETWEEN THEM IS THE WHOLE POINT. Every declared site
+  # is rewritten into a temp first; no declared file is modified until every site has
+  # staged successfully. Before this, cmd_bump called the write helper unguarded under
+  # `set -e`, so a failure on a later site aborted with the earlier ones already
+  # rewritten — the script manufacturing the exact drift it exists to prevent. Measured
+  # on a three-site fixture: an unparseable second file left the first at the new
+  # version and the second at the old one.
+  #
+  # STAGING IS KEYED ON PATH, NOT ON SITE, and that distinction is load-bearing rather
+  # than tidy. .claude-plugin/marketplace.json is declared TWICE (metadata.version and
+  # plugins.0.version), so the second edit is staged from the first edit's temp. Staging
+  # both from the original file instead would leave the second temp carrying only its
+  # own edit, and committing it would silently discard metadata.version — a fix that
+  # looks atomic and loses data. That mutation is pinned: it turns the
+  # "marketplace metadata.version moved" assertion red.
+  staged_paths=""
+  stage_fail=""
+  report=""
   while IFS="$(printf '\t')" read -r vpath field; do
+    [ -n "$vpath" ] || continue
+    # Printed immediately, unlike the per-site rows below. A SKIP is a statement about
+    # the tree, not a claim about a write, so it stays true whatever a later site does
+    # — and buffering it into $report meant a missing first site vanished from the
+    # output whenever a later site aborted, which is the one run where you most want
+    # to know a declared file was absent.
     if [ ! -f "$REPO_ROOT/$vpath" ]; then printf '  SKIP (missing) %s\n' "$vpath"; continue; fi
-    was=$(read_json_field "$REPO_ROOT/$vpath" "$field")
-    write_json_field "$REPO_ROOT/$vpath" "$field" "$new"
-    printf '  %-46s %s -> %s\n' "$vpath ($field)" "$was" "$new"
+    tmp="$REPO_ROOT/$vpath.tmp.$BUMP_PID"
+    # THE SOURCE IS CHOSEN BY WHAT THIS RUN HAS STAGED, NOT BY WHAT IS ON DISK. Chain
+    # onto our own temp so a file with two declared fields keeps both edits — but a
+    # temp we did NOT write is debris, and reading it would bump a stale base and say
+    # nothing. `$$` is recycled by the OS, so a temp bearing our PID can be the
+    # leftover of an earlier run that was killed before it could roll back.
+    # -x and -F are both load-bearing below: a path is appended once, and matching must
+    # be whole-line and literal. Plain `grep -F` would treat an already-staged path as
+    # covering any path it is a substring of, and never stage the second file.
+    if printf '%s\n' "$staged_paths" | grep -qxF "$vpath"; then
+      src="$tmp"; already_staged=yes
+    else
+      src="$REPO_ROOT/$vpath"; rm -f "$tmp" "$tmp.work"; already_staged=no
+    fi
+    was=$(read_json_field "$src" "$field") || {
+      stage_fail="$vpath ($field) could not be read"; break; }
+    stage_json_field "$src" "$field" "$new" "$tmp" || {
+      stage_fail="$vpath ($field) could not be written"; break; }
+    [ "$already_staged" = yes ] || staged_paths="$staged_paths$vpath
+"
+    report="$report$(printf '  %-46s %s -> %s' "$vpath ($field)" "$was" "$new")
+"
   done <<EOF
 $(declared_files)
 EOF
+
+  if [ -n "$stage_fail" ]; then
+    # Discard every staged temp. One left beside a manifest is a second copy of release
+    # metadata that nothing declares — the drift condition again, spelled differently.
+    printf 'ABORTED: %s\n' "$stage_fail" >&2
+    echo '  no declared file was modified; every staged write was discarded' >&2
+    while IFS= read -r spath; do
+      [ -n "$spath" ] || continue
+      # Named, not merely removed. A cleanup nobody can see is indistinguishable from
+      # one that did not happen — and printing the real filename is the only place the
+      # script's own temp naming is observable from outside, which is what lets a test
+      # confirm its `find` pattern matches what this script actually writes.
+      for dead in "$REPO_ROOT/$spath.tmp.$BUMP_PID" "$REPO_ROOT/$spath.tmp.$BUMP_PID.work"; do
+        [ -e "$dead" ] || continue
+        rm -f "$dead" && printf '  discarded: %s\n' "${dead#"$REPO_ROOT"/}" >&2
+      done
+    done <<EOF
+$staged_paths
+EOF
+    return 1
+  fi
+
+  # COMMIT. A sequence of renames, not a transaction — each temp is already a complete,
+  # valid file in the same directory as its target, so a failure here is ENOSPC/EROFS/
+  # EACCES and not anything about the version. If one does fail, name the paths that did
+  # not land rather than reporting a bump that half happened.
+  commit_fail=""
+  while IFS= read -r spath; do
+    [ -n "$spath" ] || continue
+    # STOP AT THE FIRST FAILURE. Continuing would move MORE declared files away from
+    # the state they share with the one that failed, maximising the divergence instead
+    # of bounding it.
+    mv "$REPO_ROOT/$spath.tmp.$BUMP_PID" "$REPO_ROOT/$spath" || { commit_fail="$spath"; break; }
+  done <<EOF
+$staged_paths
+EOF
+  if [ -n "$commit_fail" ]; then
+    printf 'COMMIT FAILED: %s could not be moved into place\n' "$commit_fail" >&2
+    echo '  stopped at the first failure; any declared path earlier in this run already moved' >&2
+    # EVERY SURVIVING TEMP IS DISCARDED HERE, and that is not tidiness. A staged temp
+    # beside a manifest is a complete, undeclared copy of the release metadata — the
+    # same drift condition the rollback above exists to prevent — and `--check`, which
+    # this message goes on to recommend, iterates declared SITES and cannot see it. A
+    # remedy blind to the wreckage its own branch created is worse than no remedy.
+    # Each temp is redundant with the file it did not replace, so nothing is lost.
+    while IFS= read -r spath; do
+      [ -n "$spath" ] || continue
+      dead="$REPO_ROOT/$spath.tmp.$BUMP_PID"
+      [ -e "$dead" ] || continue
+      rm -f "$dead" && printf '  discarded: %s\n' "${dead#"$REPO_ROOT"/}" >&2
+    done <<EOF
+$staged_paths
+EOF
+    echo '  the tree is partially bumped; run --check' >&2
+    return 1
+  fi
+
+  # Printed only now. Reporting a site during staging would claim a move that had not
+  # happened, which is the failure mode this rewrite exists to remove.
+  printf '%s' "$report"
   echo
   # Audit the OLD version: what still says 0.8.0 after everything declared says 0.9.0.
   cmd_audit "$old" || true

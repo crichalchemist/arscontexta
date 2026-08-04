@@ -188,29 +188,46 @@ TOTAL_FILES=$(find "$NOTES_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d
 MOC_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null | wc -l | tr -d ' ')
 NOTE_COUNT=$((TOTAL_FILES - MOC_COUNT))
 
-# Orphan count (notes with zero incoming links).
-# Counted through `wc -l` rather than by incrementing a variable: `find | while`
-# runs the loop body in a subshell, so an incremented ORPHAN_COUNT would be
-# discarded at the pipe and always render 0. Same shape as DANGLING_COUNT below.
-ORPHAN_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  grep -q '^type: moc' "$f" 2>/dev/null && continue
-  INCOMING=$(grep -rl "\[\[$NAME\]\]" "$NOTES_DIR"/ 2>/dev/null | grep -v "$f" | wc -l | tr -d ' ')
-  [[ "$INCOMING" -eq 0 ]] && echo "$NAME"
-done | wc -l | tr -d ' ')
-
-# Dangling link count (folded on both — reference/lib/link-extraction.sh)
+# Orphan and dangling counts both read the SAME two folded, sorted sets, built
+# once here (folded on both sides — reference/lib/link-extraction.sh).
 NOTE_INDEX=$(existing_note_index_recursive "$NOTES_DIR") || {
-  echo "error: note index build failed; refusing to report a dangling-link count" >&2
+  echo "error: note index build failed; refusing to report orphan or dangling counts" >&2
   exit 1
 }
 # Extraction is captured and CHECKED BEFORE the loop. Piping it straight into
 # `while` would yield the loop's status, not extraction's, so a failed extraction
 # would render as a plausible 0 (PIPESTATUS is bash-only and cannot be used here).
 LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
-  echo "error: link extraction failed; refusing to report a dangling-link count" >&2
+  echo "error: link extraction failed; refusing to report orphan or dangling counts" >&2
   exit 1
 }
+
+# Orphan count (non-MOC notes with zero incoming links).
+# The replaced spelling was the same inlined matcher removed from /graph hubs —
+# a recursive grep of the whole tree for the note's own name in brackets,
+# filtered by `grep -v` on the file path. Described, not quoted, for the reason
+# given at that site. It was wrong three ways: it counted links sitting inside
+# ``` fences, it matched neither case-folded nor up to the `|` and `#`
+# terminators, and it interpolated the name into a REGEX, so a note named `a.b`
+# was also "linked" by any [[axb]]. Every one of those errors lands on the
+# zero/non-zero boundary this count is made of, so an orphan could be hidden by
+# a link that does not exist — and on a fixture the two spellings returned the
+# SAME total (6) over DIFFERENT sets, the errors cancelling in the sum.
+#
+# MOCs are excluded, as before: a map that nothing links TO is not an orphan.
+# The MOC index is folded through _fold_lower and sorted the same way the
+# library sorts NOTE_INDEX — comm does not warn usefully on inputs collated
+# differently, it just returns a wrong set.
+MOC_INDEX=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null \
+  | while IFS= read -r f; do basename "$f" .md; done | _fold_lower | sort -u)
+# Both sides are already folded and sorted, which is what makes comm valid here.
+ORPHAN_ALL=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS"))
+ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$ORPHAN_ALL") <(printf '%s\n' "$MOC_INDEX") \
+  | grep -c . || true)
+
+# Dangling: targets that resolve to no note. Left as a membership loop rather
+# than converted to `comm -13`: it was never broken, and comm would newly make
+# this count depend on both sets being collated identically.
 DANGLING_COUNT=$(printf '%s\n' "$LINK_TARGETS" | while read -r NAME; do
   [ -n "$NAME" ] && ! printf '%s\n' "$NOTE_INDEX" | grep -qxF "$NAME" && echo "$NAME"
 done | wc -l | tr -d ' ')
@@ -227,20 +244,53 @@ else
   COMPLIANCE="N/A"
 fi
 
-# MOC coverage.
-# The MOC file list is built once, outside the loop. Two reasons: rebuilding it
-# per note re-scanned the whole vault n times, and an EMPTY list left `xargs`
-# with no file arguments — GNU xargs then runs grep against the loop's own
-# stdin and swallows the `find` stream, while BSD xargs skips the run entirely.
-# The -n test makes a vault with no MOCs behave the same on both platforms.
+# MOC coverage: share of non-MOC notes linked from at least one MOC.
+# The replaced form ran `xargs grep -l` with the note name inside the pattern —
+# the same matcher removed from the orphan count above, merely spelled so that
+# the search string divergence 6 tracked could not see it. It carried the same
+# three defects, and here they bias the coverage % rather than a count: a link
+# inside a ``` block counted as coverage, a MOC linking [[Zettelkasten]] did not
+# cover `zettelkasten.md`, and a note named `a.b` was covered by any [[axb]].
+#
+# The MOC file list is still built once, outside any loop, for the reason the
+# previous comment recorded: an EMPTY list left `xargs` with no file arguments,
+# and GNU xargs then ran grep against the loop's own stdin and swallowed the
+# `find` stream, while BSD xargs skipped the run entirely. No xargs remains, but
+# the list is still built once because rebuilding it per note rescanned the
+# whole vault n times.
 MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
-COVERED=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  grep -q '^type: moc' "$f" 2>/dev/null && continue
-  if [ -n "$MOC_FILES" ] && printf '%s\n' "$MOC_FILES" | xargs grep -l "\[\[$NAME\]\]" >/dev/null 2>&1; then
-    echo "$NAME"
-  fi
-done | wc -l | tr -d ' ')
+
+# Targets linked FROM MOCs. Extraction is inlined rather than delegated because
+# the library exposes directory-scoped functions only, and nothing that answers
+# "what does this particular SET of files link to" — see divergence 12.
+COV_SRC=$(mktemp) || exit 1
+COV_HITS=$(mktemp) || { rm -f "$COV_SRC"; exit 1; }
+COVF="/tmp/stats-cov-err-$$"
+rm -f "$COVF"
+printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
+  [ -n "$m" ] || continue
+  _strip_fences "$m" >> "$COV_SRC" || touch "$COVF"
+done
+if [ -e "$COVF" ]; then
+  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+  echo "error: MOC fence-stripping failed; refusing to report a coverage figure" >&2
+  exit 1
+fi
+# rc 1 is "no MOC links at all", a real answer; only rc >1 is a failure.
+rg -o '\[\[([^\]|#]+)' -r '$1' "$COV_SRC" > "$COV_HITS"
+if [ $? -gt 1 ]; then
+  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+  echo "error: MOC link extraction failed; refusing to report a coverage figure" >&2
+  exit 1
+fi
+MOC_TARGETS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$COV_HITS" | _fold_lower | sort -u)
+rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+
+# Denominator set is non-MOC notes, matching NOTE_COUNT, which also subtracts
+# MOCs. Both operands reach comm already folded and sorted.
+COVERED=$(comm -12 \
+  <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
+  <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
   COVERAGE=$(echo "scale=0; $COVERED * 100 / $NOTE_COUNT" | bc)
 else
@@ -374,11 +424,37 @@ fi
 # Methodology notes
 METHODOLOGY_COUNT=$(ls -1 ops/methodology/*.md 2>/dev/null | wc -l | tr -d ' ')
 
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+# The naive `grep -rl '^status: pending'` this replaced matched a line-anchored `status:`
+# ANYWHERE in the file, including inside a fenced block in the body, so a note that
+# documented the schema by showing `status: pending` in an example read as pending.
+FM_LIB="ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# A directory that does not exist means that feature is not active — valid state, count 0,
+# reported as N/A above. A scan that FAILS over a directory that exists must not fold to 0.
+count_open_items() {                       # count_open_items <dir>
+  [ -d "$1" ] || { printf '0'; return 0; }
+  count_notes_by_field "$1" status pending open
+}
+
 # Observations pending
-OBS_PENDING=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+OBS_PENDING=$(count_open_items ops/observations) || {
+  echo "error: observation scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Tensions pending
-TENSION_PENDING=$(grep -rl '^status: open\|^status: pending' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
+TENSION_PENDING=$(count_open_items ops/tensions) || {
+  echo "error: tension scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Sessions captured
 SESSION_COUNT=$(ls -1 ops/sessions/*.md 2>/dev/null | wc -l | tr -d ' ')

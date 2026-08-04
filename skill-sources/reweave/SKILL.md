@@ -212,7 +212,76 @@ Evaluate results by relevance — read any result where title or snippet suggest
 - Backlinks — what {vocabulary.note_plural} already reference this one? Do they suggest the target should cite back?
 
 ```bash
-grep -rl '\[\[target note title\]\]' {vocabulary.notes}/ --include="*.md"
+# Each fenced block is a SEPARATE shell invocation: nothing below survives from
+# any block above, so the directory, the guard and the library are all
+# re-established here.
+NOTES_DIR="{vocabulary.notes}"
+
+# An EMPTY vault is a legitimate empty backlink list; a MISSING directory is a
+# failure and must not render as one. The replaced one-liner had no guard at
+# all: `grep -rl … {vocabulary.notes}/` on a missing directory printed a "No
+# such file" line and produced no rows, which reads exactly like a note nothing
+# links to.
+[ -d "$NOTES_DIR" ] || {
+  echo "error: notes directory '$NOTES_DIR' does not exist; refusing to report backlinks" >&2
+  exit 1
+}
+
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# Replaced a recursive `grep -rl` whose pattern was the target title in
+# brackets. (Described, not quoted, for the reason given at the /graph backward
+# site.) Single-quoted and with a literal target rather than a variable, it
+# escaped the search string
+# divergence 6 was tracked by while carrying the same defects: it matched
+# neither case-folded nor through [[title|alias]], and it counted a link
+# quoted inside a ``` example as a real backlink.
+TITLE="target note title"
+TARGET=$(printf '%s\n' "$TITLE" | _fold_lower)
+BL_SRC=$(mktemp) || exit 1
+BL_HITS=$(mktemp) || { rm -f "$BL_SRC"; exit 1; }
+BLF="/tmp/reweave-backlink-err-$$"
+rm -f "$BLF"
+
+find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  _strip_fences "$f" > "$BL_SRC" || { touch "$BLF"; continue; }
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$BL_SRC" > "$BL_HITS"
+  if [ $? -gt 1 ]; then
+    touch "$BLF"; continue
+  fi
+  # grep -qxF, not a regex: a title containing `.` or `+` must match itself and
+  # nothing else.
+  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$BL_HITS" \
+       | _fold_lower | grep -qxF "$TARGET"; then
+    printf '%s\n' "$f"
+  fi
+done
+
+if [ -e "$BLF" ]; then
+  rm -f "$BL_SRC" "$BL_HITS" "$BLF"
+  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
+  exit 1
+fi
+rm -f "$BL_SRC" "$BL_HITS" "$BLF"
 ```
 
 **Key question:** What do I know today that I did not know when this {vocabulary.note} was written?

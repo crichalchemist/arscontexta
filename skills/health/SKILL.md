@@ -41,7 +41,7 @@ Parse the invocation mode immediately:
 
 | Input | Mode | Categories Run |
 |-------|------|---------------|
-| empty or `quick` | Quick | 1 (Schema), 2 (Orphans), 3 (Links), 9 (Shared Library) |
+| empty or `quick` | Quick | 1 (Schema), 2 (Orphans), 3 (Links), 9 (Shared Libraries) |
 | `full` | Full | All 9 categories |
 | `three-space` | Three-Space | 5 (Three-Space Boundaries) only |
 
@@ -561,9 +561,14 @@ Bare links without context phrases are address book entries, not navigation. Eve
 
 ### Category 9: Shared Library Integrity (quick, full)
 
-**What it checks:** The vault's own copy of the link-extraction library exists and is new enough for the skills that source it.
+**What it checks:** The vault's own copies of **both** shared libraries exist and are new enough for the skills that source them.
 
-**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh` and exit 1 when it is missing or older than version 1. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. This is the *vault* copy — the same file those skills load — not the plugin's.
+**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh`, and `/next`, `/rethink` and `/stats` source `ops/lib/frontmatter.sh`; each exits 1 when its library is missing or too old. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. These are the *vault* copies — the same files those skills load — not the plugin's.
+
+**Both are checked because this category's own numbers depend on one of them.** `/health` sources
+`frontmatter.sh` to produce its observation and tension counts. A check that covered only the link
+library would report the shared library healthy in exactly the vault where /health's own condition
+counts could not be taken — a report vouching for the thing it was unable to use.
 
 **How to check:**
 
@@ -571,27 +576,38 @@ Bare links without context phrases are address book entries, not navigation. Eve
 # Vault root: same expression the consuming skills use, so a FAIL here means
 # exactly what a FAIL in /stats means.
 VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
 
 # Report, never exit: health is a report generator, and exiting here would
-# suppress every category that follows.
-if [ ! -r "$LINK_LIB" ]; then
-  echo "FAIL: link-extraction library missing or unreadable at '$LINK_LIB'"
-  echo "      run /arscontexta:upgrade to restore it"
-else
+# suppress every category that follows. Each library is reported on its own line;
+# one missing file must not mask the state of the other.
+check_lib() {                # check_lib <path> <version-var-name> <label>
+  if [ ! -r "$1" ]; then
+    echo "FAIL: $3 library missing or unreadable at '$1'"
+    echo "      run /arscontexta:upgrade to restore it"
+    return 0
+  fi
   # Sourced in the SAME fence as the guard above — state does not cross fences.
-  . "$LINK_LIB"
-  : "${LINK_EXTRACTION_VERSION:=0}"
-  if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-    echo "FAIL: link-extraction library is version $LINK_EXTRACTION_VERSION; skills need >= 1"
+  . "$1"
+  # eval, because the version constant differs per library and its NAME is the
+  # argument. Unset or non-numeric folds to 0, which FAILs — the direction that
+  # reports a problem rather than hiding one.
+  eval "v=\${$2:-0}"
+  case "$v" in ''|*[!0-9]*) v=0 ;; esac
+  if [ "$v" -lt 1 ]; then
+    echo "FAIL: $3 library is version $v; skills need >= 1"
     echo "      run /arscontexta:upgrade to refresh it"
   else
-    echo "PASS: link-extraction library v$LINK_EXTRACTION_VERSION"
+    echo "PASS: $3 library v$v"
   fi
-fi
+}
+
+check_lib "$VAULT_ROOT/ops/lib/link-extraction.sh" LINK_EXTRACTION_VERSION link-extraction
+check_lib "$VAULT_ROOT/ops/lib/frontmatter.sh"     FRONTMATTER_VERSION     frontmatter
 ```
 
 **Thresholds:**
+
+Applied to **each** library independently; the category FAILs if either row FAILs.
 
 | Condition | Result |
 |-----------|--------|
@@ -599,16 +615,17 @@ fi
 | File present, version < 1 or unset | FAIL |
 | File missing or unreadable | FAIL |
 
-There is no WARN band. The library is a precondition, not a quality measure: the skills that source it either run or do not.
+There is no WARN band. A library is a precondition, not a quality measure: the skills that source it either run or do not.
 
-**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before the library shipped will report this FAIL at its next session-start quick check, through no fault of the user. Ranked below three other items it reads as noise; ranked first it reads as what it is — two broken commands with a one-command fix.
+**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — and `frontmatter.sh` is newer than `link-extraction.sh`, so on most existing vaults it is the frontmatter row that fires. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
 
 **Example output:**
 
 ```
-[9] Shared Library ............... FAIL
-    ops/lib/link-extraction.sh missing
-    /stats and /graph will exit 1 until restored
+[9] Shared Libraries ............. FAIL
+    ops/lib/link-extraction.sh v2
+    ops/lib/frontmatter.sh missing
+    /next, /rethink and /stats will exit 1 until restored
     Recommendation: run /arscontexta:upgrade
 ```
 
@@ -638,10 +655,40 @@ After running all applicable diagnostic categories, check these condition-based 
 # archived items as pending, so the condition stays fired no matter how much triage
 # happens. Accept both spellings: vaults write `status: open`, older templates write
 # `status: pending`, and matching one alone reads 0 on half the vaults in existence.
-OBS_COUNT=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null | wc -l | tr -d ' ')
+#
+# The FIELD is read from frontmatter, not matched line-anchored anywhere in the file.
+# The `grep -rl '^status: pending'` spelling this replaced also matched a `status:`
+# line in the BODY, including inside a fenced block — so an observation that quoted a
+# schema example counted itself as pending, and the condition stayed fired.
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+FM_LIB="$VAULT_ROOT/ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# A directory that does not exist means that feature is not active — valid state, count 0.
+# A scan that FAILS over a directory that DOES exist must not fold to 0: this number
+# crosses a threshold, and a silent 0 reports a healthy vault that was never measured.
+count_open_items() {                       # count_open_items <dir>
+  [ -d "$1" ] || { printf '0'; return 0; }
+  count_notes_by_field "$1" status pending open
+}
+
+OBS_COUNT=$(count_open_items ops/observations) || {
+  echo "error: observation scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Open tensions
-TENSION_COUNT=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null | wc -l | tr -d ' ')
+TENSION_COUNT=$(count_open_items ops/tensions) || {
+  echo "error: tension scan failed; refusing to report a count" >&2
+  exit 1
+}
 
 # Inbox items
 INBOX_COUNT=$(find {vocabulary.inbox}/ -name '*.md' -not -path '*/archive/*' 2>/dev/null | wc -l | tr -d ' ')
@@ -706,8 +753,8 @@ PASS:
 [8] MOC Coherence ................ PASS | WARN | FAIL  (full mode only)
     [details — note count per topic map, coverage gaps, bare links]
 
-[9] Shared Library ............... PASS | FAIL
-    [ops/lib/link-extraction.sh presence and version]
+[9] Shared Libraries ............. PASS | FAIL
+    [ops/lib/link-extraction.sh and ops/lib/frontmatter.sh — presence and version, one line each]
 
 ---
 
@@ -783,7 +830,7 @@ Not all issues are equal. The recommended actions section ranks by impact:
 
 ### Quick Mode (default)
 
-Runs categories 1-3 and 9: Schema, Orphans, Links, Shared Library.
+Runs categories 1-3 and 9: Schema, Orphans, Links, Shared Libraries.
 
 **Use when:**
 - Session start health check

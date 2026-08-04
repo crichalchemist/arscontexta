@@ -409,20 +409,66 @@ if [ ! -d "$NOTES_DIR" ]; then
   echo "error: notes directory '$NOTES_DIR' does not exist; run /arscontexta:setup" >&2
   exit 1
 fi
-# grep the directory, not a glob: a non-matching glob aborts the command under zsh.
-# Capture grep's own status before anything else can overwrite it.
-links=$(grep -r '\[\[note name\]\]' "$NOTES_DIR")
-rc=$?
-if [ "$rc" -ge 2 ]; then
-  echo "error: grep failed reading '$NOTES_DIR'" >&2
+# Source link-extraction library (fails loud if missing).
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
   exit 1
 fi
-# rc 1 is "no matches", which is a real answer, not a failure.
-if [ "$rc" -eq 1 ]; then
-  LINK_COUNT=0
-else
-  LINK_COUNT=$(printf '%s\n' "$links" | wc -l | tr -d ' ')
+
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+  echo " run /arscontexta:upgrade to refresh it" >&2
+  exit 1
 fi
+
+# Replaced a recursive `grep -r` over "$NOTES_DIR" whose pattern was the target
+# name in brackets. (Described, not quoted, for the reason given at the /graph
+# backward site.) The rc discipline below is
+# UNCHANGED and is still the point: the form before that one piped grep into wc,
+# which discards grep's status, so an unreadable tree rendered 0. What changed is
+# only the matcher — the old one counted a link quoted inside a ``` example,
+# did not case-fold, and could not see [[note name|alias]].
+#
+# It also counted LINES, not files: two links in one note counted twice. The
+# replacement counts distinct linking FILES, which is what "incoming links"
+# means everywhere else in this system.
+TARGET=$(printf '%s\n' "note name" | _fold_lower)
+RL_SRC=$(mktemp) || exit 1
+RL_HITS=$(mktemp) || { rm -f "$RL_SRC"; exit 1; }
+RLF="/tmp/reflect-links-err-$$"
+rm -f "$RLF"
+
+LINK_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
+  _strip_fences "$f" > "$RL_SRC" || { touch "$RLF"; continue; }
+  rg -o '\[\[([^\]|#]+)' -r '$1' "$RL_SRC" > "$RL_HITS"
+  if [ $? -gt 1 ]; then
+    touch "$RLF"; continue
+  fi
+  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$RL_HITS" \
+       | _fold_lower | grep -qxF "$TARGET"; then
+    printf '%s\n' "$f"
+  fi
+done | wc -l | tr -d ' ')
+
+# Checked AFTER the capture, like the rc test it replaces: `find | while` runs
+# the body in a subshell, so a flag variable would be discarded at the pipe and
+# a failed scan would render as a plausible 0 — the exact defect the original
+# comment was written about.
+if [ -e "$RLF" ]; then
+  rm -f "$RL_SRC" "$RL_HITS" "$RLF"
+  echo "error: link scan failed reading '$NOTES_DIR'; refusing to report a link count" >&2
+  exit 1
+fi
+rm -f "$RL_SRC" "$RL_HITS" "$RLF"
 echo "$LINK_COUNT"
 ```
 

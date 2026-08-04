@@ -246,8 +246,33 @@ Scan for friction patterns across multiple operational surfaces. Friction is the
 ### 4a. Observation Notes
 
 ```bash
-# Find all pending observations
-grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null
+# Find all pending observations.
+#
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+# The naive `grep -rl '^status: pending'` this replaced matched a line-anchored `status:`
+# ANYWHERE in the file, including inside a fenced block in the body, so an observation
+# that quoted a schema example read as pending.
+#
+# Each fence is its own shell invocation, so VAULT_ROOT is re-derived here rather than
+# read from the block above — same expression as skills/architect/SKILL.md:192.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+FM_LIB="$VAULT_ROOT/ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# A missing ops/observations/ means self-evolution is not active — valid, and empty.
+# A scan that FAILS over a directory that DOES exist must not fold to empty.
+if [ -d "$VAULT_ROOT/ops/observations" ]; then
+  list_notes_by_field "$VAULT_ROOT/ops/observations" status pending open || {
+    echo "error: observation scan failed; refusing to report friction evidence" >&2
+    exit 1
+  }
+fi
 ```
 
 Read each pending observation. Categorize by type:

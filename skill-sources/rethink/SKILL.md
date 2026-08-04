@@ -157,10 +157,36 @@ If drift observations were created, they join the pool of pending observations f
 ### 1a. Gather Pending Evidence
 
 ```bash
-OBS_PENDING=$(grep -rl '^status: pending\|^status: open' ops/observations/ 2>/dev/null)
-OBS_COUNT=$(echo "$OBS_PENDING" | grep -c . 2>/dev/null)
-TENSION_PENDING=$(grep -rl '^status: pending\|^status: open' ops/tensions/ 2>/dev/null)
-TENSION_COUNT=$(echo "$TENSION_PENDING" | grep -c . 2>/dev/null)
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+# The naive `grep -rl '^status: pending'` this replaced matched a line-anchored `status:`
+# ANYWHERE in the file, including inside a fenced block in the body, so a note that
+# documented the schema by showing `status: pending` in an example read as pending.
+FM_LIB="ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# A directory that does not exist means that feature is not active — valid, and empty.
+# A scan that FAILS over a directory that DOES exist is not, and must not fold to empty.
+list_open_items() {                        # list_open_items <dir>
+  [ -d "$1" ] || return 0
+  list_notes_by_field "$1" status pending open
+}
+
+OBS_PENDING=$(list_open_items ops/observations) || {
+  echo "error: observation scan failed; refusing to report pending evidence" >&2
+  exit 1
+}
+OBS_COUNT=$(printf '%s\n' "$OBS_PENDING" | grep -c . || true)
+TENSION_PENDING=$(list_open_items ops/tensions) || {
+  echo "error: tension scan failed; refusing to report pending evidence" >&2
+  exit 1
+}
+TENSION_COUNT=$(printf '%s\n' "$TENSION_PENDING" | grep -c . || true)
 ```
 
 Read each pending item fully. These are small atomic notes — load all of them. Understanding the full content is required for accurate triage. If zero pending items, report clean state and exit early.

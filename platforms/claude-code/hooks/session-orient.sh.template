@@ -127,6 +127,17 @@ if [ "$TENS_COUNT" -ge {{TENSION_THRESHOLD:-5}} ]; then
   SIGNALS="${SIGNALS}CONDITION: ${TENS_COUNT} unresolved tensions. Consider /{DOMAIN:rethink}.\n"
 fi
 
+# SECOND DECLARATION — the 5 below and the 3 further down are each declared twice: here,
+# and in the plugin's own hook at `hooks/scripts/session-orient.sh:271,274`. Both can fire
+# on SessionStart in a generated vault. Change one and you must change the other; they are
+# fixed by decision, and that decision with its re-derivation commands is written in that
+# same file under the heading `DELIBERATELY FIXED, NOT MERELY UNDECLARED` — grep for it
+# rather than a line number, which is the anchor that already drifted once when this very
+# comment was added. Do not parameterize these into
+# `{{SESS_THRESHOLD:-5}}`-style placeholders to "fix" the duplication — the two threshold
+# placeholders already above (`{{OBS_THRESHOLD:-10}}`, `{{TENSION_THRESHOLD:-5}}`) are
+# substituted by nothing in this repo, so that pattern adds knobs that only look configurable.
+
 # Unprocessed sessions threshold (default: 5)
 SESS_COUNT=$(find ops/sessions/ -name "*.json" -not -name "current.json" 2>/dev/null | wc -l | tr -d ' ')
 if [ "$SESS_COUNT" -ge 5 ]; then
