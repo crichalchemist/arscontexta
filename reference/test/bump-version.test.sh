@@ -259,6 +259,30 @@ eq "bump: same-file failure leaves the OTHER declared file unmoved" "7.7.7" \
 eq "bump: same-file failure leaves no .tmp. behind" "" \
    "$(find "$F" -name '*.tmp.*' | tr '\n' ' ' | sed 's/ *$//')"
 
+# --- a SKIP survives a later abort -------------------------------------------
+# REGRESSION PIN, and the regression was introduced by the atomicity fix itself.
+# Moving the per-site rows into a buffer printed after the commit was right for the
+# "old -> new" rows, which would otherwise claim moves that had not happened — but it
+# swallowed `SKIP (missing)` too, so a declared file that was absent vanished from the
+# output on exactly the runs that aborted. A SKIP is a statement about the tree, not a
+# claim about a write; it prints immediately. Verified by mutation: buffering it into
+# $report again turns this red while every other assertion stays green.
+F=$(mkfix)
+cat > "$F/.version-bump.json" <<'EOF'
+{
+  "files": [
+    {"path": "pkg/absent.json",      "field": "version"},
+    {"path": "pkg/marketplace.json", "field": "metadata.version|length"}
+  ],
+  "audit": { "exclude": [".git"] }
+}
+EOF
+skip_out=$(out_of "$F" 8.8.8)
+eq "bump: a missing declared file is still reported when a later site aborts" "yes" \
+   "$(printf '%s\n' "$skip_out" | grep -q 'SKIP (missing) pkg/absent.json' && echo yes || echo no)"
+eq "bump: that run still aborts loudly" "yes" \
+   "$(printf '%s\n' "$skip_out" | grep -q 'ABORTED' && echo yes || echo no)"
+
 # --- a jq that fails DURING the write leaves no temp -------------------------
 # The branch the success-path assertion above cannot reach. `stage_json_field`'s
 # redirection creates the .work file before jq runs, so a jq that then fails skips

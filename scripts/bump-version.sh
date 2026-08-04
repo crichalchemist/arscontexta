@@ -189,17 +189,21 @@ cmd_bump() {
   report=""
   while IFS="$(printf '\t')" read -r vpath field; do
     [ -n "$vpath" ] || continue
-    if [ ! -f "$REPO_ROOT/$vpath" ]; then
-      report="$report  SKIP (missing) $vpath
-"
-      continue
-    fi
+    # Printed immediately, unlike the per-site rows below. A SKIP is a statement about
+    # the tree, not a claim about a write, so it stays true whatever a later site does
+    # — and buffering it into $report meant a missing first site vanished from the
+    # output whenever a later site aborted, which is the one run where you most want
+    # to know a declared file was absent.
+    if [ ! -f "$REPO_ROOT/$vpath" ]; then printf '  SKIP (missing) %s\n' "$vpath"; continue; fi
     tmp="$REPO_ROOT/$vpath.tmp.$BUMP_PID"
     if [ -f "$tmp" ]; then src="$tmp"; else src="$REPO_ROOT/$vpath"; fi
     was=$(read_json_field "$src" "$field") || {
       stage_fail="$vpath ($field) could not be read"; break; }
     stage_json_field "$src" "$field" "$new" "$tmp" || {
       stage_fail="$vpath ($field) could not be written"; break; }
+    # -x and -F are both load-bearing: a path is appended once, and matching must be
+    # whole-line and literal. Plain `grep -F` would treat an already-staged path as
+    # covering any path it is a substring of, and never stage the second file.
     printf '%s\n' "$staged_paths" | grep -qxF "$vpath" || staged_paths="$staged_paths$vpath
 "
     report="$report$(printf '  %-46s %s -> %s' "$vpath ($field)" "$was" "$new")

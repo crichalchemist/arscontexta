@@ -59,7 +59,7 @@ for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 34/34
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 36/36
+  $s reference/test/bump-version.test.sh                 # 38/38
   $s reference/test/kernel-note-dirs.test.sh             # 36/36
   $s reference/test/threshold-namespace.test.sh          # 52/52
 done
@@ -719,10 +719,10 @@ defect, not a residue of the same one.
   produced it at all.
 
   ```bash
-  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 36/36, was 28/28
+  for s in bash zsh; do $s reference/test/bump-version.test.sh | tail -1; done   # 38/38, was 28/28
   ```
 
-  **Eight assertions added, each mutation-proved rather than counted** — the failure this repo has
+  **Ten assertions added, each mutation-proved rather than counted** — the failure this repo has
   already shipped is a suite whose total rises while the new rows cannot fail. Every mutation was
   asserted to have applied before its result was read:
 
@@ -733,6 +733,14 @@ defect, not a residue of the same one.
   | stage every site from the original file | `metadata.version moved`, `--check agrees afterwards` |
   | delete `rm -f "$work"` from `stage_json_field` | the write-time no-temp assertion |
   | don't create the temp the positive control looks for | the harness control |
+  | buffer the `SKIP (missing)` line into `$report` again | the SKIP-survives-abort assertion |
+
+  **The fix introduced a regression of the house class, and the last row is its pin.** Moving the
+  per-site rows into a buffer printed after the commit is right for the `old -> new` rows, which
+  would otherwise claim moves that had not happened — but it swallowed `SKIP (missing)` too, so a
+  declared file that was absent vanished from the output on exactly the runs that aborted. Found by
+  review, not by the suite. A SKIP is a statement about the tree rather than a claim about a write,
+  so it prints immediately, as it did before.
 
   **Coverage is partial in one place and is not rounded up.** The two failure-path "leaves no `.tmp.`
   behind" assertions stay **green** under the full revert, because the pre-fix helper also removed its
