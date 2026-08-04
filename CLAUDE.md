@@ -46,7 +46,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are nine executable checks. Eight run in CI (`.github/workflows/checks.yml`) on every push.
+There are ten executable checks. Nine run in CI (`.github/workflows/checks.yml`) on every push.
 Three defects shipped here were bash/zsh forks, so **the six test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
@@ -337,10 +337,15 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the **nine** checks above enforce — eight of them in
-CI, `validate-kernel.sh` being the one that needs a vault — and CI is green on `main` across all
-**14** steps, and **18** on this branch, which added four: `kernel-note-dirs.test.sh` and
-`threshold-namespace.test.sh`, each under both shells.
+not a claim you should take on trust: it is what the **ten** checks above enforce — nine of them in
+CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across all **19** steps
+on this branch. `main` carries **18**, and the difference is this branch's one new step, not four:
+the four that `fix/spec-f-divergence-drain` added are now *in* main, because that branch merged.
+
+**A claim about `main` rots on MERGE, not on edit, which is why it needs a gate rather than care.**
+Nothing in a working tree changes when a branch lands, so `# 14` sat here correct-when-written and
+wrong-by-merge with no diff to notice. `check-doc-claims.sh` now reads all three of the numbers
+below and fails when a document and the tree disagree.
 
 That "seven" stood here until the end-of-branch sweep, three lines below a Verification section
 opening "There are nine executable checks", and the two never agreed. It is the cheapest kind of
@@ -349,9 +354,9 @@ Counting the CI steps takes the same care: `grep -c '^      - name:'` returns on
 count, because `actions/checkout` carries no `name:`. Count step *items* (`^      - `), not names:
 
 ```bash
-grep -c '^      - ' .github/workflows/checks.yml                      # 18, this branch
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 14
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 9
+grep -c '^      - ' .github/workflows/checks.yml                      # 19, this branch
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 18
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 10
 ```
 
 What follows is what remains.

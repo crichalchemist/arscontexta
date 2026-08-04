@@ -28,6 +28,17 @@ jobs:
       # is not read as the stronger §4 property it cannot verify.
       - name: Prose paths resolve (checkout only)
         run: bash reference/check-prose-paths.sh
+      # Numbers our own documents STATE, checked against what the tree measures.
+      # Declared claims only -- the script's banner prints that every run, because
+      # a green tick here says nothing about numbers the claim table omits. Runs
+      # under bash only by design: its suite totals are bash-run totals, and the
+      # per-suite steps below are what cover the zsh side.
+      #
+      # This step is why the count claims it checks are edited in the same commit
+      # that added it: adding a step changes the step count the gate reads. The
+      # gate going red on its own introduction is the mechanism working.
+      - name: Documented claims are current (bash)
+        run: bash reference/check-doc-claims.sh
       - name: Shell syntax check
         run: |
           bash -n reference/validate-kernel.sh

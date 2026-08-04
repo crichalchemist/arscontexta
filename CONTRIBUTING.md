@@ -28,7 +28,7 @@ Run this first. Every line has an expected result; a mismatch invalidates verifi
 
 ```bash
 /usr/bin/grep -P . /dev/null 2>&1 | head -1   # macOS: "invalid option -- P"  <- EXPECTED
-command -v rg tree jq bc zsh                  # all five must resolve
+command -v rg awk sed tree jq bc git zsh      # all eight must resolve
 qmd --version 2>/dev/null || echo "qmd absent (semantic checks will WARN)"
 git remote -v | rg -c 'upstream'              # expect >= 1 if you forked
 ```
@@ -81,9 +81,9 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all five, expect exactly these results
+## Verification — run all ten, expect exactly these results
 
-Four run in CI on every push, **each under both bash and zsh**. Two shipped defects were bash/zsh
+Nine run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
@@ -100,7 +100,7 @@ bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
 
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh | tail -1   # expect: passed=19 failed=0
-  $s reference/test/guard-failure.test.sh   | tail -1   # expect: passed=19 failed=0
+  $s reference/test/guard-failure.test.sh   | tail -1   # expect: passed=34 failed=0
   $s reference/test/fence-isolation.test.sh | tail -1   # expect: FENCE ISOLATION: PASS
 done
 
@@ -110,7 +110,7 @@ done
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
 disabled). Any other WARN or FAIL is a regression.
 
-**"Green" means all eleven CI steps ran and passed** — not that the previously-red step turned.
+**"Green" means all nineteen CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
 
 ```bash
@@ -309,5 +309,5 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All eleven CI steps must pass. State in the PR what is **not** claimed —
+Branch from `main`. All nineteen CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.
