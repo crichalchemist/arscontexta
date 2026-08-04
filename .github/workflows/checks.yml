@@ -13,7 +13,16 @@ jobs:
   portability:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 is REQUIRED by the placeholder gate below and is not a
+      # preference. The default is depth 1, under which `git merge-base` cannot
+      # resolve — and the naive guard (`git rev-parse --verify`) SUCCEEDS on a ref
+      # whose history is absent, after which `git show "$base:$f"` returns empty,
+      # every file reads as was=0, and `now >= 0` holds for all of them. That is a
+      # silent PASS across the entire diff, in the DEFAULT configuration. The gate
+      # exits 2 there instead, verified in a real depth-1 clone.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       # jq and bc are used by fences in the SKILL.md corpus but are NOT in the
       # README prerequisite table, so nothing guarantees them on the runner
       # image. The fence-isolation gate asserts its tools are present and halts
@@ -39,6 +48,19 @@ jobs:
       # gate going red on its own introduction is the mechanism working.
       - name: Documented claims are current (bash)
         run: bash reference/check-doc-claims.sh
+      # Did an edit HARDCODE a vault's vocabulary into a template? skill-sources/
+      # files are copied into generated vaults, so a concrete `nodes/` where a
+      # `{vocabulary.notes}` stood ships one user's dialect to every future system.
+      # CONTRIBUTING.md called reversing this MANDATORY and nothing enforced it.
+      #
+      # It also fixes the manual check it replaces rather than merely automating
+      # it: that check matched two placeholder families and missed {DOMAIN:*},
+      # 128 markers across nine files. Hardcoding one produced no output at all.
+      #
+      # origin/main, not main: a CI checkout has no local main branch. On a push
+      # to main the range is empty and the gate says so rather than passing mutely.
+      - name: Templates did not lose placeholders (bash)
+        run: bash reference/check-placeholder-count.sh origin/main
       - name: Shell syntax check
         run: |
           bash -n reference/validate-kernel.sh

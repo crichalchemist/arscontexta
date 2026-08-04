@@ -81,9 +81,9 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all ten, expect exactly these results
+## Verification — run all eleven, expect exactly these results
 
-Nine run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
+Ten run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
@@ -99,6 +99,7 @@ defect with its sign flipped.
 bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-prose-paths.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-doc-claims.sh  ;  echo "expect rc=0, got rc=$?"
+bash reference/check-placeholder-count.sh main ; echo "expect rc=0, got rc=$?"
 
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=19 failed=0
@@ -131,7 +132,7 @@ primitive 2 for the opposite reason: it has no wiki links yet, and the check rep
 notes directory containing none. Neither is this repo failing; both are the validator describing
 the vault it was handed.
 
-**"Green" means all nineteen CI steps ran and passed** — not that the previously-red step turned.
+**"Green" means all twenty CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
 
 ```bash
@@ -197,13 +198,16 @@ always wrong:
 Verify you did not hardcode a placeholder — the count must not decrease:
 
 ```bash
-git diff --name-only -z main..HEAD | while IFS= read -r -d '' f; do
-  case "$f" in skill-sources/*) ;; *) continue ;; esac
-  now=$(grep -o '{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}' "$f" 2>/dev/null | wc -l | tr -d ' ')
-  was=$(git show "main:$f" 2>/dev/null | grep -o '{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}' | wc -l | tr -d ' ')
-  [ "$now" -ge "$was" ] || echo "HARDCODED A PLACEHOLDER: $f ($was -> $now)"
-done
+bash reference/check-placeholder-count.sh main    # rc 0 clean, 1 decrease, 2 cannot conclude
 ```
+
+**That command replaced an inline copy, and the copy was already wrong.** It matched
+`{vocabulary.*}` and `{config.*}` only, while `reference/skill-authoring.md` §2 matches `{DOMAIN:*}`
+as well — 488 markers against 616, a gap spanning **nine** `skill-sources/` files. Hardcoding a
+`{DOMAIN:notes}` produced **no output at all** from the check documented here, while the three-family
+pattern reported `27 -> 21` on the same tree. Both probes are recorded in the script's header. Two
+spellings of one command is the drift hazard, and this pair had already drifted; the script is now
+the single definition.
 
 Only `skill-sources/` carries placeholders you may edit; `skills/` are the plugin's own commands and
 legitimately have none, so scanning them produces `0 -> 0` noise. A count that *rises* is normal —
@@ -330,5 +334,5 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All nineteen CI steps must pass. State in the PR what is **not** claimed —
+Branch from `main`. All twenty CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.
