@@ -80,7 +80,7 @@ for d in "${SCAN[@]}"; do
 done
 
 echo "1. No PCRE grep (-P) or long-form in shipped templates"
-if hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
+if hits=$(scan_or_die "grep -P scan" -rn --include='*.md' --include='*.sh' --include='*.template' -E '(^|[^a-zA-Z_-])(grep|egrep|fgrep|zgrep) +[^|]*(-[a-zA-Z]*P|--perl-regexp)' \
     "${SCAN[@]}"); then
   hits=$(printf '%s\n' "$hits" | "$GREP" -Ev "$EXEMPT_PATHS")
   if [ -n "$hits" ]; then
@@ -99,7 +99,7 @@ echo "2. Wiki-link capture uses negated classes (not greedy dot quantifiers)"
 # status instead; PIPESTATUS is bash-only (zsh spells it pipestatus) and this
 # file must run under both.
 # Part A: negated character classes that don't exclude the | and # boundaries.
-raw_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' -F '\[\[' "${SCAN[@]}")
+raw_a=$(scan_or_die "link capture scan (negated class)" -rn --include='*.md' --include='*.sh' --include='*.template' -F '\[\[' "${SCAN[@]}")
 scan_a_ok=$?
 # Part B: greedy/lazy dot-or-plus quantifiers between \[\[ and \]\] — vector 4
 # evasion. This matched ONLY the literal `.*?` spelling; verified against a
@@ -108,7 +108,7 @@ scan_a_ok=$?
 # quantifier contains no negated class at all. `\.[*+]\??` spans greedy and
 # lazy forms of both quantifiers, with `.*` on each side so a capture group or
 # any other wrapping around the quantifier does not evade the match.
-raw_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' \
+raw_b=$(scan_or_die "link capture scan (greedy quantifiers)" -rn -E --include='*.md' --include='*.sh' --include='*.template' \
   '\\\[\\\[.*\.[*+]\??.*\\\]\\\]' "${SCAN[@]}")
 scan_b_ok=$?
 if [ "$scan_a_ok" -ne 0 ] || [ "$scan_b_ok" -ne 0 ]; then
@@ -161,7 +161,7 @@ else
 fi
 
 echo "3. No PCRE via ripgrep (fails on rg builds without PCRE2)"
-if hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' \
+if hits=$(scan_or_die "rg PCRE" -rn --include='*.md' --include='*.sh' --include='*.template' \
     -E '(^|[^a-zA-Z_-])rg +[^|]*(-P|--pcre2)' "${SCAN[@]}"); then
   hits=$(printf '%s\n' "$hits" | "$GREP" -Ev "$EXEMPT_PATHS")
   if [ -n "$hits" ]; then
@@ -383,12 +383,16 @@ echo "6. Wiki-link matchers do not interpolate a note name into the pattern"
 # generators/features/maintenance.md, which that comment consequently never listed
 # in three revisions. Requiring a command spelling is how the enumeration went stale.
 #
-# WHY `*.template` IS SCANNED HERE:
-# checks 1-3 pass --include='*.md' --include='*.sh', which matches NEITHER
-# session-orient.sh.template nor its three siblings, so the highest-blast-radius
-# site in this class was invisible to every check in this file. All four includes
-# were widened together in a separate commit, after measuring the templates clean
-# for checks 1-3 first.
+# WHY EVERY SCAN IN THIS FILE NOW INCLUDES `*.template`:
+# Until this check was written they included only *.md and *.sh, which match
+# NEITHER session-orient.sh.template nor its three siblings — so the highest-
+# blast-radius site in this class was invisible to every check here, and a
+# `grep -P` dropped into a hook template would have shipped unreported. The
+# platforms/claude-code adapter READS those templates during generation
+# (generator.md:27), so a construct there can reach a derived vault's hook.
+# All five scans were widened together, after measuring the four templates
+# clean for checks 1-3 first, so the widening could not turn CI red on a
+# pre-existing defect and mask which change caused what.
 #
 # THIS CHECK DOES NOT HONOUR `portability-exempt`, and the check-2 comment above
 # says why that marker's scope is stated rather than assumed: an allowlist entry
