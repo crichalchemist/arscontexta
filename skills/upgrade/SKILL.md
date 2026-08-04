@@ -426,7 +426,7 @@ templates a given vault's skills came from.
 
 Report the outcome: `queue lock dir: absent → created [restored]`, or `present [current]`.
 
-### 6c. Seed the self-evolution thresholds
+### 6c. Reconcile the self-evolution thresholds
 
 `/{DOMAIN:rethink}`, `/{DOMAIN:remember}` and `/{DOMAIN:next}` all read
 `self_evolution.observation_threshold` and `self_evolution.tension_threshold` from `ops/config.yaml`,
@@ -448,14 +448,14 @@ been run against.
 1. Check whether `ops/config.yaml` contains a `self_evolution:` section.
 2. Check whether it declares the same thresholds under `maintenance.conditions:` as
    `pending_observations_threshold` / `pending_tensions_threshold`.
-3. **If either is present, write nothing — but which "present" it is decides what you report.**
+3. **Which "present" it is decides what happens. Never write a default over a configured value.**
    There are four cases, not two. The both-present case is the one that actually occurs.
    - **Neither present** → seed (step 4).
    - **Only `self_evolution:`** → `self_evolution: present [current]`.
-   - **Only `maintenance.conditions.*`** → report the conflict naming **both keys and both values**,
-     and stop: `self_evolution: absent, but maintenance.conditions declares 20/10 — not seeded
-     [conflict]`. A report that says only "not seeded" replaces a silent overwrite with a silent
-     skip, which is no better.
+   - **Only `maintenance.conditions.*`** → the vault is tuned, but three of its four consumers
+     cannot see the tuning. **Propose carrying it across** (step 5). There is no competing
+     `self_evolution` value to weigh it against, so the copy is unambiguous and requires no guess:
+     `self_evolution: absent, maintenance.conditions declares 20/10 → carry across [reconcile]`.
    - **Both present** → **compare the values.** Equal is fine: `self_evolution: present, agrees with
      maintenance.conditions (20/10) [current]`. **Unequal is a live split and must be reported**:
 
@@ -465,8 +465,10 @@ been run against.
        /{DOMAIN:next}, /{DOMAIN:remember}, SessionStart hook read self_evolution -> 10/5
      ```
 
-     **Do not "fix" it by writing either value over the other.** Which pair is intended is the
-     user's call, and both are things they may have set deliberately.
+     **Do not pick the winner yourself.** Both are things the user may have set deliberately, and
+     nothing on disk distinguishes a tuned `10/5` from the `10/5` that step 4 seeds — which is
+     precisely why "the value equal to the default must be the stale one" is not a safe inference.
+     Ask with AskUserQuestion which pair the system should use, then write that pair via step 5.
 
    **This case is not hypothetical, and reporting `present [current]` for it is the defect this step
    was rewritten to stop.** The field vault carries exactly this state — `maintenance.conditions`
@@ -485,12 +487,55 @@ been run against.
    ```
 
    Report: `self_evolution: absent → seeded (10/5) [restored]`.
+5. **Carrying a value across copies it; it does not move it.** On approval, write the chosen pair
+   into `self_evolution:` and leave `maintenance.conditions.*` exactly as it is:
 
-**The namespace question this leaves open.** The field vault's own recommendation was the opposite
-repair: change the skills to read `maintenance.conditions.*` rather than invent a `self_evolution`
-namespace that no generator ever wrote (Rule 12 — conform to the existing structure). That is a
-design change across three skill templates, not an upgrade step, so it is not made here. This step
-now refuses to make the split worse; it does not resolve it.
+   ```yaml
+   self_evolution:
+     observation_threshold: 20   # carried across from maintenance.conditions.pending_observations_threshold
+     tension_threshold: 10       # carried across from maintenance.conditions.pending_tensions_threshold
+   ```
+
+   Report: `self_evolution: 20/10 carried across from maintenance.conditions [reconciled]`.
+
+   **Leaving the old pair in place is the point, not laziness.** A vault in this state has a
+   `/{DOMAIN:rethink}` generated before the namespace was settled, and that skill file reads
+   `maintenance.conditions.*`. Deleting the old keys would drop it back to its built-in default and
+   re-open the split from the other side. With both pairs declared at the same values, the stale
+   `/{DOMAIN:rethink}` and the four `self_evolution.*` readers agree — and keep agreeing whether or
+   not that skill is ever regenerated.
+
+   **The residual, stated here rather than discovered later:** two declarations of the same two
+   thresholds now exist in one file. They agree when written and nothing keeps them agreeing; a user
+   who later edits one re-opens the split. This is reconciliation, not deduplication. Deduplicating
+   means deleting the old pair, which breaks the stale `/{DOMAIN:rethink}` above. The split is fully
+   closed for a vault only once its `/{DOMAIN:rethink}` has been regenerated from the current
+   template — after which `maintenance.conditions.pending_*_threshold` has no reader left and can be
+   removed by hand.
+
+**The namespace question, settled: `self_evolution.*` is authoritative.** The field vault's own
+write-up recommended the opposite repair — change the skills to read `maintenance.conditions.*`
+rather than invent a namespace no generator ever wrote (Rule 12 — conform to the existing
+structure). That was sound advice *to a vault*. This is the generator, and three measurements taken
+against it point the other way:
+
+- `read_config.sh` resolves **one** level of nesting.
+  `maintenance.conditions.pending_observations_threshold` is three, so the SessionStart hook
+  structurally cannot read it. Deepening the reader means a general YAML parser in bash, which
+  `read_config.sh` rejects in its own header comment as "how you get a second class of silent wrong
+  answers."
+- No generator here has ever emitted `maintenance.conditions.pending_*_threshold`
+  (`grep -rn 'maintenance\.conditions\.' generators/ skills/setup/` → 0 hits). Conforming to it
+  would mean conforming to a structure this product does not produce.
+- It is not a live namespace being iterated. In the field vault the other seven keys under
+  `maintenance.conditions:` have **zero** readers
+  (`grep -rl <key> ~/second-brain/.claude ~/second-brain/.agents` → 0 files each), and the
+  `maintenance_conditions` that `/{DOMAIN:next}` iterates is a section of the **queue** file, not of
+  `ops/config.yaml` — a similarly-named different structure in a different file.
+
+**The cost of choosing it, paid rather than denied:** a vault that tuned `maintenance.conditions.*`
+gets nothing from the choice until something carries the value across. That is what step 5 is for,
+and why this step now ends in a write instead of a report.
 
 **Seeding this section now changes hook behavior too — it is no longer cosmetic.** This note used to
 say the opposite, and was correct when written: the SessionStart hook carried hardcoded thresholds
@@ -558,8 +603,8 @@ Vault infrastructure (Step 6 — runs regardless of approvals):
     {when ops/lib/ held files other than those two:} other ops/lib/ files not checked
   - queue lock dir: {absent → created [restored] | present [current]}
   - self_evolution: {absent → seeded (10/5) [restored] | present [current]
-                     | absent, but maintenance.conditions declares {n}/{n} —
-                       not seeded [conflict]}
+                     | present, agrees with maintenance.conditions ({n}/{n}) [current]
+                     | {n}/{n} carried across from maintenance.conditions [reconciled]}
 
 Validation: {PASS | FAIL with details}
 

@@ -53,6 +53,16 @@ jobs:
         run: bash reference/test/kernel-note-dirs.test.sh
       - name: Kernel note-dir resolution (zsh)
         run: zsh reference/test/kernel-note-dirs.test.sh
+      # The first coverage read_config.sh has ever had, and the guard on the one
+      # namespace the self-evolution thresholds are read from. Two namespaces
+      # declared the same two thresholds thirteen lines apart in one config file;
+      # /rethink read one pair and /next, /remember and the SessionStart hook read
+      # the other, so a vault's own tools disagreed about whether it was time to
+      # run /rethink. No other gate reads a config key at all.
+      - name: Threshold namespace (bash)
+        run: bash reference/test/threshold-namespace.test.sh
+      - name: Threshold namespace (zsh)
+        run: zsh reference/test/threshold-namespace.test.sh
       # Executes every ```bash fence in every SKILL.md as its OWN shell
       # invocation, which is how Claude runs them. The three gates above cannot
       # see a fence reading a variable or sourced function defined in a

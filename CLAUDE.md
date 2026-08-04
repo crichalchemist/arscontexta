@@ -46,8 +46,8 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are eight executable checks. Seven run in CI (`.github/workflows/checks.yml`) on every push.
-Three defects shipped here were bash/zsh forks, so **the five test suites each run under both
+There are nine executable checks. Eight run in CI (`.github/workflows/checks.yml`) on every push.
+Three defects shipped here were bash/zsh forks, so **the six test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
 harness rather than its subject.
@@ -61,6 +61,7 @@ for s in bash zsh; do
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 28/28
   $s reference/test/kernel-note-dirs.test.sh             # 36/36
+  $s reference/test/threshold-namespace.test.sh          # 46/46
 done
 ```
 
@@ -73,6 +74,7 @@ done
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear" |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
+| `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
@@ -367,12 +369,33 @@ field vault had explicitly rejected, seeding the `10/5` defaults beneath that va
 was made load-bearing by divergence 3's own fix on this branch — the hook now reads the key 5g
 writes.
 
-**Still open from that run:** the field vault declares these thresholds under
-`maintenance.conditions.*` while `next`/`remember`/`rethink` read `self_evolution.*`. The vault
-recommended the skills conform rather than the namespace be invented. Resolving that is a design
-change across three templates, so 6c now refuses to make the split worse and does not resolve it.
-`read_config.sh` reads one level of nesting, so the three-level `maintenance.conditions.*` pair is
-unreachable by the hook either way — a stated limit from divergence 3's fix, not a regression.
+**Closed from that run: `self_evolution.*` is authoritative, and 6c now reconciles instead of
+reporting.** The field vault declared these thresholds under `maintenance.conditions.*` (20/10) while
+`next`/`remember`/`rethink` and the hook read `self_evolution.*` (10/5), thirteen lines apart in one
+file. Measured there — 14 open observations, 8 open tensions — `/rethink` reported the threshold
+unmet while the other three recommended running it. The vault's own write-up recommended the skills
+conform to `maintenance.conditions.*` rather than a namespace be invented (Rule 12); that was sound
+advice *to a vault*, and this is the generator, where three measurements point the other way:
+`read_config.sh` resolves one level of nesting so the three-level key is structurally unreachable by
+the hook (deepening it means the general bash YAML parser its own header rejects); no generator here
+has ever emitted the legacy pair; and it is not a live iterated namespace — the other seven keys under
+`maintenance.conditions:` have zero readers in the field vault, and the `maintenance_conditions` that
+`/next` iterates is a section of the **queue** file, a different structure in a different file.
+
+The cost, which is real: a vault that tuned `maintenance.conditions.*` gains nothing until the value
+is carried across, so `/upgrade` 6c now ends in a write — copying the tuned pair into
+`self_evolution:` and **leaving the old pair in place**, so an un-regenerated `/rethink` keeps reading
+its own key and agrees rather than falling back to a default. That is reconciliation, not
+deduplication: two declarations survive and can re-diverge if a user later edits one. They are fully
+deduplicable only once that vault's `/rethink` has been regenerated.
+
+```bash
+bash reference/test/threshold-namespace.test.sh   # 46/46; before-state disagrees, after-state agrees
+```
+
+**What is not verified, since 6c is prose Claude executes:** the suite proves the reconciliation
+*operation* produces agreement across all four readers, and that the repo names one namespace. That
+Claude performs it when asked is not checked by anything, and is not claimed to be.
 
 **Separately — a status file that lies about status, and the entry describing it had itself gone
 stale in three different directions.** Worth spelling out, because a number swap would have hidden
