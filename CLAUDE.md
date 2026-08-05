@@ -62,7 +62,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 37/37
+  $s reference/test/kernel-note-dirs.test.sh             # 54/54
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 56/56
@@ -167,11 +167,31 @@ generated vault to run against:
 Pass criterion is 16/16 primitives PASSing — sixteen, not the fifteen the highest header number
 suggests; see below. `WARN` is acceptable **only** for primitive 10 (semantic search,
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
-FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
+FAIL is a real regression.
+
+**One check in that run is NOT a primitive and is labelled `C1.` rather than numbered.** It asserts
+that an outcome status names a target — `implemented` carries `implemented_in:`, `promoted` carries
+`promoted_to:` — and it is the first conditional-field assertion in either tree. It is deliberately
+outside the numbering because it is not in `kernel.yaml` and has no `cognitive_grounding`; numbering
+it 16 would make the contract look like it declares something it does not. It emits one result line,
+so it moves the totals without moving the primitive count — which is the third distinct number in
+this paragraph and the reason to read labels rather than totals. `C1` may WARN for one stated
+reason: a vault with no `ops/observations/` or `ops/tensions/` has not enabled self-evolution, so
+the rule does not apply. That WARN is *not* a soft pass and is not a fourth exception to the
+criterion above — the criterion is about primitives, and `C1` is not one. Full test specs live in `reference/testing-milestones.md`.
 
 **Measured against the live vault, that criterion is violated by two items — and one of them only
 became visible when a check stopped sampling.** Re-measured on `fix/exhaustive-dangling-scan`:
-`15 PASS / 2 WARN / 0 FAIL`. Primitives 8 and 10 both PASS there.
+`15 PASS / 2 WARN / 1 FAIL` — 18 result lines, exit 1. Primitives 8 and 10 both PASS there.
+
+**The FAIL is `C1`, and it is the check working rather than a regression.** `13 of 34 outcome-status
+notes name no target`. Spec H predicted **6**, and the difference is scope rather than drift: the
+spec measured `implemented` observations only, while `C1` covers all four (directory × status)
+pairs, so `13 = 6 implemented + 7 promoted`. `promoted` is the worse half by a wide margin — it
+misses its field 7 times in 8, against 6 in 26 for `implemented` — which is why covering only the
+status the spec happened to name would have left the larger violation unmeasured. Both figures are
+field-vault content defects, not defects in this repo, and they drift; re-derive with the command
+below rather than quoting them.
 
 **The two survivors are primitive 1, frontmatter coverage — `5112 with YAML, 160 without` — and
 primitive 2, `8 unresolved wiki links out of 2716 unique checked`.** Neither is on the list of
@@ -191,23 +211,25 @@ read as covering a WARN that means something else entirely.
 
 **The criterion and the summary count different things, which is what made the labels skippable.**
 "16/16" is primitives; the summary counts *result lines*. On the field vault there are 16 primitives,
-16 numbered headers and 17 result lines, because primitive 2 emits two. **The headers run 1–15 with
+16 numbered headers and 18 result lines — primitive 2 emits two, and `C1` adds one that belongs to
+no primitive at all. **The headers run 1–15 with
 one spelled `10A`, so the highest number is 15 and the COUNT is 16** — `unique-addresses` is a full
 primitive in `kernel.yaml` (its own id, layer, validation and grounding) that was folded into 10's
 number rather than renumbering the rest. This file said "15 primitives" for exactly that reason: the
 largest label was read as the total. So `PASS: 15`
-is simply `17 − 2` — it is not independent evidence that fifteen primitives passed, and it would read
-`17` if both WARNs cleared. It has now equalled the target number `15` **twice, for two different
-reasons**: once as `15 − 0` when the scan resolved nothing, and now as `17 − 2`. Matching the target
-against that total is a coincidence of arithmetic, and it is a coincidence that recurs. **Read the
-labels.**
+is simply `18 − 2 − 1` — it is not independent evidence that fifteen primitives passed, and it would
+read `18` if both WARNs and the FAIL cleared. It has now equalled the target number `15` **three
+times, for three unrelated reasons**: as `15 − 0` when the scan resolved nothing, as `17 − 2` once
+the dangling scan ran, and now as `18 − 2 − 1` with `C1` added. Three different arithmetics landing
+on the same number is not corroboration — it is the same coincidence recurring, and the third
+instance arrived within a day of the second. **Read the labels.**
 
 Re-derive every number above with — it prints each result line, so the totals, the frontmatter
 counts and the dangling counts all come out of this one run:
 
 ```bash
 ./reference/validate-kernel.sh ~/second-brain 2>&1 \
-  | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -E '^ +(PASS|WARN|FAIL) '   # 17 result lines
+  | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -E '^ +(PASS|WARN|FAIL) '   # 18 result lines
 ```
 
 **The blind spot that used to be here is closed.** Primitive 10 once checked only that `qmd` was on

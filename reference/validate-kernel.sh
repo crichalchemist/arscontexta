@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# validate-kernel.sh — Check a knowledge system against the 15 universal primitives
+# validate-kernel.sh — Check a knowledge system against the universal primitives
+# declared in reference/kernel.yaml. That file is the count; this one is the
+# executable form. The header used to say "the 15 universal primitives", which
+# is the highest HEADER number below (they run 1-15 with one spelled 10A) and
+# not the primitive count, which is 16. The summary totals count RESULT LINES,
+# a third number again. No count is stated here on purpose — read kernel.yaml.
 # Usage: ./validate-kernel.sh [path-to-vault]
 # Defaults to current directory if no path given.
 
@@ -22,6 +27,17 @@ LINK_LIB="$(cd "$(dirname "$0")" && pwd)/lib/link-extraction.sh"
   exit 1
 }
 . "$LINK_LIB"
+
+# Source frontmatter library (fails loud if missing). Same shape as above and
+# for the same reason: a validator that silently loses its parser reports on a
+# property it is no longer measuring.
+FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
+[ -r "$FM_LIB" ] || {
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       plugin structure broken, or script moved?" >&2
+  exit 1
+}
+. "$FM_LIB"
 
 pass() { echo -e "  ${GREEN}PASS${NC} $1"; PASS=$((PASS + 1)); }
 warn() { echo -e "  ${YELLOW}WARN${NC} $1"; WARN=$((WARN + 1)); }
@@ -758,6 +774,82 @@ else
     warn "No ops/sessions/ directory detected"
 fi
 
+# --- Contract check C1 (NOT a kernel primitive): outcome statuses name a target ---
+#
+# WHY THIS IS LABELLED C1 AND NOT 16. It is not in kernel.yaml and has no
+# cognitive_grounding, so numbering it alongside the primitives would make the
+# contract look like it declares something it does not. It emits one result
+# line, so the summary totals move; read the LABELS, not the totals — this file
+# already has a 10A for the same reason.
+#
+# THE PROPERTY: a status that asserts an outcome must carry the field naming
+# where that outcome went. `implemented` without `implemented_in:` and
+# `promoted` without `promoted_to:` are unfalsifiable — nothing distinguishes a
+# real fix from a closed-by-fiat one, which is the whole reason the fields exist.
+# This is the first CONDITIONAL-field assertion in either tree. What existed
+# before was a write-time instruction to an agent ("when you set X, also set Y"),
+# which fails silently and per-invocation; this is the post-hoc form.
+#
+# PLACEMENT, DECIDED RATHER THAN DEFAULTED — and what it does NOT reach:
+#   * the generated write-validate hook was REJECTED. It reaches new vaults
+#     only, so what it does not reach is every vault that already exists —
+#     including the one that demonstrated the defect. Choosing it would have
+#     been this check contradicting its own reason for existing.
+#   * a new kernel primitive was REJECTED: it needs a kernel.yaml entry with a
+#     cognitive_grounding tracing to a research claim, and grows the invariant
+#     surface, which is disproportionate for a field-presence rule.
+#   * HERE reaches any vault on demand. Its cost is that it is NOT in CI,
+#     because it needs a vault to run against.
+#
+# Both statuses are covered, not just the one the spec named: measured on the
+# field vault, `promoted` misses its field 7 times in 8 where `implemented`
+# misses 6 in 26. Covering only the named one would have left the larger
+# violation unmeasured for no reason but which one got written down.
+echo "C1. Outcome statuses carry their target field"
+c1_missing=0
+c1_scanned=0
+c1_pairs=0
+for spec in "ops/observations:implemented:implemented_in" \
+            "ops/observations:promoted:promoted_to" \
+            "ops/tensions:implemented:implemented_in" \
+            "ops/tensions:promoted:promoted_to"; do
+    d=${spec%%:*}; rest=${spec#*:}; st=${rest%%:*}; fld=${rest#*:}
+    [ -d "$VAULT/$d" ] || continue
+    c1_pairs=$((c1_pairs + 1))
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        c1_scanned=$((c1_scanned + 1))
+        frontmatter_field "$f" "$fld" >/dev/null 2>&1 || {
+            c1_missing=$((c1_missing + 1))
+            [ "$c1_missing" -le 5 ] && echo "       $st without $fld: ${f#"$VAULT"/}"
+        }
+    done <<EOF_C1
+$(list_notes_by_field "$VAULT/$d" status "$st" 2>/dev/null)
+EOF_C1
+done
+
+if [ "$c1_pairs" -eq 0 ]; then
+    # Not a violation and not a pass. A vault without self-evolution enabled has
+    # no observations or tensions, so the rule does not apply — but reporting
+    # that as PASS would be a check that never ran wearing a green label, which
+    # this validator has already shipped once (see the header on primitive 2).
+    warn "No ops/observations/ or ops/tensions/ — self-evolution not enabled, rule not applicable"
+elif [ "$c1_scanned" -eq 0 ]; then
+    # The directories exist and were scanned; nothing in them has reached an
+    # outcome status yet. Said explicitly, because "PASS, all N carry their
+    # field" with N=0 is how a scan that found nothing reads as a scan that
+    # found everything in order — the substitution primitive 2 shipped.
+    # "$c1_pairs (directory, status) pairs", NOT directories: the loop iterates
+    # four pairs over two directories, so a vault with only ops/observations/
+    # scores 2 here. Calling that "2 directories" was wrong on a vault with one.
+    pass "checked $c1_pairs (directory, status) pair(s); no note has reached an outcome status yet"
+elif [ "$c1_missing" -eq 0 ]; then
+    pass "$c1_scanned outcome-status notes, all carry their target field"
+else
+    [ "$c1_missing" -gt 5 ] && echo "       ... and $((c1_missing - 5)) more"
+    fail "$c1_missing of $c1_scanned outcome-status notes name no target"
+fi
+
 # --- Summary ---
 echo ""
 echo "=== Kernel Validation Summary ==="
@@ -767,7 +859,14 @@ echo -e "  ${RED}FAIL:${NC} $FAIL"
 echo ""
 
 if [ "$FAIL" -eq 0 ] && [ "$WARN" -eq 0 ]; then
-    echo -e "${GREEN}All 15 primitives validated successfully.${NC}"
+    # No count here on purpose. This line used to read "All 15 primitives" —
+    # 15 is the highest HEADER number, not the primitive count, which is 16
+    # (unique-addresses ships as 10A rather than renumbering the rest). The
+    # totals above count RESULT LINES, which is a third number again. Stating
+    # any one of them here invited reading it as the other two; CLAUDE.md
+    # records that PASS: 15 has already coincided with the target twice, for
+    # two unrelated reasons. Read the labels.
+    echo -e "${GREEN}Kernel contract satisfied — every check above passed.${NC}"
     exit 0
 elif [ "$FAIL" -eq 0 ]; then
     echo -e "${YELLOW}Kernel present with warnings. $WARN primitive(s) need attention.${NC}"

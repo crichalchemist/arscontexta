@@ -371,5 +371,118 @@ eq "spaced dir, unquoted + trailing comment: comment not part of the name" "my n
    "$(printf '%s' "$OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p')"
 rm -rf "$ROOT"
 
+# =============================================================================
+# --- C1: outcome statuses carry their target field ---------------------------
+#
+# The first CONDITIONAL-field assertion in either tree, so it gets its own
+# fixture rather than being read off the field vault: a suite that depends on a
+# private vault's content asserts whatever that vault happens to contain today.
+#
+# The DECOY is the assertion that matters. `decoy.md` is `status: open` in its
+# frontmatter and carries `status: implemented` at COLUMN 0 in its body. The
+# library excludes it; a naive `grep -rl '^status: implemented'` counts it and
+# reports it as a violation — wrong in both terms, since it inflates the
+# denominator AND invents a failure. Measured: correct 1 of 2, naive 2 of 3.
+c1() { # c1 <vault>  -> C1's own result line
+  _c1=$("$SELF" "$VALIDATOR" "$1" 2>/dev/null \
+    | sed "s/${ESC}\\[[0-9;]*m//g" \
+    | awk '/^C1\. /{on=1; next} /^=== /{on=0} on')
+  [ -z "$_c1" ] && printf 'VALIDATOR-PRODUCED-NO-OUTPUT' || printf '%s' "$_c1"
+}
+
+# ALL FOUR (directory x status) SPECS GET A VIOLATION. The first version of this
+# fixture had a promoted TENSION but no promoted OBSERVATION, so deleting the
+# `ops/observations:promoted` spec from the validator changed nothing observable
+# and the suite stayed green — the mutation reported STILL NOTHING, which means
+# either the assertion is vacuous or the fixture never reaches it. Here it was
+# the fixture. Each spec now has exactly one violator, so deleting ANY ONE of
+# the four reddens the count.
+mkoutcomes() { # mkoutcomes -> vault covering all four specs, plus a body-line decoy
+  local root v; root=$(mktemp -d) || return 1; v="$root/vault"
+  mkdir -p "$v/zzz-arbitrary" "$v/ops/observations" "$v/ops/tensions"
+  printf -- '---\ndescription: a\n---\n# hub\n'                        > "$v/zzz-arbitrary/hub.md"
+  printf -- '---\nstatus: implemented\nimplemented_in: p.sh\n---\n#g\n' > "$v/ops/observations/good.md"
+  printf -- '---\nstatus: implemented\n---\n# names nothing\n'          > "$v/ops/observations/bad-impl.md"
+  printf -- '---\nstatus: promoted\n---\n# names nothing\n'             > "$v/ops/observations/bad-prom.md"
+  printf -- '---\nstatus: open\n---\n# open\n\nstatus: implemented\n'   > "$v/ops/observations/decoy.md"
+  printf -- '---\nstatus: promoted\npromoted_to: "[[n]]"\n---\n#g\n'    > "$v/ops/tensions/good.md"
+  printf -- '---\nstatus: promoted\n---\n# names nothing\n'             > "$v/ops/tensions/bad-prom.md"
+  printf -- '---\nstatus: implemented\n---\n# names nothing\n'          > "$v/ops/tensions/bad-impl.md"
+  printf '%s' "$v"
+}
+
+V=$(mkoutcomes) || { echo "fixture build failed" >&2; exit 1; }
+ROOT=$(dirname "$V"); OUT=$(c1 "$V")
+
+eq "C1: the check produced output at all"                "yes" \
+   "$([ "$OUT" = "VALIDATOR-PRODUCED-NO-OUTPUT" ] && echo no || echo yes)"
+eq "C1: FAILs when an outcome names no target"           "fail" \
+   "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+# 2 bad of 4 scanned. The 4 EXCLUDES decoy.md — that is the whole point of the
+# denominator being asserted rather than just the numerator.
+eq "C1: exactly 4 violations, one per spec"              "4" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
+eq "C1: scanned 6, so the body-line decoy was NOT counted" "6" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*of \([0-9]*\) outcome-status.*/\1/p')"
+eq "C1: names the offending observation"                 "present" \
+   "$(printf '%s' "$OUT" | grep -q 'observations/bad-impl.md' && echo present || echo absent)"
+eq "C1: names the offending tension"                     "present" \
+   "$(printf '%s' "$OUT" | grep -q 'tensions/bad-prom.md' && echo present || echo absent)"
+eq "C1: covers promoted, not only implemented"           "present" \
+   "$(printf '%s' "$OUT" | grep -q 'promoted without promoted_to' && echo present || echo absent)"
+eq "C1: does not name the compliant note"                "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'observations/good.md' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# A vault with no ops dirs: the rule does not apply. WARN, never a silent PASS —
+# "the check did not run" reported as green is the defect primitive 2 shipped.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -rf "$V/ops/observations" "$V/ops/tensions"
+OUT=$(c1 "$V")
+eq "C1: no ops dirs -> WARN, not PASS"                   "warn" \
+   "$(printf '%s' "$OUT" | grep -q 'WARN' && echo warn || echo other)"
+eq "C1: no ops dirs -> says the rule is not applicable"  "stated" \
+   "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo stated || echo silent)"
+eq "C1: no ops dirs -> emits no PASS of its own"         "yes" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS' && echo no || echo yes)"
+rm -rf "$ROOT"
+
+# All outcomes compliant: PASS, and the count is the scanned total not zero.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+printf -- '---\nstatus: implemented\nimplemented_in: q.sh\n---\n#f\n' > "$V/ops/observations/bad-impl.md"
+printf -- '---\nstatus: promoted\npromoted_to: "[[m]]"\n---\n#f\n'    > "$V/ops/observations/bad-prom.md"
+printf -- '---\nstatus: promoted\npromoted_to: "[[m]]"\n---\n#f\n'    > "$V/ops/tensions/bad-prom.md"
+printf -- '---\nstatus: implemented\nimplemented_in: q.sh\n---\n#f\n' > "$V/ops/tensions/bad-impl.md"
+OUT=$(c1 "$V")
+eq "C1: all compliant -> PASS"                           "pass" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS' && echo pass || echo other)"
+eq "C1: PASS still reports 6 scanned, not 0"             "6" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*PASS \([0-9]*\) outcome-status.*/\1/p')"
+rm -rf "$ROOT"
+
+# Directories present but NOTHING has reached an outcome status. Distinct branch,
+# distinct message: "PASS, all 0 carry their field" is how a scan that found
+# nothing reads as a scan that found everything in order.
+# ONE directory only, so the pair count (2) and the directory count (1) differ.
+# With both directories present they are 4 and 2 and the assertion below cannot
+# tell which quantity the message reports — which is how the mislabel shipped.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -rf "$V/ops/tensions"
+rm -f "$V/ops/observations/"*.md
+printf -- '---\nstatus: open\n---\n# not resolved yet\n' > "$V/ops/observations/o.md"
+OUT=$(c1 "$V")
+eq "C1: empty outcome set -> PASS"                       "pass" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS' && echo pass || echo other)"
+eq "C1: empty outcome set -> says NO note reached one"   "stated" \
+   "$(printf '%s' "$OUT" | grep -q 'no note has reached an outcome status' && echo stated || echo silent)"
+# It counts (directory, status) PAIRS, not directories -- the loop runs four
+# pairs over two dirs, so one directory scores 2. The first version of this
+# message said "2 directories" on a vault that had one.
+eq "C1: empty outcome set -> counts PAIRS, not directories" "2" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*checked \([0-9]*\) (directory, status).*/\1/p')"
+eq "C1: empty outcome set -> claims no per-note check"   "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'all carry their target field' && echo present || echo absent)"
+rm -rf "$ROOT"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
