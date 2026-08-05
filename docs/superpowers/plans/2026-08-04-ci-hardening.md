@@ -74,7 +74,7 @@ demonstrated against defects it was designed around is the only kind this repo t
 > `**7, 8 and 9 —` and 14's reads `**14 —`. Match `[0-9]+[,.]` to see all of them. No repeats
 > either way.
 
-- [ ] **Step 1 — RED: record the five live instances by command, not by citation.**
+- [x] **Step 1 — RED: record the five live instances by command, not by citation.**
       ```bash
       bash reference/test/guard-failure.test.sh | tail -1        # passed=34 — doc says 19/19
       grep -n 'passed=19' CONTRIBUTING.md                        # 2 hits, one is the stale one
@@ -85,7 +85,7 @@ demonstrated against defects it was designed around is the only kind this repo t
       If any of the five has been fixed by the time this branch cuts, say so in the ledger and keep
       the remainder as the baseline; **if all five are gone, the RED baseline is a fabricated
       mutation instead — do not skip the RED step, replace it.**
-- [ ] **Step 2 — Write `reference/check-doc-claims.sh`** with the three sub-checks from the spec:
+- [x] **Step 2 — Write `reference/check-doc-claims.sh`** with the three sub-checks from the spec:
       suite totals (run the four cheap suites under bash, compare against the expectation stated
       beside each command in CLAUDE.md's verification fence and CONTRIBUTING's block), step-count
       claims (stated claim list, compared against `grep -c '^      - '` on `checks.yml`),
@@ -93,17 +93,17 @@ demonstrated against defects it was designed around is the only kind this repo t
       discovery; a listed claim that no longer matches its document is ERROR. Exit codes: 0 clean,
       1 mismatch, 2 could-not-run — and the banner prints, every run, that this checks **declared
       claims only, bash-run totals only**.
-- [ ] **Step 3 — Watch it fail on the baseline.** Run against the uncorrected tree; require at
+- [x] **Step 3 — Watch it fail on the baseline.** Run against the uncorrected tree; require at
       least the Step-1 instances to appear, each named with file and both numbers. A check that
       passes here is broken; stop and fix the check, not the docs.
-- [ ] **Step 4 — Correct the documents.** CONTRIBUTING.md: the check inventory ("five"→current,
+- [x] **Step 4 — Correct the documents.** CONTRIBUTING.md: the check inventory ("five"→current,
       "Four run in CI … each under both shells" → the true shape, `19/19` → measured, "eleven CI
       steps" ×2 → derived, and add "read the labels" beside the `15/15` line per Reconciliation
       item 5). CLAUDE.md:284: replace the two stale step counts — prefer stating the counting
       command over a bare number, the house "path count drifts" form. Renumber the second
       divergence 10 (CLAUDE.md:495) to **12** and update the two cross-references (:412, :620) to
       name 12. Coordinate with whatever Spec F's Task 7 has done to this list first.
-- [ ] **Step 5 — Wire the CI step and prove both directions.** Add the step to `checks.yml` — which
+- [x] **Step 5 — Wire the CI step and prove both directions.** Add the step to `checks.yml` — which
       changes the step count, so the same commit updates the counts the gate checks; the gate red
       on its own introduction commit is the mechanism working, not an obstacle. Mutations, each
       reverted after: bump one documented total by one → rc 1 naming it; duplicate one divergence
@@ -126,7 +126,9 @@ and the Step-5 mutations each produced their named non-zero rc before being reve
 
 ## Task 2 — G1: the interpolated bracket-pattern check
 
-- [ ] **Step 1 — RED: the property finds all six sites and nothing else.**
+- [x] **Step 1 — RED: the property finds all six sites and nothing else.**
+      Six confirmed by the stated command — but its scan set omits `generators/`, where a
+      SEVENTH live site was found (`features/maintenance.md:20`, `rg -q`). Seven allowlisted.
       ```bash
       rg -n '\\\[\\\[\$' skill-sources/ skills/ platforms/claude-code/ reference/ hooks/ \
         | grep -v 'lib/link-extraction.sh'
@@ -137,23 +139,23 @@ and the Step-5 mutations each produced their named non-zero rc before being reve
       pattern before shipping, do not allowlist a healthy site (`741b2b7` retired a check for
       exactly that). **Fewer than six:** in-flight work fixed some; the allowlist is seeded with
       what remains.
-- [ ] **Step 2 — Add the check to `check-portability.sh`** as the next numbered check, through
+- [x] **Step 2 — Add the check to `check-portability.sh`** as the next numbered check, through
       `scan_or_die`, scoped to the executable scan set plus `reference/` (the test-spec doc teaches
       the pattern; teaching it is shipping it), with `reference/lib/link-extraction.sh` excluded by
       path as the sanctioned implementation. Like check 1, it is deliberately strict about comments
       — reword a comment rather than weaken the check, and say so beside the exclusion.
-- [ ] **Step 3 — Seed the bidirectional allowlist** with the surviving sites, one stated reason
+- [x] **Step 3 — Seed the bidirectional allowlist** with the surviving sites, one stated reason
       each (blast radius, per divergence 12 — the session-orient template entry's reason must name
       SessionStart). Behavior: a listed site that stops matching, or whose file is gone, fails as
       STALE; raw scan zero while the list is non-empty is STALE, not clean.
-- [ ] **Step 4 — Prove both directions, then restore.** In a scratch copy: add a seventh
+- [x] **Step 4 — Prove both directions, then restore.** In a scratch copy: add a seventh
       `grep -rl "\[\[$X\]\]"` to any in-scope file → FAIL naming it; delete one allowlisted site's
       line → STALE naming the entry; restore → PASS with the six absorbed and printed. Then re-run
       `guard-failure.test.sh` in both shells — a new check in the shared guard changes what every
       caller sees, and this exact coupling took that suite from 19/19 to 16/3 once. Extend its
       assertions to cover the new check's failure path (mkroot fixtures carry no bracket-grep, so
       assert the clean path *and* add a fixture-level violation case).
-- [ ] **Step 5 — Update the prose that this check changes.** CLAUDE.md's check-2 blind-spot
+- [x] **Step 5 — Update the prose that this check changes.** CLAUDE.md's check-2 blind-spot
       sentence and divergence 12's "structurally blind" claim both stop being true; move them in
       this commit. Guard-failure's new total stales CLAUDE.md's `34/34` and Task 1's gate will say
       so — update in the same commit.
@@ -172,24 +174,27 @@ and the scratch-copy probes produced FAIL and STALE respectively before restorat
 
 ## Task 3 — G3: the placeholder non-decrease gate
 
-- [ ] **Step 1 — RED: reproduce the hazard in a scratch clone.** Commit a change substituting one
+- [x] **Step 1 — RED: reproduce the hazard in a scratch clone.** Commit a change substituting one
+      Done, plus a second and stronger RED the step did not anticipate: the documented check
+      matches two placeholder families where skill-authoring.md matches three, so hardcoding
+      a `{DOMAIN:*}` is SILENT under it. 488 markers vs 616, nine files.
       `{vocabulary.notes}` in a `skill-sources/` template with `nodes/`; run the CONTRIBUTING.md:179
       manual check against it and record the `HARDCODED PLACEHOLDER` line. This is the failure the
       gate automates; a gate built without seeing it fire is built on the doc's word.
-- [ ] **Step 2 — Write the gate script** (suggested: `reference/check-placeholder-count.sh`, taking
+- [x] **Step 2 — Write the gate script** (suggested: `reference/check-placeholder-count.sh`, taking
       the base ref as an argument so it is runnable locally against `main` and in CI against the
       merge base). Single definition of the marker pattern; CONTRIBUTING.md's inline copy becomes a
       pointer to the script in the same commit — two spellings of one command is the drift hazard,
       and this plan must not mint one.
-- [ ] **Step 3 — Three exit states, each reached in a probe.** Clean range → 0 with an explicit
+- [x] **Step 3 — Three exit states, each reached in a probe.** Clean range → 0 with an explicit
       "N templates changed, no count decreased" (or "no templates in range") line; decrease → 1
       naming file and both counts; no merge base / `git show` failure / extractor matching zero
       markers across all of `skill-sources/` → 2, message saying the result is not evidence.
-- [ ] **Step 4 — Wire CI with history.** `actions/checkout` defaults to depth 1; the step needs
+- [x] **Step 4 — Wire CI with history.** `actions/checkout` defaults to depth 1; the step needs
       `fetch-depth: 0` (or an explicit fetch of `origin/main`) and the gate must exit 2 — not 0 —
       when the merge base is unreachable. Prove it: run once in a depth-1 scratch clone and record
       the rc 2.
-- [ ] **Step 5 — The escape that is not silence.** A legitimate decrease requires an allowlist
+- [x] **Step 5 — The escape that is not silence.** A legitimate decrease requires an allowlist
       entry (file, old→new, reason), bidirectional: stale once counts match again. Document beside
       it that rises are normal (the hybrid qmd query form legitimately doubles one placeholder).
 
@@ -207,12 +212,17 @@ bash reference/check-placeholder-count.sh origin/main; echo rc=$? # rc=2, "not e
 
 ## Task 4 — G4: the hooks/scripts suite
 
-- [ ] **Step 1 — RED: demonstrate today's zero coverage.** Apply a scratch mutation reverting
+- [x] **Step 1 — RED: demonstrate today's zero coverage.** Apply a scratch mutation reverting
+      **Premise did not hold, and the task was rebuilt around what did.** The mutation this
+      step names is the ONE that threshold-namespace already catches (45/7), so the expected
+      all-green run did not occur. Probing all five hook scripts instead found four mutations
+      nothing caught; the suite is built around those. See the coverage table in
+      `reference/test/hook-config.test.sh`.
       `820af90`'s dotted-key routing in `hooks/scripts/read_config.sh` (assert the mutation applied
       — a sed that matched nothing reports the same green); run every existing CI-equivalent gate.
       **Expected: all green.** That all-green run is the defect this task exists to close. Revert;
       verify the tree clean.
-- [ ] **Step 2 — Write `reference/test/hook-config.test.sh`** on the `bump-version.test.sh` model
+- [x] **Step 2 — Write `reference/test/hook-config.test.sh`** on the `bump-version.test.sh` model
       (fixture tree, subject copied in, run under whichever shell the harness is in). Assertions,
       per the spec: `read_config.sh` three states (absent → default; parsed → value; unparseable →
       stderr + exit 1, **never** the default), section scoping (`other_section.…: 999` does not
@@ -222,11 +232,11 @@ bash reference/check-placeholder-count.sh origin/main; echo rc=$? # rc=2, "not e
       suite as contract-pinning, not defect-derived). Every negative assertion gets a positive
       companion; run the suite's assertions once against an empty subject and justify each survivor
       in a comment, per the `eb485ac` probe.
-- [ ] **Step 3 — Re-apply the Step-1 mutation and watch the suite fail.** The 10/5 and 99/99 rows
+- [x] **Step 3 — Re-apply the Step-1 mutation and watch the suite fail.** The 10/5 and 99/99 rows
       must become identical and at least one assertion red, in both shells — this is `820af90`'s
       own "assertion that would have caught the original defect", now existing. Revert, verify
       clean, re-run green.
-- [ ] **Step 4 — Wire two CI steps (bash, zsh)** and, in the same commit, widen the existing
+- [x] **Step 4 — Wire two CI steps (bash, zsh)** and, in the same commit, widen the existing
       `Shell syntax check` step to every tracked `*.sh` with a count guard:
       `git ls-files '*.sh' | wc -l` greater than zero asserted before the loop, so an empty
       enumeration fails rather than vacuously passing. Same commit updates every count this stales;
@@ -245,17 +255,17 @@ and the Step-3 mutation produced red in both shells before being reverted.
 
 ## Task 5 — the record that survives, and the expectations handed to in-flight work
 
-- [ ] **Step 1 — Name the expected gates in Spec F's carry-forward.** Spec G items 22 and 23 expect
+- [x] **Step 1 — Name the expected gates in Spec F's carry-forward.** Spec G items 22 and 23 expect
       gates from Spec F Task 3's commits (the enum consistency assertion; the check-portability ban
       on inlining the frontmatter library once it exists). Add one line to the *Review* section of
       `docs/superpowers/plans/2026-08-03-ten-open-divergences.md` carrying that expectation into
       its final review — a tracked file that work already reads. If that branch has merged with
       Task 3 done and no such gates, file the gap as a new divergence entry instead; do not let the
       expectation live only here.
-- [ ] **Step 2 — Fill this plan's `## Deferrals`** with the real list: item 18's contract-marker
+- [x] **Step 2 — Fill this plan's `## Deferrals`** with the real list: item 18's contract-marker
       convention (landing place: the spec's "Deliberately not gated" section), and anything parked
       during Tasks 1–4. `none` is a legal value only if literally nothing was deferred.
-- [ ] **Step 3 — Re-derive every number this plan and spec state**, dating the sweep — including
+- [x] **Step 3 — Re-derive every number this plan and spec state**, dating the sweep — including
       the ones the branch itself changed. Spec G documents that this discipline has a half-life of
       one branch; Task 1's gate now covers the declared claims, and this step covers the rest.
 
