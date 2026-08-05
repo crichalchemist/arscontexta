@@ -328,6 +328,86 @@ eq "session-orient: with the library back, threshold 0 DOES fire"  "yes" \
 # uid 1001, but container and self-hosted runners are root. Skipped assertions
 # are counted and named, so the documented total means "assertions in this
 # suite" on every runner, and a skip is visible rather than silent.
+# === the content-destruction guard ==========================================
+# Every other check in write-validate.sh asks "is this note well-formed?".
+# None asks "is it still THERE?" — so a pass that replaced a developed note with
+# a schema-clean fragment left every check green.
+#
+# THE ORDERING ASSERTION IS THE LOAD-BEARING ONE. The guard reads HEAD to see the
+# pre-write content, which only works because write-validate runs BEFORE
+# auto-commit on the same PostToolUse matcher. Invert that and the guard compares
+# the file to itself and passes silently on every write — the guard's own failure
+# mode being the defect it exists to catch.
+ORDER=$(python3 -c "
+import json,sys
+h=json.load(open('$HERE/../../hooks/hooks.json'))
+d=h.get('hooks') or h
+for e in d.get('PostToolUse',[]):
+    names=[c.get('command','').split('/')[-1] for c in e.get('hooks',[])]
+    if 'write-validate.sh' in names and 'auto-commit.sh' in names:
+        print('ok' if names.index('write-validate.sh') < names.index('auto-commit.sh') else 'INVERTED')
+        sys.exit()
+print('NOT-IN-SAME-MATCHER')
+" 2>/dev/null)
+eq "guard: write-validate runs BEFORE auto-commit"        "ok" "$ORDER"
+
+# A vault fixture with git, so the guard has a HEAD to compare against.
+mkguard() {
+    local d; d=$(mktemp -d); TMPDIRS+=("$d")
+    mkdir -p "$d/hooks/scripts" "$d/notes"
+    cp "$SRC/write-validate.sh" "$SRC/vaultguard.sh" "$d/hooks/scripts/"
+    printf '# marker\n' > "$d/.arscontexta"
+    { printf -- '---\ndescription: a developed note\ntopics: ["[[hub]]"]\n---\n'
+      for i in $(seq 1 20); do echo "Substantial paragraph $i of prose that took real work."; done
+      for i in $(seq 1 6); do echo "See [[rel-$i]]."; done; } > "$d/notes/n.md"
+    ( cd "$d" && git init -q . && git config user.email t@t && git config user.name t \
+      && git add -A && git commit -qm base ) >/dev/null 2>&1
+    printf '%s' "$d"
+}
+gwrite() { ( cd "$1" && printf '{"tool_input":{"file_path":"%s"}}' "$1/notes/n.md" \
+             | $SH hooks/scripts/write-validate.sh 2>&1 ); }
+
+# Destruction: a developed note replaced by a fragment.
+G=$(mkguard); printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\nfragment\n' > "$G/notes/n.md"
+eq "guard: a note shrinking by over half WARNS"          "yes" \
+   "$(gwrite "$G" | grep -q 'SHRANK' && echo yes || echo no)"
+eq "guard: and names both byte counts"                   "yes" \
+   "$(gwrite "$G" | grep -qE 'SHRANK [0-9]+->[0-9]+' && echo yes || echo no)"
+
+# Links are a SEPARATE property: a rewrite can hold its length and drop every edge.
+G=$(mkguard)
+{ printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\n'
+  for i in $(seq 1 26); do echo "Substantial paragraph $i of prose that took real work."; done; } > "$G/notes/n.md"
+eq "guard: links lost with length kept still WARNS"      "yes" \
+   "$(gwrite "$G" | grep -q 'wiki links' && echo yes || echo no)"
+eq "guard: and does NOT claim the note shrank"           "yes" \
+   "$(gwrite "$G" | grep -q 'SHRANK' && echo no || echo yes)"
+
+# The three silences. A guard that fires on correct work gets switched off,
+# which is worse than no guard — so each of these has its own assertion.
+G=$(mkguard)
+{ printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\n'
+  for i in $(seq 1 40); do echo "More developed prose, paragraph $i."; done
+  for i in $(seq 1 9); do echo "See [[rel-$i]]."; done; } > "$G/notes/n.md"
+eq "guard: a note that GREW is silent"                   "yes" \
+   "$(gwrite "$G" | grep -qE 'SHRANK|wiki links' && echo no || echo yes)"
+
+G=$(mkguard); printf -- '---\ndescription: d\ntopics: []\n---\nbrand new\n' > "$G/notes/fresh.md"
+eq "guard: a NEW note has nothing to destroy, silent"    "yes" \
+   "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/fresh.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -qE 'SHRANK|wiki links' && echo no || echo yes)"
+
+# The stub must HALVE, or this assertion holds with or without the floor and
+# proves nothing — the first version shrank 40->38 bytes and stayed green under
+# a mutation that removed the floor entirely.
+G=$(mkguard)
+{ printf -- '---\ndescription: s\ntopics: []\n---\n'; for i in $(seq 1 4); do echo "short line $i"; done; } > "$G/notes/stub.md"
+( cd "$G" && git add -A && git commit -qm stub ) >/dev/null 2>&1
+printf -- '---\ndescription: s\ntopics: []\n---\n' > "$G/notes/stub.md"
+eq "guard: a stub under the 200-byte floor is silent"    "yes" \
+   "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/stub.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -q 'SHRANK' && echo no || echo yes)"
+
 printf '\npassed=%s failed=%s\n' "$((passed + skipped))" "$failed"
 [ "${skipped:-0}" -eq 0 ] || printf 'note: %s assertion(s) SKIPPED (see stderr) and counted in the total\n' "$skipped"
 [ "$failed" -eq 0 ]

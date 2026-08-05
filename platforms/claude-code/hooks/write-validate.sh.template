@@ -94,7 +94,56 @@ if [ -n "$TITLE" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 6. Discovery Nudge (optional)
+# 6. Content-Destruction Guard
+# ─────────────────────────────────────────────
+# Every check above asks "is this note well-formed?". None asks "is this note
+# still THERE?". A node-writing pass — extraction, reweave, refactor, a subagent
+# returning partial output, a rewrite from a truncated read — can replace a
+# developed note with a schema-clean fragment. That passes checks 1-5 and the
+# loss is silent, which is the failure mode this system is most prone to.
+#
+# WHY IT CAN SEE THE PREVIOUS CONTENT: this hook runs BEFORE auto-commit on the
+# same PostToolUse matcher, so HEAD still holds the pre-write version at this
+# instant. That ordering is load-bearing — if auto-commit ever runs first, this
+# compares the file to itself and passes silently every time.
+#
+# It WARNS and does not block, like every check here: a legitimate split or
+# prune does shrink a note, and a guard that cries wolf gets switched off, which
+# is worse than no guard at all.
+if command -v git >/dev/null 2>&1; then
+  DIR=$(dirname "$FILE")
+  REL=$(git -C "$DIR" ls-files --full-name --error-unmatch "$FILE" 2>/dev/null)
+  if [ -n "$REL" ]; then
+    PREV=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null)
+    # Empty PREV means a NEW note — nothing to destroy, so silence is correct
+    # here and is not the same as the guard failing to run.
+    if [ -n "$PREV" ]; then
+      PREV_BYTES=$(printf '%s' "$PREV" | wc -c | tr -d ' ')
+      NOW_BYTES=$(wc -c < "$FILE" | tr -d ' ')
+      # Bytes and links are counted separately because they fail independently:
+      # a rewrite can hold its length and drop every edge, which costs the graph
+      # more than the prose does.
+      PREV_LINKS=$(printf '%s' "$PREV" | grep -o '\[\[' | wc -l | tr -d ' ')
+      NOW_LINKS=$(grep -o '\[\[' "$FILE" 2>/dev/null | wc -l | tr -d ' ')
+      # 200-byte floor so trimming a stub stays quiet; half is the threshold
+      # because a legitimate edit rarely halves a developed note.
+      if [ "${PREV_BYTES:-0}" -gt 200 ] && [ $((NOW_BYTES * 2)) -lt "$PREV_BYTES" ]; then
+        echo "CONTENT WARN: $(basename "$FILE") shrank ${PREV_BYTES} -> ${NOW_BYTES} bytes (over half removed)"
+        echo "  If this was a split or a prune, fine. If a pass wrote partial output, the rest is gone."
+        echo "  Previous version: git show HEAD:$REL"
+      fi
+      if [ "${NOW_LINKS:-0}" -lt "${PREV_LINKS:-0}" ]; then
+        echo "CONTENT WARN: $(basename "$FILE") lost $((PREV_LINKS - NOW_LINKS)) of ${PREV_LINKS} wiki links"
+        echo "  Removed edges are invisible in the note and visible only in the graph."
+      fi
+    fi
+  fi
+else
+  echo "CONDITION: git not available — the content-destruction guard did not run this write."
+fi
+
+# ─────────────────────────────────────────────
+# 7. Discovery Nudge (optional)
 # ─────────────────────────────────────────────
 # {{IF_DISCOVERY_NUDGE}}
 # Remind the agent to check for connections after creating a note.
