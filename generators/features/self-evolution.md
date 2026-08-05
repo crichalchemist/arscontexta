@@ -109,8 +109,8 @@ that sets the status — not later, because later does not happen.
 
 **`resolution:` is the free-text companion to any of them** — one or two sentences on what actually
 happened, for a reader who has only this file. The target fields say *where* it went; `resolution:`
-says *what* was decided. Systems in the field use it more than any single target field, which is a
-reasonable signal that a pointer alone does not carry enough.
+says *what* was decided. A pointer alone often does not carry enough for that reader, which is why
+this field exists alongside the targets rather than instead of them.
 
 **Counting open work means matching BOTH `pending` and `open`.** Matching one alone reads zero
 on a vault that uses the other, and that failure is silent: a threshold that never fires looks
@@ -236,7 +236,8 @@ What conflicts, why both sides seem valid, and what resolution might look like.
   `promoted_to: [[note title]]`. A genuine disagreement between two sourced claims is often the
   most valuable thing in the graph, which is why this is an outcome and not a failure
 - `implemented` — resolving it required a system change; add `implemented_in: path/to/file`
-- `archived` — superseded or no longer applicable; say which and why
+- `archived` — superseded or no longer applicable; add `archived_reason: [why]`, or `resolution:`
+  if what happened needs a sentence rather than a pointer
 - `blocked` — real, but not resolvable here: waiting on extraction, an external source, or a
   decision outside this system. **Say what it is blocked on.** A `blocked` tension is NOT
   counted toward the /{DOMAIN:rethink} threshold — that threshold exists to trigger review, and

@@ -392,10 +392,62 @@ G=$(mkguard)
 eq "guard: a note that GREW is silent"                   "yes" \
    "$(gwrite "$G" | grep -qE 'SHRANK|wiki links' && echo no || echo yes)"
 
+# The two "nothing to compare" states are DIFFERENT code paths and the labels
+# must say which. An earlier revision asserted only the first under a label
+# naming the second, so the staged-but-uncommitted path had no coverage at all.
 G=$(mkguard); printf -- '---\ndescription: d\ntopics: []\n---\nbrand new\n' > "$G/notes/fresh.md"
-eq "guard: a NEW note has nothing to destroy, silent"    "yes" \
+eq "guard: an UNTRACKED note has nothing to destroy, silent" "yes" \
    "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/fresh.md" \
-        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -qE 'SHRANK|wiki links' && echo no || echo yes)"
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -qE 'SHRANK|wiki links|CONDITION' && echo no || echo yes)"
+
+# NOT MUTATION-PROVED, and counted here as documentation rather than as
+# coverage. Measured: deleting the `cat-file -e` existence test it nominally
+# protects leaves the suite fully green, because an absent HEAD blob yields a
+# byte count of 0 and neither threshold can fire on 0. No small mutation makes
+# this path observable. It is kept because a future change that treats "no
+# previous version" as destruction WOULD be caught by it — but per this repo's
+# own rule, an assertion in a total is not evidence it can fail, and this one
+# cannot today. Do not read it as protecting the line above.
+G=$(mkguard); printf -- '---\ndescription: d\ntopics: []\n---\nbrand new\n' > "$G/notes/staged.md"
+( cd "$G" && git add notes/staged.md ) >/dev/null 2>&1
+eq "guard: TRACKED but not yet in HEAD, silent"          "yes" \
+   "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/staged.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -qE 'SHRANK|wiki links|CONDITION' && echo no || echo yes)"
+
+# THE REPORTING BRANCH. "Could not run" is not the same as "ran and found
+# nothing", and the guard's own comment is about that distinction — so the
+# distinction needs an assertion, or the comment is the only thing enforcing it.
+# The git-absent branch is not reachable here without also removing head/grep/wc
+# from PATH; not-a-git-repository is the branch that is testable, and it shares
+# the reporting path.
+NR=$(mktemp -d); TMPDIRS+=("$NR"); mkdir -p "$NR/hooks/scripts" "$NR/notes"
+cp "$SRC/write-validate.sh" "$SRC/vaultguard.sh" "$NR/hooks/scripts/"
+printf '# marker\n' > "$NR/.arscontexta"
+printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\nbody\n' > "$NR/notes/n.md"
+eq "guard: outside a git repo it REPORTS, does not go quiet" "yes" \
+   "$( ( cd "$NR" && printf '{"tool_input":{"file_path":"%s"}}' "$NR/notes/n.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -q 'CONDITION' && echo yes || echo no)"
+eq "guard: and names WHICH precondition failed"          "yes" \
+   "$( ( cd "$NR" && printf '{"tool_input":{"file_path":"%s"}}' "$NR/notes/n.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -q 'not a git repository' && echo yes || echo no)"
+
+# THE VAULT TEMPLATE, which no assertion reached until now. Its frontmatter
+# check exits 0, so a guard placed after it never sees the one input it most
+# needs to: a developed note replaced by frontmatter-less content. That is
+# ORDER, not content, so it is checkable without executing the template — which
+# matters, since the template carries {{...}} markers and does not run unsubstituted.
+TPL="$HERE/../../platforms/claude-code/hooks/write-validate.sh.template"
+g_line=$(/usr/bin/grep -n '^# [0-9]*\. Content-Destruction Guard' "$TPL" | cut -d: -f1)
+f_line=$(/usr/bin/grep -n '^# [0-9]*\. YAML Frontmatter Existence' "$TPL" | cut -d: -f1)
+eq "template: both sections located"                     "yes" \
+   "$([ -n "$g_line" ] && [ -n "$f_line" ] && echo yes || echo no)"
+eq "template: guard runs BEFORE the frontmatter exit 0"  "yes" \
+   "$([ "${g_line:-0}" -lt "${f_line:-0}" ] && echo yes || echo no)"
+# The plugin hook and the template declare the same two thresholds. They are two
+# declarations, not one copy; divergence 3 records what happens when such a pair
+# has nothing pointing each half at the other.
+eq "template: floor and halving match the plugin hook"   "yes" \
+   "$(/usr/bin/grep -q -- '-gt 200' "$TPL" && /usr/bin/grep -q -- '\* 2)) -lt' "$TPL" && echo yes || echo no)"
 
 # The stub must HALVE, or this assertion holds with or without the floor and
 # proves nothing — the first version shrank 40->38 bytes and stayed green under

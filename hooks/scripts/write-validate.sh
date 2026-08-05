@@ -46,42 +46,76 @@ case "$FILE" in
     # kept one side. The result is a valid, schema-clean, much smaller
     # note — every check above passes and the loss is silent.
     #
-    # WHY THIS CAN SEE THE OLD CONTENT AT ALL: hooks.json runs
-    # write-validate BEFORE auto-commit on the same PostToolUse
-    # matcher, so at this instant HEAD still holds the pre-write
-    # version. That ordering is load-bearing; if auto-commit ever runs
-    # first, this guard compares the file to itself and silently
-    # passes. The order is asserted in reference/test/hook-config.test.sh.
-    if command -v git >/dev/null 2>&1; then
-      DIR=$(dirname "$FILE")
+    # SCOPE LIMIT: hooks.json matches "Write" only, so an Edit or
+    # MultiEdit that destroys a note never reaches this guard. Two of
+    # the three threat cases named above (a truncated-read rewrite, a
+    # merge that kept one side) can arrive by either tool. Widening
+    # the matcher is a change to what fires on every edit in every
+    # installed vault and is not made here — but the gap is real and
+    # unstated gaps are how this repo's defects survive.
+    #
+    # WHY IT CAN SEE THE OLD CONTENT: hooks.json lists write-validate
+    # BEFORE auto-commit on the same PostToolUse matcher, so HEAD
+    # should still hold the pre-write version at this instant.
+    #
+    # THAT IS AN ORDERING ASSUMPTION, NOT A GUARANTEE, and the
+    # difference is worth stating rather than papering over.
+    # auto-commit is declared "async": true, so list order does not
+    # prove it has not already committed. hook-config.test.sh asserts
+    # the LIST order — which is the only half of this a config test can
+    # reach; nothing here observes execution order. If auto-commit does
+    # win the race, HEAD holds the new content, this guard compares the
+    # file to itself, and says nothing. The failure is one-directional:
+    # this guard can fall SILENT, it cannot warn wrongly.
+    #
+    # WHAT IS SILENT BY DESIGN vs WHAT IS REPORTED. Three states are
+    # silent because in each there is genuinely nothing to destroy:
+    # the file is untracked, it is tracked but not yet in any commit,
+    # or the repo has no commits at all. Two states are REPORTED,
+    # because they mean the guard could not run — and a guard that goes
+    # quiet when it cannot run is the defect it exists to catch: git is
+    # absent, or this is not a git repository. Earlier revisions of
+    # this comment claimed the second pair without implementing it.
+    DIR=$(dirname "$FILE")
+    if ! command -v git >/dev/null 2>&1; then
+      WARNS="${WARNS}CONDITION: git absent, content-destruction guard did not run. "
+    elif ! git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+      WARNS="${WARNS}CONDITION: not a git repository, content-destruction guard did not run. "
+    else
       REL=$(git -C "$DIR" ls-files --full-name --error-unmatch "$FILE" 2>/dev/null)
-      if [ -n "$REL" ]; then
-        OLD=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null)
-        # Distinguish "no previous version" (a new note — nothing to
-        # destroy) from "git could not answer". Only the second is a
-        # gap, and it is reported rather than passed over: a guard that
-        # goes quiet when it cannot run is the defect it exists to catch.
-        if [ -n "$OLD" ]; then
-          OLD_B=$(printf '%s' "$OLD" | wc -c | tr -d ' ')
-          NEW_B=$(wc -c < "$FILE" | tr -d ' ')
-          # Links are counted separately from bytes because they fail
-          # independently: a rewrite can keep its length and lose every
-          # edge, which costs the graph more than the prose.
-          OLD_L=$(printf '%s' "$OLD" | grep -o '\[\[' | wc -l | tr -d ' ')
-          NEW_L=$(grep -o '\[\[' "$FILE" | wc -l | tr -d ' ')
-          # 50% of bytes, and a 200-byte floor so trimming a stub does
-          # not warn. Thresholds are deliberately loud-but-rare: a guard
-          # that cries wolf gets disabled, which is worse than none.
-          if [ "${OLD_B:-0}" -gt 200 ] && [ $((NEW_B * 2)) -lt "$OLD_B" ]; then
-            WARNS="${WARNS}CONTENT SHRANK ${OLD_B}->${NEW_B} bytes (over half removed) — confirm this was intended, not a partial write. "
-          fi
-          if [ "${NEW_L:-0}" -lt "${OLD_L:-0}" ]; then
-            WARNS="${WARNS}LOST $((OLD_L - NEW_L)) of $OLD_L wiki links — graph edges removed. "
-          fi
+      # cat-file -e tests for the blob without materialising it, and
+      # keeps the byte count below off command substitution, which
+      # strips trailing newlines and would undercount the old file
+      # against a new one measured with wc -c.
+      if [ -n "$REL" ] && git -C "$DIR" cat-file -e "HEAD:$REL" 2>/dev/null; then
+        OLD_B=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null | wc -c | tr -d ' ')
+        NEW_B=$(wc -c < "$FILE" | tr -d ' ')
+        # Links are counted separately from bytes because they fail
+        # independently: a rewrite can keep its length and lose every
+        # edge, which costs the graph more than the prose.
+        #
+        # KNOWN LIMIT: this counts `[[` inside fenced code blocks too.
+        # reference/lib/link-extraction.sh has _strip_fences, and this
+        # hook deliberately does not source it — the same call
+        # divergence 12 records for session-orient.sh.template, where a
+        # missing library would break every session rather than skew
+        # one number. Both sides are counted the same way, so a fenced
+        # `[[` only misleads when the fence itself changes.
+        OLD_L=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null | grep -o '\[\[' | wc -l | tr -d ' ')
+        NEW_L=$(grep -o '\[\[' "$FILE" | wc -l | tr -d ' ')
+        # 50% of bytes, and a 200-byte floor so trimming a stub does
+        # not warn. Thresholds are deliberately loud-but-rare: a guard
+        # that cries wolf gets disabled, which is worse than none.
+        # Mirrored in platforms/claude-code/hooks/write-validate.sh.template
+        # section 1 — edit both, they are two declarations and not one
+        # copy, so nothing but this note stops them drifting apart.
+        if [ "${OLD_B:-0}" -gt 200 ] && [ $((NEW_B * 2)) -lt "$OLD_B" ]; then
+          WARNS="${WARNS}CONTENT SHRANK ${OLD_B}->${NEW_B} bytes (over half removed) — confirm this was intended, not a partial write. "
+        fi
+        if [ "${NEW_L:-0}" -lt "${OLD_L:-0}" ]; then
+          WARNS="${WARNS}LOST $((OLD_L - NEW_L)) of $OLD_L wiki links — graph edges removed. "
         fi
       fi
-    else
-      WARNS="${WARNS}CONDITION: git absent, content-destruction guard did not run. "
     fi
 
     if [ -n "$WARNS" ]; then
