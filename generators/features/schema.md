@@ -149,18 +149,19 @@ genuinely needed.
   last of those reads `enums:` specifically. That is an instruction to an agent, so it holds only
   for the runs where the agent follows it — real, but per-invocation.
 - Deterministic validators — a write hook, a pre-commit check — are written per system and are
-  **not required to read `_schema` at all.** One generated system measured in 2026-08 had a
-  commit-blocking schema validator that hardcoded its own list of valid types and never opened a
-  template.
+  **not required to read `_schema` at all.** A validator that hardcodes its own list of valid
+  types never opens a template, and nothing tells you it has stopped agreeing with one.
 
-**Nothing checks enumerated VALUES deterministically.** Even the linters that do parse `_schema`
-tend to read `required:` and `optional:` — the field lists — and skip `enums:`. So a note carrying
-`status: whatever` passes every automatic gate and fails only if a human or an agent looks.
+**Check whether anything in YOUR system reads `enums:`.** A linter that parses `_schema` for
+`required:` and `optional:` — the field lists — still may not check the enumerated values, and then
+a note carrying `status: whatever` passes every automatic gate and fails only if a human or an agent
+looks. The field lists and the value lists are separate properties; covering one is not covering both.
 
 **The consequence to design around:** if a rule matters, something has to read it back. A validator
 that hardcodes its own copy of an enum will drift from the template silently, and the drift shows up
 as a count that reads zero forever rather than as an error. When you add a value here, search for
 what matches the old one.
+```
 
 ## Dependencies
 None — this is a foundational feature.

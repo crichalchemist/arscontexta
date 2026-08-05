@@ -93,14 +93,14 @@ observed: YYYY-MM-DD
 What happened, why it matters, and what might change.
 ```
 
-**Status lifecycle.** The first two mean "still needs judgement"; the last three are outcomes,
-and each outcome carries a field naming where it went:
+**Status lifecycle.** The first two mean "still needs judgement"; the rest are outcomes. Where an
+outcome points somewhere, it carries the field that names the target:
 
 - `pending` — just captured, not yet reviewed
 - `open` — reviewed, still stands, and its fix is not in any file yet
 - `promoted` — it became a {DOMAIN:note}; add `promoted_to: [[note title]]`
 - `implemented` — the fix exists; add `implemented_in: path/to/file`
-- `archived` — no longer applicable, or subsumed by another observation; say which and why
+- `archived` — no longer applicable, or subsumed; **no target field**, so say which and why in the body
 
 **An outcome without its field is unfalsifiable.** Nothing distinguishes a real fix from a
 closed-by-fiat one, which is the whole reason `implemented_in:` and `promoted_to:` exist. Add
@@ -221,8 +221,11 @@ What conflicts, why both sides seem valid, and what resolution might look like.
 **Status lifecycle:**
 - `pending` — just captured, not yet reviewed
 - `open` — reviewed, the conflict is real and still unresolved
-- `resolved` — you resolved it by creating a new {DOMAIN:note}, updating existing ones, or choosing a side with reasons
-- `dissolved` — the conflict turned out to be apparent rather than real (e.g., the two claims operate in different contexts)
+- `resolved` — you resolved it by creating a new {DOMAIN:note}, updating existing ones, or choosing
+  a side with reasons; when the resolution came from a recorded system change, add
+  `resolved_by: [changelog reference]`
+- `dissolved` — the conflict turned out to be apparent rather than real (e.g., the two claims operate
+  in different contexts); add `dissolved_reason: [why]`
 - `promoted` — the contradiction was itself worth keeping and became a {DOMAIN:note}; add
   `promoted_to: [[note title]]`. A genuine disagreement between two sourced claims is often the
   most valuable thing in the graph, which is why this is an outcome and not a failure
@@ -233,8 +236,10 @@ What conflicts, why both sides seem valid, and what resolution might look like.
   counted toward the /{DOMAIN:rethink} threshold — that threshold exists to trigger review, and
   re-reviewing a blocked item produces nothing
 
-**As with observations, count open work by matching BOTH `pending` and `open`.** The two mean
-"awaiting judgement"; everything else is an outcome and is done.
+**As with observations, count open work by matching BOTH `pending` and `open`.** Those two mean
+"awaiting judgement here, now". `blocked` is the third live state — real and unfinished, but nothing
+in this system can move it — which is exactly why it is excluded from the threshold rather than
+counted as done. The remaining values are outcomes.
 
 **When to capture:** Immediately, during any work. Don't stop to resolve the tension — just capture it and continue. Resolution happens later via /{DOMAIN:rethink} or human judgment. Unflagged tensions silently corrupt your knowledge graph because you keep building on contradictory foundations.
 
