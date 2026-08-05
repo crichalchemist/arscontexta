@@ -106,8 +106,17 @@ truth_ci_steps_main() {
     # tree changes when a branch lands, so the number goes stale with no diff to
     # notice. That is exactly how "14 on main" survived its own branch merging
     # four more steps into main. Absent `main` is a could-not-run, not a mismatch.
-    git rev-parse --verify main >/dev/null 2>&1 || return 1
-    _n=$(git show main:.github/workflows/checks.yml 2>/dev/null | grep -c '^      - ' || true)
+    # RESOLVE main, DO NOT ASSUME A LOCAL BRANCH. actions/checkout creates no
+    # local `main` when it checks out a feature branch, so this returned nothing
+    # and the gate exited 2 on every CI run of every branch — measured in a
+    # CI-shaped clone, and invisible locally where `main` always exists. The
+    # placeholder gate beside it already spells `origin/main` for this reason.
+    local _ref=""
+    for _c in main origin/main refs/remotes/origin/main; do
+        git rev-parse --verify "$_c" >/dev/null 2>&1 && { _ref="$_c"; break; }
+    done
+    [ -n "$_ref" ] || return 1
+    _n=$(git show "$_ref:.github/workflows/checks.yml" 2>/dev/null | grep -c '^      - ' || true)
     # Zero here means main's workflow could not be read or has no steps -- a
     # could-not-run. Reporting it as 0 produced "document says 18, tree measures
     # 0 -- fix the document", instructing a wrong number into CLAUDE.md.
