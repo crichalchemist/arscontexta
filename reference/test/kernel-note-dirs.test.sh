@@ -539,6 +539,24 @@ eq "C1: renamed ops -> finds all 4 violations"           "4" \
    "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
 eq "C1: renamed ops -> names the real path"              "present" \
    "$(printf '%s' "$OUT" | grep -q 'zzz-meta/observations' && echo present || echo absent)"
+# PRIMITIVE 2 ON THE SAME VAULT, and this is the assertion whose absence let a
+# fourteenth defect through. This fixture already BUILT the vault that exposes
+# it — an `ops` renamed with no `ops/` left — and then `c1()` awk'd the output
+# down to the C1 section and discarded primitive 2's line, which was reporting a
+# shape-scan fallback that swept the renamed ops tree in as note-bearing.
+# Generating the evidence and filtering it out is worse than not testing.
+P2OUT=$(p2 "$V")
+# An if/else, not an `&&`/`||` chain. The chain form here emitted BOTH branches:
+# `(A && echo manifest) || B` succeeds, so the following `&& echo shape-scan`
+# also fires. Three-way verdicts do not fit that idiom.
+if printf '%s' "$P2OUT" | grep -q 'derivation-manifest.md vocabulary'; then p2src=manifest
+elif printf '%s' "$P2OUT" | grep -q 'shape scan';                     then p2src=shape-scan
+else                                                                        p2src=other; fi
+eq "renamed ops: primitive 2 resolves via the MANIFEST, not a shape scan" "manifest" "$p2src"
+eq "renamed ops: the ops tree is NOT scanned as note-bearing" "absent" \
+   "$(printf '%s' "$P2OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p' | grep -q 'zzz-meta' && echo present || echo absent)"
+eq "renamed ops: the notes dir IS scanned (so the above is not empty)" "present" \
+   "$(printf '%s' "$P2OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p' | grep -q 'zzz-arbitrary' && echo present || echo absent)"
 rm -rf "$ROOT"
 
 # An EMPTY target field. frontmatter.sh returns rc 0 for a present-but-empty

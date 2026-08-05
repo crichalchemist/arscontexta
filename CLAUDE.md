@@ -62,7 +62,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 65/65
+  $s reference/test/kernel-note-dirs.test.sh             # 68/68
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 56/56
@@ -378,12 +378,21 @@ not a claim you should take on trust: it is what the thirteen checks above enfor
 in CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across every step in
 `.github/workflows/checks.yml`.
 
-**THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE.** It carried four — ten / nine / 19 / 18
-against a true 13 / 12 / 24 / 24 — and the two counts that survive here are spelled as words that
-the gate's existing rows already read elsewhere in this file. The step count is not restated at all:
-it was the one that rotted worst, because "`main` carries 18" is a claim about another branch that
-goes stale on MERGE with no diff to notice. A number stated twice in one document is a number that
-can disagree with itself, and the cheapest fix is to state it once.
+**THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
+RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
+four out again while claiming they had been removed — an ungated restatement inside the sentence
+asserting there was none. Both are gone now.
+
+Two counts survive above as words, and **they are not gated either**: the gate's rows for those
+quantities anchor on a different sentence in this file, and a gate that reads one phrasing does not
+protect a synonym — which is what this entry exists to say. The step count is not restated at all,
+because "`main` carries N" is a claim about another branch that goes stale on MERGE with no diff to
+notice. Read them from the tree:
+
+```bash
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l
+grep -c '^      - ' .github/workflows/checks.yml
+```
 
 **These four numbers were stale by four, one, five and six respectively until 2026-08-05, in the
 paragraph introducing a list about numbers going stale.** They read ten / nine / 19 / 18 against a

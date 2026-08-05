@@ -63,6 +63,17 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 # one more entry in the list, which is this repo's own critique of itself.
 #
 # The candidate list survives as a FALLBACK, for vaults with no manifest.
+# resolve_ops_dir_name <vault> -> the vault's own name for its ops directory,
+# or nothing. Split out so the shape scan can exclude it by that name rather
+# than by the literal `ops`.
+resolve_ops_dir_name() {
+    _rodn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    [ -n "$_rodn_man" ] && _vocab_dir "$_rodn_man" ops 2>/dev/null && return 0
+    _rodn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+    [ -n "$_rodn_cfg" ] && _vocab_dir "$_rodn_cfg" ops 2>/dev/null && return 0
+    return 1
+}
+
 resolve_ops_dir() {
     # THE MANIFEST IS FOUND BY SHAPE, NOT AT AN ASSUMED PATH, and that is the
     # correction a second review caught. The first version of this vocabulary
@@ -224,11 +235,26 @@ _dirs_from_vocab() {
 # times. Returning the label through the one channel that does cross the boundary
 # removes the trap rather than documenting it.
 resolve_note_dirs() {
-    if _rn_out=$(_dirs_from_vocab "$1" "$1/ops/derivation-manifest.md"); then
-        printf 'ops/derivation-manifest.md vocabulary\n%s' "$_rn_out"; return 0
+    # THE MANIFEST IS LOCATED BY SHAPE HERE TOO. This function spelled
+    # "$1/ops/derivation-manifest.md" for as long as resolve_ops_dir did, and
+    # kept doing so for one commit after that one was fixed — 145 lines below the
+    # comment written to close it, in this same file, under a header at :107
+    # reading "Derive the names from the vault; never list them".
+    #
+    # It is NOT the harmless twin of that defect, because the SAME manifest
+    # declares both keys. Measured on two vaults identical but for the rename:
+    # with `ops/` kept, this resolves via the manifest and scans `zzz-a` — 1
+    # dangling link. With `ops` renamed, the read failed, the shape scan ran, and
+    # it swept the renamed ops tree IN as note-bearing — 2 dangling, the extra
+    # one a changelog citation this file's own header calls "expected to dangle".
+    # Exit 0, plausible number, no error.
+    _rn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    if [ -n "$_rn_man" ] && _rn_out=$(_dirs_from_vocab "$1" "$_rn_man"); then
+        printf '%s vocabulary\n%s' "${_rn_man#"$1"/}" "$_rn_out"; return 0
     fi
-    if _rn_out=$(_dirs_from_vocab "$1" "$1/ops/config.yaml"); then
-        printf 'ops/config.yaml vocabulary\n%s' "$_rn_out"; return 0
+    _rn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+    if [ -n "$_rn_cfg" ] && _rn_out=$(_dirs_from_vocab "$1" "$_rn_cfg"); then
+        printf '%s vocabulary\n%s' "${_rn_cfg#"$1"/}" "$_rn_out"; return 0
     fi
 
     # Shape scan. `find -mindepth 1 -maxdepth 1` rather than a "$1"/*/ glob:
@@ -237,8 +263,15 @@ resolve_note_dirs() {
     # shipped a zsh fork for exactly that reason.
     # The `while` runs in a subshell, so it accumulates nothing in a variable;
     # its STDOUT is what the command substitution collects.
+    # THE EXCLUSION LIST NAMES `ops` LITERALLY, so a vault that renamed it had its
+    # operational tree swept in as note-bearing — the second half of the same
+    # defect. The vault's own name for it is resolved first and excluded by that
+    # name; the literal stays for vaults with no vocabulary declaration.
+    _rn_ops=$(resolve_ops_dir_name "$1")
     _rn_out=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r _rn_d; do
-        case "$(basename "$_rn_d")" in
+        _rn_b=$(basename "$_rn_d")
+        [ -n "$_rn_ops" ] && [ "$_rn_b" = "$_rn_ops" ] && continue
+        case "$_rn_b" in
             .*|node_modules|ops|04_meta|archive|templates|_templates) continue ;;
         esac
         [ -n "$(find "$_rn_d" -type f -name '*.md' 2>/dev/null | head -1)" ] || continue
