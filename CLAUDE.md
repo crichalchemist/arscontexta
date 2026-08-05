@@ -936,6 +936,46 @@ substituted by nothing in this repo** — knobs that look configurable and are n
 divergence 3 (which is where it was found and where its evidence lives) rather than given an entry of
 its own; this line exists so a reader scanning headings finds it at all.
 
+**15. Two gates a merged branch was expected to leave behind do not exist, and the expectation lived
+only in a plan.** `docs/superpowers/specs/2026-08-04-ci-hardening-design.md` items 22 and 23 carry
+forward an expectation from Spec F's Task 3: that closing the `status` enum split would be followed
+by (a) an assertion that the enum stays consistent across `generators/`, and (b) a
+`check-portability.sh` ban on inlining `reference/lib/frontmatter.sh`, once that library existed.
+`fix/spec-f-divergence-drain` has since **merged** — `820af90` is on `main` — and neither gate was
+built. The expectation was recorded in a plan file, which is a record nobody re-reads; this entry is
+it moved somewhere a reader arrives at by accident.
+
+**The fix HELD; it is the gate that is missing, and the distinction is the entry.** Measured: the
+note-status enum is currently *consistent* across all three files that declare it —
+`generators/features/atomic-notes.md:94`, `schema.md:137` and `templates.md:30` all read
+`preliminary | open | active | archived`. The other `status:` values in `generators/` are **different
+fields sharing a name** (`self-evolution.md:195` is `pending | resolved | dissolved` for tensions;
+`methodology-knowledge.md:31` is `active` for methodology notes), which the closed record for
+divergences 7-9 already documents. So nothing is broken today. What is absent is anything that would
+notice if it broke — and Spec F's own closing note said the enum had been split across those files
+once already.
+
+```bash
+# (a) no gate mentions the generator enum at all — expect no output
+for f in reference/check-*.sh reference/test/*.test.sh; do
+  /usr/bin/grep -lE 'generators/.*status|atomic-notes|schema\.md' "$f"; done
+# (b) no gate forbids inlining the frontmatter library — expect 0
+/usr/bin/grep -c 'frontmatter' reference/check-portability.sh
+# the three note-status declarations, which must agree — expect ONE line.
+# The spelling is normalised first: the same enum is written three ways
+# (`a | b`, `[a, b]`, and backticked prose), so a bare sort -u returns 3 and
+# reads as a split that is not there. Compare the VALUE SET, not the text.
+/usr/bin/grep -rho 'preliminary[^]]*archived' generators/ \
+  | tr -d '`|,' | tr -s ' ' | sed 's/^ *//;s/ *$//' | sort -u        # 1 line
+/usr/bin/grep -rl 'preliminary' generators/ | wc -l                   # 3 files
+```
+
+Not built here on purpose: (a) needs a decision about which file is authoritative when they disagree,
+and `schema.md` calling itself "the single source of truth for field validation" is a claim about
+generated vaults rather than about this repo's own files. (b) is the same gate divergence 12 and 13
+both defer, and belongs with them rather than bolted on alone. Both are gate-design questions for the
+next CI-hardening pass; what this entry fixes is that they were invisible.
+
 ### Closed on `fix/exhaustive-dangling-scan`
 
 - **The dangling-link check sampled 100 links and reported the result as a property of the graph** —
