@@ -139,7 +139,28 @@ _schema:
     description: "max 200 chars, no trailing period, must add info beyond title"
 ```
 
-The `_schema` block is the single source of truth for field validation. Skills and hooks read it to check compliance. When you see a field with enumerated values, use one of the listed values — or update the template first if a new value is genuinely needed.
+The `_schema` block is the **declared** source of truth for field validation: when you see a field
+with enumerated values, use one of the listed values — or update the template first if a new value is
+genuinely needed.
+
+**What reads it, stated honestly, because "skills and hooks read it" overstates the enforcement.**
+Measured against a live generated vault on 2026-08-05:
+
+| reader | kind | strength |
+|---|---|---|
+| `/{DOMAIN:validate}`, `/{DOMAIN:verify}` | prompt instruction to an agent | soft — fires only on invocation, and only if the agent complies |
+| a field vault's own `format-lint.sh` | deterministic, hand-written in that vault | WARN only, informational |
+| that vault's commit-blocking schema hook | deterministic, **hand-written in that vault** | **ignores `_schema` entirely** and hardcodes its own valid types |
+
+So the hardest gate in the vault measured did not read this block at all. That is a gap between
+what this file claims and what a vault enforces, and naming it is the honest form — a generated
+system that believes `_schema` is authoritative will not notice when its own validator diverges
+from it.
+
+**What would make the claim true:** a deterministic validator, emitted by this generator rather
+than written by hand in each vault, that parses `_schema.required` / `.optional` / `.enums` and is
+wired to run. That does not exist in either tree today. Until it does, treat `_schema` as the
+declaration a human and an agent read, not as a rule a machine enforces.
 ```
 
 ## Dependencies

@@ -85,13 +85,29 @@ Observations are the raw material for evolution. When you notice something about
 ---
 description: What happened and what it suggests
 category: friction | surprise | process-gap | methodology
-status: pending
+status: open | implemented | archived
 observed: YYYY-MM-DD
+implemented_in: path/to/file    # required when status is `implemented`
 ---
 # the observation as a sentence
 
 What happened, why it matters, and what might change.
 ```
+
+**Status lifecycle:**
+- `open` — the observation stands and its fix is not in any file yet
+- `implemented` — the fix exists, and `implemented_in:` names the file that carries it
+- `archived` — no longer applicable, or subsumed by another observation; say which, and why
+
+**`implemented` REQUIRES `implemented_in:`.** An observation closed without naming the file
+that changed is unfalsifiable — nothing distinguishes a real fix from a closed-by-fiat one,
+which is the failure this field exists to prevent. Measured on a live vault before this rule
+was written down: 6 of 26 `implemented` observations named no file.
+
+**This enum was `pending` until 2026-08-05, and no vault ever wrote it.** A live vault used
+`implemented` 26 times, `open` 12 and `pending` **zero** — so every count keyed to `pending`
+read 0 forever. The same defect was fixed for the {DOMAIN:note} enum earlier and left here,
+because observations, tensions and notes are **different fields that share a name**.
 
 **Processing observations:**
 When observations accumulate (roughly 5-10 pending), review them as a batch:
@@ -192,7 +208,7 @@ Tensions are contradictions your system has not yet resolved. They're distinct f
 ```markdown
 ---
 description: What conflicts and why it matters
-status: pending | resolved | dissolved
+status: open | resolved | dissolved | blocked
 observed: YYYY-MM-DD
 involves: ["[[note A]]", "[[note B]]"]
 ---
@@ -202,9 +218,18 @@ What conflicts, why both sides seem valid, and what resolution might look like.
 ```
 
 **Status lifecycle:**
-- `pending` — the conflict is real and unresolved
+- `open` — the conflict is real and unresolved
 - `resolved` — you resolved it by creating a new {DOMAIN:note}, updating existing ones, or choosing a side with reasons
 - `dissolved` — the conflict turned out to be apparent rather than real (e.g., the two claims operate in different contexts)
+- `blocked` — real, but it cannot be resolved here: it is waiting on extraction, an external
+  source, or a decision outside this system. **Say what it is blocked on.** A `blocked` tension
+  is NOT counted toward the /{DOMAIN:rethink} threshold, because that threshold exists to
+  trigger review and re-reviewing a blocked item produces nothing.
+
+**This enum was `pending | resolved | dissolved` until 2026-08-05.** A live vault used `open`
+7 times and `pending` **zero**, so the same never-fires defect applied here as to observations
+above. `dissolved` had zero uses too, and is kept rather than removed: it names a real and
+distinct outcome, and absence of use is not evidence against a vocabulary a vault may still need.
 
 **When to capture:** Immediately, during any work. Don't stop to resolve the tension — just capture it and continue. Resolution happens later via /{DOMAIN:rethink} or human judgment. Unflagged tensions silently corrupt your knowledge graph because you keep building on contradictory foundations.
 
