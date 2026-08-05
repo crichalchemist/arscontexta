@@ -71,7 +71,7 @@ rg -L '^description:' {DOMAIN:notes}/*.md
 rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 
 # Cross-field queries — find pending tensions
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: pending'
+rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
 
 # Count {DOMAIN:notes} by type
 rg '^type:' {DOMAIN:notes}/ --no-filename | sort | uniq -c | sort -rn
@@ -143,25 +143,24 @@ The `_schema` block is the **declared** source of truth for field validation: wh
 with enumerated values, use one of the listed values — or update the template first if a new value is
 genuinely needed.
 
-**What reads it, stated honestly, because "skills and hooks read it" overstates the enforcement.**
-Measured against a live generated vault on 2026-08-05:
+**Declared is not enforced, and the difference matters.** What reads `_schema` in a generated system:
 
-| reader | kind | strength |
-|---|---|---|
-| `/{DOMAIN:validate}`, `/{DOMAIN:verify}` | prompt instruction to an agent | soft — fires only on invocation, and only if the agent complies |
-| a field vault's own `format-lint.sh` | deterministic, hand-written in that vault | WARN only, informational |
-| that vault's commit-blocking schema hook | deterministic, **hand-written in that vault** | **ignores `_schema` entirely** and hardcodes its own valid types |
+- `/{DOMAIN:validate}`, `/{DOMAIN:verify}` and `/{DOMAIN:refactor}` read it when invoked — the
+  last of those reads `enums:` specifically. That is an instruction to an agent, so it holds only
+  for the runs where the agent follows it — real, but per-invocation.
+- Deterministic validators — a write hook, a pre-commit check — are written per system and are
+  **not required to read `_schema` at all.** One generated system measured in 2026-08 had a
+  commit-blocking schema validator that hardcoded its own list of valid types and never opened a
+  template.
 
-So the hardest gate in the vault measured did not read this block at all. That is a gap between
-what this file claims and what a vault enforces, and naming it is the honest form — a generated
-system that believes `_schema` is authoritative will not notice when its own validator diverges
-from it.
+**Nothing checks enumerated VALUES deterministically.** Even the linters that do parse `_schema`
+tend to read `required:` and `optional:` — the field lists — and skip `enums:`. So a note carrying
+`status: whatever` passes every automatic gate and fails only if a human or an agent looks.
 
-**What would make the claim true:** a deterministic validator, emitted by this generator rather
-than written by hand in each vault, that parses `_schema.required` / `.optional` / `.enums` and is
-wired to run. That does not exist in either tree today. Until it does, treat `_schema` as the
-declaration a human and an agent read, not as a rule a machine enforces.
-```
+**The consequence to design around:** if a rule matters, something has to read it back. A validator
+that hardcodes its own copy of an enum will drift from the template silently, and the drift shows up
+as a count that reads zero forever rather than as an error. When you add a value here, search for
+what matches the old one.
 
 ## Dependencies
 None — this is a foundational feature.

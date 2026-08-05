@@ -36,7 +36,7 @@ rg -L '^description:' {DOMAIN:notes}/*.md
 rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 
 # Cross-field queries (combine with xargs)
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: pending'
+rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
 ```
 
 Field-level queries answer: "What properties do my {DOMAIN:notes} have?" They are fast, precise, and require no external tools.
@@ -138,7 +138,7 @@ Use YAML frontmatter as a queryable property layer:
 rg '^methodology:.*Zettelkasten' {DOMAIN:notes}/
 
 # Unresolved tensions
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: pending'
+rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
 
 # {DOMAIN:Notes} adapted from human patterns
 rg '^adapted_from: ' {DOMAIN:notes}/ | grep -v 'null'
