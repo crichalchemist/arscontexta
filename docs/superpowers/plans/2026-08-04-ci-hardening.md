@@ -294,6 +294,10 @@ From Task 4 (hook-config):
        branch is unreachable. Tracked: the comment beside the threshold-0 assertions.
   bare keys fail SILENT where dotted keys fail LOUD on a present-but-empty value — an asymmetry
        between the two paths of one reader. Tracked: this line.
+  the awk section/field names are interpolated into an ERE, so `self_evolution.obs.ervation`
+       matches `obsXervation`, and a two-level key can return a three-level value. Tracked: this
+       line. It was claimed as recorded in a commit message and had landed in NO tracked file —
+       divergence 10's exact class, caught in review of the commit that made the claim.
   TMPDIRS+= inside a $( ) helper leaks fixture trees per run. House pattern, not new here:
        bump-version leaks 14, guard-failure 22, placeholder-count 20, hook-config 2. Tracked:
        this line.

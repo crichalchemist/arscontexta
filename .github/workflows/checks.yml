@@ -99,13 +99,29 @@ jobs:
       # red on a pre-existing defect.
       - name: Shell syntax check (all tracked *.sh, bash and zsh)
         run: |
+          set -u
+          # AN EMPTY SCAN IS NOT A CLEAN ONE. The first version put `git ls-files`
+          # straight into the `for` word list, where its failure is invisible:
+          # outside a git repo it printed two `fatal:` lines to stderr and then
+          # `syntax OK: 0 tracked shell scripts` at rc 0. Green over nothing —
+          # the exact defect the gates in this workflow exist to catch, in the
+          # step added to widen coverage. check-prose-paths.sh already carries
+          # the idiom: exiting non-zero when the extractor yields nothing.
+          if ! files=$(git ls-files '*.sh'); then
+            echo "git ls-files failed — cannot enumerate scripts, result is not evidence"; exit 2
+          fi
+          n=$(printf '%s\n' "$files" | grep -c . || true)
+          if [ "$n" -eq 0 ]; then
+            echo "no tracked *.sh found — the scan matched nothing, which is not the same as clean"; exit 2
+          fi
           fail=0
-          for f in $(git ls-files '*.sh'); do
-            bash -n "$f" || { echo "bash -n failed: $f"; fail=1; }
-            zsh  -n "$f" || { echo "zsh -n failed: $f";  fail=1; }
-          done
+          printf '%s\n' "$files" | while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            bash -n "$f" || { echo "bash -n failed: $f"; exit 1; }
+            zsh  -n "$f" || { echo "zsh -n failed: $f";  exit 1; }
+          done || fail=1
           [ "$fail" -eq 0 ] || exit 1
-          echo "syntax OK: $(git ls-files '*.sh' | wc -l) tracked shell scripts, both parsers"
+          echo "syntax OK: $n tracked shell scripts, both parsers"
       # Both harnesses run under BOTH shells. Two defects closed by this plan
       # were bash/zsh forks (unquoted array word-splitting, PIPESTATUS reading
       # empty under zsh); a bash-only run could not have seen either.

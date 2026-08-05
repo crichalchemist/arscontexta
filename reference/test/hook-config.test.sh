@@ -59,7 +59,7 @@ FM_SRC="$HERE/../lib/frontmatter.sh"
 # The shell under test is this harness's own.
 if [ -n "${ZSH_VERSION:-}" ]; then SH=zsh; else SH=bash; fi
 
-passed=0; failed=0
+passed=0; failed=0; skipped=0
 TMPDIRS=()
 ok()   { passed=$((passed+1)); }
 fail() { failed=$((failed+1)); printf 'FAIL: %s\n  expected [%s] got [%s]\n' "$1" "$2" "$3"; }
@@ -155,7 +155,7 @@ eq "read_config: and names the key on stderr"       "yes" \
 printf 'self_evolution:\n  observation_threshold: 20\n' > "$V/ops/config.yaml"
 chmod 000 "$V/ops/config.yaml"
 if [ -r "$V/ops/config.yaml" ]; then
-    echo "SKIP: chmod 000 did not deny reads (running as root?) — 3 assertions not run" >&2
+    echo "SKIP: chmod 000 did not deny reads (running as root?) — 3 assertions not run" >&2; skipped=$((skipped+3))
 else
     eq "read_config: an UNREADABLE config exits 1"       "1" \
        "$(rc "$V" hooks/scripts/read_config.sh self_evolution.observation_threshold 10)"
@@ -168,7 +168,7 @@ chmod 644 "$V/ops/config.yaml"
 # The bare-key path had the identical hole.
 chmod 000 "$V/.arscontexta"
 if [ -r "$V/.arscontexta" ]; then
-    echo "SKIP: chmod 000 did not deny reads — 1 assertion not run" >&2
+    echo "SKIP: chmod 000 did not deny reads — 1 assertion not run" >&2; skipped=$((skipped+1))
 else
     eq "read_config: an UNREADABLE .arscontexta also exits 1" "1" \
        "$(rc "$V" hooks/scripts/read_config.sh session_capture true)"
@@ -306,15 +306,28 @@ eq "session-orient: and the session still starts"                 "0" "$(orient_
 # same silent-failure class one layer down, in reference/lib/frontmatter.sh, and
 # is recorded rather than fixed here — it is a different file with its own gate.)
 cfg "$V2" 0 0
+# ANCHORED: a bare '0 pending observations' is a substring of 10, 20 and 30, so
+# an unanchored match would go red on healthy code the moment mkvault's fixture
+# size changed. False-red rather than false-green, but it fails for the wrong
+# reason and that is how an assertion gets deleted instead of fixed.
 eq "session-orient: an unmeasured count is not fabricated as 0" "yes" \
-   "$(orient "$V2" | grep -q '0 pending observations' && echo no || echo yes)"
+   "$(orient "$V2" | grep -q '^CONDITION: 0 pending observations' && echo no || echo yes)"
 eq "session-orient: nor the tension count"                     "yes" \
-   "$(orient "$V2" | grep -q '0 unresolved tensions' && echo no || echo yes)"
+   "$(orient "$V2" | grep -q '^CONDITION: 0 unresolved tensions' && echo no || echo yes)"
 # The positive companion: with the library BACK, a threshold of 0 does fire, so
 # the two assertions above are not passing because nothing ever fires at 0.
 cp "$FM_SRC" "$V2/ops/lib/frontmatter.sh"
 eq "session-orient: with the library back, threshold 0 DOES fire"  "yes" \
    "$(orient "$V2" | grep -q '12 pending observations' && echo yes || echo no)"
 
-printf '\npassed=%s failed=%s\n' "$passed" "$failed"
+# THE TOTAL MUST NOT MOVE WHEN AN ASSERTION IS SKIPPED. As root, chmod 000 does
+# not deny reads, so the four permission assertions correctly SKIP — and the
+# suite then printed passed=36, which check-doc-claims reads as "document says
+# 40, tree measures 36 — fix the document, not the gate", instructing a wrong
+# number into two files over a runner difference. GitHub-hosted ubuntu-latest is
+# uid 1001, but container and self-hosted runners are root. Skipped assertions
+# are counted and named, so the documented total means "assertions in this
+# suite" on every runner, and a skip is visible rather than silent.
+printf '\npassed=%s failed=%s\n' "$((passed + skipped))" "$failed"
+[ "${skipped:-0}" -eq 0 ] || printf 'note: %s assertion(s) SKIPPED (see stderr) and counted in the total\n' "$skipped"
 [ "$failed" -eq 0 ]
