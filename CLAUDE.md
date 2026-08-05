@@ -163,7 +163,8 @@ generated vault to run against:
 ./reference/validate-kernel.sh ~/second-brain     # the live instance
 ```
 
-Pass criterion is 15/15 PASS. `WARN` is acceptable **only** for primitive 10 (semantic search,
+Pass criterion is 16/16 primitives PASSing — sixteen, not the fifteen the highest header number
+suggests; see below. `WARN` is acceptable **only** for primitive 10 (semantic search,
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
 FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
 
@@ -188,8 +189,12 @@ dangling-link WARN is gone because that check now runs" — true when written, a
 read as covering a WARN that means something else entirely.
 
 **The criterion and the summary count different things, which is what made the labels skippable.**
-"15/15" is primitives; the summary counts *result lines*. On the field vault there are 15 primitives,
-16 numbered headers (1–15 plus 10A) and 17 result lines, because primitive 2 emits two. So `PASS: 15`
+"16/16" is primitives; the summary counts *result lines*. On the field vault there are 16 primitives,
+16 numbered headers and 17 result lines, because primitive 2 emits two. **The headers run 1–15 with
+one spelled `10A`, so the highest number is 15 and the COUNT is 16** — `unique-addresses` is a full
+primitive in `kernel.yaml` (its own id, layer, validation and grounding) that was folded into 10's
+number rather than renumbering the rest. This file said "15 primitives" for exactly that reason: the
+largest label was read as the total. So `PASS: 15`
 is simply `17 − 2` — it is not independent evidence that fifteen primitives passed, and it would read
 `17` if both WARNs cleared. It has now equalled the target number `15` **twice, for two different
 reasons**: once as `15 − 0` when the scan resolved nothing, and now as `17 − 2`. Matching the target
@@ -248,7 +253,7 @@ Distinct from `skills/<name>/SKILL.md`, which are the *plugin's own* always-avai
 generated vault's CLAUDE.md is assembled, not templated — sections are included or omitted per
 enabled feature.
 
-**3. Kernel → invariant contract.** `reference/kernel.yaml` declares the 15 primitives every
+**3. Kernel → invariant contract.** `reference/kernel.yaml` declares the 16 primitives every
 generated system must have, each with a `validation.check` and a `cognitive_grounding` tracing to a
 research claim. `reference/validate-kernel.sh` is the executable form of that contract. **These two
 must stay in sync** — adding a primitive to the YAML without a corresponding check in the script

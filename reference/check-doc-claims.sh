@@ -157,6 +157,18 @@ truth_fence_suites() {
     printf '%s' "$_n"
 }
 
+# Kernel primitives declared in kernel.yaml. Counted because both README.md and
+# CLAUDE.md said 15 for a tree that declares 16 — `unique-addresses` is a full
+# primitive that validate-kernel.sh numbers `10A` rather than renumbering, so the
+# highest LABEL is 15 and the COUNT is 16, and the label was read as the total.
+truth_kernel_primitives() {
+    local _n
+    [ -r reference/kernel.yaml ] || return 1
+    _n=$(/usr/bin/grep -c '^  - id:' reference/kernel.yaml || true)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+
 truth_portability_checks() {
     local _n
     [ -f reference/check-portability.sh ] || return 1
@@ -246,6 +258,8 @@ reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z
 skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
 CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z-]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
 CLAUDE.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) test suites each run under both.*/\1/p|truth_fence_suites|
+README.md|kernel primitives|s/.*`reference\/kernel\.yaml` -- \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
+CLAUDE.md|kernel primitives|s/.*`reference\/kernel\.yaml` declares the \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
 CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure

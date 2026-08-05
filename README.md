@@ -74,7 +74,7 @@ domain needs and why.
 | **Derivation** | Maps signals to eight configuration dimensions with confidence scoring |
 | **Proposal** | Shows what will be generated and why, in your vocabulary |
 | **Generation** | Produces all files: context file, folders, templates, skills, hooks, manual |
-| **Validation** | Checks all 15 kernel primitives, runs pipeline smoke test |
+| **Validation** | Checks all 16 kernel primitives, runs pipeline smoke test |
 
 The whole process takes about 20 minutes. It's token-intensive because the engine
 reads research claims, reasons about your domain, and generates substantial output.
@@ -173,14 +173,21 @@ operates in the "smart zone."
 
 ## Hooks
 
-Four hooks automate quality enforcement:
+Three hooks are registered in `hooks/hooks.json`:
 
 | Hook | Event | What It Does |
 |------|-------|-------------|
-| **Session Orient** | `SessionStart` | Injects workspace tree, loads identity, surfaces maintenance signals |
+| **Session Orient** | `SessionStart` | Injects workspace tree, loads identity, surfaces maintenance signals, and persists session state to `ops/sessions/` |
 | **Write Validate** | `PostToolUse` (Write) | Schema enforcement on every note write |
 | **Auto Commit** | `PostToolUse` (Write, async) | Git auto-commit, non-blocking |
-| **Session Capture** | `Stop` | Persists session state to `ops/sessions/` |
+
+Session capture used to be a fourth hook on `Stop`. It now runs inside Session Orient — it fires once
+per session either way, and folding it in removed a script. There is no `Stop` hook and no
+`session-capture.sh`; `hooks/scripts/` also holds `vaultguard.sh` and `read_config.sh`, which are
+helpers every hook calls rather than hooks themselves.
+
+All three are inert outside a vault: `vaultguard.sh` looks for an `.arscontexta` marker and every hook
+exits 0 without it, which is why they do nothing in this repo.
 
 ---
 
@@ -260,7 +267,17 @@ Keep qmd MCP configuration and tool preapproval in `.mcp.json`.
 | `tree` | Yes | Workspace structure injection |
 | `ripgrep` (`rg`) | Yes | YAML queries, schema validation |
 | `awk` | Yes | Code-fence stripping in link extraction (POSIX; preinstalled on macOS and Linux) |
+| `sed` | Yes | Text extraction in generated skills (POSIX; preinstalled on macOS and Linux) |
+| `jq` | Yes | JSON parsing in generated skills |
+| `bc` | Yes | Arithmetic in `/stats` metrics -- **not preinstalled on Fedora or minimal Debian images** |
+| `git` | Yes | Auto-commit hook, vault history |
 | [qmd](https://github.com/tobi/qmd) | Optional | Semantic search |
+
+The six shell tools above (`rg`, `awk`, `sed`, `jq`, `bc`, `git`) are exactly what
+`reference/test/fence-isolation.test.sh` asserts before it runs, so this table and that
+gate can be checked against each other. A missing tool makes a generated skill's shell
+block exit 127, which reads as a plausible-looking failure rather than an absent
+dependency -- `bc` is the one that actually bites in practice.
 
 ---
 
@@ -298,14 +315,26 @@ arscontexta/
 |   +-- features/                # 17 composable feature blocks
 |-- methodology/                 # 249 research claims
 |-- reference/                   # Core reference documents
-|   |-- kernel.yaml              # 15 kernel primitives
+|   |-- kernel.yaml              # 16 kernel primitives
 |   |-- three-spaces.md          # Architecture spec
-|   +-- use-case-presets.md      # Pre-validated configs
+|   |-- use-case-presets.md      # Pre-validated configs
+|   |-- skill-authoring.md       # How to author a SKILL.md in this repo
+|   |-- validate-kernel.sh       # Executable form of the kernel contract
+|   |-- check-portability.sh     # Portability gate
+|   |-- check-prose-paths.sh     # Prose-path gate
+|   |-- check-doc-claims.sh      # Documented numbers vs measured reality
+|   |-- check-placeholder-count.sh  # Templates must not lose placeholders
+|   |-- lib/                     # Shared shell libraries
+|   +-- test/                    # Gate test suites
 |-- platforms/                   # Platform-specific adapters
 |   |-- claude-code/
 |   +-- shared/
 |-- presets/                     # Pre-validated configurations
 |-- scripts/                     # Utility scripts
+|-- docs/                        # Specs and implementation plans
+|-- .github/                     # CI workflows
+|-- CLAUDE.md                    # Repo guidance for coding agents
+|-- CONTRIBUTING.md              # Human contribution workflow
 +-- README.md
 ```
 
@@ -332,13 +361,32 @@ Every time you make changes, re-install the plugin:
 /plugin install arscontexta@agenticnotetaking
 ```
 
+There is no hot reload. Without the uninstall/install cycle above, Claude keeps serving
+the cached copy -- editing a skill and re-running it is the most common way to "fix"
+something and observe no change.
+
+### Verification
+
+The repo ships an executable gate suite: portability and prose-path checks, plus test
+suites that each run under both `bash` and `zsh` -- several shipped defects were shell
+forks, so one shell is not enough. Most run in CI on every push. Kernel validation is
+the exception, because it needs a generated vault to run against.
+
+`CONTRIBUTING.md` carries the commands and the contribution workflow. `CLAUDE.md`
+carries the gate table -- what each gate uniquely catches, and, more usefully, what
+none of them catch.
+
 ### Key Files for Contributors
 
-- `reference/kernel.yaml` -- 15 primitives every system must include
+- `reference/kernel.yaml` -- 16 primitives every system must include, each with an executable
+  check in `reference/validate-kernel.sh`. The validator numbers them 1--15 because one is spelled
+  `10A` rather than renumbering the rest, so "15" is a numbering artifact and not a count.
 - `generators/features/*.md` -- composable feature blocks
 - `skill-sources/*/SKILL.md` -- generated command templates
 - `skills/setup/SKILL.md` -- the derivation engine
 - `reference/use-case-presets.md` -- preset definitions
+- `reference/skill-authoring.md` -- how to author or edit a `SKILL.md` here
+- `CONTRIBUTING.md` -- workflow, verification commands, review expectations
 
 ---
 
@@ -364,6 +412,12 @@ on your conversation.
 | Claude Code plugin | Available |
 | Marketplace listing | Available |
 | Multi-agent processing | In progress |
+| Antigravity CLI adapter | Planned |
+| Pi adapter | Planned |
+
+Status here means what the tree contains, not what is intended. `platforms/` holds one adapter,
+`claude-code/`; the two planned rows have no code, no manifest entry, and no generator path. They are
+queued behind the current specs rather than in progress.
 
 ---
 
