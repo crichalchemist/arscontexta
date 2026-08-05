@@ -429,7 +429,7 @@ eq "C1: names the offending observation"                 "present" \
 eq "C1: names the offending tension"                     "present" \
    "$(printf '%s' "$OUT" | grep -q 'tensions/bad-prom.md' && echo present || echo absent)"
 eq "C1: covers promoted, not only implemented"           "present" \
-   "$(printf '%s' "$OUT" | grep -q 'promoted without promoted_to' && echo present || echo absent)"
+   "$(printf '%s' "$OUT" | grep -q 'promoted without a usable promoted_to' && echo present || echo absent)"
 eq "C1: does not name the compliant note"                "absent" \
    "$(printf '%s' "$OUT" | grep -q 'observations/good.md' && echo present || echo absent)"
 rm -rf "$ROOT"
@@ -482,6 +482,73 @@ eq "C1: empty outcome set -> counts PAIRS, not directories" "2" \
    "$(printf '%s' "$OUT" | sed -n 's/.*checked \([0-9]*\) (directory, status).*/\1/p')"
 eq "C1: empty outcome set -> claims no per-note check"   "absent" \
    "$(printf '%s' "$OUT" | grep -q 'all carry their target field' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# The SECOND empty-set case exists so the pair count cannot be satisfied by a
+# constant. With one directory it is 2; with both it is 4. A review found that
+# hardcoding the counter to the fixture's own value (2) reddened nothing, while
+# 1/3/9 each reddened one — so the assertion pinned "not an arbitrary constant"
+# rather than "counts pairs". Two fixtures with different expected values fixes
+# that: no single constant satisfies both.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -f "$V/ops/observations/"*.md "$V/ops/tensions/"*.md
+printf -- '---\nstatus: open\n---\n# not resolved yet\n' > "$V/ops/observations/o.md"
+OUT=$(c1 "$V")
+eq "C1: BOTH dirs empty -> 4 pairs, so no constant satisfies both cases" "4" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*checked \([0-9]*\) (directory, status).*/\1/p')"
+rm -rf "$ROOT"
+
+# A vault that RENAMED ops/. Primitive 12 has always accepted these variants;
+# C1 hardcoded `ops/` and so went silent on such a vault while asserting
+# "self-evolution not enabled" — two checks in one script disagreeing about the
+# same directories. The candidate list is now shared.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+mkdir -p "$V/04_meta/logs/observations"
+mv "$V/ops/observations/bad-impl.md" "$V/04_meta/logs/observations/"
+rm -rf "$V/ops/observations" "$V/ops/tensions"
+OUT=$(c1 "$V")
+eq "C1: a renamed ops dir is RESOLVED, not reported as absent" "fail" \
+   "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+eq "C1: renamed ops dir -> does NOT claim self-evolution is off" "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo present || echo absent)"
+eq "C1: renamed ops dir -> names the file under its real path" "present" \
+   "$(printf '%s' "$OUT" | grep -q '04_meta/logs/observations/bad-impl.md' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# An EMPTY target field. frontmatter.sh returns rc 0 for a present-but-empty
+# field, so a presence test passed `implemented_in:` with no value — exactly as
+# unfalsifiable as omitting it, and the cheapest way to turn every violation
+# green.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -f "$V/ops/observations/"*.md "$V/ops/tensions/"*.md
+printf -- '---\nstatus: implemented\nimplemented_in:\n---\n# empty value\n' > "$V/ops/observations/empty.md"
+printf -- '---\nstatus: promoted\npromoted_to: ""\n---\n# empty string\n'   > "$V/ops/tensions/empty.md"
+OUT=$(c1 "$V")
+eq "C1: an EMPTY target field is a violation, not a pass"  "2" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
+rm -rf "$ROOT"
+
+# THE LIBRARY'S REFUSAL MUST REACH THE VERDICT. list_notes_by_field prints
+# "refusing to report a count" and returns 1 on an unreadable directory; C1
+# called it inside `<<EOF $(...)`, which has no exit status, so a failed scan
+# emitted nothing and reported PASS.
+#
+# chmod 000 does not restrict root, so this assertion would SILENTLY pass when
+# the suite runs as root. It checks first and reports SKIPPED-AS-ROOT rather
+# than a green tick, because a check that cannot run must not look like one that
+# ran and found nothing — the defect this whole section is about.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+chmod 000 "$V/ops/observations" 2>/dev/null
+if ls "$V/ops/observations" >/dev/null 2>&1; then
+  printf '  SKIP C1: unreadable-dir branch (running as root; chmod 000 does not restrict)\n'
+else
+  OUT=$(c1 "$V")
+  eq "C1: an unscannable directory FAILs, never PASSes"    "fail" \
+     "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+  eq "C1: and says the library refused rather than a count" "stated" \
+     "$(printf '%s' "$OUT" | grep -q 'could not scan' && echo stated || echo silent)"
+fi
+chmod 755 "$V/ops/observations" 2>/dev/null
 rm -rf "$ROOT"
 
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"

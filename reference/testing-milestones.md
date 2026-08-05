@@ -63,12 +63,15 @@ Seven validation milestones for the Ars Contexta v1.6 plugin. Each milestone tes
 15. Session capture for automatic transcript persistence
   PASS Session transcripts saved to ops/sessions/, mining tasks auto-created
 
+C1. Outcome statuses carry their target field
+  PASS 12 outcome-status notes, all carry their target field
+
 === Kernel Validation Summary ===
-  PASS: 15
+  PASS: 16
   WARN: 0
   FAIL: 0
 
-All 15 primitives validated successfully.
+Kernel contract satisfied — every check above passed.
 ```
 
 **Common failure modes and remediation:**

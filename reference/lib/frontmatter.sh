@@ -97,7 +97,7 @@
 
 # Contract version. Bump on any BEHAVIOR change (delimiter rules, key matching,
 # quote stripping, recursion semantics). Callers and /arscontexta:upgrade read it.
-FRONTMATTER_VERSION=1
+FRONTMATTER_VERSION=2
 
 # Check dependencies and directory argument.
 _fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
@@ -112,6 +112,19 @@ _fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
   fi
   if [ -z "$dir" ] || [ ! -d "$dir" ]; then
     echo "error: frontmatter: not a directory: '${dir:-<empty>}'" >&2
+    return 1
+  fi
+  # EXISTENCE IS NOT ACCESS, and the difference is a silent wrong answer. `-d`
+  # succeeds on a directory this process cannot read or traverse; `find` then
+  # prints "Permission denied" to stderr and exits 0, so every counting function
+  # here returned rc 0 with ZERO matches — a scan that could not run, reported
+  # as a scan that found nothing. Callers that check the rc (validate-kernel's
+  # C1) were made dead code by it. This is the same defect as testing `[ -f ]`
+  # for a config file the process cannot open, fixed in read_config.sh for the
+  # same reason: the two states are indistinguishable downstream.
+  if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
+    echo "error: frontmatter: directory not readable: '$dir'" >&2
+    echo "       refusing to report a count over a directory this process cannot scan" >&2
     return 1
   fi
   return 0

@@ -106,7 +106,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=55 failed=0
   $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
   $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0
-  $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=54 failed=0
+  $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=61 failed=0
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=56 failed=0
@@ -117,7 +117,15 @@ done
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
 disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message first,
-because two WARNs described below are properties of the vault being scanned, not of this codebase.
+because the WARNs and the FAIL described below are properties of the vault being scanned, not of
+this codebase.
+
+**One line in that run is NOT a primitive.** `C1.` asserts that an outcome status names a target —
+`implemented` carries a non-empty `implemented_in:`, `promoted` a non-empty `promoted_to:`. It is
+labelled rather than numbered because it has no `kernel.yaml` entry, so the criterion above (which
+is about primitives) does not reach it. `C1` may WARN when a vault has no observations or tensions
+directory at all — self-evolution is not enabled and the rule does not apply — and it FAILs on the
+field vault today, which is that vault's content and not a regression here.
 
 **That is a criterion about primitives, and it deliberately does not quote a total.** An earlier
 revision of this line replaced it with one private vault's result-line totals, which is a different

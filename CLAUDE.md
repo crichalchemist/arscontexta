@@ -62,7 +62,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 54/54
+  $s reference/test/kernel-note-dirs.test.sh             # 61/61
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 56/56
@@ -193,7 +193,7 @@ status the spec happened to name would have left the larger violation unmeasured
 field-vault content defects, not defects in this repo, and they drift; re-derive with the command
 below rather than quoting them.
 
-**The two survivors are primitive 1, frontmatter coverage — `5112 with YAML, 160 without` — and
+**The two survivors are primitive 1, frontmatter coverage — `5128 with YAML, 163 without` — and
 primitive 2, `8 unresolved wiki links out of 2716 unique checked`.** Neither is on the list of
 primitives permitted to WARN, so by the criterion above both are real findings. Both are content
 defects in the field vault rather than defects in this repo, which is why they are recorded here

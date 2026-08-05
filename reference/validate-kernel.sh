@@ -39,6 +39,24 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 }
 . "$FM_LIB"
 
+# resolve_ops_dir <vault> <observations|tensions> -> the vault's directory for
+# that kind, relative to the vault, or rc 1 if none exists.
+#
+# ONE DECLARATION, TWO CONSUMERS (primitive 12 and C1). The candidate list was
+# written out inside primitive 12 and then written AGAIN inside C1 as `ops/`
+# alone. A vault that renamed `ops/` therefore got primitive 12 PASSing on
+# directories it had found and C1 reporting "self-evolution not enabled" about
+# the same directories — two checks in one script contradicting each other, with
+# C1's message asserting something false. That is the primitive-2 defect
+# (canonical names hardcoded in a validator for a generator whose purpose is
+# renaming them) reintroduced 130 lines below the comment explaining it.
+resolve_ops_dir() {
+    for _rod in "ops/$2" "04_meta/logs/$2" "logs/$2" "$2"; do
+        [ -d "$1/$_rod" ] && { printf '%s' "$_rod"; return 0; }
+    done
+    return 1
+}
+
 pass() { echo -e "  ${GREEN}PASS${NC} $1"; PASS=$((PASS + 1)); }
 warn() { echo -e "  ${YELLOW}WARN${NC} $1"; WARN=$((WARN + 1)); }
 fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
@@ -675,13 +693,13 @@ has_tensions_dir=false
 has_review_trigger=false
 has_rethink=false
 
-# Check for ops/observations/ and ops/tensions/ directories (or common variants)
-for candidate in "ops/observations" "04_meta/logs/observations" "logs/observations" "observations"; do
-    [ -d "$VAULT/$candidate" ] && has_obs_dir=true && break
-done
-for candidate in "ops/tensions" "04_meta/logs/tensions" "logs/tensions" "tensions"; do
-    [ -d "$VAULT/$candidate" ] && has_tensions_dir=true && break
-done
+# Check for the observations/ and tensions/ directories, wherever the vault put
+# them. The candidate list lives in resolve_ops_dir (near the top of this file)
+# and is shared with C1 — it used to be spelled out twice, and C1's copy had
+# only `ops/`, so C1 went silent on any vault that renamed it while THIS check
+# passed. Two lists, one vault, opposite conclusions.
+_d=$(resolve_ops_dir "$VAULT" observations) && [ -n "$_d" ] && has_obs_dir=true
+_d=$(resolve_ops_dir "$VAULT" tensions)     && [ -n "$_d" ] && has_tensions_dir=true
 
 # Check context files for review trigger documentation
 for ctx in "$VAULT/CLAUDE.md"; do
@@ -809,31 +827,59 @@ echo "C1. Outcome statuses carry their target field"
 c1_missing=0
 c1_scanned=0
 c1_pairs=0
-for spec in "ops/observations:implemented:implemented_in" \
-            "ops/observations:promoted:promoted_to" \
-            "ops/tensions:implemented:implemented_in" \
-            "ops/tensions:promoted:promoted_to"; do
-    d=${spec%%:*}; rest=${spec#*:}; st=${rest%%:*}; fld=${rest#*:}
-    [ -d "$VAULT/$d" ] || continue
+c1_unscannable=""
+for spec in "observations:implemented:implemented_in" \
+            "observations:promoted:promoted_to" \
+            "tensions:implemented:implemented_in" \
+            "tensions:promoted:promoted_to"; do
+    kind=${spec%%:*}; rest=${spec#*:}; st=${rest%%:*}; fld=${rest#*:}
+    d=$(resolve_ops_dir "$VAULT" "$kind") || continue
     c1_pairs=$((c1_pairs + 1))
+    # THE LIBRARY'S rc IS CAPTURED, NOT DISCARDED. list_notes_by_field was built
+    # to refuse silence: on an unreadable directory it prints "refusing to report
+    # a count" and returns 1. Calling it inside `<<EOF $(...)` threw both away —
+    # a command substitution in a heredoc has no exit status to test — so a scan
+    # that failed emitted zero lines and C1 reported PASS. That is the house
+    # defect class inside the check whose own comments invoke it three times.
+    c1_list=$(list_notes_by_field "$VAULT/$d" status "$st" 2>/dev/null); c1_rc=$?
+    if [ "$c1_rc" -ne 0 ]; then
+        c1_unscannable="$c1_unscannable $d($st)"
+        continue
+    fi
     while IFS= read -r f; do
         [ -n "$f" ] || continue
         c1_scanned=$((c1_scanned + 1))
-        frontmatter_field "$f" "$fld" >/dev/null 2>&1 || {
+        # NON-EMPTY, not merely present. frontmatter.sh documents rc 0 for a
+        # field whose value is the empty string, so a bare `implemented_in:`
+        # satisfied a presence test — and an empty target is exactly as
+        # unfalsifiable as a missing one, which is the property being asserted.
+        # It was also the cheapest way to turn every one of these FAILs green.
+        if [ -z "$(frontmatter_field "$f" "$fld" 2>/dev/null)" ]; then
             c1_missing=$((c1_missing + 1))
-            [ "$c1_missing" -le 5 ] && echo "       $st without $fld: ${f#"$VAULT"/}"
-        }
+            [ "$c1_missing" -le 5 ] && echo "       $st without a usable $fld: ${f#"$VAULT"/}"
+        fi
     done <<EOF_C1
-$(list_notes_by_field "$VAULT/$d" status "$st" 2>/dev/null)
+$c1_list
 EOF_C1
 done
 
-if [ "$c1_pairs" -eq 0 ]; then
-    # Not a violation and not a pass. A vault without self-evolution enabled has
-    # no observations or tensions, so the rule does not apply — but reporting
-    # that as PASS would be a check that never ran wearing a green label, which
-    # this validator has already shipped once (see the header on primitive 2).
-    warn "No ops/observations/ or ops/tensions/ — self-evolution not enabled, rule not applicable"
+if [ -n "$c1_unscannable" ]; then
+    # COULD NOT RUN outranks anything it managed to measure, and is FAIL rather
+    # than WARN. Primitive 2's header draws exactly this line: "could not run"
+    # and "ran and found nothing" are different facts, and collapsing them is
+    # what made a soft pass possible. A partial scan is the worse case — the
+    # matches already collected would otherwise be reported as a confident
+    # undercount.
+    fail "could not scan:$c1_unscannable — the library refused to report a count"
+elif [ "$c1_pairs" -eq 0 ]; then
+    # Not a violation and not a pass. A vault without observations or tensions
+    # anywhere has not enabled self-evolution, so the rule does not apply — but
+    # reporting that as PASS would be a check that never ran wearing a green
+    # label, which this validator has already shipped once (see primitive 2's
+    # header). The directories are RESOLVED, never assumed to be under ops/:
+    # asserting "not enabled" about a vault that merely renamed the directory
+    # would make this message false as well as useless.
+    warn "No observations/ or tensions/ directory resolved — self-evolution not enabled, rule not applicable"
 elif [ "$c1_scanned" -eq 0 ]; then
     # The directories exist and were scanned; nothing in them has reached an
     # outcome status yet. Said explicitly, because "PASS, all N carry their
@@ -869,9 +915,9 @@ if [ "$FAIL" -eq 0 ] && [ "$WARN" -eq 0 ]; then
     echo -e "${GREEN}Kernel contract satisfied — every check above passed.${NC}"
     exit 0
 elif [ "$FAIL" -eq 0 ]; then
-    echo -e "${YELLOW}Kernel present with warnings. $WARN primitive(s) need attention.${NC}"
+    echo -e "${YELLOW}Kernel present with warnings. $WARN check(s) need attention.${NC}"
     exit 0
 else
-    echo -e "${RED}$FAIL kernel primitive(s) missing. System may not function reliably.${NC}"
+    echo -e "${RED}$FAIL check(s) FAILED. System may not function reliably.${NC}"
     exit 1
 fi
