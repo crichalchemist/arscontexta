@@ -86,11 +86,26 @@ jobs:
         run: bash reference/test/hook-config.test.sh
       - name: Hook config behavior (zsh)
         run: zsh reference/test/hook-config.test.sh
-      - name: Shell syntax check
+      # EVERY tracked *.sh, under BOTH parsers. This named three files by hand and
+      # covered 3 of 22 — none of them under hooks/scripts/, where a syntax error
+      # in a SessionStart hook breaks every session in a vault rather than failing
+      # a build. Enumerating by hand also means a script added later is silently
+      # outside it, which is the shrinking-scope failure this repo documents.
+      #
+      # zsh as well as bash because these carry shebangs and are invoked by name:
+      # `zsh hooks/scripts/read_config.sh` is a spelling a user can type, and a
+      # bash-only parse check is how a zsh fork shipped in bump-version.sh.
+      # Measured before widening: all 22 pass both parsers, so this cannot turn CI
+      # red on a pre-existing defect.
+      - name: Shell syntax check (all tracked *.sh, bash and zsh)
         run: |
-          bash -n reference/validate-kernel.sh
-          bash -n reference/check-portability.sh
-          bash -n reference/lib/link-extraction.sh
+          fail=0
+          for f in $(git ls-files '*.sh'); do
+            bash -n "$f" || { echo "bash -n failed: $f"; fail=1; }
+            zsh  -n "$f" || { echo "zsh -n failed: $f";  fail=1; }
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "syntax OK: $(git ls-files '*.sh' | wc -l) tracked shell scripts, both parsers"
       # Both harnesses run under BOTH shells. Two defects closed by this plan
       # were bash/zsh forks (unquoted array word-splitting, PIPESTATUS reading
       # empty under zsh); a bash-only run could not have seen either.

@@ -9,14 +9,27 @@
 #   read_config.sh   kill dotted-key routing        -> caught (threshold-namespace)
 #   read_config.sh   unparseable key returns default -> NOTHING NOTICED
 #   session-orient   threshold never fires           -> NOTHING NOTICED
-#   session-orient   ignore the configured threshold -> NOTHING NOTICED
+#   session-orient   ignore the configured threshold -> see the caveat below
 #   vaultguard.sh    inertness inverted              -> NOTHING NOTICED
 #
 # The first row is the positive control: coverage IS detectable by that probe, so
-# the four NOTHINGs are a measurement and not a broken harness. Note which row is
+# the NOTHINGs are a measurement and not a broken harness. Note which row is
 # covered — the plan's own Step 1 proposed reverting exactly the dotted-key
 # routing to demonstrate zero coverage, and that is the single mutation Spec F
 # already protects. The gaps were elsewhere.
+#
+# ROW 4 NEEDS ITS CAVEAT, because the first version of this table over-claimed and
+# a reviewer caught it. `threshold-namespace.test.sh` checks TEXTUALLY that
+# session-orient.sh NAMES the key, so it depends on the SHAPE of the break:
+#
+#   OBS_THRESHOLD=10                       (key name gone) -> CAUGHT, 51/1
+#   ...=$(threshold <key> 10 >/dev/null; echo 10)          -> NOT caught, 52/0
+#                                          (name kept, value ignored)
+#
+# The second is the one that ships from an ordinary edit, and it is caught here
+# and nowhere else. So the accurate claim is: three of five scripts had no
+# coverage at all, and session-orient had TEXTUAL but not BEHAVIOURAL coverage —
+# not "four of five unprotected".
 #
 # Two of the uncovered rows are not hypothetical. "Unparseable returns the
 # default" is the thing CLAUDE.md divergence 3 says must never happen —
@@ -72,12 +85,17 @@ mkvault() {   # mkvault -> a directory the hooks accept as a vault
 # 29/1 with its subject unchanged because a silent setup failure left it
 # measuring a tree that was never built. A suite is not exempt from the defect
 # class it exists to catch.
-staged() {    # staged <vault> <expected-open-observations>
-    local d="$1" want="$2" got
+staged() {    # staged <vault> <expected-observations> [<expected-tensions>]
+    local d="$1" want="$2" wantt="${3:-6}" got gott
     got=$(ls -1 "$d"/ops/observations/*.md 2>/dev/null | wc -l | tr -d ' ')
-    [ "$got" = "$want" ] && [ -f "$d/.arscontexta" ] && [ -r "$d/ops/lib/frontmatter.sh" ] && return 0
-    printf 'FIXTURE NOT STAGED: %s has %s observations (want %s), marker=%s fmlib=%s\n' \
-        "$d" "$got" "$want" "$([ -f "$d/.arscontexta" ] && echo y || echo n)" \
+    # TENSIONS TOO. Checking only observations left a fixture with 12 of one and
+    # zero of the other passing setup, after which the tension assertion failed
+    # for a reason that reads like a defect in the subject.
+    gott=$(ls -1 "$d"/ops/tensions/*.md 2>/dev/null | wc -l | tr -d ' ')
+    [ "$got" = "$want" ] && [ "$gott" = "$wantt" ] \
+      && [ -f "$d/.arscontexta" ] && [ -r "$d/ops/lib/frontmatter.sh" ] && return 0
+    printf 'FIXTURE NOT STAGED: %s has %s observations (want %s) and %s tensions (want %s), marker=%s fmlib=%s\n' \
+        "$d" "$got" "$want" "$gott" "$wantt" "$([ -f "$d/.arscontexta" ] && echo y || echo n)" \
         "$([ -r "$d/ops/lib/frontmatter.sh" ] && echo y || echo n)" >&2
     failed=$((failed+1)); return 1
 }
@@ -125,6 +143,38 @@ eq "read_config: and does NOT return the default"   "yes" \
 eq "read_config: and names the key on stderr"       "yes" \
    "$(err "$V" hooks/scripts/read_config.sh self_evolution.observation_threshold 10 | grep -q 'observation_threshold' && echo yes || echo no)"
 
+# CONFIGURED BUT UNREADABLE — the state `[ -f ]` cannot distinguish from absent.
+# This was a live defect when the suite was written: a config at chmod 000
+# returned the DEFAULT at rc 0 with empty stderr, because `[ -f ]` tests
+# existence and awk's own 2>/dev/null swallowed the permission error, so an empty
+# parse read as "not configured". A vault whose owner set 20 was silently told
+# 10 — divergence 3's exact failure, inside the routing added to fix it.
+#
+# The chmod is VERIFIED to have taken effect: as root it does not, and an
+# assertion that silently tests nothing is the thing this repo keeps finding.
+printf 'self_evolution:\n  observation_threshold: 20\n' > "$V/ops/config.yaml"
+chmod 000 "$V/ops/config.yaml"
+if [ -r "$V/ops/config.yaml" ]; then
+    echo "SKIP: chmod 000 did not deny reads (running as root?) — 3 assertions not run" >&2
+else
+    eq "read_config: an UNREADABLE config exits 1"       "1" \
+       "$(rc "$V" hooks/scripts/read_config.sh self_evolution.observation_threshold 10)"
+    eq "read_config: and does NOT return the default"   "yes" \
+       "$(out "$V" hooks/scripts/read_config.sh self_evolution.observation_threshold 10 | grep -q '^10$' && echo no || echo yes)"
+    eq "read_config: and says so on stderr"             "yes" \
+       "$(err "$V" hooks/scripts/read_config.sh self_evolution.observation_threshold 10 | grep -q 'cannot be read' && echo yes || echo no)"
+fi
+chmod 644 "$V/ops/config.yaml"
+# The bare-key path had the identical hole.
+chmod 000 "$V/.arscontexta"
+if [ -r "$V/.arscontexta" ]; then
+    echo "SKIP: chmod 000 did not deny reads — 1 assertion not run" >&2
+else
+    eq "read_config: an UNREADABLE .arscontexta also exits 1" "1" \
+       "$(rc "$V" hooks/scripts/read_config.sh session_capture true)"
+fi
+chmod 644 "$V/.arscontexta"
+
 # SECTION SCOPING. A same-named field in a different section must not answer —
 # otherwise two unrelated settings silently share one value.
 printf 'other_section:\n  observation_threshold: 999\nself_evolution:\n  tension_threshold: 4\n' > "$V/ops/config.yaml"
@@ -138,6 +188,15 @@ eq "read_config: a bare key reads .arscontexta"      "false" \
    "$(out "$V" hooks/scripts/read_config.sh session_capture true)"
 eq "read_config: and an absent bare key defaults"    "yes" \
    "$(out "$V" hooks/scripts/read_config.sh no_such_bare_key yes)"
+
+# CLAUDE_PROJECT_DIR IS HONOURED, not merely equal to the cwd. Every helper cds
+# into the fixture and then sets CLAUDE_PROJECT_DIR to the same place, so the two
+# roots were never distinguished and `PROJECT_DIR=$(pwd)` — dropping the variable
+# entirely — passed every assertion. Running from ELSEWHERE separates them.
+V3=$(mkvault); staged "$V3" 12 || true
+cfg "$V3" 33 5
+eq "read_config: CLAUDE_PROJECT_DIR is used, not the cwd" "33" \
+   "$( cd / && CLAUDE_PROJECT_DIR="$V3" $SH "$V3/hooks/scripts/read_config.sh" self_evolution.observation_threshold 99 )"
 
 # === session-orient.sh — the thresholds actually gate something ===============
 V=$(mkvault); staged "$V" 12 || true
@@ -196,6 +255,66 @@ printf 'x: 1\n' > "$G2/ops/config.yaml"
 eq "vaultguard: a legacy ops/config.yaml is adopted"     "0" "$(rc "$G2" hooks/scripts/vaultguard.sh)"
 eq "vaultguard: and a marker is WRITTEN into that tree" "yes" \
    "$([ -f "$G2/.arscontexta" ] && echo yes || echo no)"
+
+# THE OTHER BRANCH THAT WRITES. vaultguard rewrites a legacy cat-face marker into
+# the YAML form. Unpinned, both "delete the branch" and "make its condition
+# always true" left this suite green — and the second makes EVERY SessionStart
+# rewrite .arscontexta, resetting a live `git: false / session_capture: false`
+# back to true. A guard that silently re-enables auto-commit is worse than one
+# that fails.
+G3=$(mktemp -d); TMPDIRS+=("$G3"); mkdir -p "$G3/hooks/scripts"
+cp "$SRC/vaultguard.sh" "$G3/hooks/scripts/"
+printf '(^.^)\n' > "$G3/.arscontexta"
+eq "vaultguard: a legacy cat-face marker is still a vault"  "0" "$(rc "$G3" hooks/scripts/vaultguard.sh)"
+eq "vaultguard: and is REWRITTEN into the YAML form"      "yes" \
+   "$(grep -q 'session_capture:' "$G3/.arscontexta" && echo yes || echo no)"
+# The companion, and the one that matters: a marker WITHOUT the cat-face must be
+# left exactly as the user wrote it.
+printf '# mine\ngit: false\nsession_capture: false\n' > "$G3/.arscontexta"
+eq "vaultguard: a user's own marker is left alone"        "0" "$(rc "$G3" hooks/scripts/vaultguard.sh)"
+eq "vaultguard: and its values are NOT reset to true"    "yes" \
+   "$(grep -q 'session_capture: false' "$G3/.arscontexta" && echo yes || echo no)"
+
+# OMISSION, NOT SUBSTITUTION. session-orient.sh's own comment says an unmeasured
+# count must be OMITTED rather than reported as 0, because 0 is precisely the
+# value that stops a threshold ever firing — an omitted line is visible, a
+# substituted 0 is not. Nothing held that: with the library removed, changing
+# OBS_COUNT="" to OBS_COUNT=0 left the suite green. It is reachable by an
+# ordinary edit (`|| echo 0` has shipped in this repo before), not by accident.
+V2=$(mkvault); staged "$V2" 12 || true
+cfg "$V2" 10 5
+rm -f "$V2/ops/lib/frontmatter.sh"
+eq "session-orient: no frontmatter lib -> the signal is OMITTED"  "yes" \
+   "$(orient "$V2" | grep -q 'pending observations' && echo no || echo yes)"
+eq "session-orient: and NOT reported as a count of 0"           "yes" \
+   "$(orient "$V2" | grep -q '0 pending observations' && echo no || echo yes)"
+eq "session-orient: and the reason is on stderr"                "yes" \
+   "$(orient_e "$V2" | grep -q 'frontmatter.sh missing' && echo yes || echo no)"
+eq "session-orient: and the session still starts"                 "0" "$(orient_rc "$V2")"
+
+# THE DISCRIMINATING CASE, and it took finding. With the usual threshold of 10,
+# an omitted count and a substituted 0 are INDISTINGUISHABLE — both leave
+# `0 >= 10` false and print nothing, so mutating `OBS_COUNT=""` to `OBS_COUNT=0`
+# changed nothing observable and the suite stayed green over it. A threshold of
+# ZERO separates them: omission still prints nothing, while a substituted 0
+# satisfies `0 -ge 0` and emits the absurd line "0 pending observations" — a
+# maintenance signal fabricated out of a measurement that never happened.
+#
+# (The other route to this branch is a scan that FAILS while the library is
+# present. It is not reachable: count_notes_by_field on an unreadable directory
+# returns 0 at rc 0 rather than failing, so the `||` never fires. That is the
+# same silent-failure class one layer down, in reference/lib/frontmatter.sh, and
+# is recorded rather than fixed here — it is a different file with its own gate.)
+cfg "$V2" 0 0
+eq "session-orient: an unmeasured count is not fabricated as 0" "yes" \
+   "$(orient "$V2" | grep -q '0 pending observations' && echo no || echo yes)"
+eq "session-orient: nor the tension count"                     "yes" \
+   "$(orient "$V2" | grep -q '0 unresolved tensions' && echo no || echo yes)"
+# The positive companion: with the library BACK, a threshold of 0 does fire, so
+# the two assertions above are not passing because nothing ever fires at 0.
+cp "$FM_SRC" "$V2/ops/lib/frontmatter.sh"
+eq "session-orient: with the library back, threshold 0 DOES fire"  "yes" \
+   "$(orient "$V2" | grep -q '12 pending observations' && echo yes || echo no)"
 
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

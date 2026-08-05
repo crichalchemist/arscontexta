@@ -44,7 +44,18 @@ case "$KEY" in
     NESTED="$PROJECT_DIR/ops/config.yaml"
     SECTION="${KEY%%.*}"
     FIELD="${KEY#*.}"
-    [ -f "$NESTED" ] || { echo "$DEFAULT"; exit 0; }
+    # ABSENT AND UNREADABLE ARE DIFFERENT ANSWERS, and `[ -f ]` cannot tell them
+    # apart. A config the user wrote but this process cannot open returned the
+    # DEFAULT at rc 0 with nothing on stderr: `[ -f ]` tests existence, and awk's
+    # own `2>/dev/null` swallowed the permission error, so an empty LINE read as
+    # "not configured". A vault whose owner set 20 was silently told 10 — the
+    # precise failure divergence 3 exists to prevent, inside the routing added to
+    # fix it. Reproduced with `chmod 000 ops/config.yaml`.
+    if [ ! -e "$NESTED" ]; then echo "$DEFAULT"; exit 0; fi
+    if [ ! -r "$NESTED" ]; then
+      printf 'read_config: %s exists but cannot be read (permissions?): %s\n' "$NESTED" "$KEY" >&2
+      exit 1
+    fi
 
     # The field's raw line, if the section exists and contains it. Section ends at
     # the next column-0 line, so a same-named field in a different section cannot
@@ -79,9 +90,16 @@ esac
 
 CONFIG_FILE="$PROJECT_DIR/.arscontexta"
 
-if [ ! -f "$CONFIG_FILE" ]; then
+# Same distinction on the bare-key path, which had the identical hole: a
+# `.arscontexta` at chmod 000 returned the default rather than saying it could
+# not be read. Both paths now separate "absent" from "unreadable".
+if [ ! -e "$CONFIG_FILE" ]; then
   echo "$DEFAULT"
   exit 0
+fi
+if [ ! -r "$CONFIG_FILE" ]; then
+  printf 'read_config: %s exists but cannot be read (permissions?): %s\n' "$CONFIG_FILE" "$KEY" >&2
+  exit 1
 fi
 
 # Simple YAML key-value reader (top-level scalar keys only)

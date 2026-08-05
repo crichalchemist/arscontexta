@@ -136,6 +136,18 @@ truth_check_files() {
 # Anchored on `^echo "<n>. `, the form every check header uses, so adding a check
 # updates this without anyone remembering to. A count of zero means the anchor
 # moved, not that the guard lost its checks.
+# Test SUITES named in CLAUDE.md's verification fence — a different quantity from
+# truth_check_files (which counts every gate FILE, standalone checks included).
+# The prose "the N test suites each run under both shells" went stale twice
+# without anyone noticing, because no claim row read it.
+truth_fence_suites() {
+    local _n
+    [ -r CLAUDE.md ] || return 1
+    _n=$(awk '/^for s in bash zsh; do/,/^done/' CLAUDE.md | /usr/bin/grep -c 'test\.sh' || true)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+
 truth_portability_checks() {
     local _n
     [ -f reference/check-portability.sh ] || return 1
@@ -224,6 +236,7 @@ reference/lib/frontmatter.sh|portability check count (word)|s/.*runs \([a-z][a-z
 reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
 skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
 CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z-]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
+CLAUDE.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) test suites each run under both.*/\1/p|truth_fence_suites|
 CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
 CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure

@@ -47,7 +47,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 ### Verification
 
 There are thirteen executable checks. Twelve run in CI (`.github/workflows/checks.yml`) on every push.
-Three defects shipped here were bash/zsh forks, so **the six test suites each run under both
+Three defects shipped here were bash/zsh forks, so **the eight test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
 harness rather than its subject.
@@ -65,7 +65,7 @@ for s in bash zsh; do
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
-  $s reference/test/hook-config.test.sh                  # 24/24
+  $s reference/test/hook-config.test.sh                  # 40/40
 done
 ```
 
@@ -77,7 +77,7 @@ done
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear", and a bump that moves some declared sites and not others (including two fields of the *same* file, which no file-to-file comparison sees) |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
-| `hook-config.test.sh` | the only gate that executes `session-orient.sh` or `vaultguard.sh` at all. Before it, four of five hook scripts could be broken with every other gate green — measured by mutation, one script at a time. An unparseable config value silently becoming the default, and `session-orient.sh` ignoring its configured threshold, are the two defects divergence 3 documents; `vaultguard.sh` decides whether **every** plugin hook runs, so inverting its inertness fires auto-commit in every repo the plugin is installed in |
+| `hook-config.test.sh` | the only gate that executes `session-orient.sh` or `vaultguard.sh` at all. Before it, three of five hook scripts could be broken with every other gate green, and `session-orient.sh` had only TEXTUAL coverage — `threshold-namespace` checks that it NAMES its config key, so a break that keeps the name and ignores the value passes there (52/0) and fails only here. Measured by mutation, one script at a time. An unparseable config value silently becoming the default, and `session-orient.sh` ignoring its configured threshold, are the two defects divergence 3 documents; `vaultguard.sh` decides whether **every** plugin hook runs, so inverting its inertness fires auto-commit in every repo the plugin is installed in |
 | `check-placeholder-count.sh` | a backport that HARDCODED a vault's vocabulary into a `skill-sources/` template — `nodes/` where `{vocabulary.notes}` stood — shipping one user's dialect to every future system. The only gate that reads a git range, so CI needs `fetch-depth: 0`; it exits 2, not 0, where the merge base is unreachable |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
 | `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
