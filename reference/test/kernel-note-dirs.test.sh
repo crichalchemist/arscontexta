@@ -521,9 +521,15 @@ rm -rf "$ROOT"
 # critique ("a fix verified against the field vault only proves that `nodes`
 # joined the hardcoded list") applied to this suite. zzz-meta is in no list.
 V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
-mkdir -p "$V/zzz-meta" "$V/ops"
+# NO ops/ DIRECTORY SURVIVES. The first version of this fixture kept one alive
+# solely to hold the manifest, which is not a renamed vault — it is two
+# directories, and it passed against a resolver that reads the manifest from a
+# hardcoded ops/ path. The comment above quotes this repo's critique of a fix
+# verified against a shape that cannot fail, and then committed it.
+mkdir -p "$V/zzz-meta"
 mv "$V/ops/observations" "$V/ops/tensions" "$V/zzz-meta/"
-printf 'vocabulary:\n  notes: "zzz-arbitrary"\n  ops: "zzz-meta"\n' > "$V/ops/derivation-manifest.md"
+printf 'vocabulary:\n  notes: "zzz-arbitrary"\n  ops: "zzz-meta"\n' > "$V/zzz-meta/derivation-manifest.md"
+rm -rf "$V/ops"
 OUT=$(c1 "$V")
 eq "C1: an ops dir renamed via the manifest RESOLVES"    "fail" \
    "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"

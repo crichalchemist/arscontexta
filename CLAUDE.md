@@ -71,7 +71,7 @@ done
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** — 74 matching lines carrying 78 field references across 17 distinct names, three different quantities that a review and I measured differently until the decomposition was written into the check — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** — 74 matching lines carrying 77 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 74 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
@@ -374,9 +374,16 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the **thirteen** checks above enforce — twelve of
-them in CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across all
-**24** steps, the same count `main` carries.
+not a claim you should take on trust: it is what the thirteen checks above enforce — twelve of them
+in CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across every step in
+`.github/workflows/checks.yml`.
+
+**THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE.** It carried four — ten / nine / 19 / 18
+against a true 13 / 12 / 24 / 24 — and the two counts that survive here are spelled as words that
+the gate's existing rows already read elsewhere in this file. The step count is not restated at all:
+it was the one that rotted worst, because "`main` carries 18" is a claim about another branch that
+goes stale on MERGE with no diff to notice. A number stated twice in one document is a number that
+can disagree with itself, and the cheapest fix is to state it once.
 
 **These four numbers were stale by four, one, five and six respectively until 2026-08-05, in the
 paragraph introducing a list about numbers going stale.** They read ten / nine / 19 / 18 against a

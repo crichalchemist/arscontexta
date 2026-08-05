@@ -237,7 +237,7 @@ Your system captures and processes friction signals through two channels:
 When you notice friction, surprises, process gaps, or methodology insights during work, capture them immediately as atomic notes in ops/observations/. Each observation has a prose-sentence title and category (friction | surprise | process-gap | methodology).
 
 ### Tensions (ops/tensions/)
-When two {DOMAIN:notes} contradict each other, or an implementation conflicts with methodology, capture the tension in ops/tensions/. Each tension names the conflicting notes and tracks resolution status (pending | resolved | dissolved).
+When two {DOMAIN:notes} contradict each other, or an implementation conflicts with methodology, capture the tension in ops/tensions/. Each tension names the conflicting notes and tracks a resolution status. The status vocabulary is declared once, in the Self-Evolution block — this sentence used to repeat three of its values, which made it a second declaration that could silently fall behind, and it did.
 
 ### Accumulation Triggers
 - **10+ pending observations** → Run /{DOMAIN:rethink} to triage and process

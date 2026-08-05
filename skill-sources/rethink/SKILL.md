@@ -203,6 +203,7 @@ Assign exactly one disposition per observation or tension:
 | IMPLEMENT | Operational guidance that should change the system | "System should do X differently." Points to a concrete improvement in context file, template, or skill. | Update the specific file, set `status: implemented`, add `implemented_in: [filepath]` |
 | METHODOLOGY | Friction pattern that should inform agent behavior | Behavioral learning. Not a domain insight (PROMOTE) or a system change (IMPLEMENT) — a methodology learning about HOW to operate. | Create or update methodology note in `ops/methodology/`, set `status: implemented`, add `implemented_in: ops/methodology/[file]` |
 | ARCHIVE | Session-specific, no longer relevant | One-session-specific with no lasting value. Already addressed by later work. Superseded by newer evidence. | Set `status: archived`, add `archived_reason: [why]` — and name the superseding item if there is one |
+| BLOCKED | Real, but waiting on work outside this system | TENSIONS ONLY. An extraction that has not run, a source not yet available, a decision someone else owns. Distinguish from KEEP PENDING: that is "not enough evidence", this is "evidence is fine, the blocker is elsewhere". | Set `status: blocked` and say what it is blocked on. NOT counted toward the /{DOMAIN:rethink} threshold |
 | KEEP PENDING | Not enough evidence yet | Might matter but need more data. Part of a pattern that has not fully emerged. Single data point that could go either way. | No change — leave `status: pending` |
 
 **Triage heuristics for observations:**
@@ -285,7 +286,15 @@ After user confirmation, apply all dispositions in order:
 **For KEEP PENDING items:**
 1. No changes — leave in place
 
-**Update MOCs:** After triage execution, update `ops/observations.md` and `ops/tensions.md` to reflect status changes. Move entries between Pending/Promoted/Archived/Resolved/Dissolved sections as appropriate.
+**For BLOCKED items (tensions only):**
+1. Set `status: blocked` and state the blocker in the note body — what has to happen elsewhere, and
+   ideally who or what owns it. A `blocked` with no named blocker is the same unfalsifiable state an
+   `implemented` with no `implemented_in:` is.
+2. Do NOT count it toward the /{DOMAIN:rethink} threshold. That threshold exists to trigger review,
+   and re-reviewing something whose blocker has not moved is exactly the routing defect it causes.
+3. Revisit when the blocker clears: `blocked` is a live state, not an archive.
+
+**Update MOCs:** After triage execution, update `ops/observations.md` and `ops/tensions.md` to reflect status changes. Move entries between Pending/Promoted/Blocked/Archived/Resolved/Dissolved sections as appropriate.
 
 ---
 

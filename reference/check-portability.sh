@@ -573,28 +573,33 @@ fi
 # the contrasting case and IS scanned — those recipes compose into a generated
 # vault's CLAUDE.md verbatim.
 #
-# BORN RED AT 74 ACROSS 25 FILES AND 17 FIELDS, and that is the point rather
+# BORN RED AT 74 ACROSS 25 FILES AND 16 FIELDS, and that is the point rather
 # than a defect. The plan's Step 1 says count the copies first: if any exist,
 # this is a conversion and not a gate. Converting 74 sites is not this task;
 # making them visible and un-growable is. A GREEN RUN THEREFORE MEANS "no NEW
 # hand-rolled parse", NEVER "none exists".
 #
-# THE THREE NUMBERS ARE DIFFERENT QUANTITIES AND THE DECOMPOSITION IS PUBLISHED,
-# because a review measured 16 fields where this said 17 and neither was wrong:
-# 74 LINES match, carrying 78 FIELD REFERENCES (some lines name two), across 17
-# DISTINCT NAMES. Count occurrences, not lines, or the second field on a shared
-# line is invisible. Spec G framed this ban as being about `status:` alone; the
-# spread is `type` 24, `description` 14, `status` 11, `topics` 8, `mined`,
-# `methodology` and `created` 3 each, `source` and `category` 2 each, then eight
-# singletons — 9 named + 8 = 17. Re-derive:
+# THREE DIFFERENT QUANTITIES: 74 LINES match, carrying 77 FIELD REFERENCES (some
+# lines name two), across 16 DISTINCT NAMES. Spec G framed this ban as being
+# about `status:` alone; the spread is `type` 24, `description` 14, `status` 11,
+# `topics` 8, `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each,
+# then seven singletons — 9 named + 7 = 16.
+#
+# THE RE-DERIVE COMMAND MUST USE THIS CHECK'S OWN DETECTOR, and the first version
+# of this comment did not. It matched a BARE `'^field:'` with no command prefix,
+# which yields 75/78/17 — it picks up reference/test/threshold-namespace.test.sh,
+# where `'^self_evolution:'` is an argument to a test helper rather than a
+# pattern given to grep. So the published derivation disagreed with the gated 74
+# sitting three lines above it, inside the comment written to stop precisely
+# that. Keep the `(grep|rg)` prefix; it is what makes the numbers one measurement.
 #
 #   find skills skill-sources reference generators platforms presets hooks agents scripts \
 #        \( -name '*.md' -o -name '*.sh' -o -name '*.template' \) | while IFS= read -r f; do
 #     case "$f" in reference/lib/*|reference/check-portability.sh|\
 #                  reference/test/guard-failure.test.sh|reference/test/fence-isolation.test.sh)
 #       continue;; esac
-#     sed 's/#.*$//' "$f" | /usr/bin/grep -oE "'\^[a-z_]+:"
-#   done | tr -d "'^:" | sort | uniq -c | sort -rn
+#     sed 's/#.*$//' "$f" | /usr/bin/grep -oE "(grep|rg) [^|]*'\^[a-z_]+:"
+#   done | /usr/bin/grep -oE "'\^[a-z_]+:" | tr -d "'^:" | sort | uniq -c | sort -rn
 #
 # KNOWN LIMITATIONS, stated because the previous version's limitations section
 # implied a guarantee it did not deliver:

@@ -58,10 +58,16 @@ case "$FILE" in
     #    A generated vault renames its notes directory — the field
     #    vault's is `nodes/` — so on the very vault whose defect
     #    motivated this guard, the filter excludes every note before
-    #    the guard is reached. The TEMPLATE spells it
-    #    `{{NOTES_DIR:-notes}}/*` and does not have this problem; this
-    #    hook and that template disagree, which is divergence 16's
-    #    shape in the file that guards against it.
+    #    the guard is reached. The TEMPLATE spells that filter with a
+    #    NOTES_DIR placeholder, which LOOKS like it avoids the problem
+    #    and does not actually avoid it: nothing in this repo
+    #    substitutes that placeholder — session-orient.sh records the
+    #    same of its two neighbours — and a doubled-brace marker is not
+    #    shell expansion, so an unsubstituted arm matches a literal
+    #    path and fires on nothing. BOTH SIDES ARE BROKEN, differently.
+    #    An earlier version of this comment credited the template with
+    #    a fix a placeholder cannot deliver, which is the same
+    #    over-credit this whole block exists to prevent.
     #
     # Neither is fixed here: widening the matcher changes what fires on
     # every edit in every installed vault, and widening the filter

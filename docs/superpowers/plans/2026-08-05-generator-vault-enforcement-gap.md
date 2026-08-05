@@ -188,7 +188,7 @@ would have been the ledger, it is written into this section instead, which is tr
 
 | # | Deferral | Landed in |
 |---|---|---|
-| 1 | **74 hand-rolled frontmatter parses** across 25 files and 17 fields remain unconverted. check 7 makes them visible and un-growable; converting them is separate work. | `reference/check-portability.sh` check-7 header + its `FM_ALLOW` reasons; `CLAUDE.md` gate table |
+| 1 | **74 hand-rolled frontmatter parses** across 25 files and 16 fields remain unconverted. check 7 makes them visible and un-growable; converting them is separate work. | `reference/check-portability.sh` check-7 header + its `FM_ALLOW` reasons; `CLAUDE.md` gate table |
 | 2 | **`session-orient.sh.template` still parses frontmatter naively** while the plugin's own `session-orient.sh` was converted on Spec F. A live plugin/template split, and the clearest single instance of this spec's three-tier finding. | `FM_ALLOW` entry states it; divergence 16 (Task 5 Step 2) |
 | 3 | **`generators/features/*.md` emit naive `rg '^status: …'` recipes** into generated vaults' docs. A recipe cannot source a library the way a fence can, so converting them changes what generation emits. | `FM_ALLOW` entries; already in `CLAUDE.md`'s divergence 7-9 closed record |
 | 4 | **`platforms/shared/skill-blocks/` carries 4 naive parses and cannot be fixed in place** — check 4 pins the tree against a cksum manifest. Same standing as the won't-fix already recorded for that tree. | `FM_ALLOW` entries; `CLAUDE.md` § Won't fix |

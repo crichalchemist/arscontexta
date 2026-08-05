@@ -64,8 +64,26 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 #
 # The candidate list survives as a FALLBACK, for vaults with no manifest.
 resolve_ops_dir() {
-    _rod_ops=$(_vocab_dir "$1/ops/derivation-manifest.md" ops 2>/dev/null) \
-      || _rod_ops=$(_vocab_dir "$1/ops/config.yaml" ops 2>/dev/null) || _rod_ops=""
+    # THE MANIFEST IS FOUND BY SHAPE, NOT AT AN ASSUMED PATH, and that is the
+    # correction a second review caught. The first version of this vocabulary
+    # read spelled it "$1/ops/derivation-manifest.md" — so to find the file that
+    # says where `ops` is, you had to already know where `ops` is. On a vault
+    # that genuinely renamed it (no ops/ directory at all) the read failed, the
+    # candidate list found nothing, and C1 printed "self-evolution not enabled"
+    # over real violations: the same false message, one layer up, in the commit
+    # that replaced a shared hardcoded list to stop producing it.
+    #
+    # -maxdepth 2 because the manifest lives one directory below the vault root
+    # whatever that directory is called. `head -1` because two manifests would be
+    # a malformed vault, and picking one beats failing closed on a vault whose
+    # observations are readable.
+    _rod_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    _rod_ops=""
+    [ -n "$_rod_man" ] && _rod_ops=$(_vocab_dir "$_rod_man" ops 2>/dev/null)
+    if [ -z "$_rod_ops" ]; then
+        _rod_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+        [ -n "$_rod_cfg" ] && _rod_ops=$(_vocab_dir "$_rod_cfg" ops 2>/dev/null) || _rod_ops=""
+    fi
     if [ -n "$_rod_ops" ] && [ -d "$1/$_rod_ops/$2" ]; then
         printf '%s' "$_rod_ops/$2"; return 0
     fi
