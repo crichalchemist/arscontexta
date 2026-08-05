@@ -70,7 +70,7 @@ rg -L '^description:' {DOMAIN:notes}/*.md
 # Find {DOMAIN:notes} by {DOMAIN:topic map}
 rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 
-# Cross-field queries — find pending tensions
+# Cross-field queries — find unresolved tensions (pending or open)
 rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
 
 # Count {DOMAIN:notes} by type

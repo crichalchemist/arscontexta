@@ -100,11 +100,17 @@ outcome points somewhere, it carries the field that names the target:
 - `open` — reviewed, still stands, and its fix is not in any file yet
 - `promoted` — it became a {DOMAIN:note}; add `promoted_to: [[note title]]`
 - `implemented` — the fix exists; add `implemented_in: path/to/file`
-- `archived` — no longer applicable, or subsumed; **no target field**, so say which and why in the body
+- `archived` — no longer applicable, or subsumed; add `archived_reason: [why]`, and name the
+  superseding item if there is one
 
 **An outcome without its field is unfalsifiable.** Nothing distinguishes a real fix from a
-closed-by-fiat one, which is the whole reason `implemented_in:` and `promoted_to:` exist. Add
-the field in the same edit that sets the status — not later, because later does not happen.
+closed-by-fiat one, which is the whole reason these fields exist. Add the field in the same edit
+that sets the status — not later, because later does not happen.
+
+**`resolution:` is the free-text companion to any of them** — one or two sentences on what actually
+happened, for a reader who has only this file. The target fields say *where* it went; `resolution:`
+says *what* was decided. Systems in the field use it more than any single target field, which is a
+reasonable signal that a pointer alone does not carry enough.
 
 **Counting open work means matching BOTH `pending` and `open`.** Matching one alone reads zero
 on a vault that uses the other, and that failure is silent: a threshold that never fires looks
