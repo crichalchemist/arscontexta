@@ -363,8 +363,10 @@ Counting the CI steps takes the same care: `grep -c '^      - name:'` returns on
 count, because `actions/checkout` carries no `name:`. Count step *items* (`^      - `), not names:
 
 ```bash
-grep -c '^      - ' .github/workflows/checks.yml                      # 24, this branch
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 18
+grep -c '^      - ' .github/workflows/checks.yml                      # 24, this tree
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 24, main — equal
+                                                                      # since the CI-hardening
+                                                                      # branch merged
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
 ```
 
