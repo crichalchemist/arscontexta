@@ -169,6 +169,26 @@ truth_kernel_primitives() {
     printf '%s' "$_n"
 }
 
+# check 7's allowlist totals. Ungated, these drift the moment an entry drains —
+# the check goes green at 73/24 while CLAUDE.md still says 74/25. Global
+# constraint: gate every number you mint, in the commit that mints it.
+truth_fm_sites() {
+    local _n
+    [ -f reference/check-portability.sh ] || return 1
+    _n=$(awk '/^FM_ALLOW="/{f=1;next} f&&/^"/{exit} f&&NF{s+=$2} END{print s+0}' \
+           reference/check-portability.sh)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+truth_fm_files() {
+    local _n
+    [ -f reference/check-portability.sh ] || return 1
+    _n=$(awk '/^FM_ALLOW="/{f=1;next} f&&/^"/{exit} f&&NF{c++} END{print c+0}' \
+           reference/check-portability.sh)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+
 truth_portability_checks() {
     local _n
     [ -f reference/check-portability.sh ] || return 1
@@ -261,6 +281,8 @@ CLAUDE.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) 
 README.md|kernel primitives|s/.*`reference\/kernel\.yaml` -- \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|kernel primitives|s/.*`reference\/kernel\.yaml` declares the \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
+CLAUDE.md|check-7 allowlist sites|s/.*born red at \([0-9][0-9]*\) sites across.*/\1/p|truth_fm_sites|
+CLAUDE.md|check-7 allowlist files|s/.*born red at [0-9][0-9]* sites across \([0-9][0-9]*\) files.*/\1/p|truth_fm_files|
 CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction

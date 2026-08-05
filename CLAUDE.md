@@ -71,7 +71,7 @@ done
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 39 sites across 19 files**, so green means "no NEW one" and never "none exists") |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** and 17 distinct fields, so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
@@ -776,7 +776,7 @@ where a record actually goes. And **every plan written from this branch forward*
 `## Deferrals` slot whose value is one line per deferral naming the tracked file it landed in, or
 the literal word `none`.
 
-**That is forward-binding, not a description of the directory — it is 2 of 8 today.** The six older
+**That is forward-binding, not a description of the directory — it is 3 of 9 today.** The six older
 plans have no such section, and retrofitting `none` into plans nobody has audited for deferrals
 would manufacture the exact kind of record this entry exists to stop. The wording here first read
 "every plan under `docs/superpowers/plans/` now carries", which was false by one command inside the
@@ -785,7 +785,7 @@ commit whose subject is records not matching reality:
 ```bash
 for p in docs/superpowers/plans/*.md; do
   printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
-done                                    # 2 of 8 carry it; the other six predate the convention
+done                                    # 3 of 9 carry it; the other six predate the convention
 ``` A commit-message gate was assessed and **rejected**, measured in both
 directions — the reasoning and the numbers are in
 `docs/superpowers/plans/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
@@ -986,25 +986,99 @@ notice if it broke — and Spec F's own closing note said the enum had been spli
 once already.
 
 ```bash
-# (a) no gate mentions the generator enum at all — expect no output
+# (a) BUILT on fix/spec-h-enforcement-gap -- now names check-doc-claims.sh
 for f in reference/check-*.sh reference/test/*.test.sh; do
   /usr/bin/grep -lE 'generators/.*status|atomic-notes|schema\.md' "$f"; done
-# (b) no gate forbids inlining the frontmatter library — expect 0
+# (b) BUILT on the same branch -- check 7; was 0, now non-zero
 /usr/bin/grep -c 'frontmatter' reference/check-portability.sh
-# the three note-status declarations, which must agree — expect ONE line.
-# The spelling is normalised first: the same enum is written three ways
-# (`a | b`, `[a, b]`, and backticked prose), so a bare sort -u returns 3 and
-# reads as a split that is not there. Compare the VALUE SET, not the text.
+# The note-status declarations, which must agree. Normalise the spelling first:
+# the same enum is written three ways (`a | b`, `[a, b]`, and backticked table
+# cells), so a bare sort -u returns 3 and reads as a split that is not there.
 /usr/bin/grep -rho 'preliminary[^]]*archived' generators/ \
   | tr -d '`|,' | tr -s ' ' | sed 's/^ *//;s/ *$//' | sort -u        # 1 line
-/usr/bin/grep -rl 'preliminary' generators/ | wc -l                   # 3 files
+/usr/bin/grep -rl 'preliminary' generators/ | wc -l                   # 3 FILES
+/usr/bin/grep -rc 'preliminary' generators/ | /usr/bin/grep -v ':0'   # 4 DECLARATIONS
 ```
 
-Not built here on purpose: (a) needs a decision about which file is authoritative when they disagree,
-and `schema.md` calling itself "the single source of truth for field validation" is a claim about
-generated vaults rather than about this repo's own files. (b) is the same gate divergence 12 and 13
-both defer, and belongs with them rather than bolted on alone. Both are gate-design questions for the
-next CI-hardening pass; what this entry fixes is that they were invisible.
+**AMENDED 2026-08-05 — both gates now exist, and this entry was wrong about its own subject in two
+ways.** Amended rather than superseded, because it is referenced by number.
+
+**It counts FILES where the unit is DECLARATIONS, and the two differ.** The entry names
+`atomic-notes.md:94`, `schema.md:137` and `templates.md:30` — three files, and it misses
+`schema.md:30`, a fourth declaration in a table row inside a file it already lists. Its own
+verification command is `grep -rl … | wc -l`, which counts files, so it structurally could not have
+seen it. **A file-to-file comparison cannot see two fields of ONE file disagree** — verbatim the
+blind spot `bump-version.test.sh` exists for, one tree over. The gate compares declarations; both
+commands are above so the discrepancy is visible rather than inferable.
+
+**Its tension-enum citation is stale in address and in content.** It reads "`self-evolution.md:195`
+`pending | resolved | dissolved`"; the tension enum is now `:218` with eight values, changed by
+Task 1 of this branch. An entry citing a line AND a value set has two things that rot, which is why
+neither is quoted here without the command beside it.
+
+**What each gate does and does not cover** — the honest half, since (a)'s design question was real:
+`check-doc-claims.sh` asserts cross-declaration agreement for the NOTE enum, which is the only one
+declared more than once. That property is **vacuous** for the observation and tension enums, declared
+once each. The tension enum is covered a different way — its three recipe CONSUMERS in `generators/`
+must only match values it declares, which is the C3 defect this branch shipped and caught. The
+observation enum is **not covered**: its consumer is the SessionStart hook, outside that gate's tree.
+No authority decision was needed, because the gate reports a split without naming a winner.
+
+(b) is `check-portability.sh` check 7. Its size is stated once, in the gate table near the top of
+this file, and gated there — see that row rather than a second copy here, because this entry already
+demonstrates what a duplicated count does. What belongs here is the SHAPE: it was written first with
+a detector narrower than the property, missing the flagless spelling `rg '^status: open' dir/`
+entirely, and one of the sites it missed is named by line in the closed record for divergences 7-9.
+That is divergence 12's finding reproduced inside the commit that cites it, and it is the second
+reason this entry exists. A green run means "no NEW hand-rolled parse", never "none exists". It does
+NOT cover a copied-out awk parser, an unanchored or double-quoted equivalent, or an inlined copy of
+`link-extraction.sh` — which remains convention only, so divergences 12 and 13 are unaffected.
+
+**16. A generated vault has THREE tiers of validation and they do not connect — and no gate closes
+this, because every gate this repo has reads THIS repo.** Filed 2026-08-05 from
+`fix/spec-h-enforcement-gap`. Distinct from every entry above: those are defects with a fix. This is
+a structural property of the generator/vault relationship, and it is recorded because a reader who
+does not know it will keep writing rules that cannot arrive.
+
+| tier | example in the field vault | reachable from here? |
+|---|---|---|
+| generated, thin | `.claude/hooks/validate-note.sh` — 42 lines; checks `description`, `topics` | **only in a NEW vault**; no re-sync mechanism exists |
+| hand-written, enforced | `.claude/hooks/validate-node-schema.py` — 299 lines, wired PostToolUse, **blocks commits** | **never — it has no generator counterpart at all** |
+| prompt-based, soft | `/validate` reading `_schema` | ships, but fires only on invocation and only if the agent complies |
+
+**The consequence, stated plainly: a rule added to this repo today reaches new vaults only, and
+cannot reach an existing vault's real gate by any path.** "Fix it in the generator" fixes it
+*forward*. That is not pessimism — it is the difference between a spec that closes a class and one
+that believes it did.
+
+**This branch produced a clean instance rather than an argument.** Spec F converted
+`hooks/scripts/session-orient.sh` to the frontmatter library — it sources `ops/lib/frontmatter.sh`,
+fails loud when absent, and counts with `count_notes_by_field`. The template a generated vault
+derives from, `platforms/claude-code/hooks/session-orient.sh.template`, was **not** converted and
+still reads `grep -rl '^status: pending\|^status: open'`, silently, with no library and no guard. So
+the plugin's own hook is frontmatter-strict and what vaults get is not. It is the same file pair
+divergence 3 already flags for the threshold duplication — **two independent defects, one pair of
+files, neither reachable by any gate.** Check 7 allowlists it with the blocker stated; it is not
+merely undone.
+
+```bash
+# the plugin's own hook: sources the library, fails loud
+/usr/bin/grep -n 'frontmatter\|count_notes_by_field' hooks/scripts/session-orient.sh
+# what a vault derives from: neither
+sed 's/#.*$//' platforms/claude-code/hooks/session-orient.sh.template \
+  | /usr/bin/grep -n "grep -r[Llcq]* '\^status"
+```
+
+**`/arscontexta:upgrade` is the nearest thing to a mechanism, and divergence 5 records that it has
+never been invoked as a slash command against a real vault** — structurally, since a slash command
+runs in the session's working directory and cannot be pointed at another tree. Its repairs were
+hand-executed against an `rsync` copy once, which found six defects. A design for real re-sync is its
+own spec and is explicitly out of scope for Spec H.
+
+**What would close this is not a check.** It is a generated-artifact refresh mechanism, plus a
+generator counterpart for the enforced tier that today exists only as hand-written vault code. Both
+are generation-surface changes. Until then, every "we fixed it in the generator" in this file should
+be read as "we fixed it for vaults not yet created".
 
 ### Closed on `fix/exhaustive-dangling-scan`
 
@@ -1232,7 +1306,7 @@ next CI-hardening pass; what this entry fixes is that they were invisible.
   why the `cmp` guard is part of the recipe rather than a note beside it.
 
 - **No shared frontmatter parser, a split `status` enum, and a fixture blind to both** — divergences
-  7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1`) is now the single definition,
+  7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1` when that record was written; **3** as of `fix/spec-h-enforcement-gap`, which added the readability guard and symlink traversal) is now the single definition,
   alongside `link-extraction.sh` and versioned the same way. Frontmatter is **strictly** the block
   between a `---` on line 1 and the next `---`; keys must start at column 0; the field name is matched
   with `index()`, never a regex.

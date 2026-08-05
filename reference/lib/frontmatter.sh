@@ -104,7 +104,7 @@
 
 # Contract version. Bump on any BEHAVIOR change (delimiter rules, key matching,
 # quote stripping, recursion semantics). Callers and /arscontexta:upgrade read it.
-FRONTMATTER_VERSION=2
+FRONTMATTER_VERSION=3
 
 # Check dependencies and directory argument.
 _fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
@@ -187,7 +187,32 @@ list_notes_by_field() {
   # a failure signalled by a flag inside it would be discarded and the caller would
   # see a short list as a legitimately short list. The touch-file is how
   # link-extraction.sh solves the same problem; the alternative is silence.
-  find "$dir" -type f -name '*.md' | while IFS= read -r p; do
+  # -H FOLLOWS A SYMLINK GIVEN ON THE COMMAND LINE, and without it this function
+  # certifies a path it then does not scan. `test -r`/`-x` dereference, so a
+  # symlinked directory passes the guard above; `find <symlink>` without -H does
+  # NOT descend, so the scan returned 0 notes at rc 0 — a plausible zero over a
+  # directory that has content. Measured on a 2-note fixture: real dir 2,
+  # symlink to it 0. Every caller inherits it, and validate-kernel's C1 would
+  # print its green "no note has reached an outcome status yet" over a vault
+  # whose ops/observations is a symlink.
+  #
+  # FIND'S OWN rc IS CHECKED, because an unreadable SUBdirectory is not the case
+  # the touch-file below covers. That mechanism catches unreadable FILES; a
+  # directory one level down that cannot be traversed makes find print
+  # "Permission denied" to stderr and exit non-zero, while the pipeline's status
+  # is the `while`'s — so the count came back short at rc 0. The guard at the top
+  # of this function checks the ROOT only, and its message claimed more than that.
+  # Measured: 2-note fixture with one note under a chmod-000 subdirectory
+  # returned count=1 rc=0.
+  _fm_list=$(find -H "$dir" -type f -name '*.md' 2>/dev/null); _fm_find_rc=$?
+  if [ "$_fm_find_rc" -ne 0 ]; then
+    rm -f "$errf"
+    echo "error: frontmatter: cannot fully traverse '$dir' (find rc=$_fm_find_rc)" >&2
+    echo "       refusing to report a count that would silently be short" >&2
+    return 1
+  fi
+  printf '%s\n' "$_fm_list" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
     if [ ! -r "$p" ]; then
       touch "$errf"
       continue

@@ -7,9 +7,11 @@
 # NOTHING ENFORCES THAT SENTENCE. It used to end "check-portability.sh enforces
 # that", and that was false. That script runs seven checks — PCRE grep, wiki-link
 # capture using negated classes, PCRE via ripgrep, the frozen skill-blocks
-# manifest, AGENTS.md being a symlink, and
-# interpolated wiki-link matchers — and none detects an inlined copy of
-# anything defined here. The rule is real and still binding; the enforcement is
+# manifest, AGENTS.md being a symlink, interpolated wiki-link matchers, and
+# hand-rolled frontmatter parsing — and none detects an inlined copy of
+# anything defined HERE. Check 7 is the near miss to be precise about: it bans
+# inlining reference/lib/frontmatter.sh, the OTHER library, and covers nothing
+# in this file. The rule here is real and still binding; the enforcement is
 # convention. Believing otherwise is how a green run gets read as proof, which is
 # what happened: matcher sites survived four gates for months. Owner of the gap:
 # the CI-hardening spec.

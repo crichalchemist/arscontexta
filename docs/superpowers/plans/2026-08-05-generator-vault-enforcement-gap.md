@@ -181,11 +181,36 @@ Final whole-branch review on the most capable model before `superpowers:finishin
 `none`. An empty section is a failure, not a default.** `.superpowers/` is gitignored; a deferral
 recorded only there does not exist.
 
-```text
-Filled at execution time by Task 5 Step 3. Known candidates carried in from the spec's
-"Deliberately not in scope": the tension-threshold population semantics, the existing-vault
-re-sync mechanism, and building the deterministic `_schema` reader.
-```
+**Every line below names the TRACKED file the deferral landed in.** `.superpowers/sdd/` is
+gitignored, so the SDD ledger does not count — that is divergence 10's entire subject, and two
+commits on earlier branches claimed a record that shipped nowhere. Where a deferral's only home
+would have been the ledger, it is written into this section instead, which is tracked.
+
+| # | Deferral | Landed in |
+|---|---|---|
+| 1 | **39 hand-rolled frontmatter parses** across 19 files and 6 fields remain unconverted. check 7 makes them visible and un-growable; converting them is separate work. | `reference/check-portability.sh` check-7 header + its `FM_ALLOW` reasons; `CLAUDE.md` gate table |
+| 2 | **`session-orient.sh.template` still parses frontmatter naively** while the plugin's own `session-orient.sh` was converted on Spec F. A live plugin/template split, and the clearest single instance of this spec's three-tier finding. | `FM_ALLOW` entry states it; divergence 16 (Task 5 Step 2) |
+| 3 | **`generators/features/*.md` emit naive `rg '^status: …'` recipes** into generated vaults' docs. A recipe cannot source a library the way a fence can, so converting them changes what generation emits. | `FM_ALLOW` entries; already in `CLAUDE.md`'s divergence 7-9 closed record |
+| 4 | **`platforms/shared/skill-blocks/` carries 4 naive parses and cannot be fixed in place** — check 4 pins the tree against a cksum manifest. Same standing as the won't-fix already recorded for that tree. | `FM_ALLOW` entries; `CLAUDE.md` § Won't fix |
+| 5 | **The content-destruction guard counts `[[` inside fenced blocks.** The hook deliberately does not source `link-extraction.sh`, on the precedent divergence 12 records for `session-orient.sh.template`. | comment at the site in `hooks/scripts/write-validate.sh` |
+| 6 | **`Write`-only PostToolUse matcher**, so Edit/MultiEdit bypass the guard entirely. Widening it fires on every edit in every installed vault — a scope decision, not a fix. | `SCOPE LIMIT` comment in `hooks/scripts/write-validate.sh` and the vault template |
+| 7 | **One assertion is vacuous and labelled as such** — "TRACKED but not yet in HEAD, silent". Measured: deleting the `cat-file -e` test it nominally guards leaves the suite green, because an absent HEAD blob yields 0 bytes and neither threshold fires on 0. | in-place comment, `reference/test/hook-config.test.sh` |
+| 8 | **`C1`'s violation list caps at 5** with `... and N more`. Human-facing report, not an automated decision, and it discloses both the remainder and the true total — the criterion under which `skill-sources/seed:83`'s `head -5` was assessed and left. | comment at the site in `reference/validate-kernel.sh` |
+| 9 | **`f07b9eb`'s commit message says "Nine assertions"; it was eight.** Not amended — a history rewrite for a message typo costs more than it fixes. | this row |
+| 10 | **`check-doc-claims.sh` takes over two minutes per run** because it executes every suite to get its totals. Fine in CI, prohibitive in a mutation loop — the first Task 2 harness needed 10 runs and was killed at 25 minutes. Speeding it up is its own design question. | this row |
+| 11 | **Two `session-orient.sh` files are outside `check-prose-paths.sh`'s stated scope** and name repo paths in comments and user-visible warnings. The write-validate pair now joins them. | already open in `CLAUDE.md` divergence 5; extended by divergence 16 |
+
+Carried in from the spec's *Deliberately not in scope* and still not in scope, unchanged:
+
+| # | Deferral | Landed in |
+|---|---|---|
+| 12 | **The tension-threshold population semantics** — a change to what `self_evolution.tension_threshold` counts, not a gate. | spec § Deliberately not in scope |
+| 13 | **Re-syncing existing vaults.** `/arscontexta:upgrade` is the nearest mechanism and has never been invoked as a slash command against a real vault. Its own spec. | `CLAUDE.md` divergence 5; divergence 16 (Task 5 Step 2) |
+| 14 | **Building the deterministic `_schema` reader** that would make the authority claim true. A generation-surface change. | spec § Deliberately not in scope; `generators/features/schema.md` narrowed claim |
+
+**Closed rather than deferred, recorded here because it was carried as a deferral mid-branch:**
+"only 1 of 8 promoted tensions carries `promoted_to:`" is no longer open — `C1` asserts it, and the
+field vault's 7 violations are 7 of the 13 it now reports.
 
 ---
 

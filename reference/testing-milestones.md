@@ -6,14 +6,16 @@ Seven validation milestones for the Ars Contexta v1.6 plugin. Each milestone tes
 
 ## Milestone 1: Kernel Validation
 
-**What it tests:** A freshly generated vault contains all 15 universal primitives from kernel.yaml. This is the foundational check — if the kernel is missing primitives, nothing built on top of it will function correctly.
+**What it tests:** A freshly generated vault contains all 16 universal primitives from kernel.yaml. Sixteen, not the fifteen the highest header number suggests — `unique-addresses` ships as `10A` rather than renumbering the rest, so the largest LABEL is 15 and the COUNT is 16. This is the foundational check — if the kernel is missing primitives, nothing built on top of it will function correctly.
 
 **Prerequisites:**
 - A generated vault from /setup (any domain, any preset)
 - The vault must have at least 3 notes created (to exercise link and MOC checks)
 - `validate-kernel.sh` accessible at `./reference/validate-kernel.sh`
 
-**Pass criteria:** 15/15 checks pass (PASS status). WARN is acceptable for semantic search (primitive 8) if the platform does not support qmd and for self space (primitive 9) if disabled via configuration, but all other primitives must be PASS.
+**Pass criteria:** 16/16 PRIMITIVES pass. WARN is acceptable for semantic search (primitive 10) when qmd is absent and for self space (primitive 8) when disabled by configuration; any other WARN or FAIL on a primitive is a real regression.
+
+**Count primitives, not result lines — they are different numbers and this file used to conflate them.** The run emits more result lines than there are primitives: primitive 2 emits two, and `C1` is not a primitive at all (no `kernel.yaml` entry, no `cognitive_grounding`), which is why it is labelled rather than numbered. `C1` may WARN when a vault has no observations or tensions directory — self-evolution is not enabled, so the rule does not apply — and that WARN is outside the criterion above, which is about primitives.
 
 **Verification steps:**
 
@@ -21,8 +23,9 @@ Seven validation milestones for the Ars Contexta v1.6 plugin. Each milestone tes
 # Run kernel validation against the generated vault
 ./reference/validate-kernel.sh /path/to/generated-vault
 
-# Expected: 15 PASS lines, 0 FAIL lines
-# Acceptable: 14 PASS + 1 WARN (semantic search when qmd not configured, or self space when disabled)
+# Expected: every primitive PASSes, 0 FAIL lines. Do NOT count PASS lines against
+# the primitive count — see Pass criteria above; the two differ by design.
+# Acceptable: one WARN for semantic search (qmd absent) or self space (disabled)
 ```
 
 **Expected output on success:**
@@ -67,9 +70,13 @@ C1. Outcome statuses carry their target field
   PASS 12 outcome-status notes, all carry their target field
 
 === Kernel Validation Summary ===
-  PASS: 16
+  PASS: 18
   WARN: 0
   FAIL: 0
+
+# 18 RESULT LINES, 16 primitives, 15 as the highest header number. Three
+# different quantities; the summary reports the first. Primitive 2 emits two
+# lines and C1 is not a primitive.
 
 Kernel contract satisfied — every check above passed.
 ```
@@ -699,7 +706,7 @@ fi
 - validate-kernel.sh accessible
 
 **Pass criteria:** For each preset:
-1. Kernel validation passes (15/15, or 14/15 with WARN for semantic search if qmd not configured, or self space if disabled)
+1. Kernel validation passes (every primitive PASSes, or one WARN for semantic search if qmd not configured, or self space if disabled)
 2. Vocabulary is domain-native (zero cross-domain term leakage)
 3. Interaction constraints are satisfied (no hard constraint violations)
 4. Active feature blocks match the preset's `active_blocks` list (17 blocks available)
@@ -840,7 +847,7 @@ done
 **Expected output on success:**
 
 Each preset should produce:
-- Kernel: 15/15 PASS, or 14/15 PASS + 1 WARN (semantic search if qmd not configured, or self space if disabled)
+- Kernel: every primitive PASSes, or one WARN (semantic search if qmd not configured, or self space if disabled)
 - Vocabulary: domain-native terms present, zero cross-domain leakage
 - Constraints: all coherence checks PASS
 - Features: all active blocks (from 16 available) produce output in context file

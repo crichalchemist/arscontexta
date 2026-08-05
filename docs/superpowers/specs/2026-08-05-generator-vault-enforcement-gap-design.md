@@ -82,6 +82,32 @@ done
 | observations | `status: pending` (`generators/features/self-evolution.md:88`) | `implemented` 26, `open` 12, `archived` 3, **`pending` 0** |
 | tensions | `pending \| resolved \| dissolved` (`:195`) | `open` 7, `resolved` 6, `archived` 6, **`pending` 0**, **`dissolved` 0** |
 
+> **CORRECTION, re-derived 2026-08-05 at execution.** The table above is left as written because it
+> is the record of what this spec believed; this note is what measurement found.
+>
+> **The tension row omits `promoted` 8 — a third of that directory — and the omission is not drift.**
+> The probe beside this table is `for v in open pending implemented archived resolved dissolved`, a
+> CLOSED CANDIDATE LIST reported as a survey. It could only find values already thought of, so a
+> value the repo's own `/rethink` template WRITES was invisible. Acting on the table cost Task 1 a
+> Critical: the first commit "describing what vaults write" left 14 of 27 tension files carrying an
+> undeclared status. **A closed enumeration cannot survey.** The survey form:
+>
+> ```bash
+> . reference/lib/frontmatter.sh
+> for d in observations tensions; do
+>   find ~/second-brain/ops/$d -type f -name '*.md' \
+>     | while IFS= read -r f; do frontmatter_field "$f" status; done | sort | uniq -c | sort -rn
+> done
+> ```
+>
+> Measured 2026-08-05 — observations: `implemented` 26, `open` **13**, `archived` 3.
+> Tensions: **`promoted` 8**, `open` 7, `resolved` 6, `archived` 6. `pending` and `dissolved` are 0
+> in both, as stated. `open` moved 12 → 13 in a day, which is ordinary vault drift; `promoted` was
+> never measured at all.
+>
+> §2's figures re-derived unchanged: **6 of 26**, and **0** real script references outside
+> `node_modules`.
+
 **`implemented` has 26 live uses and is declared in no generator enum at all.** `open` has 19 across
 the two fields and is declared in neither of these two (it was added to the *note* enum by Spec F).
 
