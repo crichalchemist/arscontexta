@@ -593,11 +593,23 @@ check_lib() {                # check_lib <path> <version-var-name> <label>
   # reports a problem rather than hiding one.
   eval "v=\${$2:-0}"
   case "$v" in ''|*[!0-9]*) v=0 ;; esac
+  # THE FLOOR IS 1 AND STAYS 1 — a decision, recorded because a review asked for
+  # one rather than for a particular answer. The floor exists to catch ABSENT or
+  # unparseable, which is a broken vault. It is deliberately NOT raised to track
+  # the current version: doing so would FAIL every vault that has not run
+  # /upgrade, for libraries whose later versions fix real but narrow defects
+  # (frontmatter v2 added a directory-readability guard, v3 symlink traversal and
+  # a find-rc check — a v1 copy is wrong only on trees it cannot fully scan).
+  # Turning a whole fleet red for that is a worse trade than a stale-but-working
+  # copy. What was NOT acceptable is the previous silence: `PASS: library v1`
+  # said nothing about being behind, so a vault carrying a version this repo had
+  # just documented as defective read as healthy. The PASS line now names the
+  # remedy without asserting a failure.
   if [ "$v" -lt 1 ]; then
     echo "FAIL: $3 library is version $v; skills need >= 1"
     echo "      run /arscontexta:upgrade to refresh it"
   else
-    echo "PASS: $3 library v$v"
+    echo "PASS: $3 library v$v (run /arscontexta:upgrade to check for a newer one)"
   fi
 }
 

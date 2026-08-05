@@ -15,9 +15,13 @@
 # flags a line-anchored `'^field:'` grep used to select or count notes — a
 # hand-rolled list_notes_by_field. It does NOT detect a copied-out awk parser,
 # an unanchored or double-quoted equivalent, or an inlined copy of
-# link-extraction.sh, which remains convention only. It is also born red at 39
-# allowlisted sites, so a green run means "no NEW hand-rolled parse", not "none
-# exists". The residue is owned by the CI-hardening spec.
+# link-extraction.sh, which remains convention only.
+#
+# It is born red at 74 allowlisted sites, so a green run means "no NEW
+# hand-rolled parse", not "none exists". (That phrase is on ONE line on purpose:
+# check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 74 is GATED — see
+# the check-7 rows in check-doc-claims.sh, which read this file too; the number
+# stood at 39 here for one commit after the detector was widened, which is why.
 #
 # Writing or editing a SKILL.md? Read reference/skill-authoring.md first.
 #
@@ -188,13 +192,14 @@ list_notes_by_field() {
   # see a short list as a legitimately short list. The touch-file is how
   # link-extraction.sh solves the same problem; the alternative is silence.
   # -H FOLLOWS A SYMLINK GIVEN ON THE COMMAND LINE, and without it this function
-  # certifies a path it then does not scan. `test -r`/`-x` dereference, so a
+  # certifies a path it then does not scan. Both directory-scanning functions in
+  # this file carry it. `test -r`/`-x` dereference, so a
   # symlinked directory passes the guard above; `find <symlink>` without -H does
   # NOT descend, so the scan returned 0 notes at rc 0 — a plausible zero over a
   # directory that has content. Measured on a 2-note fixture: real dir 2,
   # symlink to it 0. Every caller inherits it, and validate-kernel's C1 would
   # print its green "no note has reached an outcome status yet" over a vault
-  # whose ops/observations is a symlink.
+  # whose observations directory is a symlink.
   #
   # FIND'S OWN rc IS CHECKED, because an unreadable SUBdirectory is not the case
   # the touch-file below covers. That mechanism catches unreadable FILES; a
@@ -264,7 +269,20 @@ count_notes_missing_field() {
   errf="/tmp/frontmatter-err-$$"
   rm -f "$errf"
 
-  missing=$(find "$dir" -type f -name '*.md' | while IFS= read -r p; do
+  # -H AND THE find-rc CHECK, same as list_notes_by_field. This function did NOT
+  # get them when v3 landed, and v3's own comment said "Every caller inherits it"
+  # — false for the function 45 lines below it in the same file. Measured before
+  # this fix, on a 2-note fixture: symlinked dir 0 (truth 1), note under a
+  # chmod-000 subdirectory counted short at rc 0.
+  _fm_list=$(find -H "$dir" -type f -name '*.md' 2>/dev/null); _fm_find_rc=$?
+  if [ "$_fm_find_rc" -ne 0 ]; then
+    rm -f "$errf"
+    echo "error: frontmatter: cannot fully traverse '$dir' (find rc=$_fm_find_rc)" >&2
+    echo "       refusing to report a count that would silently be short" >&2
+    return 1
+  fi
+  missing=$(printf '%s\n' "$_fm_list" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
     if [ ! -r "$p" ]; then
       touch "$errf"
       continue

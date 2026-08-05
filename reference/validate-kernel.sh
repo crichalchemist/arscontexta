@@ -50,7 +50,25 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 # C1's message asserting something false. That is the primitive-2 defect
 # (canonical names hardcoded in a validator for a generator whose purpose is
 # renaming them) reintroduced 130 lines below the comment explaining it.
+#
+# IT READS THE VAULT'S OWN VOCABULARY FIRST, and that is the correction a review
+# caught: the first version replaced C1's hardcoded `ops/` with a SHARED
+# hardcoded list. That closed the contradiction between two checks and left the
+# hardcoding — so on a vault that renamed `ops`, C1 still printed "self-evolution
+# not enabled", which is the exact false message the comment below its WARN says
+# this function exists to avoid. `ops` IS a declared vocabulary key: the field
+# vault's ops/derivation-manifest.md carries `ops: "ops"` beside `notes: "nodes"`,
+# and _vocab_dir — thirty lines below — already parses that block for `notes`.
+# Not reading the key the file can already read is the primitive-2 defect with
+# one more entry in the list, which is this repo's own critique of itself.
+#
+# The candidate list survives as a FALLBACK, for vaults with no manifest.
 resolve_ops_dir() {
+    _rod_ops=$(_vocab_dir "$1/ops/derivation-manifest.md" ops 2>/dev/null) \
+      || _rod_ops=$(_vocab_dir "$1/ops/config.yaml" ops 2>/dev/null) || _rod_ops=""
+    if [ -n "$_rod_ops" ] && [ -d "$1/$_rod_ops/$2" ]; then
+        printf '%s' "$_rod_ops/$2"; return 0
+    fi
     for _rod in "ops/$2" "04_meta/logs/$2" "logs/$2" "$2"; do
         [ -d "$1/$_rod" ] && { printf '%s' "$_rod"; return 0; }
     done

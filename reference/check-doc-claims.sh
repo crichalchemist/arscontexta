@@ -281,6 +281,7 @@ CLAUDE.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) 
 README.md|kernel primitives|s/.*`reference\/kernel\.yaml` -- \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|kernel primitives|s/.*`reference\/kernel\.yaml` declares the \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
+reference/lib/frontmatter.sh|check-7 allowlist sites (library header)|s/.*born red at \([0-9][0-9]*\) allowlisted sites.*/\1/p|truth_fm_sites|
 CLAUDE.md|check-7 allowlist sites|s/.*born red at \([0-9][0-9]*\) sites across.*/\1/p|truth_fm_sites|
 CLAUDE.md|check-7 allowlist files|s/.*born red at [0-9][0-9]* sites across \([0-9][0-9]*\) files.*/\1/p|truth_fm_files|
 CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|

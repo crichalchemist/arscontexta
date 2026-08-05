@@ -70,16 +70,19 @@ C1. Outcome statuses carry their target field
   PASS 12 outcome-status notes, all carry their target field
 
 === Kernel Validation Summary ===
-  PASS: 18
+  PASS: 17
   WARN: 0
   FAIL: 0
 
-# 18 RESULT LINES, 16 primitives, 15 as the highest header number. Three
-# different quantities; the summary reports the first. Primitive 2 emits two
-# lines and C1 is not a primitive.
-
 Kernel contract satisfied — every check above passed.
 ```
+
+**Read that `17` as what it is: RESULT LINES.** Three different quantities appear in one run and
+only the first is in the summary — 17 result lines here, **16 primitives**, and **15** as the highest
+header number (they run 1–15 with one spelled `10A`). The block above has 16 numbered headers plus
+`C1`, which is not a primitive. On a real vault the line count runs higher still, because primitive 2
+emits two lines. Matching the summary total against the primitive count is a coincidence when it
+works and a wrong conclusion when it does not.
 
 **Common failure modes and remediation:**
 
@@ -87,8 +90,8 @@ Kernel contract satisfied — every check above passed.
 |---------|-------|-----|
 | FAIL on primitive 1 (YAML frontmatter) | Template generation skipped frontmatter | Check `generators/features/templates.md` — ensure all templates output YAML blocks |
 | FAIL on primitive 3 (MOC hierarchy) | Generated notes lack `type: moc` in frontmatter | Verify MOC template includes `type: moc` in YAML |
-| FAIL on primitive 9 (self space) | self/ directory not created when enabled | Check that /setup creates self/identity.md, self/methodology.md, self/goals.md when self space is enabled |
-| WARN on primitive 9 (self space) | self space disabled via configuration | Acceptable — self space is CONFIGURABLE, off by default for research presets, on for personal assistant |
+| FAIL on primitive 8 (self space) | self/ directory not created when enabled | Check that /setup creates self/identity.md, self/methodology.md, self/goals.md when self space is enabled |
+| WARN on primitive 8 (self space) | self space disabled via configuration | Acceptable — self space is CONFIGURABLE, off by default for research presets, on for personal assistant |
 | WARN on primitive 7 (schema enforcement) | Templates exist but no validation script generated | Ensure /setup creates a validate.sh or validate skill |
 | WARN on primitive 11 (discovery-first) | Context file has discovery section but skills lack discovery checks | Add discovery-first check to generated skill templates |
 | FAIL on primitive 12 (learning loop) | Missing ops/observations/ or ops/tensions/ directories | Ensure /setup creates both directories and documents condition-based triggers in context file |

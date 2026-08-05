@@ -62,7 +62,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 61/61
+  $s reference/test/kernel-note-dirs.test.sh             # 65/65
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 56/56
@@ -71,7 +71,7 @@ done
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** and 17 distinct fields, so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** — 74 matching lines carrying 78 field references across 17 distinct names, three different quantities that a review and I measured differently until the decomposition was written into the check — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
@@ -374,10 +374,22 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the **ten** checks above enforce — nine of them in
-CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across all **19** steps
-on this branch. `main` carries **18**, and the difference is this branch's one new step, not four:
-the four that `fix/spec-f-divergence-drain` added are now *in* main, because that branch merged.
+not a claim you should take on trust: it is what the **thirteen** checks above enforce — twelve of
+them in CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across all
+**24** steps, the same count `main` carries.
+
+**These four numbers were stale by four, one, five and six respectively until 2026-08-05, in the
+paragraph introducing a list about numbers going stale.** They read ten / nine / 19 / 18 against a
+true 13 / 12 / 24 / 24, three paragraphs above this file's own explanation that a claim about `main`
+rots on merge. They were UNGATED while the gated spellings of the same three quantities — "thirteen
+executable checks", "Twelve run in CI", `# 24` — sat correct in the same file. A gate that reads one
+phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
+
+```bash
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
+grep -c '^      - ' .github/workflows/checks.yml                                        # 24
+git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 24
+```
 
 **A claim about `main` rots on MERGE, not on edit, which is why it needs a gate rather than care.**
 Nothing in a working tree changes when a branch lands, so `# 14` sat here correct-when-written and
@@ -1067,6 +1079,22 @@ merely undone.
 # what a vault derives from: neither
 sed 's/#.*$//' platforms/claude-code/hooks/session-orient.sh.template \
   | /usr/bin/grep -n "grep -r[Llcq]* '\^status"
+```
+
+**A SECOND live instance arrived on the same branch, from work that was not even in its plan.** The
+content-destruction guard in `hooks/scripts/write-validate.sh` compares a written note against its
+last committed version. Measured: nothing under `skills/` or `generators/` names `write-validate` at
+all — the only code reference in the tree is `hooks/hooks.json`, which wires the PLUGIN's own copy.
+So the vault template beside it is reference material Claude reads while generating, exactly the
+mechanism this entry's neighbour (divergence 3) describes for `session-orient.sh.template`: what
+reaches a vault is whatever Claude *derives*, which is not a copy and tracks nothing. And the plugin
+copy is gated behind a hardcoded `*/notes/*` case filter, so on the field vault — `nodes/`, the vault
+whose defect motivated the guard — it cannot fire either. A guard that reaches neither side is the
+three-tier gap in miniature, built by someone who had just written this entry.
+
+```bash
+/usr/bin/grep -rln 'write-validate' skills/ generators/     # no hits, rc 1
+/usr/bin/grep -n 'notes/' hooks/scripts/write-validate.sh | head -2   # the hardcoded filter
 ```
 
 **`/arscontexta:upgrade` is the nearest thing to a mechanism, and divergence 5 records that it has

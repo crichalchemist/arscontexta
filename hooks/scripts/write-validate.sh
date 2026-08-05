@@ -46,13 +46,28 @@ case "$FILE" in
     # kept one side. The result is a valid, schema-clean, much smaller
     # note — every check above passes and the loss is silent.
     #
-    # SCOPE LIMIT: hooks.json matches "Write" only, so an Edit or
-    # MultiEdit that destroys a note never reaches this guard. Two of
-    # the three threat cases named above (a truncated-read rewrite, a
-    # merge that kept one side) can arrive by either tool. Widening
-    # the matcher is a change to what fires on every edit in every
-    # installed vault and is not made here — but the gap is real and
-    # unstated gaps are how this repo's defects survive.
+    # SCOPE LIMITS — TWO, and the second is the larger one. It was
+    # omitted from this list for a whole branch while the list read as
+    # complete, which is the failure mode divergence 16 is about.
+    #
+    # 1. hooks.json matches "Write" only, so an Edit or MultiEdit that
+    #    destroys a note never reaches this guard. Two of the three
+    #    threat cases above (a truncated-read rewrite, a merge that
+    #    kept one side) can arrive by either tool.
+    # 2. THE CASE FILTER ABOVE IS `*/notes/*|*thinking/*`, HARDCODED.
+    #    A generated vault renames its notes directory — the field
+    #    vault's is `nodes/` — so on the very vault whose defect
+    #    motivated this guard, the filter excludes every note before
+    #    the guard is reached. The TEMPLATE spells it
+    #    `{{NOTES_DIR:-notes}}/*` and does not have this problem; this
+    #    hook and that template disagree, which is divergence 16's
+    #    shape in the file that guards against it.
+    #
+    # Neither is fixed here: widening the matcher changes what fires on
+    # every edit in every installed vault, and widening the filter
+    # changes what this hook validates for every user. Both are scope
+    # decisions. What is fixed is that the list no longer reads as
+    # complete while omitting the one that matters most.
     #
     # WHY IT CAN SEE THE OLD CONTENT: hooks.json lists write-validate
     # BEFORE auto-commit on the same PostToolUse matcher, so HEAD
@@ -106,6 +121,15 @@ case "$FILE" in
         # 50% of bytes, and a 200-byte floor so trimming a stub does
         # not warn. Thresholds are deliberately loud-but-rare: a guard
         # that cries wolf gets disabled, which is worse than none.
+        #
+        # THE LINK ARM HAS NO FLOOR AND FIRES ON LOSING ONE LINK, which
+        # is a third number this comment used to claim did not exist
+        # ("the only two numbers in this check"). It is deliberate and
+        # it is a judgement call, not an oversight: a lost edge is
+        # invisible in the note and visible only in the graph, so the
+        # asymmetry with bytes is intended. /reduce and /reweave DO
+        # legitimately drop edges, so if this proves noisy in practice
+        # the fix is a floor here, not deleting the arm.
         # Mirrored in platforms/claude-code/hooks/write-validate.sh.template
         # section 1 — edit both, they are two declarations and not one
         # copy, so nothing but this note stops them drifting apart.

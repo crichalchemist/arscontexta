@@ -575,11 +575,26 @@ fi
 #
 # BORN RED AT 74 ACROSS 25 FILES AND 17 FIELDS, and that is the point rather
 # than a defect. The plan's Step 1 says count the copies first: if any exist,
-# this is a conversion and not a gate. Seventeen fields, where Spec G framed the
-# ban as being about `status:` alone — `type` 24, `description` 14, `status` 11,
-# `topics` 8, then fourteen more with 1-3 each. Converting 74 sites is not this
-# task; making them visible and un-growable is. A GREEN RUN THEREFORE MEANS
-# "no NEW hand-rolled parse", NEVER "none exists".
+# this is a conversion and not a gate. Converting 74 sites is not this task;
+# making them visible and un-growable is. A GREEN RUN THEREFORE MEANS "no NEW
+# hand-rolled parse", NEVER "none exists".
+#
+# THE THREE NUMBERS ARE DIFFERENT QUANTITIES AND THE DECOMPOSITION IS PUBLISHED,
+# because a review measured 16 fields where this said 17 and neither was wrong:
+# 74 LINES match, carrying 78 FIELD REFERENCES (some lines name two), across 17
+# DISTINCT NAMES. Count occurrences, not lines, or the second field on a shared
+# line is invisible. Spec G framed this ban as being about `status:` alone; the
+# spread is `type` 24, `description` 14, `status` 11, `topics` 8, `mined`,
+# `methodology` and `created` 3 each, `source` and `category` 2 each, then eight
+# singletons — 9 named + 8 = 17. Re-derive:
+#
+#   find skills skill-sources reference generators platforms presets hooks agents scripts \
+#        \( -name '*.md' -o -name '*.sh' -o -name '*.template' \) | while IFS= read -r f; do
+#     case "$f" in reference/lib/*|reference/check-portability.sh|\
+#                  reference/test/guard-failure.test.sh|reference/test/fence-isolation.test.sh)
+#       continue;; esac
+#     sed 's/#.*$//' "$f" | /usr/bin/grep -oE "'\^[a-z_]+:"
+#   done | tr -d "'^:" | sort | uniq -c | sort -rn
 #
 # KNOWN LIMITATIONS, stated because the previous version's limitations section
 # implied a guarantee it did not deliver:

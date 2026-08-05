@@ -515,6 +515,26 @@ eq "C1: renamed ops dir -> names the file under its real path" "present" \
    "$(printf '%s' "$OUT" | grep -q '04_meta/logs/observations/bad-impl.md' && echo present || echo absent)"
 rm -rf "$ROOT"
 
+# A vault that renamed `ops` ITSELF, via its manifest vocabulary. The previous
+# fixture used 04_meta/logs/, which is INSIDE the hardcoded candidate list, so it
+# could not fail on a resolver that only knows that list — the repo's own
+# critique ("a fix verified against the field vault only proves that `nodes`
+# joined the hardcoded list") applied to this suite. zzz-meta is in no list.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+mkdir -p "$V/zzz-meta" "$V/ops"
+mv "$V/ops/observations" "$V/ops/tensions" "$V/zzz-meta/"
+printf 'vocabulary:\n  notes: "zzz-arbitrary"\n  ops: "zzz-meta"\n' > "$V/ops/derivation-manifest.md"
+OUT=$(c1 "$V")
+eq "C1: an ops dir renamed via the manifest RESOLVES"    "fail" \
+   "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+eq "C1: renamed ops -> does NOT claim self-evolution off" "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo present || echo absent)"
+eq "C1: renamed ops -> finds all 4 violations"           "4" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
+eq "C1: renamed ops -> names the real path"              "present" \
+   "$(printf '%s' "$OUT" | grep -q 'zzz-meta/observations' && echo present || echo absent)"
+rm -rf "$ROOT"
+
 # An EMPTY target field. frontmatter.sh returns rc 0 for a present-but-empty
 # field, so a presence test passed `implemented_in:` with no value — exactly as
 # unfalsifiable as omitting it, and the cheapest way to turn every violation

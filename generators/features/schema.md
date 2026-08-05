@@ -70,7 +70,10 @@ rg -L '^description:' {DOMAIN:notes}/*.md
 # Find {DOMAIN:notes} by {DOMAIN:topic map}
 rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 
-# Cross-field queries — find unresolved tensions (pending or open)
+# Cross-field queries — tensions AWAITING REVIEW (pending or open).
+# Not "all unresolved": `blocked` is also unresolved and deliberately excluded,
+# because it is waiting on work outside this system and re-reviewing it would
+# fire the threshold on something no review can move.
 rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
 
 # Count {DOMAIN:notes} by type
