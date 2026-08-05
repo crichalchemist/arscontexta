@@ -258,11 +258,50 @@ and whether any Task-1 claim-list entry is already stale again.
 `none`. An empty section is a failure, not a default.** `.superpowers/` is gitignored; a deferral
 recorded only there does not exist.
 
+Ten deferrals, all recorded in tracked files rather than only in the gitignored ledger. Each names
+where it landed and what would reopen it.
+
 ```text
-Item 18 (output-contract marker convention): deferred to whoever next changes the template
-format; tracked in docs/superpowers/specs/2026-08-04-ci-hardening-design.md, "Deliberately not
-gated", item 18. Others: filled at execution time by Task 5 Step 2.
+Item 18 (output-contract marker convention) — deferred to whoever next changes the template
+  format. Tracked: docs/superpowers/specs/2026-08-04-ci-hardening-design.md, "Deliberately not
+  gated", item 18. Needs an explicit contract marker in the templates before it is checkable.
+
+From Task 2 (check-portability check 6):
+  M-2  interp_hits_in is an unanchored -F substring match while the other half parses paths
+       differently. Every divergence yields a false FAIL, never a false PASS. Tracked: the
+       comment at that function in reference/check-portability.sh.
+  M-5  the allowlist is whitespace-delimited, so a path containing a space mis-parses silently.
+       No such path exists in the tree. Tracked: same comment block.
+  M-3  the property is keyed on the ESCAPED spelling, so `grep -rlF "[[$q]]"` and a two-step
+       `pat="[[$q]]"` interpolate and are not flagged. Tracked as a stated limitation in
+       reference/check-portability.sh, with the next widening's starting edge named.
+
+From Task 3 (check-placeholder-count):
+  -M pairs a rename with an edit only while the sides stay similar, so a file renamed AND
+       rewritten end to end arrives as add+delete and cannot be compared. Now NAMED at runtime
+       ("NOTE template deleted, not compared") rather than silent. Tracked: the D* branch comment.
+  allowlist staleness is scoped to files in the range, so a fully obsolete entry survives until
+       some range touches its file again. The price of a range-relative key. Tracked: the
+       staleness-loop comment.
+  cd "$ROOT" failing is the one rc-2 site the suite does not assert. Tracked: named in
+       reference/test/placeholder-count.test.sh's rc-2 section header.
+
+From Task 4 (hook-config):
+  auto-commit.sh and write-validate.sh still have zero coverage from any gate. Tracked: this
+       line, and the coverage table in reference/test/hook-config.test.sh's header.
+  count_notes_by_field returns 0 at rc 0 on an unreadable directory rather than failing — the
+       same silent-failure class one layer down, which is why session-orient's scan-failure
+       branch is unreachable. Tracked: the comment beside the threshold-0 assertions.
+  bare keys fail SILENT where dotted keys fail LOUD on a present-but-empty value — an asymmetry
+       between the two paths of one reader. Tracked: this line.
+  TMPDIRS+= inside a $( ) helper leaks fixture trees per run. House pattern, not new here:
+       bump-version leaks 14, guard-failure 22, placeholder-count 20, hook-config 2. Tracked:
+       this line.
 ```
+
+**Not deferred, and worth distinguishing:** the numbers this branch moved are not on this list
+because Task 1's gate now reads them. That is the difference between a deferral and a gap — a
+deferral needs a human to remember it, and every count above is checked on every push.
 
 ---
 
