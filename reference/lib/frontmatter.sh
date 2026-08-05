@@ -4,13 +4,20 @@
 # Sourced by skill templates and by the plugin's own skills. Do NOT inline copies
 # of these functions anywhere.
 #
-# NOTHING ENFORCES THAT SENTENCE, for the same reason it enforces nothing for
-# reference/lib/link-extraction.sh: check-portability.sh runs six checks — PCRE
-# grep, wiki-link capture using negated classes, PCRE via ripgrep, the frozen
-# skill-blocks manifest, AGENTS.md being a symlink, and
-# interpolated wiki-link matchers — and none of them detects
-# an inlined copy of anything. The rule is real and still binding; the enforcement
-# is convention. Owner of the gap: the CI-hardening spec.
+# THAT SENTENCE IS NOW ENFORCED FOR THIS LIBRARY, AND STILL IS NOT FOR THE LINK
+# ONE — do not read the two as equivalent. check-portability.sh runs seven checks
+# — PCRE grep, wiki-link capture using negated classes, PCRE via ripgrep, the
+# frozen skill-blocks manifest, AGENTS.md being a symlink, interpolated wiki-link
+# matchers, and (check 7) hand-rolled frontmatter parsing outside this file.
+#
+# WHAT CHECK 7 ACTUALLY COVERS, stated narrowly because the previous version of
+# this paragraph was a claim nobody had verified and it was false for months: it
+# flags a line-anchored `'^field:'` grep used to select or count notes — a
+# hand-rolled list_notes_by_field. It does NOT detect a copied-out awk parser,
+# an unanchored or double-quoted equivalent, or an inlined copy of
+# link-extraction.sh, which remains convention only. It is also born red at 39
+# allowlisted sites, so a green run means "no NEW hand-rolled parse", not "none
+# exists". The residue is owned by the CI-hardening spec.
 #
 # Writing or editing a SKILL.md? Read reference/skill-authoring.md first.
 #

@@ -71,7 +71,7 @@ done
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | six checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally) |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 39 sites across 19 files**, so green means "no NEW one" and never "none exists") |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
@@ -89,7 +89,7 @@ the number it prints is *right* is not checked by anything here.
 
 **Nor does any gate enforce "do not inline the link library's functions."** That row used to claim
 `check-portability.sh` catches inlined copies, and `reference/lib/link-extraction.sh` said the same in
-its header. Both were false — the six checks are enumerated above and none of them looks for it. Check
+its header. Both were false — the seven checks are enumerated above and only check 7 looks for an inlined copy, of the FRONTMATTER library and not this one. Check
 6 is not that gate either, and the distinction is the one divergence 13 draws: it forbids
 *interpolating* a note name into a matcher, while the inlined sites spell `rg -o '\[\[([^\]|#]+)'` and
 interpolate nothing, so they are correctly outside it. The

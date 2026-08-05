@@ -5,7 +5,7 @@
 # these functions anywhere.
 #
 # NOTHING ENFORCES THAT SENTENCE. It used to end "check-portability.sh enforces
-# that", and that was false. That script runs six checks — PCRE grep, wiki-link
+# that", and that was false. That script runs seven checks — PCRE grep, wiki-link
 # capture using negated classes, PCRE via ripgrep, the frozen skill-blocks
 # manifest, AGENTS.md being a symlink, and
 # interpolated wiki-link matchers — and none detects an inlined copy of
