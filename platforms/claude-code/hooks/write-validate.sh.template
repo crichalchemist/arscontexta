@@ -45,7 +45,7 @@ esac
 # exits 0 when frontmatter is missing. A write that replaces a developed note
 # with frontmatter-less content is the MOST complete destruction this guard
 # exists to catch, and from any position below check 2 it would never see it.
-# It ran sixth for one commit; that is the bug this ordering fixes.
+# If you add checks, keep this one first.
 #
 # WHY IT CAN SEE THE PREVIOUS CONTENT: this hook runs before auto-commit on the
 # same PostToolUse matcher, so HEAD should still hold the pre-write version at
@@ -60,8 +60,9 @@ esac
 # committed, or the repo has no commits. Two are REPORTED, because they mean the
 # guard could not run at all: git absent, or not a git repository.
 #
-# SCOPE LIMIT: the PostToolUse matcher is "Write", so an Edit or MultiEdit that
-# destroys a note never reaches this guard.
+# SCOPE LIMIT: this guard sees only the tool events your hooks.json routes to it.
+# If that matcher is "Write" alone — the default this system ships — then an Edit
+# or MultiEdit that destroys a note never reaches this guard at all.
 #
 # It WARNS and does not block, like every check here: a legitimate split or
 # prune does shrink a note, and a guard that cries wolf gets switched off, which
@@ -86,10 +87,11 @@ else
     PREV_LINKS=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null | grep -o '\[\[' | wc -l | tr -d ' ')
     NOW_LINKS=$(grep -o '\[\[' "$FILE" 2>/dev/null | wc -l | tr -d ' ')
     # 200-byte floor so trimming a stub stays quiet; half is the threshold
-    # because a legitimate edit rarely halves a developed note. These two
-    # numbers are declared again in the plugin's own
-    # hooks/scripts/write-validate.sh — edit both; they are two declarations,
-    # not one copy, and nothing but this note stops them drifting apart.
+    # because a legitimate edit rarely halves a developed note. Tune them to
+    # your own notes if they warn too often or too rarely — they are the only
+    # two numbers in this check. The generator that produced this file declares
+    # the same pair on its own side, and editing them here does not change them
+    # there; that is a one-way relationship and it is the expected one.
     if [ "${PREV_BYTES:-0}" -gt 200 ] && [ $((NOW_BYTES * 2)) -lt "$PREV_BYTES" ]; then
       echo "CONTENT WARN: $(basename "$FILE") shrank ${PREV_BYTES} -> ${NOW_BYTES} bytes (over half removed)"
       echo "  If this was a split or a prune, fine. If a pass wrote partial output, the rest is gone."

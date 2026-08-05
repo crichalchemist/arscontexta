@@ -333,11 +333,18 @@ eq "session-orient: with the library back, threshold 0 DOES fire"  "yes" \
 # None asks "is it still THERE?" — so a pass that replaced a developed note with
 # a schema-clean fragment left every check green.
 #
-# THE ORDERING ASSERTION IS THE LOAD-BEARING ONE. The guard reads HEAD to see the
-# pre-write content, which only works because write-validate runs BEFORE
-# auto-commit on the same PostToolUse matcher. Invert that and the guard compares
-# the file to itself and passes silently on every write — the guard's own failure
-# mode being the defect it exists to catch.
+# THE ORDERING ASSERTION IS THE LOAD-BEARING ONE, AND IT COVERS HALF OF WHAT IT
+# SOUNDS LIKE. The guard reads HEAD to see the pre-write content, which requires
+# that auto-commit has not already committed. What this asserts is LIST ORDER in
+# hooks.json — array position — which is all a config test can reach. auto-commit
+# is declared "async": true, so list order does not prove execution order, and
+# nothing here observes execution order. Both write-validate.sh and the vault
+# template say so in their own comments; this label used to claim more than the
+# check performs, which left the two files disagreeing.
+#
+# Inverting the list order still matters: it makes the guard compare the file to
+# itself and pass silently on every write — the guard's own failure mode being
+# the defect it exists to catch.
 ORDER=$(python3 -c "
 import json,sys
 h=json.load(open('$HERE/../../hooks/hooks.json'))
@@ -349,7 +356,7 @@ for e in d.get('PostToolUse',[]):
         sys.exit()
 print('NOT-IN-SAME-MATCHER')
 " 2>/dev/null)
-eq "guard: write-validate runs BEFORE auto-commit"        "ok" "$ORDER"
+eq "guard: write-validate is LISTED before auto-commit"   "ok" "$ORDER"
 
 # A vault fixture with git, so the guard has a HEAD to compare against.
 mkguard() {
@@ -446,8 +453,21 @@ eq "template: guard runs BEFORE the frontmatter exit 0"  "yes" \
 # The plugin hook and the template declare the same two thresholds. They are two
 # declarations, not one copy; divergence 3 records what happens when such a pair
 # has nothing pointing each half at the other.
-eq "template: floor and halving match the plugin hook"   "yes" \
-   "$(/usr/bin/grep -q -- '-gt 200' "$TPL" && /usr/bin/grep -q -- '\* 2)) -lt' "$TPL" && echo yes || echo no)"
+#
+# THIS COMPARES BOTH FILES, and the first version did not — it grepped only the
+# template while its label claimed a cross-file match, so raising the PLUGIN
+# hook's floor to 500 left the suite green. A whole-check label on half a check,
+# added in the same commit that fixed a false coverage claim. Extract the
+# numbers from each side and compare the values; do not test one side for a
+# literal, which is what made the first version vacuous.
+hook_floor=$(/usr/bin/grep -oE '\-gt [0-9]+' "$SRC/write-validate.sh" | head -1 | tr -dc '0-9')
+tpl_floor=$(/usr/bin/grep -oE '\-gt [0-9]+' "$TPL"                    | head -1 | tr -dc '0-9')
+eq "template: both floors were extracted"                "yes" \
+   "$([ -n "$hook_floor" ] && [ -n "$tpl_floor" ] && echo yes || echo no)"
+eq "template: floor matches the plugin hook"             "$hook_floor" "$tpl_floor"
+hook_halve=$(/usr/bin/grep -c -- '\* 2)) -lt' "$SRC/write-validate.sh")
+tpl_halve=$(/usr/bin/grep -c -- '\* 2)) -lt' "$TPL")
+eq "template: halving test present on both sides"        "$hook_halve" "$tpl_halve"
 
 # The stub must HALVE, or this assertion holds with or without the floor and
 # proves nothing — the first version shrank 40->38 bytes and stayed green under

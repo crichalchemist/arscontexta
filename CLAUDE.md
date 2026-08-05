@@ -65,7 +65,7 @@ for s in bash zsh; do
   $s reference/test/kernel-note-dirs.test.sh             # 37/37
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
-  $s reference/test/hook-config.test.sh                  # 54/54
+  $s reference/test/hook-config.test.sh                  # 56/56
 done
 ```
 
