@@ -48,6 +48,32 @@ The check is built *before* the documents are corrected, because the current tre
 baseline: five live stale claims, enumerated in the spec's Reconciliation section. A check first
 demonstrated against defects it was designed around is the only kind this repo trusts.
 
+> **Re-derivation sweep, 2026-08-04, at the close of execution.** The numbers below are the state
+> **at planning time** and are deliberately NOT rewritten — a plan is a record of what was true when
+> it was written, and editing it to match the tree destroys the evidence that the drift happened. What
+> follows is what this branch moved, so a reader running the Step-1 probes is not confused when they
+> disagree:
+>
+> | probe | said | now |
+> |---|---|---|
+> | `guard-failure.test.sh` total | 34 | **55** |
+> | `grep -c '^      - ' checks.yml` | 16 | **24** |
+> | `grep -n 'eleven CI steps' CONTRIBUTING.md` | 2 hits | **0** — now "twenty-four", and gated |
+> | `grep -n 'passed=19' CONTRIBUTING.md` | 2 hits | **1** — link-extraction only; the stale one is fixed |
+> | executable checks | ten | **thirteen** |
+>
+> Every one of those five is now read by `reference/check-doc-claims.sh` on every push, which is the
+> point of Task 1 — the drift this plan opened by cataloguing is the drift it closed by gating.
+>
+> **The last probe returns nothing and always would have.** `awk -F.` keeps `grep -n`'s line prefix,
+> so `764:**12` and `833:**12` are different fields and never collide; it cannot fail on any tree.
+> Found while building Task 1, which replaced it with a section-scoped check that is not vacuous —
+> verified by planting a genuine duplicate. The divergence list now runs **1–7, 10–13, 15**, with 8
+> and 9 collapsed into 7's heading and 14 a pointer rather than an entry — so the naive extraction
+> `grep -oE '^\*\*[0-9]+\.'` returns `1-6, 10-13, 15` and misses two, because 7's heading reads
+> `**7, 8 and 9 —` and 14's reads `**14 —`. Match `[0-9]+[,.]` to see all of them. No repeats
+> either way.
+
 - [ ] **Step 1 — RED: record the five live instances by command, not by citation.**
       ```bash
       bash reference/test/guard-failure.test.sh | tail -1        # passed=34 — doc says 19/19
