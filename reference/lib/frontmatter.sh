@@ -17,11 +17,13 @@
 # an unanchored or double-quoted equivalent, or an inlined copy of
 # link-extraction.sh, which remains convention only.
 #
-# It is born red at 74 allowlisted sites, so a green run means "no NEW
+# It is born red at 71 allowlisted sites, so a green run means "no NEW
 # hand-rolled parse", not "none exists". (That phrase is on ONE line on purpose:
-# check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 74 is GATED — see
+# check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 71 is GATED — see
 # the check-7 rows in check-doc-claims.sh, which read this file too; the number
-# stood at 39 here for one commit after the detector was widened, which is why.
+# stood at 39 here for one commit after the detector was widened, then at 74
+# until three sites converted to this library's own `list_notes_by_field` on
+# fix/spec-h-enforcement-gap, which is why it moves again here.
 #
 # Writing or editing a SKILL.md? Read reference/skill-authoring.md first.
 #

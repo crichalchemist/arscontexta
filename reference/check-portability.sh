@@ -573,23 +573,29 @@ fi
 # the contrasting case and IS scanned — those recipes compose into a generated
 # vault's CLAUDE.md verbatim.
 #
-# BORN RED AT 74 ACROSS 25 FILES AND 16 FIELDS, and that is the point rather
-# than a defect. The plan's Step 1 says count the copies first: if any exist,
-# this is a conversion and not a gate. Converting 74 sites is not this task;
-# making them visible and un-growable is. A GREEN RUN THEREFORE MEANS "no NEW
-# hand-rolled parse", NEVER "none exists".
+# BORN RED AT 74 ACROSS 25 FILES AND 16 FIELDS at the time this check was
+# written; three sites converted to reference/lib/frontmatter.sh's own
+# list_notes_by_field on fix/spec-h-enforcement-gap, moving the count to 71
+# without changing the file count or the field-name count. Still the point
+# rather than a defect. The plan's Step 1 says count the copies first: if any
+# exist, this is a conversion and not a gate. Converting the remaining 71 sites
+# is not this task; making them visible and un-growable is. A GREEN RUN
+# THEREFORE MEANS "no NEW hand-rolled parse", NEVER "none exists".
 #
-# THREE DIFFERENT QUANTITIES: 74 LINES match, carrying 77 FIELD REFERENCES (some
-# lines name two), across 16 DISTINCT NAMES. Spec G framed this ban as being
-# about `status:` alone; the spread is `type` 24, `description` 14, `status` 11,
-# `topics` 8, `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each,
-# then seven singletons — 9 named + 7 = 16.
+# THREE DIFFERENT QUANTITIES: 71 LINES match, carrying 71 FIELD REFERENCES
+# (the three converted sites each carried two — `type` and `status` — which is
+# why LINES and REFERENCES moved by different amounts, 74→71 and 77→71), across
+# 16 DISTINCT NAMES, unchanged. Spec G framed this ban as being about `status:`
+# alone; the spread is now `type` 21, `description` 14, `topics` 8, `status` 8,
+# `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each, then seven
+# singletons — 9 named + 7 = 16.
 #
 # THE RE-DERIVE COMMAND MUST USE THIS CHECK'S OWN DETECTOR, and the first version
 # of this comment did not. It matched a BARE `'^field:'` with no command prefix,
-# which yields 75/78/17 — it picks up reference/test/threshold-namespace.test.sh,
-# where `'^self_evolution:'` is an argument to a test helper rather than a
-# pattern given to grep. So the published derivation disagreed with the gated 74
+# which now yields 72/72/17 — it still picks up
+# reference/test/threshold-namespace.test.sh, where `'^self_evolution:'` is an
+# argument to a test helper rather than a pattern given to grep. So the
+# published derivation disagreed with the gated 71 (formerly 74)
 # sitting three lines above it, inside the comment written to stop precisely
 # that. Keep the `(grep|rg)` prefix; it is what makes the numbers one measurement.
 #

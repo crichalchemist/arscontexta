@@ -464,7 +464,11 @@ fi
 # agreeing with each other would read PASS. The expected count is therefore
 # declared, and a move in EITHER direction is rc 2, not a quiet pass.
 #   /usr/bin/grep -rc 'preliminary' generators/ --include='*.md' | grep -v ':0'   # 4 across 3 files
-#   /usr/bin/grep -rn 'type: tension' generators/ --include='*.md' | grep -c 'status: ('   # 3
+#   /usr/bin/grep -rn 'list_notes_by_field.*type tension' generators/ --include='*.md'   # 3
+# (The recipe shape moved on fix/spec-h-enforcement-gap from an inline
+# `status: (pending|open)` to a list_notes_by_field call whose FOLLOWING line
+# names the values via `[ "$s" = "..." ]`. The anchor above tracks the new
+# shape; TENSION_RECIPES itself is unchanged, since the same 3 sites moved.)
 NOTE_ENUM_DECLS=4
 TENSION_RECIPES=3
 
@@ -509,7 +513,12 @@ fi
 
 printf '  %-18s %-30s ' "generators/" "tension recipes match enum"
 tenum=$(/usr/bin/grep -rh 'status:.*dissolved' generators/ --include='*.md' 2>/dev/null | head -1 | enum_values)
-recipes=$(/usr/bin/grep -rn 'type: tension' generators/ --include='*.md' 2>/dev/null | /usr/bin/grep 'status: (')
+# The recipe used to be one line, `type: tension` piped to `status: (a|b)`, so
+# the values were extractable from the same line matched. Since the conversion
+# to list_notes_by_field (fix/spec-h-enforcement-gap), the values live on the
+# FOLLOWING line instead — `[ "$s" = "pending" ] || [ "$s" = "open" ]` — so this
+# check now reads one line past each match rather than parsing the match itself.
+recipes=$(/usr/bin/grep -rn 'list_notes_by_field.*type tension' generators/ --include='*.md' 2>/dev/null)
 n_rec=$(printf '%s\n' "$recipes" | grep -c . || true)
 if [ -z "$tenum" ]; then
     echo "ERROR  tension enum not found (anchor 'dissolved') — cannot evaluate"
@@ -521,8 +530,11 @@ else
     undeclared=""
     while IFS= read -r r; do
         [ -n "$r" ] || continue
-        site=$(printf '%s' "$r" | cut -d: -f1-2)
-        for v in $(printf '%s' "$r" | sed 's/.*status: (\([^)]*\)).*/\1/' | tr '|' ' '); do
+        f=$(printf '%s' "$r" | cut -d: -f1)
+        ln=$(printf '%s' "$r" | cut -d: -f2)
+        site="$f:$ln"
+        follow=$(sed -n "$((ln + 1))p" "$f")
+        for v in $(printf '%s' "$follow" | /usr/bin/grep -oE '"\$s" = "[a-zA-Z_]+"' | sed 's/.*"\([a-zA-Z_]*\)"$/\1/'); do
             printf '%s\n' "$tenum" | grep -qxF "$v" || undeclared="$undeclared $site:$v"
         done
     done <<EOF_REC
