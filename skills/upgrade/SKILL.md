@@ -63,6 +63,57 @@ Generated skills and meta-skills follow fundamentally different upgrade mechanis
 
 ---
 
+## Shared Step: Resolving a Vault Skill to Its Canonical Template
+
+Step 1 and Step 5 both need to know, for a skill installed in this vault, which
+`skill-sources/<canonical-name>/SKILL.md` in the plugin it came from. The
+vault's installed skills are named in *this vault's own vocabulary* (a
+directory literally named `extract`); the plugin's templates are named by
+*canonical* name (`skill-sources/reduce/`). Resolve one from the other by
+inverting `ops/derivation-manifest.md`'s `vocabulary:` block — it is keyed by
+canonical name, so canonical→derived is a direct lookup; derived→canonical,
+which is what's needed here, requires building the reverse map.
+
+```bash
+# Given a vault-local skill directory name, resolve the canonical
+# skill-sources/ name it was generated from.
+resolve_canonical_name() {
+  local derived="$1" manifest="ops/derivation-manifest.md"
+  [[ -f "$manifest" ]] || { echo "HALT: no $manifest — cannot resolve '$derived' to a canonical name" >&2; return 1; }
+  local canonical="" key value line
+  # Only the vocabulary: block's flat "key: value" pairs are candidates — the
+  # sed range excludes everything before/after the block, including its own
+  # nested extraction_categories list (deeper indent, so the inner /^  .../
+  # filter skips it too). Then keep only pairs whose KEY is itself a real
+  # skill-sources/ directory name: this is what excludes folder names, note
+  # types, and command names by construction, rather than by hoping their
+  # derived VALUES never collide with a skill directory name.
+  while IFS= read -r line; do
+    key=$(printf '%s' "$line" | sed 's/^  \([a-z_]*\): .*/\1/')
+    value=$(printf '%s' "$line" | sed 's/^  [a-z_]*: "\(.*\)"$/\1/')
+    [[ -d "${CLAUDE_PLUGIN_ROOT}/skill-sources/$key" ]] || continue
+    [[ "$value" == "$derived" ]] && { canonical="$key"; break; }
+  done < <(sed -n '/^vocabulary:/,/^[a-z_]*:$/{/^  [a-z_]*: /p;}' "$manifest")
+  [[ -n "$canonical" ]] || { echo "HALT: no vocabulary.* entry among skill-sources/ names maps to '$derived'" >&2; return 1; }
+  printf '%s\n' "$canonical"
+}
+```
+
+**No match halts and names both the unresolved skill and the fact that no
+`vocabulary.*` entry covers it.** This is the expected outcome for a
+vault-authored skill with no plugin counterpart, and must never be treated as
+"this skill needs no changes" — the absence of a template says nothing about
+whether the skill itself is current.
+
+**Placement decision, stated rather than implied:** this lives inline here,
+not as a third file in `reference/lib/` alongside `frontmatter.sh` and
+`link-extraction.sh`. Nothing else calls it yet, and a new shared library
+means a version constant, a Step 6a row, and a `skills/setup` copy-step change
+for a function with exactly one caller today. Revisit only if a second caller
+appears.
+
+---
+
 ## Step 1: Inventory Current System
 
 Gather the vault's current state:
