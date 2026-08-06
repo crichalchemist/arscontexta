@@ -99,6 +99,7 @@ resolve_canonical_name() {
   # miss a real rename. The two comment markers are the generator's own
   # section boundaries (skills/setup/SKILL.md), not this vault's wording, so
   # this holds across every generated vault, not just this one.
+  grep -q '# Level 5: Process verbs' "$manifest" || { echo "HALT: $manifest has no 'Level 5: Process verbs' section — cannot verify '$derived' is not a renamed skill, and falling back to identity here would be a silent guess" >&2; return 1; }
   local level5 key value line canonical=""
   level5=$(sed -n '/# Level 5: Process verbs/,/# Level 6:/{/^  [a-z_]*: /p;}' "$manifest")
   while IFS= read -r line; do
