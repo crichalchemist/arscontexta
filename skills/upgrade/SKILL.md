@@ -66,51 +66,71 @@ Generated skills and meta-skills follow fundamentally different upgrade mechanis
 ## Shared Step: Resolving a Vault Skill to Its Canonical Template
 
 Step 1 and Step 5 both need to know, for a skill installed in this vault, which
-`skill-sources/<canonical-name>/SKILL.md` in the plugin it came from. The
-vault's installed skills are named in *this vault's own vocabulary* (a
-directory literally named `extract`); the plugin's templates are named by
-*canonical* name (`skill-sources/reduce/`). Resolve one from the other by
-inverting `ops/derivation-manifest.md`'s `vocabulary:` block — it is keyed by
-canonical name, so canonical→derived is a direct lookup; derived→canonical,
-which is what's needed here, requires building the reverse map.
+`skill-sources/<canonical-name>/SKILL.md` in the plugin it came from.
+
+**Only 6 of the 16 canonical skills are ever vocabulary-transformable.**
+`skills/setup/SKILL.md`'s own manifest template (its "Level 5: Process verbs"
+section) declares exactly `reduce`, `reflect`, `reweave`, `verify`, `validate`,
+`rethink` as renameable — every other canonical name (`graph`, `next`,
+`pipeline`, `ralph`, `refactor`, `remember`, `seed`, `stats`, `tasks`, `learn`)
+keeps its canonical name as the vault's directory name in *every* generated
+vault, unconditionally, by generator design — not by omission. A first version
+of this step assumed all 16 were vocabulary-derived and halted on 11 of them
+when tested against a real vault, even though all 11 have a `skill-sources/`
+counterpart — a false halt on the common case, not the rare one. Fixed by
+scoping the reverse lookup to exactly the 6 transformable keys and falling
+back to identity for everything else, rather than guessing at directory
+existence on the plugin side (which this file's own Step 6a note says a shell
+fence cannot check — `${CLAUDE_PLUGIN_ROOT}` is unset in a shell; it resolves
+for the agent, not for a subprocess).
 
 ```bash
 # Given a vault-local skill directory name, resolve the canonical
-# skill-sources/ name it was generated from.
+# skill-sources/ name it was generated from. Needs only this vault's own
+# ops/derivation-manifest.md -- no plugin-side path is read here, so this
+# never depends on ${CLAUDE_PLUGIN_ROOT} resolving in a shell.
 resolve_canonical_name() {
   local derived="$1" manifest="ops/derivation-manifest.md"
   [[ -f "$manifest" ]] || { echo "HALT: no $manifest — cannot resolve '$derived' to a canonical name" >&2; return 1; }
-  local canonical="" key value line
-  # Only the vocabulary: block's flat "key: value" pairs are candidates — the
-  # sed range excludes everything before/after the block, including its own
-  # nested extraction_categories list (deeper indent, so the inner /^  .../
-  # filter skips it too). Then keep only pairs whose KEY is itself a real
-  # skill-sources/ directory name: this is what excludes folder names, note
-  # types, and command names by construction, rather than by hoping their
-  # derived VALUES never collide with a skill directory name.
+  # Scoped to the "Level 5: Process verbs" section only -- the sole part of
+  # the vocabulary: block whose keys are skill names. Scoping any wider (the
+  # whole block) risks matching a folder- or field-level derived value that
+  # happens to coincide with a skill's domain term; scoping narrower would
+  # miss a real rename. The two comment markers are the generator's own
+  # section boundaries (skills/setup/SKILL.md), not this vault's wording, so
+  # this holds across every generated vault, not just this one.
+  local level5 key value line canonical=""
+  level5=$(sed -n '/# Level 5: Process verbs/,/# Level 6:/{/^  [a-z_]*: /p;}' "$manifest")
   while IFS= read -r line; do
+    [ -n "$line" ] || continue
     key=$(printf '%s' "$line" | sed 's/^  \([a-z_]*\): .*/\1/')
     value=$(printf '%s' "$line" | sed 's/^  [a-z_]*: "\(.*\)"$/\1/')
-    [[ -d "${CLAUDE_PLUGIN_ROOT}/skill-sources/$key" ]] || continue
-    [[ "$value" == "$derived" ]] && { canonical="$key"; break; }
-  done < <(sed -n '/^vocabulary:/,/^[a-z_]*:$/{/^  [a-z_]*: /p;}' "$manifest")
-  [[ -n "$canonical" ]] || { echo "HALT: no vocabulary.* entry among skill-sources/ names maps to '$derived'" >&2; return 1; }
-  printf '%s\n' "$canonical"
+    # First match wins; the six process-verb domain terms are meant to be
+    # distinct per vault, so this is not expected to matter in practice.
+    [ "$value" = "$derived" ] && { canonical="$key"; break; }
+  done <<EOF_LEVEL5
+$level5
+EOF_LEVEL5
+  # No match means $derived was never one of the six renameable terms, so it
+  # already IS the canonical name -- not a failure, the common case.
+  printf '%s\n' "${canonical:-$derived}"
 }
 ```
 
-**No match halts and names both the unresolved skill and the fact that no
-`vocabulary.*` entry covers it.** This is the expected outcome for a
-vault-authored skill with no plugin counterpart, and must never be treated as
-"this skill needs no changes" — the absence of a template says nothing about
-whether the skill itself is current.
+**This resolver never halts on a valid derived name — only on a missing
+manifest**, since every non-renamed skill legitimately resolves to itself.
+Whether the *resulting* canonical name actually has a `skill-sources/`
+template is a separate question this function does not answer: that check
+belongs to whichever step reads the plugin side (Step 5's render step, next),
+which already needs agent-carried plugin-root resolution for other reasons.
 
 **Placement decision, stated rather than implied:** this lives inline here,
 not as a third file in `reference/lib/` alongside `frontmatter.sh` and
-`link-extraction.sh`. Nothing else calls it yet, and a new shared library
-means a version constant, a Step 6a row, and a `skills/setup` copy-step change
-for a function with exactly one caller today. Revisit only if a second caller
-appears.
+`link-extraction.sh`, and the decision covers only this deterministic lookup
+— the render/substitution half (next) may end up living elsewhere. Nothing
+calls this yet, and a new shared library means a version constant, a Step 6a
+row, and a `skills/setup` copy-step change for a function with exactly one
+caller today. Revisit only if a second caller appears.
 
 ---
 
