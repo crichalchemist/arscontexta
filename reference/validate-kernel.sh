@@ -65,7 +65,7 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 # The candidate list survives as a FALLBACK, for vaults with no manifest.
 # resolve_ops_dir_name <vault> -> the vault's own name for its ops directory,
 # or nothing. Split out so the shape scan can exclude it by that name rather
-# than by the literal `ops`.
+# resolve_ops_dir_name resolves the operational directory name from the vault's manifest or configuration.
 resolve_ops_dir_name() {
     _rodn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
     [ -n "$_rodn_man" ] && _vocab_dir "$_rodn_man" ops 2>/dev/null && return 0
@@ -74,6 +74,7 @@ resolve_ops_dir_name() {
     return 1
 }
 
+# resolve_ops_dir locates an operational subdirectory within a vault using manifest, configuration, and legacy-path discovery.
 resolve_ops_dir() {
     # THE MANIFEST IS FOUND BY SHAPE, NOT AT AN ASSUMED PATH, and that is the
     # correction a second review caught. The first version of this vocabulary
@@ -104,8 +105,11 @@ resolve_ops_dir() {
     return 1
 }
 
+# pass reports a successful validation check and increments the pass count.
 pass() { echo -e "  ${GREEN}PASS${NC} $1"; PASS=$((PASS + 1)); }
+# warn reports a warning message and increments the warning count.
 warn() { echo -e "  ${YELLOW}WARN${NC} $1"; WARN=$((WARN + 1)); }
+# fail reports a failed validation check and increments the failure count.
 fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
 
 # ---------------------------------------------------------------------------
@@ -233,7 +237,7 @@ _dirs_from_vocab() {
 # exactly that and every message printed "directories via " with the name
 # missing -- the same swallowed-in-a-subshell defect this repo has shipped six
 # times. Returning the label through the one channel that does cross the boundary
-# removes the trap rather than documenting it.
+# resolve_note_dirs resolves note-bearing directories from vault vocabulary or configuration, with a top-level Markdown-directory fallback.
 resolve_note_dirs() {
     # THE MANIFEST IS LOCATED BY SHAPE HERE TOO. This function spelled
     # "$1/ops/derivation-manifest.md" for as long as resolve_ops_dir did, and
