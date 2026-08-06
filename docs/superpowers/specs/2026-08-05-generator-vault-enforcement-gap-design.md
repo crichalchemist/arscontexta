@@ -119,21 +119,36 @@ divergences 7/8/9 states the reason it is easy to miss: `ops/tensions/` and obse
 external work — that belongs to the *tension* enum only. Merging it into the note enum would
 collapse a separation this repo made deliberately.
 
-### 2. `implemented ⇒ implemented_in:` is enforced by nothing
+### 2. C1: Conditional-field assertions are enforced by nothing
+
+Two outcome statuses carry a target field — `implemented ⇒ implemented_in:` for observations,
+`promoted ⇒ promoted_to:` for tensions — and neither is enforced.
 
 ```bash
-n=0; while IFS= read -r f; do /usr/bin/grep -q '^implemented_in:' "$f" || n=$((n+1)); done \
-  < <(/usr/bin/grep -rl '^status: implemented$' ~/second-brain/ops/observations/)
-echo "$n of $(/usr/bin/grep -rl '^status: implemented$' ~/second-brain/ops/observations/ | wc -l)"
+. reference/lib/frontmatter.sh
+total=$(list_notes_by_field ~/second-brain/ops/observations status implemented | wc -l | tr -d ' ')
+missing=$(count_notes_missing_field ~/second-brain/ops/observations implemented_in | tr -d ' ')
+echo "$missing of $total"
 ```
 
-**6 of 26.** The rule is prose in the vault's root `CLAUDE.md`; the two scripts the triage names as
-candidate homes both lack it. Grepping the vault's `*.py`/`*.sh`/`*.mjs` for `implemented_in` returns
-one hit, and it is a coincidental substring inside a minified `node_modules/workerd` bundle — so
-**zero real references**.
+**6 of 26** implemented observations lack `implemented_in:`. Measured separately:
 
-An `implemented` with no target is unfalsifiable: nothing distinguishes a real fix from a
-closed-by-fiat one, which is the failure the field exists to prevent.
+```bash
+. reference/lib/frontmatter.sh
+total=$(list_notes_by_field ~/second-brain/ops/tensions status promoted | wc -l | tr -d ' ')
+missing=$(count_notes_missing_field ~/second-brain/ops/tensions promoted_to | tr -d ' ')
+echo "$missing of $total"
+```
+
+**7 of 8** promoted tensions lack `promoted_to:`. **13 combined violations.**
+
+The rule is prose in the vault's root `CLAUDE.md`; the two scripts the triage names as candidate
+homes both lack it. Grepping the vault's `*.py`/`*.sh`/`*.mjs` for `implemented_in` or `promoted_to`
+returns one hit, and it is a coincidental substring inside a minified `node_modules/workerd` bundle —
+so **zero real references**.
+
+An `implemented` or `promoted` with no target is unfalsifiable: nothing distinguishes a real fix
+from a closed-by-fiat one, which is the failure the field exists to prevent.
 
 ### 3. Spec G items 22 and 23 are now unblocked
 
@@ -171,11 +186,12 @@ should be amended rather than superseded.
 
 Four tasks. Each closes a measured instance, not a hypothetical.
 
-1. **Reconcile the observation and tension enums** with what vaults use, including `blocked` for
-   tensions, keeping the three fields separate.
+1. **Reconcile the observation and tension enums** with what vaults use, including `blocked` and
+   `promoted` for tensions, keeping the three fields separate.
 2. **The enum-consistency gate** (Spec G item 22) — assert the declaring files agree, so the
    reconciliation cannot silently come apart again.
-3. **`implemented ⇒ implemented_in:`** — the first conditional-field rule, and the task that has to
+3. **C1: conditional-field assertions** (`implemented ⇒ implemented_in:` for observations,
+   `promoted ⇒ promoted_to:` for tensions) — the first such rules, and the task that has to
    answer the placement question below.
 4. **The frontmatter-inlining ban** (Spec G item 23), in the style of the existing link-library ban.
 
@@ -218,8 +234,9 @@ green — CLAUDE.md already records two occasions where a check was weakened int
 
 1. The observation and tension enums include every value the field vault uses, with the three fields
    still separate, and a gate that fails if the declaring files disagree.
-2. `implemented ⇒ implemented_in:` is asserted by something that runs, with its placement decided in
-   writing and its reach stated — including which vaults it does *not* reach.
+2. C1 conditional-field assertions (`implemented ⇒ implemented_in:` and `promoted ⇒ promoted_to:`)
+   are asserted by something that runs, with placement decided in writing and reach stated —
+   including which vaults it does *not* reach.
 3. `check-portability.sh` bans inlining `reference/lib/frontmatter.sh`, proved by planting a copy.
 4. Divergence 15 is amended with the vault-measured half; a new divergence records the three-tier
    structural finding, since no gate closes it.

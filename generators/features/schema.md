@@ -74,7 +74,10 @@ rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 # Not "all unresolved": `blocked` is also unresolved and deliberately excluded,
 # because it is waiting on work outside this system and re-reviewing it would
 # fire the threshold on something no review can move.
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
+. {config.ops_dir}/lib/frontmatter.sh
+list_notes_by_field {DOMAIN:notes} type tension | while IFS= read -r f; do
+  s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"
+done
 
 # Count {DOMAIN:notes} by type
 rg '^type:' {DOMAIN:notes}/ --no-filename | sort | uniq -c | sort -rn

@@ -124,10 +124,11 @@ its own version constant, and `skills/health` Category 9 checks it. A guard whos
 names a repair that does not perform it is worse than no guard.
 
 **Neither rule is enforced by anything.** This paragraph used to say `check-portability.sh` rejects
-inlined copies. It does not — that script runs seven checks, and only check 7 detects an inlined copy, of
-anything, which `reference/lib/link-extraction.sh` states outright in its own header. The rule is real
-and still binding; the enforcement is convention. Believing otherwise is how matcher sites survived
-four gates for months.
+inlined copies. It does not — that script runs seven checks, and only check 7 detects inlined
+frontmatter parsing specifically (line-anchored `^field:` grep used to select or count notes), not
+inlined copies of link-extraction.sh or other logic. The rule against inlining any shared library
+is real and still binding; the enforcement is convention. Believing otherwise is how matcher sites
+survived four gates for months.
 
 What the gate asserts, cited by letter so this table cannot drift from it:
 

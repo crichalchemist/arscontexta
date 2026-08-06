@@ -30,13 +30,14 @@ Spec: `docs/superpowers/specs/2026-08-05-generator-vault-enforcement-gap-design.
       and that `open` is absent from these two specifically. **If any value has since changed, the
       table is the record — update it and rescope before editing anything.**
 - [ ] **Step 2 — add the measured values**, keeping the three fields separate. Observations gain
-      `open` and `implemented`; tensions gain `open` and `blocked`. `generators/features/self-evolution.md:88,195`
+      `open` and `implemented`; tensions gain `open`, `blocked`, and `promoted`. `generators/features/self-evolution.md:88,195`
       is the site. Do **not** touch the note enum at `atomic-notes.md:94` / `schema.md:137` /
       `templates.md:30` — Spec F separated these deliberately and the closed record for divergences
       7/8/9 says why.
 - [ ] **Step 3 — state each new value's meaning in the block that declares it**, especially
-      `blocked`: a tension awaiting external work, which is **not counted** toward the `/rethink`
-      threshold. One sentence each; an enum value with no stated meaning is how `pending` survived.
+      `blocked` (a tension awaiting external work, which is **not counted** toward the `/rethink`
+      threshold) and `promoted` (elevated to a standing methodology or template, indicating
+      resolution by adoption into the system itself). One sentence each; an enum value with no stated meaning is how `pending` survived.
 - [ ] **Step 4 — narrow the `_schema` authority claim** at `generators/features/schema.md:142`. It
       says "the single source of truth for field validation"; the hardest gate in the field vault
       ignores it and one WARN-only linter reads it. Either state the scope honestly or name what
@@ -78,33 +79,35 @@ bash reference/check-doc-claims.sh; echo rc=$?     # rc 0
 
 ---
 
-## Task 3 — `implemented ⇒ implemented_in:` (the placement decision)
+## Task 3 — C1: conditional-field assertions (the placement decision)
 
-- [ ] **Step 1 — measure the premise.** Re-derive the 6-of-26 figure. Confirm zero real script
-      references to `implemented_in` in the vault (the one grep hit is a minified `node_modules`
+- [ ] **Step 1 — measure the premise.** Re-derive BOTH figures: 6-of-26 `implemented` observations
+      lacking `implemented_in:`, and 7-of-8 `promoted` tensions lacking `promoted_to:`. Confirm zero
+      real script references to either field in the vault (the one grep hit is a minified `node_modules`
       bundle — exclude `node_modules` and expect zero).
 - [ ] **Step 2 — DECIDE THE HOME IN WRITING before implementing.** The spec's table gives three
       options and their costs. The honest default is `reference/validate-kernel.sh`, because it is
       the only one that reaches the vault that demonstrated the defect. Record the decision and the
       rejected alternatives in the check's header — **including which vaults it does not reach**,
       which for the generated-hook option is "every vault that already exists".
-- [ ] **Step 3 — implement it as a conditional-field assertion**, the first in either tree. Reuse
-      `reference/lib/frontmatter.sh` (`frontmatter_field`, `list_notes_by_field`) rather than a new
-      parser — the library exists precisely because body-line matches were counted as frontmatter.
+- [ ] **Step 3 — implement BOTH assertions as C1**, the first conditional-field check in either tree.
+      Reuse `reference/lib/frontmatter.sh` (`frontmatter_field`, `list_notes_by_field`) rather than
+      a new parser — the library exists precisely because body-line matches were counted as frontmatter.
       A missing directory is not a violation; a directory that cannot be scanned is rc 2, not 0.
-- [ ] **Step 4 — expect the field vault to go red, and do not soften the check.** It has 6
-      violations, so its run will worsen from `15 PASS / 2 WARN / 0 FAIL`. That is the check working
-      on the content it was built for. Record the new figure in CLAUDE.md's pass-criterion block with
-      the reason, the way primitives 1 and 2 are already recorded as content defects rather than
-      repo regressions.
-- [ ] **Step 5 — a fixture, not the live vault.** Assertions run against a built fixture with a
-      known-good and a known-bad note, so the suite does not depend on a private vault's content.
+- [ ] **Step 4 — expect the field vault to go red, and do not soften the check.** It has 6+7=13
+      violations combined, so its run will worsen from `15 PASS / 2 WARN / 0 FAIL`. That is the check
+      working on the content it was built for. Record the new figure in CLAUDE.md's pass-criterion
+      block with the reason, the way primitives 1 and 2 are already recorded as content defects
+      rather than repo regressions.
+- [ ] **Step 5 — a fixture, not the live vault.** Assertions run against a built fixture with
+      known-good and known-bad notes for BOTH assertions, so the suite does not depend on a private
+      vault's content.
 
 **Done when:**
 
 ```bash
-./reference/validate-kernel.sh <a-fixture-vault>          # the new assertion fires on the bad note
-./reference/validate-kernel.sh ~/second-brain             # reports the 6, does not crash
+./reference/validate-kernel.sh <a-fixture-vault>          # C1 fires on both bad notes
+./reference/validate-kernel.sh ~/second-brain             # reports the 13 combined (6+7), does not crash
 for s in bash zsh; do $s reference/test/<suite>.test.sh | tail -1; done   # failed=0
 ```
 
@@ -156,7 +159,18 @@ for s in bash zsh; do $s reference/test/guard-failure.test.sh | tail -1; done  #
 **Done when:**
 
 ```bash
-awk '/^## Deferrals/{f=1;next} /^## /{f=0} f&&NF' docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md | grep -c .
+# Structural validation: Deferrals section permits only "none" (when literally empty) or
+# one deferral row per line with a tracked-file reference. Must not be an unconstrained list.
+section=$(awk '/^## Deferrals/{f=1;next} /^## /{f=0} f' docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md)
+nonblank=$(printf '%s\n' "$section" | /usr/bin/grep -cE '^[^#].*[^ ]' || true)
+if [ "$nonblank" = 0 ]; then
+  printf '%s\n' "$section" | /usr/bin/grep -qE '^\s*none\s*$' || { echo "FAIL: empty deferrals require 'none'"; exit 1; }
+else
+  # Each non-comment, non-blank line must reference a tracked file (heuristic: contains a path or filename)
+  printf '%s\n' "$section" | /usr/bin/grep -E '^[^#].*[^ ]' | while IFS= read -r line; do
+    printf '%s\n' "$line" | /usr/bin/grep -qE '(\.md|\.sh|\.ya?ml|/)' || { echo "FAIL: deferral line lacks file reference: $line"; exit 1; }
+  done
+fi
 bash reference/check-doc-claims.sh; echo rc=$?     # rc 0
 ```
 

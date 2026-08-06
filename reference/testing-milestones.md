@@ -37,6 +37,7 @@ Seven validation milestones for the Ars Contexta v1.6 plugin. Each milestone tes
   PASS N markdown files, all with YAML frontmatter
 2. Wiki links as graph edges
   PASS N of N files contain wiki links
+  PASS No dangling wiki links (checked all targets)
 3. MOC hierarchy for attention management
   PASS N MOCs found
 4. Tree injection at session start
@@ -70,19 +71,20 @@ C1. Outcome statuses carry their target field
   PASS 12 outcome-status notes, all carry their target field
 
 === Kernel Validation Summary ===
-  PASS: 17
+  PASS: 18
   WARN: 0
   FAIL: 0
 
 Kernel contract satisfied — every check above passed.
 ```
 
-**Read that `17` as what it is: RESULT LINES.** Three different quantities appear in one run and
-only the first is in the summary — 17 result lines here, **16 primitives**, and **15** as the highest
+**Read that `18` as what it is: RESULT LINES.** Three different quantities appear in one run and
+only the first is in the summary — 18 result lines here, **16 primitives**, and **15** as the highest
 header number (they run 1–15 with one spelled `10A`). The block above has 16 numbered headers plus
-`C1`, which is not a primitive. On a real vault the line count runs higher still, because primitive 2
-emits two lines. Matching the summary total against the primitive count is a coincidence when it
-works and a wrong conclusion when it does not.
+`C1`, which is not a primitive. Primitive 2 emits two result lines (wiki link presence, dangling
+check), so the total is 18 = 16 primitives + 1 extra from primitive 2 + 1 for C1. Matching the
+summary total against the primitive count is a coincidence when it works and a wrong conclusion
+when it does not.
 
 **Common failure modes and remediation:**
 

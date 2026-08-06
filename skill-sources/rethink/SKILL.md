@@ -251,6 +251,9 @@ Present the full triage to the user before executing any changes:
   ARCHIVE ([count])
     [filename] — [title] — [reason for archiving]
 
+  BLOCKED ([count]) — TENSIONS ONLY
+    [filename] — [title] — [what it is blocked on]
+
   KEEP PENDING ([count])
     [filename] — [title] — [why more evidence needed]
 ```

@@ -375,7 +375,7 @@ it.**
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
 not a claim you should take on trust: it is what the thirteen checks above enforce — twelve of them
-in CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across every step in
+in CI, `validate-kernel.sh` being the one that needs a vault — as defined by the twenty-four steps in
 `.github/workflows/checks.yml`.
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH

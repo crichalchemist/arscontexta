@@ -35,8 +35,11 @@ rg -L '^description:' {DOMAIN:notes}/*.md
 # Find {DOMAIN:notes} by {DOMAIN:topic map}
 rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 
-# Cross-field queries (combine with xargs)
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
+# Cross-field queries — tensions awaiting review (pending or open status)
+. {config.ops_dir}/lib/frontmatter.sh
+list_notes_by_field {DOMAIN:notes} type tension | while IFS= read -r f; do
+  s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"
+done
 ```
 
 Field-level queries answer: "What properties do my {DOMAIN:notes} have?" They are fast, precise, and require no external tools.
@@ -137,8 +140,11 @@ Use YAML frontmatter as a queryable property layer:
 # All {DOMAIN:notes} by methodology tradition
 rg '^methodology:.*Zettelkasten' {DOMAIN:notes}/
 
-# Unresolved tensions
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: (pending|open)'
+# Unresolved tensions — tensions awaiting review (pending or open status)
+. {config.ops_dir}/lib/frontmatter.sh
+list_notes_by_field {DOMAIN:notes} type tension | while IFS= read -r f; do
+  s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"
+done
 
 # {DOMAIN:Notes} adapted from human patterns
 rg '^adapted_from: ' {DOMAIN:notes}/ | grep -v 'null'

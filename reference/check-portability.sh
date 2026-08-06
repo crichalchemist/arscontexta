@@ -639,10 +639,10 @@ fm_exempt_p() { # fm_exempt_p <relative-path> -> rc 0 when structurally exempt
 # lines drift on every edit, and a bare path would let a file quietly grow a
 # fourth site behind three.
 FM_ALLOW="
-generators/features/graph-analysis.md 10 recipe emitted into a generated vault's docs; a recipe cannot source the library the way a fence can, so converting it changes what generation emits
+generators/features/graph-analysis.md 8 recipe emitted into a generated vault's docs; a recipe cannot source the library the way a fence can, so converting it changes what generation emits
 generators/features/maintenance.md 1 recipe emitted into a generated vault's docs
 generators/features/methodology-knowledge.md 2 recipe emitted into a generated vault's docs; CLAUDE.md names :31 by line as a known-open instance of this class
-generators/features/schema.md 6 recipe emitted into a generated vault's docs
+generators/features/schema.md 5 recipe emitted into a generated vault's docs
 generators/features/semantic-search.md 6 recipe emitted into a generated vault's docs
 platforms/shared/skill-blocks/remember.md 1 FROZEN tree; check 4 pins it against a cksum manifest, so this cannot be fixed in place
 platforms/shared/skill-blocks/rethink.md 2 FROZEN tree; check 4 pins it against a cksum manifest
