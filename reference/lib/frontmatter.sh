@@ -4,13 +4,24 @@
 # Sourced by skill templates and by the plugin's own skills. Do NOT inline copies
 # of these functions anywhere.
 #
-# NOTHING ENFORCES THAT SENTENCE, for the same reason it enforces nothing for
-# reference/lib/link-extraction.sh: check-portability.sh runs six checks — PCRE
-# grep, wiki-link capture using negated classes, PCRE via ripgrep, the frozen
-# skill-blocks manifest, AGENTS.md being a symlink, and
-# interpolated wiki-link matchers — and none of them detects
-# an inlined copy of anything. The rule is real and still binding; the enforcement
-# is convention. Owner of the gap: the CI-hardening spec.
+# THAT SENTENCE IS NOW ENFORCED FOR THIS LIBRARY, AND STILL IS NOT FOR THE LINK
+# ONE — do not read the two as equivalent. check-portability.sh runs seven checks
+# — PCRE grep, wiki-link capture using negated classes, PCRE via ripgrep, the
+# frozen skill-blocks manifest, AGENTS.md being a symlink, interpolated wiki-link
+# matchers, and (check 7) hand-rolled frontmatter parsing outside this file.
+#
+# WHAT CHECK 7 ACTUALLY COVERS, stated narrowly because the previous version of
+# this paragraph was a claim nobody had verified and it was false for months: it
+# flags a line-anchored `'^field:'` grep used to select or count notes — a
+# hand-rolled list_notes_by_field. It does NOT detect a copied-out awk parser,
+# an unanchored or double-quoted equivalent, or an inlined copy of
+# link-extraction.sh, which remains convention only.
+#
+# It is born red at 74 allowlisted sites, so a green run means "no NEW
+# hand-rolled parse", not "none exists". (That phrase is on ONE line on purpose:
+# check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 74 is GATED — see
+# the check-7 rows in check-doc-claims.sh, which read this file too; the number
+# stood at 39 here for one commit after the detector was widened, which is why.
 #
 # Writing or editing a SKILL.md? Read reference/skill-authoring.md first.
 #
@@ -97,9 +108,9 @@
 
 # Contract version. Bump on any BEHAVIOR change (delimiter rules, key matching,
 # quote stripping, recursion semantics). Callers and /arscontexta:upgrade read it.
-FRONTMATTER_VERSION=1
+FRONTMATTER_VERSION=3
 
-# Check dependencies and directory argument.
+# _fm_require_deps_and_dir validates required commands and confirms that the directory exists, is readable, and is traversable.
 _fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
   local dir="$1"
   if ! command -v awk >/dev/null 2>&1; then
@@ -112,6 +123,19 @@ _fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
   fi
   if [ -z "$dir" ] || [ ! -d "$dir" ]; then
     echo "error: frontmatter: not a directory: '${dir:-<empty>}'" >&2
+    return 1
+  fi
+  # EXISTENCE IS NOT ACCESS, and the difference is a silent wrong answer. `-d`
+  # succeeds on a directory this process cannot read or traverse; `find` then
+  # prints "Permission denied" to stderr and exits 0, so every counting function
+  # here returned rc 0 with ZERO matches — a scan that could not run, reported
+  # as a scan that found nothing. Callers that check the rc (validate-kernel's
+  # C1) were made dead code by it. This is the same defect as testing `[ -f ]`
+  # for a config file the process cannot open, fixed in read_config.sh for the
+  # same reason: the two states are indistinguishable downstream.
+  if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
+    echo "error: frontmatter: directory not readable: '$dir'" >&2
+    echo "       refusing to report a count over a directory this process cannot scan" >&2
     return 1
   fi
   return 0
@@ -151,7 +175,9 @@ frontmatter_field() {
 }
 
 # list_notes_by_field <dir> <field> <value>... -> matching file paths, one per line
-# Recursive. Emits nothing and returns 0 when the tree holds no match.
+# list_notes_by_field recursively prints Markdown file paths whose frontmatter field matches any supplied value.
+# It returns a nonzero status if the field or values are missing or the directory tree cannot be fully scanned.
+# The field and values are provided after the directory path.
 list_notes_by_field() {
   _fm_require_deps_and_dir "$1" || return 1
   local dir="$1" field="$2" errf p fm_val want
@@ -167,7 +193,33 @@ list_notes_by_field() {
   # a failure signalled by a flag inside it would be discarded and the caller would
   # see a short list as a legitimately short list. The touch-file is how
   # link-extraction.sh solves the same problem; the alternative is silence.
-  find "$dir" -type f -name '*.md' | while IFS= read -r p; do
+  # -H FOLLOWS A SYMLINK GIVEN ON THE COMMAND LINE, and without it this function
+  # certifies a path it then does not scan. Both directory-scanning functions in
+  # this file carry it. `test -r`/`-x` dereference, so a
+  # symlinked directory passes the guard above; `find <symlink>` without -H does
+  # NOT descend, so the scan returned 0 notes at rc 0 — a plausible zero over a
+  # directory that has content. Measured on a 2-note fixture: real dir 2,
+  # symlink to it 0. Every caller inherits it, and validate-kernel's C1 would
+  # print its green "no note has reached an outcome status yet" over a vault
+  # whose observations directory is a symlink.
+  #
+  # FIND'S OWN rc IS CHECKED, because an unreadable SUBdirectory is not the case
+  # the touch-file below covers. That mechanism catches unreadable FILES; a
+  # directory one level down that cannot be traversed makes find print
+  # "Permission denied" to stderr and exit non-zero, while the pipeline's status
+  # is the `while`'s — so the count came back short at rc 0. The guard at the top
+  # of this function checks the ROOT only, and its message claimed more than that.
+  # Measured: 2-note fixture with one note under a chmod-000 subdirectory
+  # returned count=1 rc=0.
+  _fm_list=$(find -H "$dir" -type f -name '*.md' 2>/dev/null); _fm_find_rc=$?
+  if [ "$_fm_find_rc" -ne 0 ]; then
+    rm -f "$errf"
+    echo "error: frontmatter: cannot fully traverse '$dir' (find rc=$_fm_find_rc)" >&2
+    echo "       refusing to report a count that would silently be short" >&2
+    return 1
+  fi
+  printf '%s\n' "$_fm_list" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
     if [ ! -r "$p" ]; then
       touch "$errf"
       continue
@@ -208,7 +260,7 @@ count_notes_by_field() {
 # files with no frontmatter at all. This is the dual of count_notes_by_field, and
 # it is the function the three-way fixture assertion keys on: only a parser that
 # actually reads the requested FIELD NAME can distinguish "missing status" from
-# "missing some-field-nothing-declares".
+# count_notes_missing_field recursively counts Markdown files that do not define the specified frontmatter field.
 count_notes_missing_field() {
   _fm_require_deps_and_dir "$1" || return 1
   local dir="$1" field="$2" errf missing p
@@ -219,7 +271,20 @@ count_notes_missing_field() {
   errf="/tmp/frontmatter-err-$$"
   rm -f "$errf"
 
-  missing=$(find "$dir" -type f -name '*.md' | while IFS= read -r p; do
+  # -H AND THE find-rc CHECK, same as list_notes_by_field. This function did NOT
+  # get them when v3 landed, and v3's own comment said "Every caller inherits it"
+  # — false for the function 45 lines below it in the same file. Measured before
+  # this fix, on a 2-note fixture: symlinked dir 0 (truth 1), note under a
+  # chmod-000 subdirectory counted short at rc 0.
+  _fm_list=$(find -H "$dir" -type f -name '*.md' 2>/dev/null); _fm_find_rc=$?
+  if [ "$_fm_find_rc" -ne 0 ]; then
+    rm -f "$errf"
+    echo "error: frontmatter: cannot fully traverse '$dir' (find rc=$_fm_find_rc)" >&2
+    echo "       refusing to report a count that would silently be short" >&2
+    return 1
+  fi
+  missing=$(printf '%s\n' "$_fm_list" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
     if [ ! -r "$p" ]; then
       touch "$errf"
       continue

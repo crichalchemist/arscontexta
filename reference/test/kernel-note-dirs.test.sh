@@ -371,5 +371,229 @@ eq "spaced dir, unquoted + trailing comment: comment not part of the name" "my n
    "$(printf '%s' "$OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p')"
 rm -rf "$ROOT"
 
+# =============================================================================
+# --- C1: outcome statuses carry their target field ---------------------------
+#
+# The first CONDITIONAL-field assertion in either tree, so it gets its own
+# fixture rather than being read off the field vault: a suite that depends on a
+# private vault's content asserts whatever that vault happens to contain today.
+#
+# The DECOY is the assertion that matters. `decoy.md` is `status: open` in its
+# frontmatter and carries `status: implemented` at COLUMN 0 in its body. The
+# library excludes it; a naive `grep -rl '^status: implemented'` counts it and
+# reports it as a violation — wrong in both terms, since it inflates the
+# denominator AND invents a failure. Measured: correct 1 of 2, naive 2 of 3.
+c1() { # c1 <vault>  -> C1's own result line
+  _c1=$("$SELF" "$VALIDATOR" "$1" 2>/dev/null \
+    | sed "s/${ESC}\\[[0-9;]*m//g" \
+    | awk '/^C1\. /{on=1; next} /^=== /{on=0} on')
+  [ -z "$_c1" ] && printf 'VALIDATOR-PRODUCED-NO-OUTPUT' || printf '%s' "$_c1"
+}
+
+# ALL FOUR (directory x status) SPECS GET A VIOLATION. The first version of this
+# fixture had a promoted TENSION but no promoted OBSERVATION, so deleting the
+# `ops/observations:promoted` spec from the validator changed nothing observable
+# and the suite stayed green — the mutation reported STILL NOTHING, which means
+# either the assertion is vacuous or the fixture never reaches it. Here it was
+# the fixture. Each spec now has exactly one violator, so deleting ANY ONE of
+# the four reddens the count.
+mkoutcomes() { # mkoutcomes -> vault covering all four specs, plus a body-line decoy
+  local root v; root=$(mktemp -d) || return 1; v="$root/vault"
+  mkdir -p "$v/zzz-arbitrary" "$v/ops/observations" "$v/ops/tensions"
+  printf -- '---\ndescription: a\n---\n# hub\n'                        > "$v/zzz-arbitrary/hub.md"
+  printf -- '---\nstatus: implemented\nimplemented_in: p.sh\n---\n#g\n' > "$v/ops/observations/good.md"
+  printf -- '---\nstatus: implemented\n---\n# names nothing\n'          > "$v/ops/observations/bad-impl.md"
+  printf -- '---\nstatus: promoted\n---\n# names nothing\n'             > "$v/ops/observations/bad-prom.md"
+  printf -- '---\nstatus: open\n---\n# open\n\nstatus: implemented\n'   > "$v/ops/observations/decoy.md"
+  printf -- '---\nstatus: promoted\npromoted_to: "[[n]]"\n---\n#g\n'    > "$v/ops/tensions/good.md"
+  printf -- '---\nstatus: promoted\n---\n# names nothing\n'             > "$v/ops/tensions/bad-prom.md"
+  printf -- '---\nstatus: implemented\n---\n# names nothing\n'          > "$v/ops/tensions/bad-impl.md"
+  printf '%s' "$v"
+}
+
+V=$(mkoutcomes) || { echo "fixture build failed" >&2; exit 1; }
+ROOT=$(dirname "$V"); OUT=$(c1 "$V")
+
+eq "C1: the check produced output at all"                "yes" \
+   "$([ "$OUT" = "VALIDATOR-PRODUCED-NO-OUTPUT" ] && echo no || echo yes)"
+eq "C1: FAILs when an outcome names no target"           "fail" \
+   "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+# 2 bad of 4 scanned. The 4 EXCLUDES decoy.md — that is the whole point of the
+# denominator being asserted rather than just the numerator.
+eq "C1: exactly 4 violations, one per spec"              "4" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
+eq "C1: scanned 6, so the body-line decoy was NOT counted" "6" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*of \([0-9]*\) outcome-status.*/\1/p')"
+eq "C1: names the offending observation"                 "present" \
+   "$(printf '%s' "$OUT" | grep -q 'observations/bad-impl.md' && echo present || echo absent)"
+eq "C1: names the offending tension"                     "present" \
+   "$(printf '%s' "$OUT" | grep -q 'tensions/bad-prom.md' && echo present || echo absent)"
+eq "C1: covers promoted, not only implemented"           "present" \
+   "$(printf '%s' "$OUT" | grep -q 'promoted without a usable promoted_to' && echo present || echo absent)"
+eq "C1: does not name the compliant note"                "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'observations/good.md' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# A vault with no ops dirs: the rule does not apply. WARN, never a silent PASS —
+# "the check did not run" reported as green is the defect primitive 2 shipped.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -rf "$V/ops/observations" "$V/ops/tensions"
+OUT=$(c1 "$V")
+eq "C1: no ops dirs -> WARN, not PASS"                   "warn" \
+   "$(printf '%s' "$OUT" | grep -q 'WARN' && echo warn || echo other)"
+eq "C1: no ops dirs -> says the rule is not applicable"  "stated" \
+   "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo stated || echo silent)"
+eq "C1: no ops dirs -> emits no PASS of its own"         "yes" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS' && echo no || echo yes)"
+rm -rf "$ROOT"
+
+# All outcomes compliant: PASS, and the count is the scanned total not zero.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+printf -- '---\nstatus: implemented\nimplemented_in: q.sh\n---\n#f\n' > "$V/ops/observations/bad-impl.md"
+printf -- '---\nstatus: promoted\npromoted_to: "[[m]]"\n---\n#f\n'    > "$V/ops/observations/bad-prom.md"
+printf -- '---\nstatus: promoted\npromoted_to: "[[m]]"\n---\n#f\n'    > "$V/ops/tensions/bad-prom.md"
+printf -- '---\nstatus: implemented\nimplemented_in: q.sh\n---\n#f\n' > "$V/ops/tensions/bad-impl.md"
+OUT=$(c1 "$V")
+eq "C1: all compliant -> PASS"                           "pass" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS' && echo pass || echo other)"
+eq "C1: PASS still reports 6 scanned, not 0"             "6" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*PASS \([0-9]*\) outcome-status.*/\1/p')"
+rm -rf "$ROOT"
+
+# Directories present but NOTHING has reached an outcome status. Distinct branch,
+# distinct message: "PASS, all 0 carry their field" is how a scan that found
+# nothing reads as a scan that found everything in order.
+# ONE directory only, so the pair count (2) and the directory count (1) differ.
+# With both directories present they are 4 and 2 and the assertion below cannot
+# tell which quantity the message reports — which is how the mislabel shipped.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -rf "$V/ops/tensions"
+rm -f "$V/ops/observations/"*.md
+printf -- '---\nstatus: open\n---\n# not resolved yet\n' > "$V/ops/observations/o.md"
+OUT=$(c1 "$V")
+eq "C1: empty outcome set -> PASS"                       "pass" \
+   "$(printf '%s' "$OUT" | grep -q 'PASS' && echo pass || echo other)"
+eq "C1: empty outcome set -> says NO note reached one"   "stated" \
+   "$(printf '%s' "$OUT" | grep -q 'no note has reached an outcome status' && echo stated || echo silent)"
+# It counts (directory, status) PAIRS, not directories -- the loop runs four
+# pairs over two dirs, so one directory scores 2. The first version of this
+# message said "2 directories" on a vault that had one.
+eq "C1: empty outcome set -> counts PAIRS, not directories" "2" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*checked \([0-9]*\) (directory, status).*/\1/p')"
+eq "C1: empty outcome set -> claims no per-note check"   "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'all carry their target field' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# The SECOND empty-set case exists so the pair count cannot be satisfied by a
+# constant. With one directory it is 2; with both it is 4. A review found that
+# hardcoding the counter to the fixture's own value (2) reddened nothing, while
+# 1/3/9 each reddened one — so the assertion pinned "not an arbitrary constant"
+# rather than "counts pairs". Two fixtures with different expected values fixes
+# that: no single constant satisfies both.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -f "$V/ops/observations/"*.md "$V/ops/tensions/"*.md
+printf -- '---\nstatus: open\n---\n# not resolved yet\n' > "$V/ops/observations/o.md"
+OUT=$(c1 "$V")
+eq "C1: BOTH dirs empty -> 4 pairs, so no constant satisfies both cases" "4" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*checked \([0-9]*\) (directory, status).*/\1/p')"
+rm -rf "$ROOT"
+
+# A vault that RENAMED ops/. Primitive 12 has always accepted these variants;
+# C1 hardcoded `ops/` and so went silent on such a vault while asserting
+# "self-evolution not enabled" — two checks in one script disagreeing about the
+# same directories. The candidate list is now shared.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+mkdir -p "$V/04_meta/logs/observations"
+mv "$V/ops/observations/bad-impl.md" "$V/04_meta/logs/observations/"
+rm -rf "$V/ops/observations" "$V/ops/tensions"
+OUT=$(c1 "$V")
+eq "C1: a renamed ops dir is RESOLVED, not reported as absent" "fail" \
+   "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+eq "C1: renamed ops dir -> does NOT claim self-evolution is off" "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo present || echo absent)"
+eq "C1: renamed ops dir -> names the file under its real path" "present" \
+   "$(printf '%s' "$OUT" | grep -q '04_meta/logs/observations/bad-impl.md' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# A vault that renamed `ops` ITSELF, via its manifest vocabulary. The previous
+# fixture used 04_meta/logs/, which is INSIDE the hardcoded candidate list, so it
+# could not fail on a resolver that only knows that list — the repo's own
+# critique ("a fix verified against the field vault only proves that `nodes`
+# joined the hardcoded list") applied to this suite. zzz-meta is in no list.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+# NO ops/ DIRECTORY SURVIVES. The first version of this fixture kept one alive
+# solely to hold the manifest, which is not a renamed vault — it is two
+# directories, and it passed against a resolver that reads the manifest from a
+# hardcoded ops/ path. The comment above quotes this repo's critique of a fix
+# verified against a shape that cannot fail, and then committed it.
+mkdir -p "$V/zzz-meta"
+mv "$V/ops/observations" "$V/ops/tensions" "$V/zzz-meta/"
+printf 'vocabulary:\n  notes: "zzz-arbitrary"\n  ops: "zzz-meta"\n' > "$V/zzz-meta/derivation-manifest.md"
+rm -rf "$V/ops"
+OUT=$(c1 "$V")
+eq "C1: an ops dir renamed via the manifest RESOLVES"    "fail" \
+   "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+eq "C1: renamed ops -> does NOT claim self-evolution off" "absent" \
+   "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo present || echo absent)"
+eq "C1: renamed ops -> finds all 4 violations"           "4" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
+eq "C1: renamed ops -> names the real path"              "present" \
+   "$(printf '%s' "$OUT" | grep -q 'zzz-meta/observations' && echo present || echo absent)"
+# PRIMITIVE 2 ON THE SAME VAULT, and this is the assertion whose absence let a
+# fourteenth defect through. This fixture already BUILT the vault that exposes
+# it — an `ops` renamed with no `ops/` left — and then `c1()` awk'd the output
+# down to the C1 section and discarded primitive 2's line, which was reporting a
+# shape-scan fallback that swept the renamed ops tree in as note-bearing.
+# Generating the evidence and filtering it out is worse than not testing.
+P2OUT=$(p2 "$V")
+# An if/else, not an `&&`/`||` chain. The chain form here emitted BOTH branches:
+# `(A && echo manifest) || B` succeeds, so the following `&& echo shape-scan`
+# also fires. Three-way verdicts do not fit that idiom.
+if printf '%s' "$P2OUT" | grep -q 'derivation-manifest.md vocabulary'; then p2src=manifest
+elif printf '%s' "$P2OUT" | grep -q 'shape scan';                     then p2src=shape-scan
+else                                                                        p2src=other; fi
+eq "renamed ops: primitive 2 resolves via the MANIFEST, not a shape scan" "manifest" "$p2src"
+eq "renamed ops: the ops tree is NOT scanned as note-bearing" "absent" \
+   "$(printf '%s' "$P2OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p' | grep -q 'zzz-meta' && echo present || echo absent)"
+eq "renamed ops: the notes dir IS scanned (so the above is not empty)" "present" \
+   "$(printf '%s' "$P2OUT" | sed -n 's/.*scanned: \([^]]*\)\].*/\1/p' | grep -q 'zzz-arbitrary' && echo present || echo absent)"
+rm -rf "$ROOT"
+
+# An EMPTY target field. frontmatter.sh returns rc 0 for a present-but-empty
+# field, so a presence test passed `implemented_in:` with no value — exactly as
+# unfalsifiable as omitting it, and the cheapest way to turn every violation
+# green.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+rm -f "$V/ops/observations/"*.md "$V/ops/tensions/"*.md
+printf -- '---\nstatus: implemented\nimplemented_in:\n---\n# empty value\n' > "$V/ops/observations/empty.md"
+printf -- '---\nstatus: promoted\npromoted_to: ""\n---\n# empty string\n'   > "$V/ops/tensions/empty.md"
+OUT=$(c1 "$V")
+eq "C1: an EMPTY target field is a violation, not a pass"  "2" \
+   "$(printf '%s' "$OUT" | sed -n 's/.*FAIL \([0-9]*\) of .*/\1/p')"
+rm -rf "$ROOT"
+
+# THE LIBRARY'S REFUSAL MUST REACH THE VERDICT. list_notes_by_field prints
+# "refusing to report a count" and returns 1 on an unreadable directory; C1
+# called it inside `<<EOF $(...)`, which has no exit status, so a failed scan
+# emitted nothing and reported PASS.
+#
+# chmod 000 does not restrict root, so this assertion would SILENTLY pass when
+# the suite runs as root. It checks first and reports SKIPPED-AS-ROOT rather
+# than a green tick, because a check that cannot run must not look like one that
+# ran and found nothing — the defect this whole section is about.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+chmod 000 "$V/ops/observations" 2>/dev/null
+if ls "$V/ops/observations" >/dev/null 2>&1; then
+  printf '  SKIP C1: unreadable-dir branch (running as root; chmod 000 does not restrict)\n'
+else
+  OUT=$(c1 "$V")
+  eq "C1: an unscannable directory FAILs, never PASSes"    "fail" \
+     "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+  eq "C1: and says the library refused rather than a count" "stated" \
+     "$(printf '%s' "$OUT" | grep -q 'could not scan' && echo stated || echo silent)"
+fi
+chmod 755 "$V/ops/observations" 2>/dev/null
+rm -rf "$ROOT"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

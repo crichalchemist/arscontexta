@@ -32,7 +32,80 @@ case "$FILE" in
 esac
 
 # ─────────────────────────────────────────────
-# 1. YAML Frontmatter Existence
+# 1. Content-Destruction Guard
+# ─────────────────────────────────────────────
+# Every other check here asks "is this note well-formed?". None asks "is this
+# note still THERE?". A node-writing pass — extraction, reweave, refactor, a
+# subagent returning partial output, a rewrite from a truncated read — can
+# replace a developed note with a schema-clean fragment. That passes every
+# other check and the loss is silent, which is the failure mode this system is
+# most prone to.
+#
+# WHY THIS RUNS FIRST, AND NOT LATER WITH THE OTHER CONTENT CHECKS: check 2
+# exits 0 when frontmatter is missing. A write that replaces a developed note
+# with frontmatter-less content is the MOST complete destruction this guard
+# exists to catch, and from any position below check 2 it would never see it.
+# If you add checks, keep this one first.
+#
+# WHY IT CAN SEE THE PREVIOUS CONTENT: this hook runs before auto-commit on the
+# same PostToolUse matcher, so HEAD should still hold the pre-write version at
+# this instant. THAT IS AN ORDERING ASSUMPTION, NOT A GUARANTEE — auto-commit
+# is declared async, so list order does not prove it has not already committed.
+# If it wins the race, HEAD holds the new content and this compares the file to
+# itself. The failure is one-directional: this guard can fall SILENT, it cannot
+# warn wrongly.
+#
+# SILENT BY DESIGN vs REPORTED: three states are silent because in each there is
+# genuinely nothing to destroy — the file is untracked, tracked but not yet
+# committed, or the repo has no commits. Two are REPORTED, because they mean the
+# guard could not run at all: git absent, or not a git repository.
+#
+# SCOPE LIMIT: this guard sees only the tool events your hooks.json routes to it.
+# If that matcher is "Write" alone — the default this system ships — then an Edit
+# or MultiEdit that destroys a note never reaches this guard at all.
+#
+# It WARNS and does not block, like every check here: a legitimate split or
+# prune does shrink a note, and a guard that cries wolf gets switched off, which
+# is worse than no guard at all.
+DIR=$(dirname "$FILE")
+if ! command -v git >/dev/null 2>&1; then
+  echo "CONDITION: git not available — the content-destruction guard did not run this write."
+elif ! git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "CONDITION: not a git repository — the content-destruction guard did not run this write."
+else
+  REL=$(git -C "$DIR" ls-files --full-name --error-unmatch "$FILE" 2>/dev/null)
+  # cat-file -e tests for the blob without materialising it, and keeps the byte
+  # count below off command substitution, which strips trailing newlines and
+  # would undercount the previous file against one measured with wc -c.
+  if [ -n "$REL" ] && git -C "$DIR" cat-file -e "HEAD:$REL" 2>/dev/null; then
+    PREV_BYTES=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null | wc -c | tr -d ' ')
+    NOW_BYTES=$(wc -c < "$FILE" | tr -d ' ')
+    # Bytes and links are counted separately because they fail independently:
+    # a rewrite can hold its length and drop every edge, which costs the graph
+    # more than the prose does. Both sides count `[[` inside fenced blocks, so
+    # a fenced link only misleads when the fence itself changes.
+    PREV_LINKS=$(git -C "$DIR" show "HEAD:$REL" 2>/dev/null | grep -o '\[\[' | wc -l | tr -d ' ')
+    NOW_LINKS=$(grep -o '\[\[' "$FILE" 2>/dev/null | wc -l | tr -d ' ')
+    # 200-byte floor so trimming a stub stays quiet; half is the threshold
+    # because a legitimate edit rarely halves a developed note. Tune them to
+    # your own notes if they warn too often or too rarely — they are the only
+    # two numbers in this check. The generator that produced this file declares
+    # the same pair on its own side, and editing them here does not change them
+    # there; that is a one-way relationship and it is the expected one.
+    if [ "${PREV_BYTES:-0}" -gt 200 ] && [ $((NOW_BYTES * 2)) -lt "$PREV_BYTES" ]; then
+      echo "CONTENT WARN: $(basename "$FILE") shrank ${PREV_BYTES} -> ${NOW_BYTES} bytes (over half removed)"
+      echo "  If this was a split or a prune, fine. If a pass wrote partial output, the rest is gone."
+      echo "  Previous version: git show HEAD:$REL"
+    fi
+    if [ "${NOW_LINKS:-0}" -lt "${PREV_LINKS:-0}" ]; then
+      echo "CONTENT WARN: $(basename "$FILE") lost $((PREV_LINKS - NOW_LINKS)) of ${PREV_LINKS} wiki links"
+      echo "  Removed edges are invisible in the note and visible only in the graph."
+    fi
+  fi
+fi
+
+# ─────────────────────────────────────────────
+# 2. YAML Frontmatter Existence
 # ─────────────────────────────────────────────
 if ! head -1 "$FILE" 2>/dev/null | grep -q "^---$"; then
   echo "SCHEMA WARN: Missing YAML frontmatter in $(basename "$FILE")"
@@ -41,7 +114,7 @@ if ! head -1 "$FILE" 2>/dev/null | grep -q "^---$"; then
 fi
 
 # ─────────────────────────────────────────────
-# 2. Required Field: description
+# 3. Required Field: description
 # ─────────────────────────────────────────────
 if ! head -20 "$FILE" 2>/dev/null | grep -q "^description:"; then
   echo "SCHEMA WARN: Missing 'description' field in $(basename "$FILE")"
@@ -50,7 +123,7 @@ if ! head -20 "$FILE" 2>/dev/null | grep -q "^description:"; then
 fi
 
 # ─────────────────────────────────────────────
-# 3. Required Field: topics
+# 4. Required Field: topics
 # ─────────────────────────────────────────────
 # Check both YAML frontmatter and markdown footer format
 HAS_TOPICS=false
@@ -68,7 +141,7 @@ if [ "$HAS_TOPICS" = false ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 4. Description Quality Check
+# 5. Description Quality Check
 # ─────────────────────────────────────────────
 # Warn if description is suspiciously short (likely placeholder)
 DESC=$(head -20 "$FILE" 2>/dev/null | grep "^description:" | sed 's/^description: *//')
@@ -81,7 +154,7 @@ if [ -n "$DESC" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 5. Title Format Check
+# 6. Title Format Check
 # ─────────────────────────────────────────────
 # Check that the first heading matches prose-as-title pattern
 TITLE=$(grep '^# ' "$FILE" 2>/dev/null | head -1 | sed 's/^# //')
@@ -94,7 +167,7 @@ if [ -n "$TITLE" ]; then
 fi
 
 # ─────────────────────────────────────────────
-# 6. Discovery Nudge (optional)
+# 7. Discovery Nudge (optional)
 # ─────────────────────────────────────────────
 # {{IF_DISCOVERY_NUDGE}}
 # Remind the agent to check for connections after creating a note.

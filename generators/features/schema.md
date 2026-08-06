@@ -70,8 +70,14 @@ rg -L '^description:' {DOMAIN:notes}/*.md
 # Find {DOMAIN:notes} by {DOMAIN:topic map}
 rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 
-# Cross-field queries — find pending tensions
-rg -l '^type: tension' {DOMAIN:notes}/ | xargs rg '^status: pending'
+# Cross-field queries — tensions AWAITING REVIEW (pending or open).
+# Not "all unresolved": `blocked` is also unresolved and deliberately excluded,
+# because it is waiting on work outside this system and re-reviewing it would
+# fire the threshold on something no review can move.
+. {config.ops_dir}/lib/frontmatter.sh
+list_notes_by_field {DOMAIN:notes} type tension | while IFS= read -r f; do
+  s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"
+done
 
 # Count {DOMAIN:notes} by type
 rg '^type:' {DOMAIN:notes}/ --no-filename | sort | uniq -c | sort -rn
@@ -139,7 +145,28 @@ _schema:
     description: "max 200 chars, no trailing period, must add info beyond title"
 ```
 
-The `_schema` block is the single source of truth for field validation. Skills and hooks read it to check compliance. When you see a field with enumerated values, use one of the listed values — or update the template first if a new value is genuinely needed.
+The `_schema` block is the **declared** source of truth for field validation: when you see a field
+with enumerated values, use one of the listed values — or update the template first if a new value is
+genuinely needed.
+
+**Declared is not enforced, and the difference matters.** What reads `_schema` in a generated system:
+
+- `/{DOMAIN:validate}`, `/{DOMAIN:verify}` and `/{DOMAIN:refactor}` read it when invoked — the
+  last of those reads `enums:` specifically. That is an instruction to an agent, so it holds only
+  for the runs where the agent follows it — real, but per-invocation.
+- Deterministic validators — a write hook, a pre-commit check — are written per system and are
+  **not required to read `_schema` at all.** A validator that hardcodes its own list of valid
+  types never opens a template, and nothing tells you it has stopped agreeing with one.
+
+**Check whether anything in YOUR system reads `enums:`.** A linter that parses `_schema` for
+`required:` and `optional:` — the field lists — still may not check the enumerated values, and then
+a note carrying `status: whatever` passes every automatic gate and fails only if a human or an agent
+looks. The field lists and the value lists are separate properties; covering one is not covering both.
+
+**The consequence to design around:** if a rule matters, something has to read it back. A validator
+that hardcodes its own copy of an enum will drift from the template silently, and the drift shows up
+as a count that reads zero forever rather than as an error. When you add a value here, search for
+what matches the old one.
 ```
 
 ## Dependencies

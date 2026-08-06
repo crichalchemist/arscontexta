@@ -62,16 +62,16 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 37/37
+  $s reference/test/kernel-note-dirs.test.sh             # 68/68
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
-  $s reference/test/hook-config.test.sh                  # 40/40
+  $s reference/test/hook-config.test.sh                  # 56/56
 done
 ```
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | six checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally) |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** — 74 matching lines carrying 77 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 74 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
@@ -81,6 +81,7 @@ done
 | `check-placeholder-count.sh` | a backport that HARDCODED a vault's vocabulary into a `skill-sources/` template — `nodes/` where `{vocabulary.notes}` stood — shipping one user's dialect to every future system. The only gate that reads a git range, so CI needs `fetch-depth: 0`; it exits 2, not 0, where the merge base is unreachable |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
 | `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
+| `check-doc-claims.sh` | a number a document DECLARES going stale — including on MERGE, where nothing in a working tree changes and there is no diff to notice. Also the only gate reading `generators/`: the note `status` enum is declared **four times across three files** (`schema.md` declares it twice, once in a table and once in `_schema`), and a file-to-file comparison cannot see those two disagree — the blind spot `bump-version.test.sh` exists for, one tree over. It compares the VALUE SET, never the text, because the same enum is legitimately spelled three ways. It also checks the tension enum against its three consumers, which is the half that is checkable for an enum declared only once: a recipe matching a value the enum dropped returns 0 forever. **What it cannot cover:** the observation enum, declared once with no consumer inside `generators/` — its consumer is the SessionStart hook, in another tree. Declaration counts are PINNED, because discovery keys on an anchor value and a declaration that drops the anchor stops being discovered; three survivors agreeing would otherwise read PASS |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
@@ -88,7 +89,7 @@ the number it prints is *right* is not checked by anything here.
 
 **Nor does any gate enforce "do not inline the link library's functions."** That row used to claim
 `check-portability.sh` catches inlined copies, and `reference/lib/link-extraction.sh` said the same in
-its header. Both were false — the six checks are enumerated above and none of them looks for it. Check
+its header. Both were false — the seven checks are enumerated above and only check 7 looks for an inlined copy, of the FRONTMATTER library and not this one. Check
 6 is not that gate either, and the distinction is the one divergence 13 draws: it forbids
 *interpolating* a note name into a matcher, while the inlined sites spell `rg -o '\[\[([^\]|#]+)'` and
 interpolate nothing, so they are correctly outside it. The
@@ -166,13 +167,33 @@ generated vault to run against:
 Pass criterion is 16/16 primitives PASSing — sixteen, not the fifteen the highest header number
 suggests; see below. `WARN` is acceptable **only** for primitive 10 (semantic search,
 when `qmd` is absent) and primitive 8 (self space, when disabled by config). Any other WARN or
-FAIL is a real regression. Full test specs live in `reference/testing-milestones.md`.
+FAIL is a real regression.
+
+**One check in that run is NOT a primitive and is labelled `C1.` rather than numbered.** It asserts
+that an outcome status names a target — `implemented` carries `implemented_in:`, `promoted` carries
+`promoted_to:` — and it is the first conditional-field assertion in either tree. It is deliberately
+outside the numbering because it is not in `kernel.yaml` and has no `cognitive_grounding`; numbering
+it 16 would make the contract look like it declares something it does not. It emits one result line,
+so it moves the totals without moving the primitive count — which is the third distinct number in
+this paragraph and the reason to read labels rather than totals. `C1` may WARN for one stated
+reason: a vault with no `ops/observations/` or `ops/tensions/` has not enabled self-evolution, so
+the rule does not apply. That WARN is *not* a soft pass and is not a fourth exception to the
+criterion above — the criterion is about primitives, and `C1` is not one. Full test specs live in `reference/testing-milestones.md`.
 
 **Measured against the live vault, that criterion is violated by two items — and one of them only
 became visible when a check stopped sampling.** Re-measured on `fix/exhaustive-dangling-scan`:
-`15 PASS / 2 WARN / 0 FAIL`. Primitives 8 and 10 both PASS there.
+`15 PASS / 2 WARN / 1 FAIL` — 18 result lines, exit 1. Primitives 8 and 10 both PASS there.
 
-**The two survivors are primitive 1, frontmatter coverage — `5112 with YAML, 160 without` — and
+**The FAIL is `C1`, and it is the check working rather than a regression.** `13 of 34 outcome-status
+notes name no target`. Spec H predicted **6**, and the difference is scope rather than drift: the
+spec measured `implemented` observations only, while `C1` covers all four (directory × status)
+pairs, so `13 = 6 implemented + 7 promoted`. `promoted` is the worse half by a wide margin — it
+misses its field 7 times in 8, against 6 in 26 for `implemented` — which is why covering only the
+status the spec happened to name would have left the larger violation unmeasured. Both figures are
+field-vault content defects, not defects in this repo, and they drift; re-derive with the command
+below rather than quoting them.
+
+**The two survivors are primitive 1, frontmatter coverage — `5128 with YAML, 163 without` — and
 primitive 2, `8 unresolved wiki links out of 2716 unique checked`.** Neither is on the list of
 primitives permitted to WARN, so by the criterion above both are real findings. Both are content
 defects in the field vault rather than defects in this repo, which is why they are recorded here
@@ -190,23 +211,25 @@ read as covering a WARN that means something else entirely.
 
 **The criterion and the summary count different things, which is what made the labels skippable.**
 "16/16" is primitives; the summary counts *result lines*. On the field vault there are 16 primitives,
-16 numbered headers and 17 result lines, because primitive 2 emits two. **The headers run 1–15 with
+16 numbered headers and 18 result lines — primitive 2 emits two, and `C1` adds one that belongs to
+no primitive at all. **The headers run 1–15 with
 one spelled `10A`, so the highest number is 15 and the COUNT is 16** — `unique-addresses` is a full
 primitive in `kernel.yaml` (its own id, layer, validation and grounding) that was folded into 10's
 number rather than renumbering the rest. This file said "15 primitives" for exactly that reason: the
 largest label was read as the total. So `PASS: 15`
-is simply `17 − 2` — it is not independent evidence that fifteen primitives passed, and it would read
-`17` if both WARNs cleared. It has now equalled the target number `15` **twice, for two different
-reasons**: once as `15 − 0` when the scan resolved nothing, and now as `17 − 2`. Matching the target
-against that total is a coincidence of arithmetic, and it is a coincidence that recurs. **Read the
-labels.**
+is simply `18 − 2 − 1` — it is not independent evidence that fifteen primitives passed, and it would
+read `18` if both WARNs and the FAIL cleared. It has now equalled the target number `15` **three
+times, for three unrelated reasons**: as `15 − 0` when the scan resolved nothing, as `17 − 2` once
+the dangling scan ran, and now as `18 − 2 − 1` with `C1` added. Three different arithmetics landing
+on the same number is not corroboration — it is the same coincidence recurring, and the third
+instance arrived within a day of the second. **Read the labels.**
 
 Re-derive every number above with — it prints each result line, so the totals, the frontmatter
 counts and the dangling counts all come out of this one run:
 
 ```bash
 ./reference/validate-kernel.sh ~/second-brain 2>&1 \
-  | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -E '^ +(PASS|WARN|FAIL) '   # 17 result lines
+  | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -E '^ +(PASS|WARN|FAIL) '   # 18 result lines
 ```
 
 **The blind spot that used to be here is closed.** Primitive 10 once checked only that `qmd` was on
@@ -351,10 +374,38 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the **ten** checks above enforce — nine of them in
-CI, `validate-kernel.sh` being the one that needs a vault — and CI is green across all **19** steps
-on this branch. `main` carries **18**, and the difference is this branch's one new step, not four:
-the four that `fix/spec-f-divergence-drain` added are now *in* main, because that branch merged.
+not a claim you should take on trust: it is what the thirteen checks above enforce — twelve of them
+in CI, `validate-kernel.sh` being the one that needs a vault — as defined by the twenty-four steps in
+`.github/workflows/checks.yml`.
+
+**THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
+RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
+four out again while claiming they had been removed — an ungated restatement inside the sentence
+asserting there was none. Both are gone now.
+
+Two counts survive above as words, and **they are not gated either**: the gate's rows for those
+quantities anchor on a different sentence in this file, and a gate that reads one phrasing does not
+protect a synonym — which is what this entry exists to say. The step count is not restated at all,
+because "`main` carries N" is a claim about another branch that goes stale on MERGE with no diff to
+notice. Read them from the tree:
+
+```bash
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l
+grep -c '^      - ' .github/workflows/checks.yml
+```
+
+**These four numbers were stale by four, one, five and six respectively until 2026-08-05, in the
+paragraph introducing a list about numbers going stale.** They read ten / nine / 19 / 18 against a
+true 13 / 12 / 24 / 24, three paragraphs above this file's own explanation that a claim about `main`
+rots on merge. They were UNGATED while the gated spellings of the same three quantities — "thirteen
+executable checks", "Twelve run in CI", `# 24` — sat correct in the same file. A gate that reads one
+phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
+
+```bash
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
+grep -c '^      - ' .github/workflows/checks.yml                                        # 24
+git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 24
+```
 
 **A claim about `main` rots on MERGE, not on edit, which is why it needs a gate rather than care.**
 Nothing in a working tree changes when a branch lands, so `# 14` sat here correct-when-written and
@@ -753,7 +804,7 @@ where a record actually goes. And **every plan written from this branch forward*
 `## Deferrals` slot whose value is one line per deferral naming the tracked file it landed in, or
 the literal word `none`.
 
-**That is forward-binding, not a description of the directory — it is 2 of 8 today.** The six older
+**That is forward-binding, not a description of the directory — it is 3 of 9 today.** The six older
 plans have no such section, and retrofitting `none` into plans nobody has audited for deferrals
 would manufacture the exact kind of record this entry exists to stop. The wording here first read
 "every plan under `docs/superpowers/plans/` now carries", which was false by one command inside the
@@ -762,7 +813,7 @@ commit whose subject is records not matching reality:
 ```bash
 for p in docs/superpowers/plans/*.md; do
   printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
-done                                    # 2 of 8 carry it; the other six predate the convention
+done                                    # 3 of 9 carry it; the other six predate the convention
 ``` A commit-message gate was assessed and **rejected**, measured in both
 directions — the reasoning and the numbers are in
 `docs/superpowers/plans/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
@@ -963,25 +1014,115 @@ notice if it broke — and Spec F's own closing note said the enum had been spli
 once already.
 
 ```bash
-# (a) no gate mentions the generator enum at all — expect no output
+# (a) BUILT on fix/spec-h-enforcement-gap -- now names check-doc-claims.sh
 for f in reference/check-*.sh reference/test/*.test.sh; do
   /usr/bin/grep -lE 'generators/.*status|atomic-notes|schema\.md' "$f"; done
-# (b) no gate forbids inlining the frontmatter library — expect 0
+# (b) BUILT on the same branch -- check 7; was 0, now non-zero
 /usr/bin/grep -c 'frontmatter' reference/check-portability.sh
-# the three note-status declarations, which must agree — expect ONE line.
-# The spelling is normalised first: the same enum is written three ways
-# (`a | b`, `[a, b]`, and backticked prose), so a bare sort -u returns 3 and
-# reads as a split that is not there. Compare the VALUE SET, not the text.
+# The note-status declarations, which must agree. Normalise the spelling first:
+# the same enum is written three ways (`a | b`, `[a, b]`, and backticked table
+# cells), so a bare sort -u returns 3 and reads as a split that is not there.
 /usr/bin/grep -rho 'preliminary[^]]*archived' generators/ \
   | tr -d '`|,' | tr -s ' ' | sed 's/^ *//;s/ *$//' | sort -u        # 1 line
-/usr/bin/grep -rl 'preliminary' generators/ | wc -l                   # 3 files
+/usr/bin/grep -rl 'preliminary' generators/ | wc -l                   # 3 FILES
+/usr/bin/grep -rc 'preliminary' generators/ | /usr/bin/grep -v ':0'   # 4 DECLARATIONS
 ```
 
-Not built here on purpose: (a) needs a decision about which file is authoritative when they disagree,
-and `schema.md` calling itself "the single source of truth for field validation" is a claim about
-generated vaults rather than about this repo's own files. (b) is the same gate divergence 12 and 13
-both defer, and belongs with them rather than bolted on alone. Both are gate-design questions for the
-next CI-hardening pass; what this entry fixes is that they were invisible.
+**AMENDED 2026-08-05 — both gates now exist, and this entry was wrong about its own subject in two
+ways.** Amended rather than superseded, because it is referenced by number.
+
+**It counts FILES where the unit is DECLARATIONS, and the two differ.** The entry names
+`atomic-notes.md:94`, `schema.md:137` and `templates.md:30` — three files, and it misses
+`schema.md:30`, a fourth declaration in a table row inside a file it already lists. Its own
+verification command is `grep -rl … | wc -l`, which counts files, so it structurally could not have
+seen it. **A file-to-file comparison cannot see two fields of ONE file disagree** — verbatim the
+blind spot `bump-version.test.sh` exists for, one tree over. The gate compares declarations; both
+commands are above so the discrepancy is visible rather than inferable.
+
+**Its tension-enum citation is stale in address and in content.** It reads "`self-evolution.md:195`
+`pending | resolved | dissolved`"; the tension enum is now `:218` with eight values, changed by
+Task 1 of this branch. An entry citing a line AND a value set has two things that rot, which is why
+neither is quoted here without the command beside it.
+
+**What each gate does and does not cover** — the honest half, since (a)'s design question was real:
+`check-doc-claims.sh` asserts cross-declaration agreement for the NOTE enum, which is the only one
+declared more than once. That property is **vacuous** for the observation and tension enums, declared
+once each. The tension enum is covered a different way — its three recipe CONSUMERS in `generators/`
+must only match values it declares, which is the C3 defect this branch shipped and caught. The
+observation enum is **not covered**: its consumer is the SessionStart hook, outside that gate's tree.
+No authority decision was needed, because the gate reports a split without naming a winner.
+
+(b) is `check-portability.sh` check 7. Its size is stated once, in the gate table near the top of
+this file, and gated there — see that row rather than a second copy here, because this entry already
+demonstrates what a duplicated count does. What belongs here is the SHAPE: it was written first with
+a detector narrower than the property, missing the flagless spelling `rg '^status: open' dir/`
+entirely, and one of the sites it missed is named by line in the closed record for divergences 7-9.
+That is divergence 12's finding reproduced inside the commit that cites it, and it is the second
+reason this entry exists. A green run means "no NEW hand-rolled parse", never "none exists". It does
+NOT cover a copied-out awk parser, an unanchored or double-quoted equivalent, or an inlined copy of
+`link-extraction.sh` — which remains convention only, so divergences 12 and 13 are unaffected.
+
+**16. A generated vault has THREE tiers of validation and they do not connect — and no gate closes
+this, because every gate this repo has reads THIS repo.** Filed 2026-08-05 from
+`fix/spec-h-enforcement-gap`. Distinct from every entry above: those are defects with a fix. This is
+a structural property of the generator/vault relationship, and it is recorded because a reader who
+does not know it will keep writing rules that cannot arrive.
+
+| tier | example in the field vault | reachable from here? |
+|---|---|---|
+| generated, thin | `.claude/hooks/validate-note.sh` — 42 lines; checks `description`, `topics` | **only in a NEW vault**; no re-sync mechanism exists |
+| hand-written, enforced | `.claude/hooks/validate-node-schema.py` — 299 lines, wired PostToolUse, **blocks commits** | **never — it has no generator counterpart at all** |
+| prompt-based, soft | `/validate` reading `_schema` | ships, but fires only on invocation and only if the agent complies |
+
+**The consequence, stated plainly: a rule added to this repo today reaches new vaults only, and
+cannot reach an existing vault's real gate by any path.** "Fix it in the generator" fixes it
+*forward*. That is not pessimism — it is the difference between a spec that closes a class and one
+that believes it did.
+
+**This branch produced a clean instance rather than an argument.** Spec F converted
+`hooks/scripts/session-orient.sh` to the frontmatter library — it sources `ops/lib/frontmatter.sh`,
+fails loud when absent, and counts with `count_notes_by_field`. The template a generated vault
+derives from, `platforms/claude-code/hooks/session-orient.sh.template`, was **not** converted and
+still reads `grep -rl '^status: pending\|^status: open'`, silently, with no library and no guard. So
+the plugin's own hook is frontmatter-strict and what vaults get is not. It is the same file pair
+divergence 3 already flags for the threshold duplication — **two independent defects, one pair of
+files, neither reachable by any gate.** Check 7 allowlists it with the blocker stated; it is not
+merely undone.
+
+```bash
+# the plugin's own hook: sources the library, fails loud
+/usr/bin/grep -n 'frontmatter\|count_notes_by_field' hooks/scripts/session-orient.sh
+# what a vault derives from: neither
+sed 's/#.*$//' platforms/claude-code/hooks/session-orient.sh.template \
+  | /usr/bin/grep -n "grep -r[Llcq]* '\^status"
+```
+
+**A SECOND live instance arrived on the same branch, from work that was not even in its plan.** The
+content-destruction guard in `hooks/scripts/write-validate.sh` compares a written note against its
+last committed version. Measured: nothing under `skills/` or `generators/` names `write-validate` at
+all — the only code reference in the tree is `hooks/hooks.json`, which wires the PLUGIN's own copy.
+So the vault template beside it is reference material Claude reads while generating, exactly the
+mechanism this entry's neighbour (divergence 3) describes for `session-orient.sh.template`: what
+reaches a vault is whatever Claude *derives*, which is not a copy and tracks nothing. And the plugin
+copy is gated behind a hardcoded `*/notes/*` case filter, so on the field vault — `nodes/`, the vault
+whose defect motivated the guard — it cannot fire either. A guard that reaches neither side is the
+three-tier gap in miniature, built by someone who had just written this entry.
+
+```bash
+/usr/bin/grep -rln 'write-validate' skills/ generators/     # no hits, rc 1
+/usr/bin/grep -n 'notes/' hooks/scripts/write-validate.sh | head -2   # the hardcoded filter
+```
+
+**`/arscontexta:upgrade` is the nearest thing to a mechanism, and divergence 5 records that it has
+never been invoked as a slash command against a real vault** — structurally, since a slash command
+runs in the session's working directory and cannot be pointed at another tree. Its repairs were
+hand-executed against an `rsync` copy once, which found six defects. A design for real re-sync is its
+own spec and is explicitly out of scope for Spec H.
+
+**What would close this is not a check.** It is a generated-artifact refresh mechanism, plus a
+generator counterpart for the enforced tier that today exists only as hand-written vault code. Both
+are generation-surface changes. Until then, every "we fixed it in the generator" in this file should
+be read as "we fixed it for vaults not yet created".
 
 ### Closed on `fix/exhaustive-dangling-scan`
 
@@ -1209,7 +1350,7 @@ next CI-hardening pass; what this entry fixes is that they were invisible.
   why the `cmp` guard is part of the recipe rather than a note beside it.
 
 - **No shared frontmatter parser, a split `status` enum, and a fixture blind to both** — divergences
-  7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1`) is now the single definition,
+  7, 8 and 9. `reference/lib/frontmatter.sh` (`FRONTMATTER_VERSION=1` when that record was written; **3** as of `fix/spec-h-enforcement-gap`, which added the readability guard and symlink traversal) is now the single definition,
   alongside `link-extraction.sh` and versioned the same way. Frontmatter is **strictly** the block
   between a `---` on line 1 and the next `---`; keys must start at column 0; the field name is matched
   with `index()`, never a regex.

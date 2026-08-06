@@ -385,12 +385,16 @@ link-extraction.sh: v1 → v2 [refreshed]
 link-extraction.sh: v2 [current]
 link-extraction.sh: v2 → v1 [vault ahead, skipped]
 link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
-frontmatter.sh:     v0 (absent) → v1 [restored]
-frontmatter.sh:     v1 [current]
+frontmatter.sh:     v0 (absent) → v3 [restored]
+frontmatter.sh:     v1 → v3 [refreshed]
+frontmatter.sh:     v3 [current]
 ```
 
-`frontmatter.sh` is absent from **every vault generated before it existed**, so `v0 (absent) → v1
-[restored]` is the expected line on an older vault, not an anomaly. Until that copy lands, `/next`,
+`frontmatter.sh` is absent from **every vault generated before it existed**, so `v0 (absent) → v3
+[restored]` is the expected line on an older vault, not an anomaly. A vault that has the file but at
+v1 or v2 gets `[refreshed]`: v2 added the directory-readability guard and v3 symlink traversal plus a
+check on `find`'s own exit status, so a v1 copy reports counts over trees it cannot fully scan. These
+examples track the constant — do not read them as pinned versions. Until that copy lands, `/next`,
 `/rethink` and `/stats` exit 1 naming this step as the repair — which is why this step must actually
 perform it. A remedy message pointing at a step that does not restore the file would be the silent
 failure this repo is named for, wearing a helpful voice.

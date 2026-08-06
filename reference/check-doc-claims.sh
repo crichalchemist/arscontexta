@@ -160,7 +160,7 @@ truth_fence_suites() {
 # Kernel primitives declared in kernel.yaml. Counted because both README.md and
 # CLAUDE.md said 15 for a tree that declares 16 — `unique-addresses` is a full
 # primitive that validate-kernel.sh numbers `10A` rather than renumbering, so the
-# highest LABEL is 15 and the COUNT is 16, and the label was read as the total.
+# truth_kernel_primitives counts primitive declarations in reference/kernel.yaml and prints the count.
 truth_kernel_primitives() {
     local _n
     [ -r reference/kernel.yaml ] || return 1
@@ -169,6 +169,28 @@ truth_kernel_primitives() {
     printf '%s' "$_n"
 }
 
+# check 7's allowlist totals. Ungated, these drift the moment an entry drains —
+# the check goes green at 73/24 while CLAUDE.md still says 74/25. Global
+# truth_fm_sites counts the configured frontmatter allowlist sites and prints the count.
+truth_fm_sites() {
+    local _n
+    [ -f reference/check-portability.sh ] || return 1
+    _n=$(awk '/^FM_ALLOW="/{f=1;next} f&&/^"/{exit} f&&NF{s+=$2} END{print s+0}' \
+           reference/check-portability.sh)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+# truth_fm_files counts the allowlisted frontmatter files in reference/check-portability.sh and fails if the file or allowlist is missing or empty.
+truth_fm_files() {
+    local _n
+    [ -f reference/check-portability.sh ] || return 1
+    _n=$(awk '/^FM_ALLOW="/{f=1;next} f&&/^"/{exit} f&&NF{c++} END{print c+0}' \
+           reference/check-portability.sh)
+    [ "${_n:-0}" -gt 0 ] || return 1
+    printf '%s' "$_n"
+}
+
+# truth_portability_checks counts numbered portability checks in the repository portability-check script.
 truth_portability_checks() {
     local _n
     [ -f reference/check-portability.sh ] || return 1
@@ -261,6 +283,9 @@ CLAUDE.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) 
 README.md|kernel primitives|s/.*`reference\/kernel\.yaml` -- \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|kernel primitives|s/.*`reference\/kernel\.yaml` declares the \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
+reference/lib/frontmatter.sh|check-7 allowlist sites (library header)|s/.*born red at \([0-9][0-9]*\) allowlisted sites.*/\1/p|truth_fm_sites|
+CLAUDE.md|check-7 allowlist sites|s/.*born red at \([0-9][0-9]*\) sites across.*/\1/p|truth_fm_sites|
+CLAUDE.md|check-7 allowlist files|s/.*born red at [0-9][0-9]* sites across \([0-9][0-9]*\) files.*/\1/p|truth_fm_files|
 CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
@@ -408,6 +433,106 @@ else
         else
             echo "ok     $n_nums entries, all distinct"
         fi
+    fi
+fi
+
+# --- structural: the generator status enums ---------------------------------
+# Spec G item 22, deferred there pending Spec F's fix and unbuilt when Spec F
+# merged. Divergence 15 records the expectation and that nothing carried it out.
+#
+# WHICH ENUM THIS COVERS AND WHICH IT CANNOT — the decision, not an omission.
+# "The declaring files agree" is not one property, because the three status
+# vocabularies are declared different numbers of times:
+#   * the NOTE enum is declared FOUR times and must agree with itself
+#   * the OBSERVATION enum is declared ONCE (self-evolution.md), so there is
+#     nothing for it to agree WITH; cross-declaration agreement is vacuous for it
+#   * the TENSION enum is likewise declared once — but it has CONSUMERS, and a
+#     consumer that matches a value the enum no longer declares returns zero
+#     forever. That is a real coupling and it IS checkable, so the second check
+#     below covers it. This is the defect this branch shipped and caught in
+#     review: three recipes matched `^status: pending` alone after `pending` was
+#     briefly removed from the enum.
+#
+# FOUR, NOT THREE. Divergence 15 says three FILES, which is true and is not the
+# same number: schema.md declares the note enum twice, once in a table and once
+# in its _schema block. A file-to-file comparison cannot see those two disagree
+# — the same blind spot bump-version.sh had for two fields of one manifest.
+#
+# WHY THE COUNTS ARE PINNED. Discovery keys on an anchor value (`preliminary`,
+# `dissolved`), so a declaration that DROPS the anchor stops being discovered —
+# and a split enum is exactly the case where that happens. Three sites left
+# agreeing with each other would read PASS. The expected count is therefore
+# declared, and a move in EITHER direction is rc 2, not a quiet pass.
+#   /usr/bin/grep -rc 'preliminary' generators/ --include='*.md' | grep -v ':0'   # 4 across 3 files
+#   /usr/bin/grep -rn 'type: tension' generators/ --include='*.md' | grep -c 'status: ('   # 3
+NOTE_ENUM_DECLS=4
+TENSION_RECIPES=3
+
+# Normalisation is two rules and no vocabulary: take everything after `enum` if
+# the line has it (the table row), else after `status`, then drop punctuation.
+# The value set is compared, never the text — the four sites legitimately spell
+# the same enum three ways (`a | b`, `[a, b]`, and backticked table cells), so a
+# enum_values extracts and sorts unique status enum values from input text.
+enum_values() { sed 's/.*enum//' | sed 's/.*status[`:]*//' | tr -d '`|,[]' \
+                | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' '\n' | grep -v '^$' | LC_ALL=C sort -u; }
+
+printf '  %-18s %-30s ' "generators/" "note status enum agrees"
+decls=$(/usr/bin/grep -rn 'preliminary' generators/ --include='*.md' 2>/dev/null)
+n_decls=$(printf '%s\n' "$decls" | grep -c . || true)
+if [ "$n_decls" -ne "$NOTE_ENUM_DECLS" ]; then
+    echo "ERROR  found $n_decls note-enum declaration(s), expected $NOTE_ENUM_DECLS — the set moved; re-derive and re-pin"
+    errors=$((errors + 1))
+else
+    sigs=""; bad=""
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        site=$(printf '%s' "$d" | cut -d: -f1-2)
+        vals=$(printf '%s' "${d#*:*:}" | enum_values | tr '\n' ' ')
+        nv=$(printf '%s' "$vals" | wc -w | tr -d ' ')
+        if [ "$nv" -lt 2 ]; then bad="$bad $site"; fi
+        sigs="$sigs$site|$vals"$'\n'
+    done <<EOF_DECLS
+$decls
+EOF_DECLS
+    distinct=$(printf '%s' "$sigs" | grep -v '^$' | cut -d'|' -f2 | LC_ALL=C sort -u | grep -c . || true)
+    if [ -n "$bad" ]; then
+        echo "ERROR  extraction yielded under 2 values at:$bad — the declaration form changed"
+        errors=$((errors + 1))
+    elif [ "$distinct" -ne 1 ]; then
+        echo "MISMATCH  $distinct different value sets across $n_decls declarations:"
+        printf '%s' "$sigs" | grep -v '^$' | sed 's/^/      /'
+        mismatches=$((mismatches + 1))
+    else
+        echo "ok     $n_decls declarations, one value set"
+    fi
+fi
+
+printf '  %-18s %-30s ' "generators/" "tension recipes match enum"
+tenum=$(/usr/bin/grep -rh 'status:.*dissolved' generators/ --include='*.md' 2>/dev/null | head -1 | enum_values)
+recipes=$(/usr/bin/grep -rn 'type: tension' generators/ --include='*.md' 2>/dev/null | /usr/bin/grep 'status: (')
+n_rec=$(printf '%s\n' "$recipes" | grep -c . || true)
+if [ -z "$tenum" ]; then
+    echo "ERROR  tension enum not found (anchor 'dissolved') — cannot evaluate"
+    errors=$((errors + 1))
+elif [ "$n_rec" -ne "$TENSION_RECIPES" ]; then
+    echo "ERROR  found $n_rec tension recipe(s), expected $TENSION_RECIPES — the set moved; re-derive and re-pin"
+    errors=$((errors + 1))
+else
+    undeclared=""
+    while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        site=$(printf '%s' "$r" | cut -d: -f1-2)
+        for v in $(printf '%s' "$r" | sed 's/.*status: (\([^)]*\)).*/\1/' | tr '|' ' '); do
+            printf '%s\n' "$tenum" | grep -qxF "$v" || undeclared="$undeclared $site:$v"
+        done
+    done <<EOF_REC
+$recipes
+EOF_REC
+    if [ -n "$undeclared" ]; then
+        echo "MISMATCH  recipe matches value(s) the enum does not declare:$undeclared"
+        mismatches=$((mismatches + 1))
+    else
+        echo "ok     $n_rec recipes, all values declared"
     fi
 fi
 

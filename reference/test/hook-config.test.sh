@@ -328,6 +328,158 @@ eq "session-orient: with the library back, threshold 0 DOES fire"  "yes" \
 # uid 1001, but container and self-hosted runners are root. Skipped assertions
 # are counted and named, so the documented total means "assertions in this
 # suite" on every runner, and a skip is visible rather than silent.
+# === the content-destruction guard ==========================================
+# Every other check in write-validate.sh asks "is this note well-formed?".
+# None asks "is it still THERE?" — so a pass that replaced a developed note with
+# a schema-clean fragment left every check green.
+#
+# THE ORDERING ASSERTION IS THE LOAD-BEARING ONE, AND IT COVERS HALF OF WHAT IT
+# SOUNDS LIKE. The guard reads HEAD to see the pre-write content, which requires
+# that auto-commit has not already committed. What this asserts is LIST ORDER in
+# hooks.json — array position — which is all a config test can reach. auto-commit
+# is declared "async": true, so list order does not prove execution order, and
+# nothing here observes execution order. Both write-validate.sh and the vault
+# template say so in their own comments; this label used to claim more than the
+# check performs, which left the two files disagreeing.
+#
+# Inverting the list order still matters: it makes the guard compare the file to
+# itself and pass silently on every write — the guard's own failure mode being
+# the defect it exists to catch.
+ORDER=$(python3 -c "
+import json,sys
+h=json.load(open('$HERE/../../hooks/hooks.json'))
+d=h.get('hooks') or h
+for e in d.get('PostToolUse',[]):
+    names=[c.get('command','').split('/')[-1] for c in e.get('hooks',[])]
+    if 'write-validate.sh' in names and 'auto-commit.sh' in names:
+        print('ok' if names.index('write-validate.sh') < names.index('auto-commit.sh') else 'INVERTED')
+        sys.exit()
+print('NOT-IN-SAME-MATCHER')
+" 2>/dev/null)
+eq "guard: write-validate is LISTED before auto-commit"   "ok" "$ORDER"
+
+# A vault fixture with git, so the guard has a HEAD to compare against.
+mkguard() {
+    local d; d=$(mktemp -d); TMPDIRS+=("$d")
+    mkdir -p "$d/hooks/scripts" "$d/notes"
+    cp "$SRC/write-validate.sh" "$SRC/vaultguard.sh" "$d/hooks/scripts/"
+    printf '# marker\n' > "$d/.arscontexta"
+    { printf -- '---\ndescription: a developed note\ntopics: ["[[hub]]"]\n---\n'
+      for i in $(seq 1 20); do echo "Substantial paragraph $i of prose that took real work."; done
+      for i in $(seq 1 6); do echo "See [[rel-$i]]."; done; } > "$d/notes/n.md"
+    ( cd "$d" && git init -q . && git config user.email t@t && git config user.name t \
+      && git add -A && git commit -qm base ) >/dev/null 2>&1
+    printf '%s' "$d"
+}
+gwrite() { ( cd "$1" && printf '{"tool_input":{"file_path":"%s"}}' "$1/notes/n.md" \
+             | $SH hooks/scripts/write-validate.sh 2>&1 ); }
+
+# Destruction: a developed note replaced by a fragment.
+G=$(mkguard); printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\nfragment\n' > "$G/notes/n.md"
+eq "guard: a note shrinking by over half WARNS"          "yes" \
+   "$(gwrite "$G" | grep -q 'SHRANK' && echo yes || echo no)"
+eq "guard: and names both byte counts"                   "yes" \
+   "$(gwrite "$G" | grep -qE 'SHRANK [0-9]+->[0-9]+' && echo yes || echo no)"
+
+# Links are a SEPARATE property: a rewrite can hold its length and drop every edge.
+G=$(mkguard)
+{ printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\n'
+  for i in $(seq 1 26); do echo "Substantial paragraph $i of prose that took real work."; done; } > "$G/notes/n.md"
+eq "guard: links lost with length kept still WARNS"      "yes" \
+   "$(gwrite "$G" | grep -q 'wiki links' && echo yes || echo no)"
+eq "guard: and does NOT claim the note shrank"           "yes" \
+   "$(gwrite "$G" | grep -q 'SHRANK' && echo no || echo yes)"
+
+# The three silences. A guard that fires on correct work gets switched off,
+# which is worse than no guard — so each of these has its own assertion.
+G=$(mkguard)
+{ printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\n'
+  for i in $(seq 1 40); do echo "More developed prose, paragraph $i."; done
+  for i in $(seq 1 9); do echo "See [[rel-$i]]."; done; } > "$G/notes/n.md"
+eq "guard: a note that GREW is silent"                   "yes" \
+   "$(gwrite "$G" | grep -qE 'SHRANK|wiki links' && echo no || echo yes)"
+
+# The two "nothing to compare" states are DIFFERENT code paths and the labels
+# must say which. An earlier revision asserted only the first under a label
+# naming the second, so the staged-but-uncommitted path had no coverage at all.
+G=$(mkguard); printf -- '---\ndescription: d\ntopics: []\n---\nbrand new\n' > "$G/notes/fresh.md"
+eq "guard: an UNTRACKED note has nothing to destroy, silent" "yes" \
+   "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/fresh.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -qE 'SHRANK|wiki links|CONDITION' && echo no || echo yes)"
+
+# NOT MUTATION-PROVED, and counted here as documentation rather than as
+# coverage. Measured: deleting the `cat-file -e` existence test it nominally
+# protects leaves the suite fully green, because an absent HEAD blob yields a
+# byte count of 0 and neither threshold can fire on 0. No small mutation makes
+# this path observable. It is kept because a future change that treats "no
+# previous version" as destruction WOULD be caught by it — but per this repo's
+# own rule, an assertion in a total is not evidence it can fail, and this one
+# cannot today. Do not read it as protecting the line above.
+G=$(mkguard); printf -- '---\ndescription: d\ntopics: []\n---\nbrand new\n' > "$G/notes/staged.md"
+( cd "$G" && git add notes/staged.md ) >/dev/null 2>&1
+eq "guard: TRACKED but not yet in HEAD, silent"          "yes" \
+   "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/staged.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -qE 'SHRANK|wiki links|CONDITION' && echo no || echo yes)"
+
+# THE REPORTING BRANCH. "Could not run" is not the same as "ran and found
+# nothing", and the guard's own comment is about that distinction — so the
+# distinction needs an assertion, or the comment is the only thing enforcing it.
+# The git-absent branch is not reachable here without also removing head/grep/wc
+# from PATH; not-a-git-repository is the branch that is testable, and it shares
+# the reporting path.
+NR=$(mktemp -d); TMPDIRS+=("$NR"); mkdir -p "$NR/hooks/scripts" "$NR/notes"
+cp "$SRC/write-validate.sh" "$SRC/vaultguard.sh" "$NR/hooks/scripts/"
+printf '# marker\n' > "$NR/.arscontexta"
+printf -- '---\ndescription: d\ntopics: ["[[hub]]"]\n---\nbody\n' > "$NR/notes/n.md"
+eq "guard: outside a git repo it REPORTS, does not go quiet" "yes" \
+   "$( ( cd "$NR" && printf '{"tool_input":{"file_path":"%s"}}' "$NR/notes/n.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -q 'CONDITION' && echo yes || echo no)"
+eq "guard: and names WHICH precondition failed"          "yes" \
+   "$( ( cd "$NR" && printf '{"tool_input":{"file_path":"%s"}}' "$NR/notes/n.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -q 'not a git repository' && echo yes || echo no)"
+
+# THE VAULT TEMPLATE, which no assertion reached until now. Its frontmatter
+# check exits 0, so a guard placed after it never sees the one input it most
+# needs to: a developed note replaced by frontmatter-less content. That is
+# ORDER, not content, so it is checkable without executing the template — which
+# matters, since the template carries {{...}} markers and does not run unsubstituted.
+TPL="$HERE/../../platforms/claude-code/hooks/write-validate.sh.template"
+g_line=$(/usr/bin/grep -n '^# [0-9]*\. Content-Destruction Guard' "$TPL" | cut -d: -f1)
+f_line=$(/usr/bin/grep -n '^# [0-9]*\. YAML Frontmatter Existence' "$TPL" | cut -d: -f1)
+eq "template: both sections located"                     "yes" \
+   "$([ -n "$g_line" ] && [ -n "$f_line" ] && echo yes || echo no)"
+eq "template: guard runs BEFORE the frontmatter exit 0"  "yes" \
+   "$([ "${g_line:-0}" -lt "${f_line:-0}" ] && echo yes || echo no)"
+# The plugin hook and the template declare the same two thresholds. They are two
+# declarations, not one copy; divergence 3 records what happens when such a pair
+# has nothing pointing each half at the other.
+#
+# THIS COMPARES BOTH FILES, and the first version did not — it grepped only the
+# template while its label claimed a cross-file match, so raising the PLUGIN
+# hook's floor to 500 left the suite green. A whole-check label on half a check,
+# added in the same commit that fixed a false coverage claim. Extract the
+# numbers from each side and compare the values; do not test one side for a
+# literal, which is what made the first version vacuous.
+hook_floor=$(/usr/bin/grep -oE '\-gt [0-9]+' "$SRC/write-validate.sh" | head -1 | tr -dc '0-9')
+tpl_floor=$(/usr/bin/grep -oE '\-gt [0-9]+' "$TPL"                    | head -1 | tr -dc '0-9')
+eq "template: both floors were extracted"                "yes" \
+   "$([ -n "$hook_floor" ] && [ -n "$tpl_floor" ] && echo yes || echo no)"
+eq "template: floor matches the plugin hook"             "$hook_floor" "$tpl_floor"
+hook_halve=$(/usr/bin/grep -c -- '\* 2)) -lt' "$SRC/write-validate.sh")
+tpl_halve=$(/usr/bin/grep -c -- '\* 2)) -lt' "$TPL")
+eq "template: halving test present on both sides"        "$hook_halve" "$tpl_halve"
+
+# The stub must HALVE, or this assertion holds with or without the floor and
+# proves nothing — the first version shrank 40->38 bytes and stayed green under
+# a mutation that removed the floor entirely.
+G=$(mkguard)
+{ printf -- '---\ndescription: s\ntopics: []\n---\n'; for i in $(seq 1 4); do echo "short line $i"; done; } > "$G/notes/stub.md"
+( cd "$G" && git add -A && git commit -qm stub ) >/dev/null 2>&1
+printf -- '---\ndescription: s\ntopics: []\n---\n' > "$G/notes/stub.md"
+eq "guard: a stub under the 200-byte floor is silent"    "yes" \
+   "$( ( cd "$G" && printf '{"tool_input":{"file_path":"%s"}}' "$G/notes/stub.md" \
+        | $SH hooks/scripts/write-validate.sh 2>&1 ) | grep -q 'SHRANK' && echo no || echo yes)"
+
 printf '\npassed=%s failed=%s\n' "$((passed + skipped))" "$failed"
 [ "${skipped:-0}" -eq 0 ] || printf 'note: %s assertion(s) SKIPPED (see stderr) and counted in the total\n' "$skipped"
 [ "$failed" -eq 0 ]

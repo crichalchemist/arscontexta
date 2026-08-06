@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# validate-kernel.sh — Check a knowledge system against the 15 universal primitives
+# validate-kernel.sh — Check a knowledge system against the universal primitives
+# declared in reference/kernel.yaml. That file is the count; this one is the
+# executable form. The header used to say "the 15 universal primitives", which
+# is the highest HEADER number below (they run 1-15 with one spelled 10A) and
+# not the primitive count, which is 16. The summary totals count RESULT LINES,
+# a third number again. No count is stated here on purpose — read kernel.yaml.
 # Usage: ./validate-kernel.sh [path-to-vault]
 # Defaults to current directory if no path given.
 
@@ -23,8 +28,88 @@ LINK_LIB="$(cd "$(dirname "$0")" && pwd)/lib/link-extraction.sh"
 }
 . "$LINK_LIB"
 
+# Source frontmatter library (fails loud if missing). Same shape as above and
+# for the same reason: a validator that silently loses its parser reports on a
+# property it is no longer measuring.
+FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
+[ -r "$FM_LIB" ] || {
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       plugin structure broken, or script moved?" >&2
+  exit 1
+}
+. "$FM_LIB"
+
+# resolve_ops_dir <vault> <observations|tensions> -> the vault's directory for
+# that kind, relative to the vault, or rc 1 if none exists.
+#
+# ONE DECLARATION, TWO CONSUMERS (primitive 12 and C1). The candidate list was
+# written out inside primitive 12 and then written AGAIN inside C1 as `ops/`
+# alone. A vault that renamed `ops/` therefore got primitive 12 PASSing on
+# directories it had found and C1 reporting "self-evolution not enabled" about
+# the same directories — two checks in one script contradicting each other, with
+# C1's message asserting something false. That is the primitive-2 defect
+# (canonical names hardcoded in a validator for a generator whose purpose is
+# renaming them) reintroduced 130 lines below the comment explaining it.
+#
+# IT READS THE VAULT'S OWN VOCABULARY FIRST, and that is the correction a review
+# caught: the first version replaced C1's hardcoded `ops/` with a SHARED
+# hardcoded list. That closed the contradiction between two checks and left the
+# hardcoding — so on a vault that renamed `ops`, C1 still printed "self-evolution
+# not enabled", which is the exact false message the comment below its WARN says
+# this function exists to avoid. `ops` IS a declared vocabulary key: the field
+# vault's ops/derivation-manifest.md carries `ops: "ops"` beside `notes: "nodes"`,
+# and _vocab_dir — thirty lines below — already parses that block for `notes`.
+# Not reading the key the file can already read is the primitive-2 defect with
+# one more entry in the list, which is this repo's own critique of itself.
+#
+# The candidate list survives as a FALLBACK, for vaults with no manifest.
+# resolve_ops_dir_name <vault> -> the vault's own name for its ops directory,
+# or nothing. Split out so the shape scan can exclude it by that name rather
+# resolve_ops_dir_name resolves the operational directory name from the vault's manifest or configuration.
+resolve_ops_dir_name() {
+    _rodn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    [ -n "$_rodn_man" ] && _vocab_dir "$_rodn_man" ops 2>/dev/null && return 0
+    _rodn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+    [ -n "$_rodn_cfg" ] && _vocab_dir "$_rodn_cfg" ops 2>/dev/null && return 0
+    return 1
+}
+
+# resolve_ops_dir locates an operational subdirectory within a vault using manifest, configuration, and legacy-path discovery.
+resolve_ops_dir() {
+    # THE MANIFEST IS FOUND BY SHAPE, NOT AT AN ASSUMED PATH, and that is the
+    # correction a second review caught. The first version of this vocabulary
+    # read spelled it "$1/ops/derivation-manifest.md" — so to find the file that
+    # says where `ops` is, you had to already know where `ops` is. On a vault
+    # that genuinely renamed it (no ops/ directory at all) the read failed, the
+    # candidate list found nothing, and C1 printed "self-evolution not enabled"
+    # over real violations: the same false message, one layer up, in the commit
+    # that replaced a shared hardcoded list to stop producing it.
+    #
+    # -maxdepth 2 because the manifest lives one directory below the vault root
+    # whatever that directory is called. `head -1` because two manifests would be
+    # a malformed vault, and picking one beats failing closed on a vault whose
+    # observations are readable.
+    _rod_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    _rod_ops=""
+    [ -n "$_rod_man" ] && _rod_ops=$(_vocab_dir "$_rod_man" ops 2>/dev/null)
+    if [ -z "$_rod_ops" ]; then
+        _rod_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+        [ -n "$_rod_cfg" ] && _rod_ops=$(_vocab_dir "$_rod_cfg" ops 2>/dev/null) || _rod_ops=""
+    fi
+    if [ -n "$_rod_ops" ] && [ -d "$1/$_rod_ops/$2" ]; then
+        printf '%s' "$_rod_ops/$2"; return 0
+    fi
+    for _rod in "ops/$2" "04_meta/logs/$2" "logs/$2" "$2"; do
+        [ -d "$1/$_rod" ] && { printf '%s' "$_rod"; return 0; }
+    done
+    return 1
+}
+
+# pass reports a successful validation check and increments the pass count.
 pass() { echo -e "  ${GREEN}PASS${NC} $1"; PASS=$((PASS + 1)); }
+# warn reports a warning message and increments the warning count.
 warn() { echo -e "  ${YELLOW}WARN${NC} $1"; WARN=$((WARN + 1)); }
+# fail reports a failed validation check and increments the failure count.
 fail() { echo -e "  ${RED}FAIL${NC} $1"; FAIL=$((FAIL + 1)); }
 
 # ---------------------------------------------------------------------------
@@ -152,13 +237,28 @@ _dirs_from_vocab() {
 # exactly that and every message printed "directories via " with the name
 # missing -- the same swallowed-in-a-subshell defect this repo has shipped six
 # times. Returning the label through the one channel that does cross the boundary
-# removes the trap rather than documenting it.
+# resolve_note_dirs resolves note-bearing directories from vault vocabulary or configuration, with a top-level Markdown-directory fallback.
 resolve_note_dirs() {
-    if _rn_out=$(_dirs_from_vocab "$1" "$1/ops/derivation-manifest.md"); then
-        printf 'ops/derivation-manifest.md vocabulary\n%s' "$_rn_out"; return 0
+    # THE MANIFEST IS LOCATED BY SHAPE HERE TOO. This function spelled
+    # "$1/ops/derivation-manifest.md" for as long as resolve_ops_dir did, and
+    # kept doing so for one commit after that one was fixed — 145 lines below the
+    # comment written to close it, in this same file, under a header at :107
+    # reading "Derive the names from the vault; never list them".
+    #
+    # It is NOT the harmless twin of that defect, because the SAME manifest
+    # declares both keys. Measured on two vaults identical but for the rename:
+    # with `ops/` kept, this resolves via the manifest and scans `zzz-a` — 1
+    # dangling link. With `ops` renamed, the read failed, the shape scan ran, and
+    # it swept the renamed ops tree IN as note-bearing — 2 dangling, the extra
+    # one a changelog citation this file's own header calls "expected to dangle".
+    # Exit 0, plausible number, no error.
+    _rn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    if [ -n "$_rn_man" ] && _rn_out=$(_dirs_from_vocab "$1" "$_rn_man"); then
+        printf '%s vocabulary\n%s' "${_rn_man#"$1"/}" "$_rn_out"; return 0
     fi
-    if _rn_out=$(_dirs_from_vocab "$1" "$1/ops/config.yaml"); then
-        printf 'ops/config.yaml vocabulary\n%s' "$_rn_out"; return 0
+    _rn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+    if [ -n "$_rn_cfg" ] && _rn_out=$(_dirs_from_vocab "$1" "$_rn_cfg"); then
+        printf '%s vocabulary\n%s' "${_rn_cfg#"$1"/}" "$_rn_out"; return 0
     fi
 
     # Shape scan. `find -mindepth 1 -maxdepth 1` rather than a "$1"/*/ glob:
@@ -167,8 +267,15 @@ resolve_note_dirs() {
     # shipped a zsh fork for exactly that reason.
     # The `while` runs in a subshell, so it accumulates nothing in a variable;
     # its STDOUT is what the command substitution collects.
+    # THE EXCLUSION LIST NAMES `ops` LITERALLY, so a vault that renamed it had its
+    # operational tree swept in as note-bearing — the second half of the same
+    # defect. The vault's own name for it is resolved first and excluded by that
+    # name; the literal stays for vaults with no vocabulary declaration.
+    _rn_ops=$(resolve_ops_dir_name "$1")
     _rn_out=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r _rn_d; do
-        case "$(basename "$_rn_d")" in
+        _rn_b=$(basename "$_rn_d")
+        [ -n "$_rn_ops" ] && [ "$_rn_b" = "$_rn_ops" ] && continue
+        case "$_rn_b" in
             .*|node_modules|ops|04_meta|archive|templates|_templates) continue ;;
         esac
         [ -n "$(find "$_rn_d" -type f -name '*.md' 2>/dev/null | head -1)" ] || continue
@@ -659,13 +766,13 @@ has_tensions_dir=false
 has_review_trigger=false
 has_rethink=false
 
-# Check for ops/observations/ and ops/tensions/ directories (or common variants)
-for candidate in "ops/observations" "04_meta/logs/observations" "logs/observations" "observations"; do
-    [ -d "$VAULT/$candidate" ] && has_obs_dir=true && break
-done
-for candidate in "ops/tensions" "04_meta/logs/tensions" "logs/tensions" "tensions"; do
-    [ -d "$VAULT/$candidate" ] && has_tensions_dir=true && break
-done
+# Check for the observations/ and tensions/ directories, wherever the vault put
+# them. The candidate list lives in resolve_ops_dir (near the top of this file)
+# and is shared with C1 — it used to be spelled out twice, and C1's copy had
+# only `ops/`, so C1 went silent on any vault that renamed it while THIS check
+# passed. Two lists, one vault, opposite conclusions.
+_d=$(resolve_ops_dir "$VAULT" observations) && [ -n "$_d" ] && has_obs_dir=true
+_d=$(resolve_ops_dir "$VAULT" tensions)     && [ -n "$_d" ] && has_tensions_dir=true
 
 # Check context files for review trigger documentation
 for ctx in "$VAULT/CLAUDE.md"; do
@@ -758,6 +865,110 @@ else
     warn "No ops/sessions/ directory detected"
 fi
 
+# --- Contract check C1 (NOT a kernel primitive): outcome statuses name a target ---
+#
+# WHY THIS IS LABELLED C1 AND NOT 16. It is not in kernel.yaml and has no
+# cognitive_grounding, so numbering it alongside the primitives would make the
+# contract look like it declares something it does not. It emits one result
+# line, so the summary totals move; read the LABELS, not the totals — this file
+# already has a 10A for the same reason.
+#
+# THE PROPERTY: a status that asserts an outcome must carry the field naming
+# where that outcome went. `implemented` without `implemented_in:` and
+# `promoted` without `promoted_to:` are unfalsifiable — nothing distinguishes a
+# real fix from a closed-by-fiat one, which is the whole reason the fields exist.
+# This is the first CONDITIONAL-field assertion in either tree. What existed
+# before was a write-time instruction to an agent ("when you set X, also set Y"),
+# which fails silently and per-invocation; this is the post-hoc form.
+#
+# PLACEMENT, DECIDED RATHER THAN DEFAULTED — and what it does NOT reach:
+#   * the generated write-validate hook was REJECTED. It reaches new vaults
+#     only, so what it does not reach is every vault that already exists —
+#     including the one that demonstrated the defect. Choosing it would have
+#     been this check contradicting its own reason for existing.
+#   * a new kernel primitive was REJECTED: it needs a kernel.yaml entry with a
+#     cognitive_grounding tracing to a research claim, and grows the invariant
+#     surface, which is disproportionate for a field-presence rule.
+#   * HERE reaches any vault on demand. Its cost is that it is NOT in CI,
+#     because it needs a vault to run against.
+#
+# Both statuses are covered, not just the one the spec named: measured on the
+# field vault, `promoted` misses its field 7 times in 8 where `implemented`
+# misses 6 in 26. Covering only the named one would have left the larger
+# violation unmeasured for no reason but which one got written down.
+echo "C1. Outcome statuses carry their target field"
+c1_missing=0
+c1_scanned=0
+c1_pairs=0
+c1_unscannable=""
+for spec in "observations:implemented:implemented_in" \
+            "observations:promoted:promoted_to" \
+            "tensions:implemented:implemented_in" \
+            "tensions:promoted:promoted_to"; do
+    kind=${spec%%:*}; rest=${spec#*:}; st=${rest%%:*}; fld=${rest#*:}
+    d=$(resolve_ops_dir "$VAULT" "$kind") || continue
+    c1_pairs=$((c1_pairs + 1))
+    # THE LIBRARY'S rc IS CAPTURED, NOT DISCARDED. list_notes_by_field was built
+    # to refuse silence: on an unreadable directory it prints "refusing to report
+    # a count" and returns 1. Calling it inside `<<EOF $(...)` threw both away —
+    # a command substitution in a heredoc has no exit status to test — so a scan
+    # that failed emitted zero lines and C1 reported PASS. That is the house
+    # defect class inside the check whose own comments invoke it three times.
+    c1_list=$(list_notes_by_field "$VAULT/$d" status "$st" 2>/dev/null); c1_rc=$?
+    if [ "$c1_rc" -ne 0 ]; then
+        c1_unscannable="$c1_unscannable $d($st)"
+        continue
+    fi
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        c1_scanned=$((c1_scanned + 1))
+        # NON-EMPTY, not merely present. frontmatter.sh documents rc 0 for a
+        # field whose value is the empty string, so a bare `implemented_in:`
+        # satisfied a presence test — and an empty target is exactly as
+        # unfalsifiable as a missing one, which is the property being asserted.
+        # It was also the cheapest way to turn every one of these FAILs green.
+        if [ -z "$(frontmatter_field "$f" "$fld" 2>/dev/null)" ]; then
+            c1_missing=$((c1_missing + 1))
+            [ "$c1_missing" -le 5 ] && echo "       $st without a usable $fld: ${f#"$VAULT"/}"
+        fi
+    done <<EOF_C1
+$c1_list
+EOF_C1
+done
+
+if [ -n "$c1_unscannable" ]; then
+    # COULD NOT RUN outranks anything it managed to measure, and is FAIL rather
+    # than WARN. Primitive 2's header draws exactly this line: "could not run"
+    # and "ran and found nothing" are different facts, and collapsing them is
+    # what made a soft pass possible. A partial scan is the worse case — the
+    # matches already collected would otherwise be reported as a confident
+    # undercount.
+    fail "could not scan:$c1_unscannable — the library refused to report a count"
+elif [ "$c1_pairs" -eq 0 ]; then
+    # Not a violation and not a pass. A vault without observations or tensions
+    # anywhere has not enabled self-evolution, so the rule does not apply — but
+    # reporting that as PASS would be a check that never ran wearing a green
+    # label, which this validator has already shipped once (see primitive 2's
+    # header). The directories are RESOLVED, never assumed to be under ops/:
+    # asserting "not enabled" about a vault that merely renamed the directory
+    # would make this message false as well as useless.
+    warn "No observations/ or tensions/ directory resolved — self-evolution not enabled, rule not applicable"
+elif [ "$c1_scanned" -eq 0 ]; then
+    # The directories exist and were scanned; nothing in them has reached an
+    # outcome status yet. Said explicitly, because "PASS, all N carry their
+    # field" with N=0 is how a scan that found nothing reads as a scan that
+    # found everything in order — the substitution primitive 2 shipped.
+    # "$c1_pairs (directory, status) pairs", NOT directories: the loop iterates
+    # four pairs over two directories, so a vault with only ops/observations/
+    # scores 2 here. Calling that "2 directories" was wrong on a vault with one.
+    pass "checked $c1_pairs (directory, status) pair(s); no note has reached an outcome status yet"
+elif [ "$c1_missing" -eq 0 ]; then
+    pass "$c1_scanned outcome-status notes, all carry their target field"
+else
+    [ "$c1_missing" -gt 5 ] && echo "       ... and $((c1_missing - 5)) more"
+    fail "$c1_missing of $c1_scanned outcome-status notes name no target"
+fi
+
 # --- Summary ---
 echo ""
 echo "=== Kernel Validation Summary ==="
@@ -767,12 +978,19 @@ echo -e "  ${RED}FAIL:${NC} $FAIL"
 echo ""
 
 if [ "$FAIL" -eq 0 ] && [ "$WARN" -eq 0 ]; then
-    echo -e "${GREEN}All 15 primitives validated successfully.${NC}"
+    # No count here on purpose. This line used to read "All 15 primitives" —
+    # 15 is the highest HEADER number, not the primitive count, which is 16
+    # (unique-addresses ships as 10A rather than renumbering the rest). The
+    # totals above count RESULT LINES, which is a third number again. Stating
+    # any one of them here invited reading it as the other two; CLAUDE.md
+    # records that PASS: 15 has already coincided with the target twice, for
+    # two unrelated reasons. Read the labels.
+    echo -e "${GREEN}Kernel contract satisfied — every check above passed.${NC}"
     exit 0
 elif [ "$FAIL" -eq 0 ]; then
-    echo -e "${YELLOW}Kernel present with warnings. $WARN primitive(s) need attention.${NC}"
+    echo -e "${YELLOW}Kernel present with warnings. $WARN check(s) need attention.${NC}"
     exit 0
 else
-    echo -e "${RED}$FAIL kernel primitive(s) missing. System may not function reliably.${NC}"
+    echo -e "${RED}$FAIL check(s) FAILED. System may not function reliably.${NC}"
     exit 1
 fi

@@ -535,6 +535,242 @@ else
   red "interpolated matcher scan could not run (see stderr) — cannot conclude anything"
 fi
 
+# ---------------------------------------------------------------------------
+# CHECK 7 — hand-rolled frontmatter parsing outside reference/lib/frontmatter.sh
+#
+# Spec G item 23, deferred there ("a ban on inlining a library that does not
+# exist yet mandates nothing") and unbuilt when fix/spec-f-divergence-drain
+# merged. CLAUDE.md divergence 15 records both halves.
+#
+# READ THE LINK-LIBRARY BAN'S HISTORY BEFORE TRUSTING THIS ONE. CLAIMED bans are
+# how this repo got here: CLAUDE.md's gate table asserted for months that check 4
+# caught inlined link matchers, and link-extraction.sh's own header said the
+# same. BOTH WERE FALSE — inlined matchers sat in five skill-sources fences
+# through four gates and a 127 KB review, and the commit that removed them added
+# a sixth.
+#
+# THIS CHECK ALREADY SHIPPED THAT FAILURE ONCE, WHICH IS WHY THE PATTERN LOOKS
+# LIKE THIS. Its first version required an `-r/-L/-l/-c/-q` flag between the
+# command and the pattern, so `rg '^status: open' notes/` — no flag, same
+# spelling, same defect — was invisible. It reported 39 where the property has
+# 74, and among the 35 it missed was generators/features/methodology-knowledge.md,
+# which CLAUDE.md names BY LINE as an open instance of this very class. That is
+# divergence 12's finding ("every search string tried so far has been narrower
+# than the class") reproduced inside the commit that cites it. The flag is gone.
+#
+# THE PROPERTY: no code outside reference/lib/frontmatter.sh may select or count
+# notes by a frontmatter field using a line-anchored match. `grep -rl '^type: moc'`
+# is a hand-rolled list_notes_by_field, and it matches a `type: moc` line
+# ANYWHERE in the body, including inside a fenced block — the reason the library
+# exists.
+#
+# SCOPE IS DECLARED, because an undeclared scope is a second way to be narrower
+# than the class. FM_SCAN below is the same directory set the rest of this file
+# scans, with ONE deliberate exclusion: methodology/. That tree is 249 atomic
+# research claims; its recipes are illustrative prose inside claims about
+# cognition, nothing there composes into a vault or runs, and including it would
+# add 87 sites that no conversion would ever touch. generators/features/*.md is
+# the contrasting case and IS scanned — those recipes compose into a generated
+# vault's CLAUDE.md verbatim.
+#
+# BORN RED AT 74 ACROSS 25 FILES AND 16 FIELDS, and that is the point rather
+# than a defect. The plan's Step 1 says count the copies first: if any exist,
+# this is a conversion and not a gate. Converting 74 sites is not this task;
+# making them visible and un-growable is. A GREEN RUN THEREFORE MEANS "no NEW
+# hand-rolled parse", NEVER "none exists".
+#
+# THREE DIFFERENT QUANTITIES: 74 LINES match, carrying 77 FIELD REFERENCES (some
+# lines name two), across 16 DISTINCT NAMES. Spec G framed this ban as being
+# about `status:` alone; the spread is `type` 24, `description` 14, `status` 11,
+# `topics` 8, `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each,
+# then seven singletons — 9 named + 7 = 16.
+#
+# THE RE-DERIVE COMMAND MUST USE THIS CHECK'S OWN DETECTOR, and the first version
+# of this comment did not. It matched a BARE `'^field:'` with no command prefix,
+# which yields 75/78/17 — it picks up reference/test/threshold-namespace.test.sh,
+# where `'^self_evolution:'` is an argument to a test helper rather than a
+# pattern given to grep. So the published derivation disagreed with the gated 74
+# sitting three lines above it, inside the comment written to stop precisely
+# that. Keep the `(grep|rg)` prefix; it is what makes the numbers one measurement.
+#
+#   find skills skill-sources reference generators platforms presets hooks agents scripts \
+#        \( -name '*.md' -o -name '*.sh' -o -name '*.template' \) | while IFS= read -r f; do
+#     case "$f" in reference/lib/*|reference/check-portability.sh|\
+#                  reference/test/guard-failure.test.sh|reference/test/fence-isolation.test.sh)
+#       continue;; esac
+#     sed 's/#.*$//' "$f" | /usr/bin/grep -oE "(grep|rg) [^|]*'\^[a-z_]+:"
+#   done | /usr/bin/grep -oE "'\^[a-z_]+:" | tr -d "'^:" | sort | uniq -c | sort -rn
+#
+# KNOWN LIMITATIONS, stated because the previous version's limitations section
+# implied a guarantee it did not deliver:
+#   * DOUBLE-QUOTED or UNANCHORED equivalents are not flagged. Neither occurs in
+#     the scanned scope today; measured, not assumed.
+#   * A copied-out awk/sed frontmatter parser is not detected at all. None occurs.
+#   * An inlined copy of reference/lib/link-extraction.sh is NOT covered by this
+#     or any check. That remains convention; divergences 12 and 13 own it.
+#   * `#` comments are stripped before matching, so a comment describing the old
+#     spelling is not a hit. Measured: this suppresses 13 lines in this tree and
+#     every one is such a comment. `sed` only deletes, so it cannot CREATE a hit.
+#   * methodology/ is out of scope, above.
+#
+# EXEMPT BY STRUCTURE, not by allowlist, because these must CONTAIN the pattern
+# to do their jobs: the library itself, this guard, and the two suites that plant
+# it into fixtures. Check 2's header makes the same distinction.
+#
+# SPELLED AS A `case`, NOT A LIST IN A VARIABLE, and this is not style. The first
+# version was `FM_EXEMPT="a b c"` iterated with `for _fe in $FM_EXEMPT`, which
+# word-splits under bash and NOT under zsh: zsh ran one iteration with the whole
+# string as the pattern, so only the first entry was exempt and
+# reference/test/fence-isolation.test.sh reported UNLISTED. bash rc 0, zsh rc 1,
+# fm_exempt_p identifies paths excluded from the hand-rolled frontmatter parsing scan.
+fm_exempt_p() { # fm_exempt_p <relative-path> -> rc 0 when structurally exempt
+  case "$1" in
+    reference/lib/*)                        return 0 ;;  # the library itself
+    reference/check-portability.sh)         return 0 ;;  # this guard states the pattern
+    reference/test/guard-failure.test.sh)   return 0 ;;  # plants it into fixtures
+    reference/test/fence-isolation.test.sh) return 0 ;;  # assertion F's naive-parser arm
+  esac
+  return 1
+}
+
+# ALLOWLIST — "<path> <count> <reason>", bidirectional on check 4's and check 6's
+# model: an unlisted hit FAILS, and an entry whose file is gone or whose count no
+# longer matches is STALE and also fails. Path and COUNT, never line numbers —
+# lines drift on every edit, and a bare path would let a file quietly grow a
+# fourth site behind three.
+FM_ALLOW="
+generators/features/graph-analysis.md 8 recipe emitted into a generated vault's docs; a recipe cannot source the library the way a fence can, so converting it changes what generation emits
+generators/features/maintenance.md 1 recipe emitted into a generated vault's docs
+generators/features/methodology-knowledge.md 2 recipe emitted into a generated vault's docs; CLAUDE.md names :31 by line as a known-open instance of this class
+generators/features/schema.md 5 recipe emitted into a generated vault's docs
+generators/features/semantic-search.md 6 recipe emitted into a generated vault's docs
+platforms/shared/skill-blocks/remember.md 1 FROZEN tree; check 4 pins it against a cksum manifest, so this cannot be fixed in place
+platforms/shared/skill-blocks/rethink.md 2 FROZEN tree; check 4 pins it against a cksum manifest
+platforms/shared/skill-blocks/stats.md 1 FROZEN tree; check 4 pins it against a cksum manifest
+platforms/claude-code/hooks/session-orient.sh.template 3 BLOCKED, not merely undone: the plugin's own session-orient.sh WAS converted on Spec F and this was not, so it is a live plugin/template split. Divergence 12 states the blocker for this exact file - it runs on EVERY SessionStart, where a missing library turns a wrong number into a broken session
+reference/components.md 1 PROSE describing the spelling; not code, and this check has no fence awareness
+reference/semantic-vs-keyword.md 1 PROSE describing the spelling
+reference/skill-authoring.md 1 PROSE counter-example describing the naive spelling
+reference/validate-kernel.sh 3 primitives 3, 5 and 6 count MOCs, descriptions and topics naively; the same file sources the library for C1, so this is a conversion backlog inside one file
+skill-sources/graph/SKILL.md 8 conversion backlog
+skill-sources/next/SKILL.md 1 conversion backlog
+skill-sources/refactor/SKILL.md 1 conversion backlog
+skill-sources/remember/SKILL.md 1 conversion backlog
+skill-sources/seed/SKILL.md 1 conversion backlog
+skill-sources/stats/SKILL.md 9 conversion backlog; the largest single concentration
+skills/architect/SKILL.md 3 conversion backlog
+skills/ask/SKILL.md 1 conversion backlog
+skills/health/SKILL.md 6 conversion backlog
+skills/reseed/SKILL.md 1 conversion backlog
+skills/setup/SKILL.md 2 conversion backlog
+skills/upgrade/SKILL.md 2 conversion backlog
+"
+
+# Comment-stripped per file. Keying on the literal string instead would count
+# every comment that DESCRIBES the old spelling — Spec F's own conversion count
+# was taken that way and was meaningless.
+#
+# NOT scan_or_die: sed's stderr is discarded, so an unreadable FILE yields 0 hits
+# and is indistinguishable from a clean one. Recorded rather than fixed here; the
+# fm_hits_in counts hand-rolled frontmatter parsing patterns in a repository-relative file. It outputs the number of matching lines after removing comments.
+fm_hits_in() { # fm_hits_in <relative-path> -> live hit count
+  sed 's/#.*$//' "$ROOT/$1" 2>/dev/null \
+    | "$GREP" -cE "(grep|rg) [^|]*'\^[a-z_]+:" || true
+}
+
+echo "7. No hand-rolled frontmatter parsing outside reference/lib/frontmatter.sh"
+
+# DECLARED SCOPE. Kept as an explicit list rather than reusing $SCAN so the
+# methodology/ exclusion is visible at the point of use instead of being an
+# absence a reader has to notice.
+# AN ARRAY, for the reason this file's own header gives for $SCAN and the reason
+# fm_exempt_p is a `case`: an unquoted "$FM_SCAN" in a command argument position
+# word-splits under bash and NOT under zsh, where find receives ONE nonexistent
+# path, prints nothing, and this check reports PASS over an empty scan. That is
+# exactly what the first version of this rewrite did — bash 74/25, zsh 0/0, both
+# green — three paragraphs below a comment explaining the same trap.
+FM_SCAN=(skills skill-sources reference generators platforms presets hooks agents scripts)
+fm_scan_files=$(cd "$ROOT" 2>/dev/null && find "${FM_SCAN[@]}" \
+                  \( -name '*.md' -o -name '*.sh' -o -name '*.template' \) 2>/dev/null | LC_ALL=C sort)
+
+# THE THREE-OUTCOME DISCRIMINATOR, keyed on the TREE and not on this script —
+# from check 6, whose comment records why: the allowlist is inline so it is never
+# absent, but the FILES are what a tree either has or has not. guard-failure.test.sh
+# builds empty fixture trees to exercise this guard's failure paths, and a check
+# that red()s there fails on every tree except this repo — which is how check 4
+# once took that suite from 19/19 to 16/3, breaking precisely the assertions that
+# prove the guard is not vacuous. Check 7's first draft did it again, 49/6, all
+# six being "clean tree still passes".
+fm_present=$(printf '%s\n' "$FM_ALLOW" | while IFS= read -r e; do
+               [ -n "$e" ] || continue
+               f=$(printf '%s' "$e" | cut -d' ' -f1)
+               [ -e "$ROOT/$f" ] && printf 'x\n'
+             done | "$GREP" -c . || true)
+
+fm_bad=""; fm_total=0; fm_files=0
+if [ -n "$fm_scan_files" ]; then
+  # A heredoc, not a pipe: under bash a piped `while` runs in a subshell and
+  # every counter below resets to 0 on exit, which reads as a clean tree.
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    fm_exempt_p "$rel" && continue
+    n=$(fm_hits_in "$rel")
+    [ "${n:-0}" -gt 0 ] || continue
+    fm_total=$((fm_total + n)); fm_files=$((fm_files + 1))
+    listed=$(printf '%s\n' "$FM_ALLOW" | while IFS= read -r e; do
+               [ -n "$e" ] || continue
+               case "$e" in "$rel "*) printf '%s' "$e" | cut -d' ' -f2 ;; esac
+             done)
+    if [ -z "$listed" ]; then
+      fm_bad="$fm_bad    UNLISTED $rel ($n hit(s))
+"
+    elif [ "$listed" != "$n" ]; then
+      fm_bad="$fm_bad    COUNT    $rel — allowlist says $listed, tree has $n
+"
+    fi
+  done <<EOF_FM
+$fm_scan_files
+EOF_FM
+fi
+
+# The staleness half. Without it a site fixed on another branch leaves its entry
+# behind and the next reader treats a closed defect as open.
+#
+# "file gone" is reported ONLY where the tree carries some of these files, on
+# check 6's model: $ROOT is an argument, so this guard runs against fixture trees
+# and could be run against a generated vault, and neither has any reason to hold
+# skill-sources/stats/SKILL.md.
+fm_stale=$(printf '%s\n' "$FM_ALLOW" | while IFS= read -r e; do
+  [ -n "$e" ] || continue
+  f=$(printf '%s' "$e" | cut -d' ' -f1)
+  if [ ! -e "$ROOT/$f" ]; then
+    [ "$fm_present" -gt 0 ] && printf '    STALE    %s — allowlisted but file gone; drop the entry\n' "$f"
+  elif [ "$(fm_hits_in "$f")" = "0" ]; then
+    printf '    STALE    %s — allowlisted but no longer matches; site converted, so drop the entry\n' "$f"
+  fi
+done)
+
+# INTERNAL CONSISTENCY, and it is the assertion that would have caught the zsh
+# fork above. fm_present is computed from the allowlist against $ROOT directly;
+# fm_total from the scan. If the allowlisted files ARE present but the scan found
+# nothing, the scan is broken — the two disagree about the same tree, and "PASS 0"
+# is the wrong answer to that. The stale half does not catch it, because it also
+# reads $ROOT directly and so sees the hits the scan missed.
+if [ "$fm_present" -gt 0 ] && [ "$fm_total" -eq 0 ]; then
+  red "frontmatter scan found 0 hits while $fm_present allowlisted file(s) are present — the scan did not run"
+elif [ "$fm_present" -eq 0 ] && [ "$fm_total" -eq 0 ]; then
+  skip "no allowlisted file present and no hand-rolled frontmatter parse found — nothing here claims this property"
+elif [ -n "$fm_bad" ] || [ -n "$fm_stale" ]; then
+  red "hand-rolled frontmatter parsing does not match the allowlist:"
+  [ -n "$fm_bad" ] && printf '%s' "$fm_bad"
+  [ -n "$fm_stale" ] && printf '%s\n' "$fm_stale"
+  echo "    A line-anchored '^field:' grep matches the BODY too, including inside a fence."
+  echo "    Use reference/lib/frontmatter.sh; allowlist only with a stated reason."
+else
+  ok "$fm_total hand-rolled frontmatter parse(s) across $fm_files allowlisted file(s), all accounted for"
+fi
+
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "PORTABILITY: PASS"; exit 0
