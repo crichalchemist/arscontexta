@@ -138,9 +138,11 @@ caller today. Revisit only if a second caller appears.
 ## Shared Step: Rendering the Canonical Template in This Vault's Vocabulary
 
 Together with `resolve_canonical_name` above, this is `render_current_template`
-— what Step 1's modification test and Step 5b both call to reproduce what the
-plugin's *current* `skill-sources/` template would look like, in *this
-vault's* vocabulary, for comparison against what's actually installed.
+— what Step 5b calls to reproduce what the plugin's *current*
+`skill-sources/` template would look like, in *this vault's* vocabulary, as
+the candidate replacement text. Step 1's modification test does **not** call
+this — see "Shared Step: Mechanically Comparing..." below for why an LLM
+render can't back that check, and what replaces it.
 
 Given a canonical name from `resolve_canonical_name`:
 
@@ -167,9 +169,10 @@ Given a canonical name from `resolve_canonical_name`:
    `ops/derivation-manifest.md` `vocabulary:` block as the mapping — the
    same one `resolve_canonical_name` reads.
 
-3. **The result is the comparison text**, used two ways: Step 1 diffs it
-   against the vault's installed copy to decide `MODIFIED`; Step 5b treats
-   it as the candidate replacement.
+3. **The result is Step 5b's candidate replacement text** — the vault's
+   post-upgrade version of this skill, once the human approves swapping it
+   in. It is **not** used to decide `MODIFIED`; see the mechanical-comparison
+   step below for that.
 
 ---
 
@@ -188,48 +191,75 @@ deterministic substitution instead — no LLM judgment anywhere in it.
 
 Given a canonical name from `resolve_canonical_name` above:
 
-1. **Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`.** Same
-   halt contract as `render_current_template`'s step 1 on a missing
-   template — halt evaluation of this one skill, report it, move on.
+1. **Confirm both files exist:** `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`
+   and the installed `.claude/skills/<skill>/SKILL.md`. Same halt contract
+   as `render_current_template`'s step 1 on a missing template — halt
+   evaluation of this one skill, report it, move on. The function below
+   takes both as *file paths*, not pre-read content — it reads them itself.
 
-2. **Mechanically substitute canonical → vault vocabulary, on this text only:**
-   fold to lowercase, then replace every character that is not alphanumeric,
-   `_`, or whitespace with a space. This collapses `{vocabulary.X}` and the
-   older `{DOMAIN:X}` spelling (`reference/skill-authoring.md:45` documents
-   the latter as still live) to the same plain tokens, so no separate
-   placeholder-syntax pass is needed. Then replace every token that exactly
+2. **Unwrap the placeholder syntax on the canonical side, then fold, then
+   substitute.** `{vocabulary.X}` and the older `{DOMAIN:X}` spelling
+   (`reference/skill-authoring.md:45` documents the latter as still live)
+   are unified and stripped to the bare key `X` first — folding alone turns
+   the wrapper into extra `vocabulary`/`domain` tokens with no counterpart
+   on the installed side, which is already plain prose (measured: this
+   alone made an unmodified template diff non-empty against itself). *Then*
+   fold to lowercase and replace every character that is not alphanumeric,
+   `_`, or whitespace with a space. Then replace every token that exactly
    matches one of this vault's `vocabulary:` block keys (Levels 1-6 — Level
-   7 is a nested list, not a substitution pair) with that key's value, plus
-   one further pair sourced from `reference/vocabulary-transforms.md`'s own
-   "MOC" row — the documented universal name for what the manifest calls
-   `topic_map`/`topic_maps` — mapped to this vault's value for those keys.
+   7 is a nested list, not a substitution pair) with that key's value —
+   itself folded and trimmed the same way, so a value like
+   `cmd_reduce: "/extract"` matches what the installed side's own folding
+   already produced for it — plus one further pair sourced from
+   `reference/vocabulary-transforms.md`'s own "MOC" row — the documented
+   universal name for what the manifest calls `topic_map`/`topic_maps` —
+   mapped to this vault's value for those keys.
 
-3. **Fold the installed `.claude/skills/<skill>/SKILL.md` the same way —
-   case and punctuation only, never substitution.** The installed file is
-   already in vault vocabulary; running the same table on it risks a real
-   collision, not a hypothetical one: this vault's own `hub: "index"` key
-   re-matches the bare word "hub" inside `topic_map`'s *already-correct*
+3. **Fold the installed file the same way — case, punctuation, and
+   whitespace normalization only, never substitution.** The installed file
+   is already in vault vocabulary; running the same table on it risks a
+   real collision, not a hypothetical one: this vault's own `hub: "index"`
+   key re-matches the bare word "hub" inside `topic_map`'s *already-correct*
    value "graph hub", corrupting it (measured). Substitute only the
-   canonical side, ever — that asymmetry is the fix, not an oversight.
+   canonical side, ever — that asymmetry is the fix, not an oversight. Both
+   sides get the identical whitespace-normalizing rebuild regardless of
+   whether a substitution fired on a given line — otherwise a substituted
+   line and an untouched line normalize differently for no reason connected
+   to real content (measured: this too made an unmodified template diff
+   non-empty against itself).
 
-4. **Diff the two.** Non-empty → `MODIFIED: $skill`.
+4. **Diff the two.** A non-zero exit from any guard in step 1 (or from the
+   substitution-table build below) means the comparison could not be made
+   for this skill — halt evaluation of this one skill and report it, per
+   the tag convention above; never treat that as `MODIFIED`, since an empty
+   diff and "the comparison never ran" must not read the same way.
+   Otherwise: non-empty diff → `MODIFIED: $skill`.
 
 ```bash
-# Step 2+3 above, portable bash/zsh. Takes the canonical template's content
-# (already read by the agent per step 1) and the installed file's path.
+# Steps 2-4 above, portable bash/zsh. Takes both files as PATHS -- it reads
+# them itself; the caller does not need to pre-read either one.
 mechanically_compare() {
   local manifest="ops/derivation-manifest.md" canon_file="$1" installed_file="$2"
   [[ -f "$manifest" ]] || { echo "HALT: no $manifest -- cannot build the substitution table" >&2; return 1; }
+  [[ -f "$canon_file" ]] || { echo "HALT: $canon_file does not exist" >&2; return 1; }
   [[ -f "$installed_file" ]] || { echo "HALT: $installed_file does not exist" >&2; return 1; }
 
   local block line key value topic_map_val="" topic_maps_val="" pairs_file
   pairs_file=$(mktemp)
   block=$(sed -n '/^vocabulary:/,/# Level 7:/p' "$manifest")
+  if [ -z "$block" ]; then
+    echo "HALT: $manifest has no 'vocabulary:' block (or no '# Level 7:' marker) -- cannot build the substitution table" >&2
+    rm -f "$pairs_file"; return 1
+  fi
   while IFS= read -r line; do
     case "$line" in *': "'*'"'*) : ;; *) continue ;; esac
     key=$(printf '%s\n' "$line" | sed -n 's/^  \([a-zA-Z_]*\): .*/\1/p')
     value=$(printf '%s\n' "$line" | sed -n 's/^  [a-zA-Z_]*: "\(.*\)"$/\1/p')
     [ -n "$key" ] && [ -n "$value" ] || continue
+    # Fold the value the same way the text is folded -- a leading-slash
+    # command name like "/extract" must match what the installed side's
+    # own folding already produced for it, not the raw slash-prefixed form.
+    value=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_[:space:]' ' ' | awk '{$1=$1}1')
     printf '%s\t%s\n' "$key" "$value" >> "$pairs_file"
     [ "$key" = "topic_map" ] && topic_map_val="$value"
     [ "$key" = "topic_maps" ] && topic_maps_val="$value"
@@ -238,24 +268,32 @@ $block
 EOF_VOCAB
   [ -n "$topic_map_val" ]  && printf 'MOC\t%s\n' "$topic_map_val" >> "$pairs_file"
   [ -n "$topic_maps_val" ] && printf 'MOCs\t%s\n' "$topic_maps_val" >> "$pairs_file"
+  if [ ! -s "$pairs_file" ]; then
+    echo "HALT: $manifest's vocabulary: block yielded no usable key/value pairs -- cannot build the substitution table" >&2
+    rm -f "$pairs_file"; return 1
+  fi
 
-  # Canonical side: unify placeholder spellings, then fold+strip, then
-  # substitute -- the only side that ever gets substituted (see step 3).
-  local canon_text canon_folded
+  # Canonical side: unify placeholder spellings and strip the wrapper down
+  # to the bare key, fold+strip, then substitute -- the only side that
+  # ever gets substituted (see step 3 above).
+  local canon_text canon_folded canon_out
   canon_text=$(sed -e 's/{DOMAIN:topic maps}/{vocabulary.topic_maps}/g' \
                     -e 's/{DOMAIN:topic map}/{vocabulary.topic_map}/g' \
-                    -e 's/{DOMAIN:\([a-zA-Z_]*\)}/{vocabulary.\1}/g' "$canon_file")
+                    -e 's/{DOMAIN:\([a-zA-Z_]*\)}/{vocabulary.\1}/g' \
+                    -e 's/{vocabulary\.\([a-zA-Z_]*\)}/\1/g' "$canon_file")
   canon_folded=$(printf '%s' "$canon_text" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_[:space:]' ' ')
-  local canon_out
   canon_out=$(printf '%s\n' "$canon_folded" | awk -v pf="$pairs_file" '
-    BEGIN { while ((getline line < pf) > 0) { n = split(line, f, "\t"); if (n == 2 && f[1] != "") map[tolower(f[1])] = tolower(f[2]) }; close(pf) }
-    { for (i = 1; i <= NF; i++) if ($i in map) $i = map[$i]; print }
+    BEGIN { while ((getline line < pf) > 0) { n = split(line, f, "\t"); if (n == 2 && f[1] != "") map[tolower(f[1])] = f[2] }; close(pf) }
+    { for (i = 1; i <= NF; i++) if ($i in map) $i = map[$i]; $1 = $1; print }
   ')
   rm -f "$pairs_file"
 
-  # Installed side: fold+strip only, no substitution table applied.
+  # Installed side: same fold and the same forced whitespace rebuild, never
+  # the substitution table (see step 3 above). The rebuild is what keeps
+  # whitespace normalization identical to the canonical side's on every
+  # line, substituted or not -- it adds no substitution of its own.
   local installed_folded
-  installed_folded=$(tr '[:upper:]' '[:lower:]' < "$installed_file" | tr -c '[:alnum:]_[:space:]' ' ')
+  installed_folded=$(tr '[:upper:]' '[:lower:]' < "$installed_file" | tr -c '[:alnum:]_[:space:]' ' ' | awk '{$1=$1}1')
 
   diff <(printf '%s\n' "$canon_out") <(printf '%s\n' "$installed_folded")
 }
@@ -264,17 +302,22 @@ EOF_VOCAB
 **What this catches and what it doesn't — stated, not silent.** Covers the
 `{vocabulary.X}`/`{DOMAIN:X}` placeholder forms, the literal Levels-1-6 key
 names as bare words, and the one sourced MOC alias. It does NOT cover any
-other synonym outside that closed set: `{DOMAIN:topic map plural}`-style
-spellings that don't literally match a declared key (9 `skill-sources/`
-files use this exact spelling where the manifest declares `topic_maps`, a
-pre-existing naming mismatch this step does not fix) will not substitute
-and will read as false-positive divergence. And even a perfect substitution
-can't separate "the user edited this" from "the plugin's canonical
-template changed since generation" — there are no git tags to isolate an
-original baseline (Global Constraint). The honest predicate this produces
-is **diverges from the current canonical template**, not strictly
-*user-modified* — both conflate into the same non-empty diff, and Step 1's
-presentation says so rather than implying otherwise.
+other synonym outside that closed set: `{vocabulary.topic_map_plural}` — a
+spelling that does not literally match the manifest's declared key
+(`topic_maps`) — appears 24 times across 5 `skill-sources/` files (measured)
+and will not substitute, reading as false-positive divergence; a
+pre-existing naming mismatch this step does not fix. Nor does it cover
+`{DOMAIN:extraction_categories}` (a Level 7 nested list, never a
+substitution pair by design) — any template using it always shows that
+token as unsubstituted. Case-folding is exercised only against BSD `tr`
+(this repo's default); GNU `tr`'s handling of non-ASCII uppercase is
+untested and could fold differently across environments. And even a
+perfect substitution can't separate "the user edited this" from "the
+plugin's canonical template changed since generation" — there are no git
+tags to isolate an original baseline (Global Constraint). The honest
+predicate this produces is **diverges from the current canonical template**,
+not strictly *user-modified* — both conflate into the same non-empty diff,
+and Step 1's presentation says so rather than implying otherwise.
 
 ---
 
@@ -309,11 +352,16 @@ Gather the vault's current state:
    a. Run `resolve_canonical_name` (shared step above) on the directory
       name — a fresh, standalone invocation each time; a fence earlier in
       this file does not persist into this one.
-   b. Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md` (same
-      halt contract as the two shared steps above on a missing template).
-   c. Run `mechanically_compare` (shared step above) — another standalone
-      invocation — with that content and the installed file's path.
-   d. Non-empty diff → `MODIFIED: $skill`.
+   b. Run `mechanically_compare` (shared step above) — another standalone
+      invocation — with `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`
+      and the installed file's path. It reads both itself; do not pre-read
+      the canonical template for this check (Step 5b's render step, which
+      does need pre-read content, is separate).
+   c. Non-zero exit (any file it needs is missing, or the manifest's
+      vocabulary block is missing or unusable) → halt evaluation of this
+      one skill and report it, same tag convention as the two shared steps
+      above — never treat that as `MODIFIED`. Otherwise: non-empty diff →
+      `MODIFIED: $skill`.
 
 Present inventory:
 
