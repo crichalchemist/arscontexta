@@ -38,7 +38,7 @@ rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 # Cross-field queries — tensions awaiting review (pending or open status)
 . {config.ops_dir}/lib/frontmatter.sh
 tensions=$(list_notes_by_field {DOMAIN:notes} type tension) || { echo "error: tension scan failed; refusing to report partial results" >&2; exit 1; }
-printf '%s\n' "$tensions" | while IFS= read -r f; do s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"; done
+[ -n "$tensions" ] && printf '%s\n' "$tensions" | while IFS= read -r f; do s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"; done
 ```
 
 Field-level queries answer: "What properties do my {DOMAIN:notes} have?" They are fast, precise, and require no external tools.
@@ -142,7 +142,7 @@ rg '^methodology:.*Zettelkasten' {DOMAIN:notes}/
 # Unresolved tensions — tensions awaiting review (pending or open status)
 . {config.ops_dir}/lib/frontmatter.sh
 tensions=$(list_notes_by_field {DOMAIN:notes} type tension) || { echo "error: tension scan failed; refusing to report partial results" >&2; exit 1; }
-printf '%s\n' "$tensions" | while IFS= read -r f; do s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"; done
+[ -n "$tensions" ] && printf '%s\n' "$tensions" | while IFS= read -r f; do s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"; done
 
 # {DOMAIN:Notes} adapted from human patterns
 rg '^adapted_from: ' {DOMAIN:notes}/ | grep -v 'null'

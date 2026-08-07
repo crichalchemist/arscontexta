@@ -76,7 +76,7 @@ rg '^topics:.*\[\[methodology\]\]' {DOMAIN:notes}/
 # fire the threshold on something no review can move.
 . {config.ops_dir}/lib/frontmatter.sh
 tensions=$(list_notes_by_field {DOMAIN:notes} type tension) || { echo "error: tension scan failed; refusing to report partial results" >&2; exit 1; }
-printf '%s\n' "$tensions" | while IFS= read -r f; do s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"; done
+[ -n "$tensions" ] && printf '%s\n' "$tensions" | while IFS= read -r f; do s=$(frontmatter_field "$f" status); [ "$s" = "pending" ] || [ "$s" = "open" ] && echo "$f"; done
 
 # Count {DOMAIN:notes} by type
 rg '^type:' {DOMAIN:notes}/ --no-filename | sort | uniq -c | sort -rn
