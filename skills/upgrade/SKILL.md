@@ -246,9 +246,19 @@ mechanically_compare() {
 
   local block line key value topic_map_val="" topic_maps_val="" pairs_file
   pairs_file=$(mktemp)
+  # Presence-check the CLOSING marker before extracting -- an unclosed
+  # range (vocabulary: present, # Level 7: absent) runs to EOF and silently
+  # absorbs every later key: "value" line into the table (wrong answers,
+  # not just a missing block), so the emptiness check below can't catch
+  # it: that block would be non-empty, just contaminated. Mirrors
+  # resolve_canonical_name's own closing-marker guard above. (No separate
+  # opening-marker check is needed: if "vocabulary:" itself is absent the
+  # sed range below never opens and $block is empty, which the check
+  # after this loop already catches.)
+  grep -q '# Level 7:' "$manifest" || { echo "HALT: $manifest has no '# Level 7:' marker -- cannot bound the vocabulary: block's extraction, and running it to EOF would silently absorb unrelated content" >&2; rm -f "$pairs_file"; return 1; }
   block=$(sed -n '/^vocabulary:/,/# Level 7:/p' "$manifest")
   if [ -z "$block" ]; then
-    echo "HALT: $manifest has no 'vocabulary:' block (or no '# Level 7:' marker) -- cannot build the substitution table" >&2
+    echo "HALT: $manifest has no 'vocabulary:' block -- cannot build the substitution table" >&2
     rm -f "$pairs_file"; return 1
   fi
   while IFS= read -r line; do
