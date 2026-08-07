@@ -497,11 +497,16 @@ Your customization:
 
 Options:
   (a) Keep your version unchanged
-  (b) Apply upgrade, preserving your customizations
   (c) Apply upgrade, replacing your version (archived to ops/skills-archive/)
 ```
 
-Option (b) requires the upgrade to be compatible with the user's changes. If they conflict, explain why and recommend (a) or (c).
+**Option (b), a merge preserving customizations, is not offered — not as a corner case, but as
+the real behavior every invocation of `/upgrade` gets today: there is no OLD-rendering
+available.** A merge needs the *original* canonical template this skill was generated from, and
+this repo carries no release tags to recover it. Without that baseline a merge is a guess, not a
+fact — exactly the render-noise problem the mechanical-comparison step above was built to avoid,
+not something to reintroduce here by another route. State this plainly to the human rather than
+presenting a third option that would fail silently or produce a guessed merge.
 
 ---
 
@@ -564,11 +569,14 @@ cp ".claude/skills/${SKILL_NAME}/SKILL.md" \
 
 ### 5b. Generate Updated Skill
 
-1. Read the skill's generation block from the plugin (if available)
+1. Resolve the canonical name (`resolve_canonical_name`, shared step above) and render it in
+   this vault's vocabulary (`render_current_template`, shared step above) — no "if available"
+   fallback: the halt contract shared by both closes the silent skip a looser phrasing here used
+   to license. A missing manifest section, canonical template, or vocabulary block halts naming
+   the exact skill and lookup that failed.
 2. Apply the specific improvements identified in Step 2
 3. Preserve the user's vocabulary transformation from `ops/derivation-manifest.md`
 4. Preserve the user's dimensional positions from `ops/config.yaml`
-5. For user-modified skills with option (b): merge the user's customizations into the updated skill
 
 ### 5c. Update Version Tracking
 
