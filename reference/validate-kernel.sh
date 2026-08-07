@@ -277,12 +277,17 @@ resolve_note_dirs() {
     # one a changelog citation this file's own header calls "expected to dangle".
     # Exit 0, plausible number, no error.
     # RC 2 MEANS "A find CALL ITSELF FAILED" -- see resolve_ops_dir_name's
-    # header for the full rationale. This function has three find call sites
-    # (manifest, config, shape scan); the flag below is set if ANY of them
-    # reports a nonzero exit status directly, and only consulted once, at the
-    # very end, if every method still comes up empty -- a resolver error on
-    # the manifest find does not stop the config or shape-scan fallbacks from
-    # being tried, exactly as an ordinary "not found" would not.
+    # header for the full rationale. This function has FOUR find call sites
+    # (manifest, config, the shape scan's own top-level find, and the
+    # per-candidate-directory markdown probe inside the shape-scan loop --
+    # the fourth is easy to undercount because it sits inside a loop rather
+    # than beside the other three, and an earlier version of this comment
+    # said "three" and omitted exactly that one). The flag below is set if
+    # ANY of them reports a nonzero exit status directly, and only consulted
+    # once, at the very end, if every method still comes up empty -- a
+    # resolver error on the manifest find does not stop the config or
+    # shape-scan fallbacks from being tried, exactly as an ordinary "not
+    # found" would not.
     _rn_resolver_err=false
     _rn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null); _rn_man_rc=$?
     [ "$_rn_man_rc" -eq 0 ] || _rn_resolver_err=true
@@ -315,9 +320,22 @@ resolve_note_dirs() {
     # and fixed in three doc recipes) -- guarded here with the same one-line
     # `[ -n "$_rn_d" ] || continue`, so a genuinely empty scan still produces
     # zero iterations, identical to the original direct-pipe behavior.
+    # THE PER-CANDIDATE PROBE BELOW RUNS INSIDE THE while LOOP'S SUBSHELL --
+    # it reads from a pipe, so bash and zsh both fork it -- and a variable
+    # assignment made in there is discarded the moment the subshell exits.
+    # `_rn_resolver_err=true` set inside the loop body would never reach this
+    # function's return value at all: the exact swallowed-in-a-subshell trap
+    # this function's OWN header comment already names, and the one
+    # reference/lib/frontmatter.sh solves at list_notes_by_field with a
+    # touch-file instead of a variable. Same fix here: a failed per-directory
+    # probe touches $_rn_probe_errf rather than setting a variable, and the
+    # parent scope (this line, after the $( ) around the whole loop has
+    # exited) checks for that file's existence instead.
     _rn_ops=$(resolve_ops_dir_name "$1")
     _rn_shape_raw=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null); _rn_shape_rc=$?
     [ "$_rn_shape_rc" -eq 0 ] || _rn_resolver_err=true
+    _rn_probe_errf="/tmp/validate-kernel-probe-err-$$"
+    rm -f "$_rn_probe_errf"
     _rn_out=$(printf '%s\n' "$_rn_shape_raw" | while IFS= read -r _rn_d; do
         [ -n "$_rn_d" ] || continue
         _rn_b=$(basename "$_rn_d")
@@ -325,9 +343,16 @@ resolve_note_dirs() {
         case "$_rn_b" in
             .*|node_modules|ops|04_meta|archive|templates|_templates) continue ;;
         esac
-        [ -n "$(find "$_rn_d" -type f -name '*.md' 2>/dev/null | head -1)" ] || continue
+        _rn_probe=$(find "$_rn_d" -type f -name '*.md' 2>/dev/null); _rn_probe_rc=$?
+        [ "$_rn_probe_rc" -eq 0 ] || touch "$_rn_probe_errf"
+        _rn_probe=$(printf '%s\n' "$_rn_probe" | head -1)
+        [ -n "$_rn_probe" ] || continue
         printf '%s\n' "$_rn_d"
     done)
+    if [ -e "$_rn_probe_errf" ]; then
+        _rn_resolver_err=true
+        rm -f "$_rn_probe_errf"
+    fi
     if [ -n "$_rn_out" ]; then
         printf 'shape scan (top-level directories containing *.md)\n%s\n' "$_rn_out"; return 0
     fi
