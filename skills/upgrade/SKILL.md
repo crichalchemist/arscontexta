@@ -571,9 +571,9 @@ cp ".claude/skills/${SKILL_NAME}/SKILL.md" \
 
 1. Resolve the canonical name (`resolve_canonical_name`, shared step above) and render it in
    this vault's vocabulary (`render_current_template`, shared step above) — no "if available"
-   fallback: the halt contract shared by both closes the silent skip a looser phrasing here used
-   to license. A missing manifest section, canonical template, or vocabulary block halts naming
-   the exact skill and lookup that failed.
+   fallback: `resolve_canonical_name` halts on a missing manifest section and
+   `render_current_template` halts on a missing canonical template, each naming the exact skill
+   and lookup that failed. Neither silently skips, which is what the old phrasing here licensed.
 2. Apply the specific improvements identified in Step 2
 3. Preserve the user's vocabulary transformation from `ops/derivation-manifest.md`
 4. Preserve the user's dimensional positions from `ops/config.yaml`
@@ -920,7 +920,7 @@ All upgrades are advisory. The user owns the files.
 
 **No generation manifest:** Treat all skills as version 0 (unknown generation state). Compare methodology against current knowledge base. This is fine — consultation reasons about approach, not version numbers.
 
-**Skill has been user-modified:** Present the side-by-side comparison. Offer three options: keep user version, merge upgrade with customizations, or replace (with archive). Never silently overwrite.
+**Skill has been user-modified:** Present the side-by-side comparison. Offer only two options: keep user version, or replace (with archive) — merge preserving customizations is not offered (see "Side-by-Side for User-Modified Skills" above for why). Never silently overwrite.
 
 **No ops/derivation-manifest.md:** Use universal vocabulary for all output.
 
