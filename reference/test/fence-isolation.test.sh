@@ -332,7 +332,10 @@ assert_frontmatter_three_ways "$VAULT_FULL" || f_fail=1
 # adjacent -> not) satisfy the brief's three success criteria without that
 # risk. `verify` is not optional: (c)'s identity-mapped stats/extract pair
 # alone does NOT catch the asymmetry regression Task 3's fix depends on --
-# see (c2) below and the mutation record in task-5-report.md.
+# see (c2) below, whose own comment records the mutation that proved it
+# (not cited by filename: .superpowers/sdd/ ledgers are gitignored scratch
+# and do not ship -- a citation into one resolves to nothing in a fresh
+# clone, this repo's own documented divergence 10).
 extract_shared_step() {   # extract_shared_step <heading> <next-heading> <outfile>
   m_start=$(/usr/bin/grep -nF "$1" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
   m_end=$(/usr/bin/grep -nF "$2" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
