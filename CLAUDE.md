@@ -62,7 +62,7 @@ for s in bash zsh; do
   $s reference/test/guard-failure.test.sh                # 55/55
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 68/68
+  $s reference/test/kernel-note-dirs.test.sh             # 71/71
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 57/57

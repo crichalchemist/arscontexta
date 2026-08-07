@@ -595,5 +595,38 @@ fi
 chmod 755 "$V/ops/observations" 2>/dev/null
 rm -rf "$ROOT"
 
+# RESOLVER ERROR ON A VOCABULARY-DECLARED CUSTOM OPS NAME, not a hardcoded
+# one. The "renamed ops" fixtures above prove resolve_ops_dir can FIND a
+# manifest-declared directory; this one makes that directory itself
+# unreadable, so the manifest that would declare its name can never be read
+# either -- reachable ONLY through its vocabulary-declared name, and that
+# whole path is an I/O error. Before this task, resolve_ops_dir had no third
+# state: this returned the same rc as "no ops dir at all", and C1 read it as
+# WARN "self-evolution not enabled" -- a false statement about a vault whose
+# self-evolution tree exists and simply could not be read.
+#
+# chmod 000 does not restrict root, so this assertion would SILENTLY pass
+# when the suite runs as root -- same guard as the block above, checked
+# first, reporting SKIPPED-AS-ROOT rather than a green tick that never ran.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+mkdir -p "$V/zzz-ops-err"
+mv "$V/ops/observations" "$V/ops/tensions" "$V/zzz-ops-err/"
+printf 'vocabulary:\n  notes: "zzz-arbitrary"\n  ops: "zzz-ops-err"\n' > "$V/zzz-ops-err/derivation-manifest.md"
+rm -rf "$V/ops"
+chmod 000 "$V/zzz-ops-err" 2>/dev/null
+if ls "$V/zzz-ops-err" >/dev/null 2>&1; then
+  printf '  SKIP C1: resolver-error branch (running as root; chmod 000 does not restrict)\n'
+else
+  OUT=$(c1 "$V")
+  eq "C1: resolver error on a vocab-declared custom ops name FAILs, not warns" "fail" \
+     "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+  eq "C1: resolver error -> does NOT read as self-evolution not enabled"      "absent" \
+     "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo present || echo absent)"
+  eq "C1: resolver error -> message names it as a resolver error"            "present" \
+     "$(printf '%s' "$OUT" | grep -q 'resolver-error' && echo present || echo absent)"
+fi
+chmod 755 "$V/zzz-ops-err" 2>/dev/null
+rm -rf "$ROOT"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

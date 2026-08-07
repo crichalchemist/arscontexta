@@ -66,11 +66,26 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 # resolve_ops_dir_name <vault> -> the vault's own name for its ops directory,
 # or nothing. Split out so the shape scan can exclude it by that name rather
 # than by the literal `ops`.
+# RC 2 MEANS "A find CALL ITSELF FAILED" (permission-denied path, most likely),
+# distinct from rc 1, "found is walked cleanly and nothing matched". Both used
+# to collapse into the same rc 1 -- exit status captured directly off each
+# command substitution, on the same line via `;`, never through `local
+# x=$(...)`, which reads as `local`'s own rc and silently discards it (the
+# trap reference/lib/frontmatter.sh documents at count_notes_by_field's own
+# comment). Callers that only check "did this resolve" still work unchanged;
+# only a caller that must fail loud on a resolver error, rather than treat it
+# as legitimate absence, needs to distinguish rc 2 from rc 1.
 resolve_ops_dir_name() {
-    _rodn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    _rodn_resolver_err=false
+    _rodn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null); _rodn_man_rc=$?
+    [ "$_rodn_man_rc" -eq 0 ] || _rodn_resolver_err=true
+    _rodn_man=$(printf '%s\n' "$_rodn_man" | head -1)
     [ -n "$_rodn_man" ] && _vocab_dir "$_rodn_man" ops 2>/dev/null && return 0
-    _rodn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+    _rodn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null); _rodn_cfg_rc=$?
+    [ "$_rodn_cfg_rc" -eq 0 ] || _rodn_resolver_err=true
+    _rodn_cfg=$(printf '%s\n' "$_rodn_cfg" | head -1)
     [ -n "$_rodn_cfg" ] && _vocab_dir "$_rodn_cfg" ops 2>/dev/null && return 0
+    [ "$_rodn_resolver_err" = true ] && return 2
     return 1
 }
 
@@ -89,11 +104,19 @@ resolve_ops_dir() {
     # whatever that directory is called. `head -1` because two manifests would be
     # a malformed vault, and picking one beats failing closed on a vault whose
     # observations are readable.
-    _rod_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    # RC 2 MEANS "A find CALL ITSELF FAILED" -- see resolve_ops_dir_name's
+    # header for the full rationale; this function follows the same
+    # convention and the same on-the-same-line `; VAR_rc=$?` capture.
+    _rod_resolver_err=false
+    _rod_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null); _rod_man_rc=$?
+    [ "$_rod_man_rc" -eq 0 ] || _rod_resolver_err=true
+    _rod_man=$(printf '%s\n' "$_rod_man" | head -1)
     _rod_ops=""
     [ -n "$_rod_man" ] && _rod_ops=$(_vocab_dir "$_rod_man" ops 2>/dev/null)
     if [ -z "$_rod_ops" ]; then
-        _rod_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+        _rod_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null); _rod_cfg_rc=$?
+        [ "$_rod_cfg_rc" -eq 0 ] || _rod_resolver_err=true
+        _rod_cfg=$(printf '%s\n' "$_rod_cfg" | head -1)
         [ -n "$_rod_cfg" ] && _rod_ops=$(_vocab_dir "$_rod_cfg" ops 2>/dev/null) || _rod_ops=""
     fi
     if [ -n "$_rod_ops" ] && [ -d "$1/$_rod_ops/$2" ]; then
@@ -102,6 +125,7 @@ resolve_ops_dir() {
     for _rod in "ops/$2" "04_meta/logs/$2" "logs/$2" "$2"; do
         [ -d "$1/$_rod" ] && { printf '%s' "$_rod"; return 0; }
     done
+    [ "$_rod_resolver_err" = true ] && return 2
     return 1
 }
 
@@ -252,11 +276,23 @@ resolve_note_dirs() {
     # it swept the renamed ops tree IN as note-bearing — 2 dangling, the extra
     # one a changelog citation this file's own header calls "expected to dangle".
     # Exit 0, plausible number, no error.
-    _rn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
+    # RC 2 MEANS "A find CALL ITSELF FAILED" -- see resolve_ops_dir_name's
+    # header for the full rationale. This function has three find call sites
+    # (manifest, config, shape scan); the flag below is set if ANY of them
+    # reports a nonzero exit status directly, and only consulted once, at the
+    # very end, if every method still comes up empty -- a resolver error on
+    # the manifest find does not stop the config or shape-scan fallbacks from
+    # being tried, exactly as an ordinary "not found" would not.
+    _rn_resolver_err=false
+    _rn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null); _rn_man_rc=$?
+    [ "$_rn_man_rc" -eq 0 ] || _rn_resolver_err=true
+    _rn_man=$(printf '%s\n' "$_rn_man" | head -1)
     if [ -n "$_rn_man" ] && _rn_out=$(_dirs_from_vocab "$1" "$_rn_man"); then
         printf '%s vocabulary\n%s' "${_rn_man#"$1"/}" "$_rn_out"; return 0
     fi
-    _rn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null | head -1)
+    _rn_cfg=$(find "$1" -maxdepth 2 -name 'config.yaml' -type f 2>/dev/null); _rn_cfg_rc=$?
+    [ "$_rn_cfg_rc" -eq 0 ] || _rn_resolver_err=true
+    _rn_cfg=$(printf '%s\n' "$_rn_cfg" | head -1)
     if [ -n "$_rn_cfg" ] && _rn_out=$(_dirs_from_vocab "$1" "$_rn_cfg"); then
         printf '%s vocabulary\n%s' "${_rn_cfg#"$1"/}" "$_rn_out"; return 0
     fi
@@ -271,8 +307,19 @@ resolve_note_dirs() {
     # operational tree swept in as note-bearing — the second half of the same
     # defect. The vault's own name for it is resolved first and excluded by that
     # name; the literal stays for vaults with no vocabulary declaration.
+    #
+    # find's OWN rc is captured before the pipe, same as the two finds above --
+    # so `find | while read` is now `find` captured, then `printf | while read`
+    # on the capture. On an EMPTY capture, `printf '%s\n' ""` still emits one
+    # blank line rather than zero (the exact hazard Task 1 of this plan found
+    # and fixed in three doc recipes) -- guarded here with the same one-line
+    # `[ -n "$_rn_d" ] || continue`, so a genuinely empty scan still produces
+    # zero iterations, identical to the original direct-pipe behavior.
     _rn_ops=$(resolve_ops_dir_name "$1")
-    _rn_out=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r _rn_d; do
+    _rn_shape_raw=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null); _rn_shape_rc=$?
+    [ "$_rn_shape_rc" -eq 0 ] || _rn_resolver_err=true
+    _rn_out=$(printf '%s\n' "$_rn_shape_raw" | while IFS= read -r _rn_d; do
+        [ -n "$_rn_d" ] || continue
         _rn_b=$(basename "$_rn_d")
         [ -n "$_rn_ops" ] && [ "$_rn_b" = "$_rn_ops" ] && continue
         case "$_rn_b" in
@@ -284,6 +331,7 @@ resolve_note_dirs() {
     if [ -n "$_rn_out" ]; then
         printf 'shape scan (top-level directories containing *.md)\n%s\n' "$_rn_out"; return 0
     fi
+    [ "$_rn_resolver_err" = true ] && return 2
     return 1
 }
 
@@ -441,7 +489,14 @@ dangling=$(comm -23 <(printf '%s\n' "$link_folded") <(printf '%s\n' "$existing_f
 # beneath `PASS 3786 of 5253 files contain wiki links` -- two lines of one run
 # contradicting each other -- and was read as a soft pass across several
 # sessions. A check that never executed must never be reported as a warning.
-if [ "$resolve_rc" -ne 0 ]; then
+if [ "$resolve_rc" -eq 2 ]; then
+    # THE THIRD ARM. rc 1 and rc 2 both land here as a FAIL either way -- this
+    # check truly cannot run without a resolved directory regardless of WHY
+    # resolution failed -- but the message now says which failure it was,
+    # rather than asserting "no note-bearing directory could be resolved" on
+    # a vault where one may well exist and simply could not be READ.
+    fail "Dangling-link check did NOT run: a resolver encountered an I/O error locating note-bearing directories in '$VAULT' (a permission-denied path, most likely) -- this is a failure, not a warning, and the cause is a resolver error, not an absent directory. Nothing was checked."
+elif [ "$resolve_rc" -ne 0 ]; then
     fail "Dangling-link check did NOT run: no note-bearing directory could be resolved in '$VAULT' (tried ops/derivation-manifest.md vocabulary, then ops/config.yaml vocabulary, then a scan for top-level directories containing *.md). This is a failure, not a warning -- nothing was checked."
 elif [ "$checked" -eq 0 ]; then
     warn "Resolved note directories via $NOTE_DIR_SOURCE, but they contain no wiki links to check [scanned: $SCANNED_NAMES]"
@@ -771,8 +826,18 @@ has_rethink=false
 # and is shared with C1 — it used to be spelled out twice, and C1's copy had
 # only `ops/`, so C1 went silent on any vault that renamed it while THIS check
 # passed. Two lists, one vault, opposite conclusions.
-_d=$(resolve_ops_dir "$VAULT" observations) && [ -n "$_d" ] && has_obs_dir=true
-_d=$(resolve_ops_dir "$VAULT" tensions)     && [ -n "$_d" ] && has_tensions_dir=true
+#
+# RESOLVER ERROR (rc 2) IS TRACKED SEPARATELY FROM "MISSING", because folding
+# it into has_obs_dir/has_tensions_dir staying false would report it as a
+# partial-loop WARN ("Missing: observations dir") — the same false "not
+# present" reading this whole task exists to stop, one level up.
+p12_resolver_err=""
+_d=$(resolve_ops_dir "$VAULT" observations); _d_rc=$?
+[ "$_d_rc" -eq 0 ] && [ -n "$_d" ] && has_obs_dir=true
+[ "$_d_rc" -eq 2 ] && p12_resolver_err="${p12_resolver_err}observations, "
+_d=$(resolve_ops_dir "$VAULT" tensions); _d_rc=$?
+[ "$_d_rc" -eq 0 ] && [ -n "$_d" ] && has_tensions_dir=true
+[ "$_d_rc" -eq 2 ] && p12_resolver_err="${p12_resolver_err}tensions, "
 
 # Check context files for review trigger documentation
 for ctx in "$VAULT/CLAUDE.md"; do
@@ -793,7 +858,13 @@ $has_tensions_dir && checks_passed=$((checks_passed + 1))
 $has_review_trigger && checks_passed=$((checks_passed + 1))
 $has_rethink && checks_passed=$((checks_passed + 1))
 
-if [ "$checks_passed" -eq 4 ]; then
+if [ -n "$p12_resolver_err" ]; then
+    # RESOLVER ERROR OUTRANKS EVERYTHING computed above, same principle as
+    # primitive 2's header states it: "could not run" and "ran and found
+    # nothing" are different facts, and collapsing them is what let a soft
+    # WARN stand in for a genuine I/O failure.
+    fail "Operational learning loop check could not fully run: resolver error locating ${p12_resolver_err%, } dir(s) in '$VAULT' -- this is a failure, not a warning; the affected dir(s) may exist and simply could not be read."
+elif [ "$checks_passed" -eq 4 ]; then
     pass "Operational learning loop: observations, tensions, review trigger, rethink mechanism"
 elif [ "$checks_passed" -ge 2 ]; then
     details=""
@@ -906,7 +977,18 @@ for spec in "observations:implemented:implemented_in" \
             "tensions:implemented:implemented_in" \
             "tensions:promoted:promoted_to"; do
     kind=${spec%%:*}; rest=${spec#*:}; st=${rest%%:*}; fld=${rest#*:}
-    d=$(resolve_ops_dir "$VAULT" "$kind") || continue
+    # RESOLVER ERROR (rc 2) JOINS c1_unscannable, THE SAME LIST list_notes_by_
+    # field failures already use below — both are "this pair could not be
+    # checked", and the existing fail branch below already outranks the
+    # "self-evolution not enabled" WARN. A genuinely-absent dir (rc 1) still
+    # falls through silently to `continue`, unchanged: that state legitimately
+    # means the rule does not apply, which c1_pairs staying low already covers.
+    d=$(resolve_ops_dir "$VAULT" "$kind"); d_rc=$?
+    if [ "$d_rc" -eq 2 ]; then
+        c1_unscannable="$c1_unscannable $kind(resolver-error)"
+        continue
+    fi
+    [ "$d_rc" -eq 0 ] || continue
     c1_pairs=$((c1_pairs + 1))
     # THE LIBRARY'S rc IS CAPTURED, NOT DISCARDED. list_notes_by_field was built
     # to refuse silence: on an unreadable directory it prints "refusing to report
@@ -943,7 +1025,13 @@ if [ -n "$c1_unscannable" ]; then
     # what made a soft pass possible. A partial scan is the worse case — the
     # matches already collected would otherwise be reported as a confident
     # undercount.
-    fail "could not scan:$c1_unscannable — the library refused to report a count"
+    #
+    # TWO DIFFERENT ORIGINS SHARE THIS LIST, distinguished by the tag each
+    # append site writes: "$kind(resolver-error)" when resolve_ops_dir itself
+    # could not run (a find-level I/O error), "$d($st)" when it resolved fine
+    # but list_notes_by_field then refused to report a count. The message
+    # below is worded to cover both without claiming a specific cause.
+    fail "could not scan:$c1_unscannable — a resolver or the frontmatter library refused to report a count"
 elif [ "$c1_pairs" -eq 0 ]; then
     # Not a violation and not a pass. A vault without observations or tensions
     # anywhere has not enabled self-evolution, so the rule does not apply — but
