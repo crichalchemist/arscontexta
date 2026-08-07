@@ -27,7 +27,12 @@ Read these files to configure domain-specific behavior:
 
 3. **`ops/derivation.md`** — derivation state and engine version
 
-If these files don't exist, use universal defaults.
+If these files don't exist, use universal defaults for domain-specific *content* (vocabulary,
+processing depth). This does NOT extend to Step 1's modification check: `resolve_canonical_name`
+and `mechanically_compare` (shared steps below) both halt on a missing `ops/derivation-manifest.md`
+rather than defaulting, since neither can determine a skill's canonical name or divergence status
+without it — see the "No ops/derivation-manifest.md" Edge Case below for what that means for the
+inventory.
 
 ## EXECUTE NOW
 
@@ -118,12 +123,16 @@ EOF_LEVEL5
 }
 ```
 
-**This resolver never halts on a valid derived name — only on a missing
-manifest**, since every non-renamed skill legitimately resolves to itself.
-Whether the *resulting* canonical name actually has a `skill-sources/`
-template is a separate question this function does not answer: that check
-belongs to whichever step reads the plugin side (Step 5's render step, next),
-which already needs agent-carried plugin-root resolution for other reasons.
+**This resolver never halts on a valid derived name — only on a missing or
+unparseable manifest** (no manifest file, or a manifest present but missing
+its `# Level 5: Process verbs` marker), since every non-renamed skill
+legitimately resolves to itself. Whether the *resulting* canonical name
+actually has a `skill-sources/` template is a separate question this
+function does not answer: that check belongs to whichever step reads the
+plugin side, which today is both `render_current_template`'s step 1 (below)
+and `mechanically_compare`'s own file guards (further below) — each needs
+agent-carried plugin-root resolution for its own reasons, this resolver
+does not.
 
 **Placement decision, stated rather than implied:** this lives inline here,
 not as a third file in `reference/lib/` alongside `frontmatter.sh` and
@@ -191,11 +200,19 @@ deterministic substitution instead — no LLM judgment anywhere in it.
 
 Given a canonical name from `resolve_canonical_name` above:
 
-1. **Confirm both files exist:** `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`
-   and the installed `.claude/skills/<skill>/SKILL.md`. Same halt contract
-   as `render_current_template`'s step 1 on a missing template — halt
-   evaluation of this one skill, report it, move on. The function below
-   takes both as *file paths*, not pre-read content — it reads them itself.
+1. **Resolve `${CLAUDE_PLUGIN_ROOT}` yourself before calling the function
+   below, and confirm both files exist:** `${CLAUDE_PLUGIN_ROOT}` resolves
+   for you, the agent; it is unset in a shell (`:83-85` above), so handing
+   the literal, unexpanded string to `mechanically_compare` would let the
+   shell try to expand it itself and silently produce a nonexistent path
+   like `/skill-sources/<canonical>/SKILL.md` — no leading root, no halt,
+   because the guard below sees a string and correctly reports "does not
+   exist" for the wrong reason. Substitute the real absolute path
+   yourself, then confirm it and the installed `.claude/skills/<skill>/SKILL.md`
+   both exist. Same halt contract as `render_current_template`'s step 1 on
+   a missing template — halt evaluation of this one skill, report it, move
+   on. The function below takes both as *file paths*, already resolved,
+   not pre-read content — it reads them itself.
 
 2. **Unwrap the placeholder syntax on the canonical side, then fold, then
    substitute.** `{vocabulary.X}` and the older `{DOMAIN:X}` spelling
@@ -228,12 +245,16 @@ Given a canonical name from `resolve_canonical_name` above:
    to real content (measured: this too made an unmodified template diff
    non-empty against itself).
 
-4. **Diff the two.** A non-zero exit from any guard in step 1 (or from the
-   substitution-table build below) means the comparison could not be made
-   for this skill — halt evaluation of this one skill and report it, per
-   the tag convention above; never treat that as `MODIFIED`, since an empty
-   diff and "the comparison never ran" must not read the same way.
-   Otherwise: non-empty diff → `MODIFIED: $skill`.
+4. **Diff the two, and read the RESULT from stdout, not from the exit
+   code.** `diff` itself returns 1 on any difference, the exact same value
+   every guard in step 1 (and the substitution-table build below) returns
+   on a halt — so exit code alone cannot tell "this skill is modified"
+   apart from "the comparison could not be made"; only the function's
+   *output* can. Non-empty stdout → `MODIFIED: $skill`, regardless of exit
+   code. Empty stdout with a non-zero exit and a `HALT:` line on stderr →
+   the comparison could not be made — halt evaluation of this one skill
+   and report it, per the tag convention above; never treat that as
+   `MODIFIED`. Empty stdout with exit 0 → not modified.
 
 ```bash
 # Steps 2-4 above, portable bash/zsh. Takes both files as PATHS -- it reads
@@ -363,15 +384,24 @@ Gather the vault's current state:
       name — a fresh, standalone invocation each time; a fence earlier in
       this file does not persist into this one.
    b. Run `mechanically_compare` (shared step above) — another standalone
-      invocation — with `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`
-      and the installed file's path. It reads both itself; do not pre-read
-      the canonical template for this check (Step 5b's render step, which
-      does need pre-read content, is separate).
-   c. Non-zero exit (any file it needs is missing, or the manifest's
-      vocabulary block is missing or unusable) → halt evaluation of this
-      one skill and report it, same tag convention as the two shared steps
-      above — never treat that as `MODIFIED`. Otherwise: non-empty diff →
-      `MODIFIED: $skill`.
+      invocation — with the RESOLVED absolute path to
+      `skill-sources/<canonical>/SKILL.md` under the plugin root (resolve
+      `${CLAUDE_PLUGIN_ROOT}` yourself first — it is unset in a shell, so
+      handing it unexpanded would let the shell silently build a
+      nonexistent path with no leading root) and the installed file's
+      path. It reads both itself; do not pre-read the canonical template
+      for this check (Step 5b's render step, which does need pre-read
+      content, is separate).
+   c. Read the RESULT from stdout, not from the exit code — `diff` itself
+      returns 1 on any difference, the same value every one of
+      `mechanically_compare`'s own guards returns on a halt, so exit code
+      alone cannot tell "modified" apart from "the comparison could not be
+      made." Non-empty stdout → `MODIFIED: $skill`, regardless of exit
+      code. Empty stdout with a non-zero exit (any file it needs is
+      missing, or the manifest's vocabulary block is missing or unusable)
+      → halt evaluation of this one skill and report it, same tag
+      convention as the two shared steps above — never treat that as
+      `MODIFIED`. Empty stdout with exit 0 → not modified.
 
 Present inventory:
 
@@ -380,11 +410,12 @@ Present inventory:
 
 System: {domain description}
 Engine: arscontexta-{version}
-Skills: {count} installed ({modified_count} diverge from the current template)
+Skills: {count} installed ({modified_count} diverge from the current template, {skipped_count} skipped)
 
   Skill               Version  Generated From    Modified
   /{vocabulary.reduce}    1.0  arscontexta-v1.6  no
   /{vocabulary.reflect}   1.0  arscontexta-v1.6  yes
+  /{vocabulary.reweave}   1.0  arscontexta-v1.6  skipped [reason from the tag]
   ...
 
 Note: "Modified" means diverges from the current canonical template, not
@@ -392,6 +423,10 @@ strictly "the user edited this" -- a template that changed upstream since
 generation reads the same way, and there is no way to separate the two
 without git tag history (there is none). See the mechanical-comparison
 step above for what the substitution table covers and what it doesn't.
+"skipped" means the comparison itself could not be made (a halt from
+either shared step, per its own tag convention) -- never render a skipped
+skill as "no" (not modified); that would fabricate a clean result for a
+skill nothing actually checked.
 ```
 
 ---
@@ -441,11 +476,12 @@ For each skill being evaluated:
    | **Correction** | Knowledge base contradicts skill's approach | Outdated methodology, known anti-pattern |
    | **Extension** | Knowledge base covers scenario skill ignores | New edge case, new domain pattern |
 
-5. **Check user modifications:**
-   If the skill has been modified by the user, read both the current (user-modified) version and evaluate whether:
-   - The user's changes already incorporate the improvement (skip it)
-   - The user's changes are orthogonal to the improvement (can coexist)
-   - The user's changes conflict with the improvement (flag for side-by-side review)
+5. **Check divergence from the canonical template** (see the mechanical-comparison shared step
+   above for what "diverges" means here — not necessarily user-authored):
+   If the skill diverges, read both the current (diverging) version and evaluate whether:
+   - The divergence already incorporates the improvement (skip it)
+   - The divergence is orthogonal to the improvement (can coexist)
+   - The divergence conflicts with the improvement (flag for side-by-side review)
 
 ---
 
@@ -456,7 +492,7 @@ For each skill with available improvements, create a structured proposal:
 ```
 Skill: /{domain:skill-name}
 Status: {current | enhancement | correction | extension}
-User-modified: {yes | no}
+Diverges from template: {yes | no}
 
 Current approach:
   {2-3 sentences describing what the skill currently does}
@@ -482,18 +518,23 @@ Reversible: yes (previous version archived to ops/skills-archive/)
 | **Medium** | Modified behavior (different extraction strategy, changed search pattern). Output quality affected. |
 | **High** | Structural change (different phase ordering, changed handoff format). Pipeline coordination affected. |
 
-### Side-by-Side for User-Modified Skills
+### Side-by-Side for Skills That Diverge From Their Template
 
-When a skill has been modified by the user AND an upgrade is available, show a side-by-side comparison:
+When an installed skill diverges from its canonical template (per the mechanical-comparison shared
+step above — this may or may not be user-authored; see that step for why the two can't be told
+apart) AND an upgrade is available, show a side-by-side comparison:
 
 ```
-Skill: /{domain:skill-name} (USER-MODIFIED)
+Skill: /{domain:skill-name} (DIVERGES FROM TEMPLATE)
 
 Your version:                     Recommended:
   [relevant section excerpt]        [what knowledge base suggests]
 
-Your customization:
-  {description of what the user changed and why it appears intentional}
+What differs:
+  {description of what the installed version does differently, and whether it looks
+   intentional -- do not assert the user made this change on purpose; the mechanical
+   comparison cannot distinguish a real edit from the template having moved since
+   generation}
 
 Options:
   (a) Keep your version unchanged
@@ -528,7 +569,7 @@ Upgrades available: {count}
      Research: "{claim title}"
      Risk: low
 
-  2. /{domain:skill-name} (USER-MODIFIED)
+  2. /{domain:skill-name} (DIVERGES FROM TEMPLATE)
      Type: Correction
      Change: {one-line summary}
      Research: "{claim title}", "{claim title}"
@@ -874,7 +915,7 @@ After applying all approved upgrades:
 
 Applied: {N} upgrades
 Archived: {N} previous versions to ops/skills-archive/
-Skipped: {N} (user-modified, kept as-is)
+Skipped: {N} (diverges from template, kept as-is per option (a))
 
 Changes:
   - /{skill}: {what changed} (Research: "{claim}")
@@ -920,9 +961,9 @@ All upgrades are advisory. The user owns the files.
 
 **No generation manifest:** Treat all skills as version 0 (unknown generation state). Compare methodology against current knowledge base. This is fine — consultation reasons about approach, not version numbers.
 
-**Skill has been user-modified:** Present the side-by-side comparison. Offer only two options: keep user version, or replace (with archive) — merge preserving customizations is not offered (see "Side-by-Side for User-Modified Skills" above for why). Never silently overwrite.
+**Skill diverges from its canonical template:** Present the side-by-side comparison. Offer only two options: keep the installed version, or replace (with archive) — merge preserving a real customization is not offered (see "Side-by-Side for Skills That Diverge From Their Template" above for why). Never silently overwrite.
 
-**No ops/derivation-manifest.md:** Use universal vocabulary for all output.
+**No ops/derivation-manifest.md:** Use universal vocabulary for all output — but note this is a different failure mode from Step 1's modification check: `resolve_canonical_name` and `mechanically_compare` (both shared steps above) halt on a missing manifest too, since neither can determine a skill's canonical name or diverge status without it. In this state, EVERY skill's modification status is unresolvable, not just its vocabulary — report all skills `skipped` (per the inventory presentation's third `Modified` value above), never silently proceed as though nothing diverges.
 
 **Plugin knowledge base unavailable:** Report that knowledge base consultation requires the Ars Contexta plugin. Without the plugin's bundled methodology/ and reference/ directories, /upgrade cannot evaluate skills.
 
