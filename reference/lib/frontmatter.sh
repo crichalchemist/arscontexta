@@ -177,6 +177,7 @@ frontmatter_field() {
 }
 
 # list_notes_by_field <dir> <field> <value>... -> matching file paths, one per line
+# Recursive. Emits nothing and returns 0 when the tree holds no match.
 # list_notes_by_field recursively prints Markdown file paths whose frontmatter field matches any supplied value.
 # It returns a nonzero status if the field or values are missing or the directory tree cannot be fully scanned.
 # The field and values are provided after the directory path.
@@ -262,7 +263,7 @@ count_notes_by_field() {
 # files with no frontmatter at all. This is the dual of count_notes_by_field, and
 # it is the function the three-way fixture assertion keys on: only a parser that
 # actually reads the requested FIELD NAME can distinguish "missing status" from
-# count_notes_missing_field recursively counts Markdown files that do not define the specified frontmatter field.
+# "missing some-field-nothing-declares".
 count_notes_missing_field() {
   _fm_require_deps_and_dir "$1" || return 1
   local dir="$1" field="$2" errf missing p

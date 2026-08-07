@@ -65,7 +65,7 @@ FM_LIB="$(cd "$(dirname "$0")" && pwd)/lib/frontmatter.sh"
 # The candidate list survives as a FALLBACK, for vaults with no manifest.
 # resolve_ops_dir_name <vault> -> the vault's own name for its ops directory,
 # or nothing. Split out so the shape scan can exclude it by that name rather
-# resolve_ops_dir_name resolves the operational directory name from the vault's manifest or configuration.
+# than by the literal `ops`.
 resolve_ops_dir_name() {
     _rodn_man=$(find "$1" -maxdepth 2 -name 'derivation-manifest.md' -type f 2>/dev/null | head -1)
     [ -n "$_rodn_man" ] && _vocab_dir "$_rodn_man" ops 2>/dev/null && return 0
@@ -237,7 +237,7 @@ _dirs_from_vocab() {
 # exactly that and every message printed "directories via " with the name
 # missing -- the same swallowed-in-a-subshell defect this repo has shipped six
 # times. Returning the label through the one channel that does cross the boundary
-# resolve_note_dirs resolves note-bearing directories from vault vocabulary or configuration, with a top-level Markdown-directory fallback.
+# removes the trap rather than documenting it.
 resolve_note_dirs() {
     # THE MANIFEST IS LOCATED BY SHAPE HERE TOO. This function spelled
     # "$1/ops/derivation-manifest.md" for as long as resolve_ops_dir did, and

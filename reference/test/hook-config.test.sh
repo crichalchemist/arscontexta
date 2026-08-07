@@ -467,6 +467,11 @@ eq "template: both floors were extracted"                "yes" \
 eq "template: floor matches the plugin hook"             "$hook_floor" "$tpl_floor"
 hook_halve=$(/usr/bin/grep -c -- '\* 2)) -lt' "$SRC/write-validate.sh")
 tpl_halve=$(/usr/bin/grep -c -- '\* 2)) -lt' "$TPL")
+# A zero-vs-zero match from grep -c is what "present on neither side" looks
+# like too -- the same coincidental-pass shape floor's own precondition above
+# exists to rule out. Require both counts to be positive before comparing them.
+eq "template: both halving tests were found"             "yes" \
+   "$([ "${hook_halve:-0}" -gt 0 ] && [ "${tpl_halve:-0}" -gt 0 ] && echo yes || echo no)"
 eq "template: halving test present on both sides"        "$hook_halve" "$tpl_halve"
 
 # The stub must HALVE, or this assertion holds with or without the floor and

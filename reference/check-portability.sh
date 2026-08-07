@@ -628,7 +628,7 @@ fi
 # word-splits under bash and NOT under zsh: zsh ran one iteration with the whole
 # string as the pattern, so only the first entry was exempt and
 # reference/test/fence-isolation.test.sh reported UNLISTED. bash rc 0, zsh rc 1,
-# fm_exempt_p identifies paths excluded from the hand-rolled frontmatter parsing scan.
+# from one line. A `case` needs no splitting and behaves identically in both.
 fm_exempt_p() { # fm_exempt_p <relative-path> -> rc 0 when structurally exempt
   case "$1" in
     reference/lib/*)                        return 0 ;;  # the library itself
@@ -678,7 +678,7 @@ skills/upgrade/SKILL.md 2 conversion backlog
 #
 # NOT scan_or_die: sed's stderr is discarded, so an unreadable FILE yields 0 hits
 # and is indistinguishable from a clean one. Recorded rather than fixed here; the
-# fm_hits_in counts hand-rolled frontmatter parsing patterns in a repository-relative file. It outputs the number of matching lines after removing comments.
+# scan-scope roots are the level at which this guard checks readability.
 fm_hits_in() { # fm_hits_in <relative-path> -> live hit count
   sed 's/#.*$//' "$ROOT/$1" 2>/dev/null \
     | "$GREP" -cE "(grep|rg) [^|]*'\^[a-z_]+:" || true

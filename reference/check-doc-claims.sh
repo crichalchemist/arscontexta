@@ -160,7 +160,7 @@ truth_fence_suites() {
 # Kernel primitives declared in kernel.yaml. Counted because both README.md and
 # CLAUDE.md said 15 for a tree that declares 16 — `unique-addresses` is a full
 # primitive that validate-kernel.sh numbers `10A` rather than renumbering, so the
-# truth_kernel_primitives counts primitive declarations in reference/kernel.yaml and prints the count.
+# highest LABEL is 15 and the COUNT is 16, and the label was read as the total.
 truth_kernel_primitives() {
     local _n
     [ -r reference/kernel.yaml ] || return 1
@@ -171,7 +171,7 @@ truth_kernel_primitives() {
 
 # check 7's allowlist totals. Ungated, these drift the moment an entry drains —
 # the check goes green at 73/24 while CLAUDE.md still says 74/25. Global
-# truth_fm_sites counts the configured frontmatter allowlist sites and prints the count.
+# constraint: gate every number you mint, in the commit that mints it.
 truth_fm_sites() {
     local _n
     [ -f reference/check-portability.sh ] || return 1
@@ -476,7 +476,7 @@ TENSION_RECIPES=3
 # the line has it (the table row), else after `status`, then drop punctuation.
 # The value set is compared, never the text — the four sites legitimately spell
 # the same enum three ways (`a | b`, `[a, b]`, and backticked table cells), so a
-# enum_values extracts and sorts unique status enum values from input text.
+# textual diff reports a split that is not there.
 enum_values() { sed 's/.*enum//' | sed 's/.*status[`:]*//' | tr -d '`|,[]' \
                 | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' '\n' | grep -v '^$' | LC_ALL=C sort -u; }
 

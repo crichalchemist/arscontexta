@@ -123,12 +123,13 @@ new library is not finished until `skills/setup` copies it, `skills/upgrade` Ste
 its own version constant, and `skills/health` Category 9 checks it. A guard whose remedy message
 names a repair that does not perform it is worse than no guard.
 
-**Neither rule is enforced by anything.** This paragraph used to say `check-portability.sh` rejects
-inlined copies. It does not — that script runs seven checks, and only check 7 detects inlined
-frontmatter parsing specifically (line-anchored `^field:` grep used to select or count notes), not
-inlined copies of link-extraction.sh or other logic. The rule against inlining any shared library
-is real and still binding; the enforcement is convention. Believing otherwise is how matcher sites
-survived four gates for months.
+**The link-inlining prohibition is still unenforced.** This paragraph used to say
+`check-portability.sh` rejects inlined copies generally. It does not — that script runs seven checks,
+and only check 7 detects inlined frontmatter parsing specifically (line-anchored `^field:` grep used
+to select or count notes). It does not catch inlined copies of link-extraction.sh or other
+shared-library logic. The rule against inlining any shared library is real and still binding; for the
+link-extraction case specifically, the enforcement is convention only. Believing otherwise is how
+matcher sites survived four gates for months.
 
 What the gate asserts, cited by letter so this table cannot drift from it:
 

@@ -534,7 +534,7 @@ When an installed skill diverges from its canonical template (per the mechanical
 step above — this may or may not be user-authored; see that step for why the two can't be told
 apart) AND an upgrade is available, show a side-by-side comparison:
 
-```
+```text
 Skill: /{domain:skill-name} (DIVERGES FROM TEMPLATE)
 
 Your version:                     Recommended:
