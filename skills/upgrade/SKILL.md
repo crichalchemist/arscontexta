@@ -173,6 +173,111 @@ Given a canonical name from `resolve_canonical_name`:
 
 ---
 
+## Shared Step: Mechanically Comparing a Vault Skill Against Its Canonical Template
+
+Step 1's modification check needs this, not `render_current_template` above.
+Measured on two canonical templates (~310 and ~740 lines, one with real
+`{vocabulary.*}` substitution activity): two independent LLM renders of the
+*identical* source diverge from each other — every diverging hunk was a
+missed or inconsistent vocabulary-term substitution, never open rephrasing.
+A diff between one such render and the installed file can't tell "the user
+edited this" from "this render's judgment call landed differently than
+whatever render produced the installed copy" — so `render_current_template`
+cannot back a MODIFIED verdict. This step is a separate, fully mechanical,
+deterministic substitution instead — no LLM judgment anywhere in it.
+
+Given a canonical name from `resolve_canonical_name` above:
+
+1. **Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`.** Same
+   halt contract as `render_current_template`'s step 1 on a missing
+   template — halt evaluation of this one skill, report it, move on.
+
+2. **Mechanically substitute canonical → vault vocabulary, on this text only:**
+   fold to lowercase, then replace every character that is not alphanumeric,
+   `_`, or whitespace with a space. This collapses `{vocabulary.X}` and the
+   older `{DOMAIN:X}` spelling (`reference/skill-authoring.md:45` documents
+   the latter as still live) to the same plain tokens, so no separate
+   placeholder-syntax pass is needed. Then replace every token that exactly
+   matches one of this vault's `vocabulary:` block keys (Levels 1-6 — Level
+   7 is a nested list, not a substitution pair) with that key's value, plus
+   one further pair sourced from `reference/vocabulary-transforms.md`'s own
+   "MOC" row — the documented universal name for what the manifest calls
+   `topic_map`/`topic_maps` — mapped to this vault's value for those keys.
+
+3. **Fold the installed `.claude/skills/<skill>/SKILL.md` the same way —
+   case and punctuation only, never substitution.** The installed file is
+   already in vault vocabulary; running the same table on it risks a real
+   collision, not a hypothetical one: this vault's own `hub: "index"` key
+   re-matches the bare word "hub" inside `topic_map`'s *already-correct*
+   value "graph hub", corrupting it (measured). Substitute only the
+   canonical side, ever — that asymmetry is the fix, not an oversight.
+
+4. **Diff the two.** Non-empty → `MODIFIED: $skill`.
+
+```bash
+# Step 2+3 above, portable bash/zsh. Takes the canonical template's content
+# (already read by the agent per step 1) and the installed file's path.
+mechanically_compare() {
+  local manifest="ops/derivation-manifest.md" canon_file="$1" installed_file="$2"
+  [[ -f "$manifest" ]] || { echo "HALT: no $manifest -- cannot build the substitution table" >&2; return 1; }
+  [[ -f "$installed_file" ]] || { echo "HALT: $installed_file does not exist" >&2; return 1; }
+
+  local block line key value topic_map_val="" topic_maps_val="" pairs_file
+  pairs_file=$(mktemp)
+  block=$(sed -n '/^vocabulary:/,/# Level 7:/p' "$manifest")
+  while IFS= read -r line; do
+    case "$line" in *': "'*'"'*) : ;; *) continue ;; esac
+    key=$(printf '%s\n' "$line" | sed -n 's/^  \([a-zA-Z_]*\): .*/\1/p')
+    value=$(printf '%s\n' "$line" | sed -n 's/^  [a-zA-Z_]*: "\(.*\)"$/\1/p')
+    [ -n "$key" ] && [ -n "$value" ] || continue
+    printf '%s\t%s\n' "$key" "$value" >> "$pairs_file"
+    [ "$key" = "topic_map" ] && topic_map_val="$value"
+    [ "$key" = "topic_maps" ] && topic_maps_val="$value"
+  done <<EOF_VOCAB
+$block
+EOF_VOCAB
+  [ -n "$topic_map_val" ]  && printf 'MOC\t%s\n' "$topic_map_val" >> "$pairs_file"
+  [ -n "$topic_maps_val" ] && printf 'MOCs\t%s\n' "$topic_maps_val" >> "$pairs_file"
+
+  # Canonical side: unify placeholder spellings, then fold+strip, then
+  # substitute -- the only side that ever gets substituted (see step 3).
+  local canon_text canon_folded
+  canon_text=$(sed -e 's/{DOMAIN:topic maps}/{vocabulary.topic_maps}/g' \
+                    -e 's/{DOMAIN:topic map}/{vocabulary.topic_map}/g' \
+                    -e 's/{DOMAIN:\([a-zA-Z_]*\)}/{vocabulary.\1}/g' "$canon_file")
+  canon_folded=$(printf '%s' "$canon_text" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_[:space:]' ' ')
+  local canon_out
+  canon_out=$(printf '%s\n' "$canon_folded" | awk -v pf="$pairs_file" '
+    BEGIN { while ((getline line < pf) > 0) { n = split(line, f, "\t"); if (n == 2 && f[1] != "") map[tolower(f[1])] = tolower(f[2]) }; close(pf) }
+    { for (i = 1; i <= NF; i++) if ($i in map) $i = map[$i]; print }
+  ')
+  rm -f "$pairs_file"
+
+  # Installed side: fold+strip only, no substitution table applied.
+  local installed_folded
+  installed_folded=$(tr '[:upper:]' '[:lower:]' < "$installed_file" | tr -c '[:alnum:]_[:space:]' ' ')
+
+  diff <(printf '%s\n' "$canon_out") <(printf '%s\n' "$installed_folded")
+}
+```
+
+**What this catches and what it doesn't — stated, not silent.** Covers the
+`{vocabulary.X}`/`{DOMAIN:X}` placeholder forms, the literal Levels-1-6 key
+names as bare words, and the one sourced MOC alias. It does NOT cover any
+other synonym outside that closed set: `{DOMAIN:topic map plural}`-style
+spellings that don't literally match a declared key (9 `skill-sources/`
+files use this exact spelling where the manifest declares `topic_maps`, a
+pre-existing naming mismatch this step does not fix) will not substitute
+and will read as false-positive divergence. And even a perfect substitution
+can't separate "the user edited this" from "the plugin's canonical
+template changed since generation" — there are no git tags to isolate an
+original baseline (Global Constraint). The honest predicate this produces
+is **diverges from the current canonical template**, not strictly
+*user-modified* — both conflate into the same non-empty diff, and Step 1's
+presentation says so rather than implying otherwise.
+
+---
+
 ## Step 1: Inventory Current System
 
 Gather the vault's current state:
@@ -199,20 +304,16 @@ Gather the vault's current state:
 
 4. Read `ops/config.yaml` for current dimensional positions
 
-5. Check for user modifications:
-   ```bash
-   # Detect skills modified after generation
-   for dir in .claude/skills/*/; do
-     skill=$(basename "$dir")
-     file="$dir/SKILL.md"
-     [[ ! -f "$file" ]] && continue
-     # Check git status — modified files indicate user customization
-     git_status=$(git status --porcelain "$file" 2>/dev/null)
-     if [[ -n "$git_status" ]]; then
-       echo "MODIFIED: $skill"
-     fi
-   done
-   ```
+5. **Check for user modifications — as instructions you carry out, not one
+   isolated fence.** For each installed skill directory (`.claude/skills/*/`):
+   a. Run `resolve_canonical_name` (shared step above) on the directory
+      name — a fresh, standalone invocation each time; a fence earlier in
+      this file does not persist into this one.
+   b. Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md` (same
+      halt contract as the two shared steps above on a missing template).
+   c. Run `mechanically_compare` (shared step above) — another standalone
+      invocation — with that content and the installed file's path.
+   d. Non-empty diff → `MODIFIED: $skill`.
 
 Present inventory:
 
@@ -221,12 +322,18 @@ Present inventory:
 
 System: {domain description}
 Engine: arscontexta-{version}
-Skills: {count} installed ({modified_count} user-modified)
+Skills: {count} installed ({modified_count} diverge from the current template)
 
   Skill               Version  Generated From    Modified
   /{vocabulary.reduce}    1.0  arscontexta-v1.6  no
   /{vocabulary.reflect}   1.0  arscontexta-v1.6  yes
   ...
+
+Note: "Modified" means diverges from the current canonical template, not
+strictly "the user edited this" -- a template that changed upstream since
+generation reads the same way, and there is no way to separate the two
+without git tag history (there is none). See the mechanical-comparison
+step above for what the substitution table covers and what it doesn't.
 ```
 
 ---
