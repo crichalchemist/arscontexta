@@ -571,7 +571,7 @@ cp ".claude/skills/${SKILL_NAME}/SKILL.md" \
 
 1. Resolve the canonical name (`resolve_canonical_name`, shared step above) and render it in
    this vault's vocabulary (`render_current_template`, shared step above) — no "if available"
-   fallback: `resolve_canonical_name` halts on a missing manifest section and
+   fallback: `resolve_canonical_name` halts on a missing or unparseable manifest and
    `render_current_template` halts on a missing canonical template, each naming the exact skill
    and lookup that failed. Neither silently skips, which is what the old phrasing here licensed.
 2. Apply the specific improvements identified in Step 2
