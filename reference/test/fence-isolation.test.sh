@@ -323,12 +323,16 @@ assert_frontmatter_three_ways "$VAULT_FULL" || f_fail=1
 # exactly that reason.
 #
 # NO NEW GLOB is introduced for the "for every skill" success criterion in
-# the brief -- both skills this assertion cares about (extract, stats) are
-# addressed by exact path, deliberately, rather than iterating
+# the brief -- all three skills this assertion cares about (extract, stats,
+# verify) are addressed by exact path, deliberately, rather than iterating
 # `.claude/skills/*/` and risking the zsh `nomatch` trap skill-sources/seed
-# f01 and skills/health f08 already carry (see KNOWN_OPEN above). Two named
-# skills covering both required outcomes (diverged -> MODIFIED, unmodified ->
-# not) satisfy the brief's three success criteria without that risk.
+# f01 and skills/health f08 already carry (see KNOWN_OPEN above). Three named
+# skills covering all required outcomes (diverged -> MODIFIED, unmodified,
+# identity-mapped -> not, unmodified AND vocabulary-substitution-collision-
+# adjacent -> not) satisfy the brief's three success criteria without that
+# risk. `verify` is not optional: (c)'s identity-mapped stats/extract pair
+# alone does NOT catch the asymmetry regression Task 3's fix depends on --
+# see (c2) below and the mutation record in task-5-report.md.
 extract_shared_step() {   # extract_shared_step <heading> <next-heading> <outfile>
   m_start=$(/usr/bin/grep -nF "$1" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
   m_end=$(/usr/bin/grep -nF "$2" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
@@ -399,9 +403,14 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   m_err=$(cd "$m_bad" && CLAUDE_PLUGIN_ROOT="$m_plugin" "$SELF" "$WORK/m-driver-a.sh" 2>&1 1>/dev/null)
   m_rc2=$?
   [ "$m_rc2" -ne 0 ] || { printf 'M  (b) manifest missing "# Level 7:" should halt (rc != 0); got rc=0\n' >> "$FAIL_LOG"; m_fail=1; }
+  # Key on text unique to THIS guard's own halt message (mechanically_compare's
+  # "# Level 7:" marker check), not a substring ("derivation-manifest.md")
+  # every halt in this file happens to share -- a predicate that broad would
+  # still pass if resolve_canonical_name's own Level-5 guard fired instead
+  # (it names the same manifest path), silently testing the wrong function.
   case "$m_err" in
-    *derivation-manifest.md*) : ;;
-    *) printf 'M  (b) halt on malformed manifest did not name the manifest file: [%s]\n' "$m_err" >> "$FAIL_LOG"; m_fail=1 ;;
+    *'Level 7'*) : ;;
+    *) printf 'M  (b) halt on malformed manifest was not mechanically_compare'"'"'s "# Level 7:" guard: [%s]\n' "$m_err" >> "$FAIL_LOG"; m_fail=1 ;;
   esac
   rm -rf "$m_bad"
 
@@ -412,9 +421,17 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   m_err2=$(cd "$m_noman" && "$SELF" "$WORK/m-driver-b.sh" 2>&1 1>/dev/null)
   m_rc3=$?
   [ "$m_rc3" -ne 0 ] || { printf 'M  (b) resolve_canonical_name on a missing manifest should halt (rc != 0); got rc=0\n' >> "$FAIL_LOG"; m_fail=1; }
+  # resolve_canonical_name has TWO halts and both interpolate $derived into
+  # their message, so "*extract*" alone cannot tell which one fired -- a
+  # mutation removing only the missing-file guard (this fixture's actual
+  # condition) still halts via the downstream "Level 5" guard on the same
+  # nonexistent path, and that message also contains "extract" (measured:
+  # this is exactly what the report's own mutation-2 found). Key on "cannot
+  # resolve", unique to the missing-manifest-FILE guard's own wording --
+  # the Level-5 guard says "cannot verify" instead.
   case "$m_err2" in
-    *extract*) : ;;
-    *) printf 'M  (b) resolve_canonical_name halt did not name the derived skill it was asked to resolve: [%s]\n' "$m_err2" >> "$FAIL_LOG"; m_fail=1 ;;
+    *'cannot resolve'*) : ;;
+    *) printf 'M  (b) halt on a missing manifest was not resolve_canonical_name'"'"'s own missing-file guard: [%s]\n' "$m_err2" >> "$FAIL_LOG"; m_fail=1 ;;
   esac
   rm -rf "$m_noman"
 
