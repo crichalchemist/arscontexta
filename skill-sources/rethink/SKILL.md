@@ -18,8 +18,8 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.cmd_reflect` for connection-finding references
 
 2. **`ops/config.yaml`** — thresholds, processing preferences
-   - `self_evolution.observation_threshold`: number of pending observations before suggesting rethink (default: 10)
-   - `self_evolution.tension_threshold`: number of pending tensions before suggesting rethink (default: 5)
+   - `self_evolution.observation_threshold`: number of pending or open observations before suggesting rethink (default: 10)
+   - `self_evolution.tension_threshold`: number of pending or open tensions before suggesting rethink (default: 5)
 
 3. **`ops/methodology/`** — existing methodology notes (read all to understand current system self-knowledge)
 
@@ -32,7 +32,7 @@ The command name itself transforms per domain. The derivation manifest maps the 
 **Target: $ARGUMENTS**
 
 Parse immediately:
-- If target is empty: run full six-phase rethink (Phase 0 drift check + five evidence phases) on all pending observations and tensions
+- If target is empty: run full six-phase rethink (Phase 0 drift check + five evidence phases) on all pending or open observations and tensions
 - If target is "triage": run Phase 1 only (triage and methodology updates, no pattern detection)
 - If target is "patterns": skip triage, run Phases 3-5 only (analyze existing evidence for patterns)
 - If target is "drift": run Phase 0 only (drift check without triage or pattern detection)
@@ -488,11 +488,11 @@ Do not propose architectural changes based on thin evidence. The threshold scale
 
 ### /next Integration
 
-If 10+ pending observations or 5+ pending tensions remain after triage AND pattern detection did not consume them into proposals:
+If 10+ pending or open observations or 5+ pending or open tensions remain after triage AND pattern detection did not consume them into proposals:
 
 ```
   Threshold signal for /next:
-    [N] pending observations, [N] pending tensions remain
+    [N] pending or open observations, [N] pending or open tensions remain
     /next should prioritize {DOMAIN:rethink} at session priority
 ```
 
