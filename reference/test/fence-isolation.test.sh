@@ -401,8 +401,13 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   m_bad="$WORK/vault-bad-manifest"
   rm -rf "$m_bad"; cp -R "$m_vault" "$m_bad" 2>/dev/null || { printf 'M  (b) cannot copy vault fixture for the malformed-manifest case\n' >> "$FAIL_LOG"; m_fail=1; }
   # vocabulary: present, but no "# Level 7:" marker -- mechanically_compare's
-  # own guard, not resolve_canonical_name's (which has a marker of its own).
-  printf 'vocabulary:\n  notes: notes\n# Level 5: Process verbs\n  reduce: "extract"\n' > "$m_bad/ops/derivation-manifest.md"
+  # own guard, not resolve_canonical_name's (which has markers of its own:
+  # "# Level 5:" AND "# Level 6:", the latter added once resolve_canonical_name
+  # gained the same unguarded-range hazard mechanically_compare's Level-7 guard
+  # already closed -- omitting it here would make resolve_canonical_name halt
+  # first, on a DIFFERENT guard, before this driver ever reaches
+  # mechanically_compare, silently testing the wrong function).
+  printf 'vocabulary:\n  notes: notes\n# Level 5: Process verbs\n  reduce: "extract"\n# Level 6: placeholder\n' > "$m_bad/ops/derivation-manifest.md"
   m_err=$(cd "$m_bad" && CLAUDE_PLUGIN_ROOT="$m_plugin" "$SELF" "$WORK/m-driver-a.sh" 2>&1 1>/dev/null)
   m_rc2=$?
   [ "$m_rc2" -ne 0 ] || { printf 'M  (b) manifest missing "# Level 7:" should halt (rc != 0); got rc=0\n' >> "$FAIL_LOG"; m_fail=1; }

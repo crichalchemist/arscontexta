@@ -105,6 +105,10 @@ resolve_canonical_name() {
   # section boundaries (skills/setup/SKILL.md), not this vault's wording, so
   # this holds across every generated vault, not just this one.
   grep -q '# Level 5: Process verbs' "$manifest" || { echo "HALT: $manifest has no 'Level 5: Process verbs' section — cannot verify '$derived' is not a renamed skill, and falling back to identity here would be a silent guess" >&2; return 1; }
+  # Same hazard mechanically_compare's Level 7 parse guards against: a range
+  # (Level 5 present, # Level 6: absent) runs to EOF and silently absorbs
+  # everything after Level 5 into $level5 -- checked before the sed, not after.
+  grep -q '# Level 6:' "$manifest" || { echo "HALT: $manifest has no '# Level 6:' marker -- cannot bound the 'Level 5: Process verbs' section's extraction, and running it to EOF would silently absorb unrelated content" >&2; return 1; }
   local level5 key value line canonical=""
   level5=$(sed -n '/# Level 5: Process verbs/,/# Level 6:/{/^  [a-z_]*: /p;}' "$manifest")
   while IFS= read -r line; do
@@ -262,8 +266,8 @@ Given a canonical name from `resolve_canonical_name` above:
 mechanically_compare() {
   local manifest="ops/derivation-manifest.md" canon_file="$1" installed_file="$2"
   [[ -f "$manifest" ]] || { echo "HALT: no $manifest -- cannot build the substitution table" >&2; return 1; }
-  [[ -f "$canon_file" ]] || { echo "HALT: $canon_file does not exist" >&2; return 1; }
-  [[ -f "$installed_file" ]] || { echo "HALT: $installed_file does not exist" >&2; return 1; }
+  [[ -f "$canon_file" && -r "$canon_file" ]] || { echo "HALT: $canon_file does not exist or is not readable" >&2; return 1; }
+  [[ -f "$installed_file" && -r "$installed_file" ]] || { echo "HALT: $installed_file does not exist or is not readable" >&2; return 1; }
 
   local block line key value topic_map_val="" topic_maps_val="" pairs_file
   pairs_file=$(mktemp)
