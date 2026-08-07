@@ -402,6 +402,12 @@ Gather the vault's current state:
       → halt evaluation of this one skill and report it, same tag
       convention as the two shared steps above — never treat that as
       `MODIFIED`. Empty stdout with exit 0 → not modified.
+   d. Tally as you go — the three per-skill results above are the only
+      source for the header counts below. `{count}` = every skill this
+      loop ran against. `{modified_count}` = how many read `MODIFIED` in
+      (c). `{skipped_count}` = how many halted in (c). A skill that
+      halted is neither modified nor unmodified — do not fold it into
+      either count under the other label.
 
 Present inventory:
 
@@ -915,7 +921,11 @@ After applying all approved upgrades:
 
 Applied: {N} upgrades
 Archived: {N} previous versions to ops/skills-archive/
-Skipped: {N} (diverges from template, kept as-is per option (a))
+Kept as-is: {N} (diverges from template, human chose option (a) at Step 4)
+Unresolved: {N} (comparison could not be made at Step 1 -- see the
+  "skipped" rows in the inventory table; never evaluated in Step 2, never
+  offered a choice at Step 4 -- do not describe these as diverging or as
+  a human decision)
 
 Changes:
   - /{skill}: {what changed} (Research: "{claim}")
