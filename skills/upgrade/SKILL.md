@@ -135,6 +135,49 @@ caller today. Revisit only if a second caller appears.
 
 ---
 
+## Shared Step: Rendering the Canonical Template in This Vault's Vocabulary
+
+Together with `resolve_canonical_name` above, this is `render_current_template`
+— what Step 1's modification test and Step 5b both call to reproduce what the
+plugin's *current* `skill-sources/` template would look like, in *this
+vault's* vocabulary, for comparison against what's actually installed.
+
+Given a canonical name from `resolve_canonical_name`:
+
+1. **Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`.** If it
+   doesn't exist — the installed plugin predates this skill, or the name
+   resolved above doesn't correspond to a real template — **halt evaluation of
+   this one skill and report it, mirroring Step 6a's row-scoped tag style**
+   (`halt this row and report it`, not a whole-run abort):
+   `<canonical>: no skill-sources/ template [halted — plugin absent or
+   predates this skill]`. Move on to the next skill; never fall through to
+   treating the vault's installed copy as current for *this* skill when the
+   comparison can't actually be made — that is exactly the failure this plan
+   exists to close.
+
+2. **Apply vocabulary transformation the way `/setup` already does it — do
+   not restate or re-derive the rule here.** `skills/setup/SKILL.md:637`
+   describes this as "LLM-based contextual replacement, NOT string
+   find-replace" — a judgment call you make as you read the template, not a
+   substitution script. Its Structural Marker Protection rule
+   (`skills/setup/SKILL.md:702`) binds here too: YAML field names
+   (`description:`, `topics:`, `type:`, `status:`, `_schema:`, and so on)
+   stay universal; only values, prose, and user-facing labels transform. Use
+   this vault's own `ops/derivation-manifest.md` `vocabulary:` block as the
+   mapping — the same one `resolve_canonical_name` reads.
+
+3. **The result is the comparison text**, used two ways: Step 1 diffs it
+   against the vault's installed copy to decide `MODIFIED`; Step 5b treats
+   it as the candidate replacement.
+
+`skills/setup/SKILL.md:637` labels this "the Section 9 algorithm," but no
+section numbered 9 exists in that file or in
+`reference/vocabulary-transforms.md` — a stale cross-reference, not
+something to propagate here. What's cited above is the rule's actual text
+and location, not its broken label.
+
+---
+
 ## Step 1: Inventory Current System
 
 Gather the vault's current state:
