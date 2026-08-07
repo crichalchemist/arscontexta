@@ -149,7 +149,7 @@ Given a canonical name from `resolve_canonical_name`:
    resolved above doesn't correspond to a real template — **halt evaluation of
    this one skill and report it, mirroring Step 6a's row-scoped tag style**
    (`halt this row and report it`, not a whole-run abort):
-   `<canonical>: no skill-sources/ template [halted — plugin absent or
+   `<canonical>: no skill-sources/ template [skipped — plugin absent or
    predates this skill]`. Move on to the next skill; never fall through to
    treating the vault's installed copy as current for *this* skill when the
    comparison can't actually be made — that is exactly the failure this plan
@@ -161,20 +161,15 @@ Given a canonical name from `resolve_canonical_name`:
    find-replace" — a judgment call you make as you read the template, not a
    substitution script. Its Structural Marker Protection rule
    (`skills/setup/SKILL.md:702`) binds here too: YAML field names
-   (`description:`, `topics:`, `type:`, `status:`, `_schema:`, and so on)
-   stay universal; only values, prose, and user-facing labels transform. Use
-   this vault's own `ops/derivation-manifest.md` `vocabulary:` block as the
-   mapping — the same one `resolve_canonical_name` reads.
+   (`description:`, `topics:`, `relevant_notes:`, `type:`, `status:`,
+   `_schema:`, and so on) stay universal; only values, prose, and
+   user-facing labels transform. Use this vault's own
+   `ops/derivation-manifest.md` `vocabulary:` block as the mapping — the
+   same one `resolve_canonical_name` reads.
 
 3. **The result is the comparison text**, used two ways: Step 1 diffs it
    against the vault's installed copy to decide `MODIFIED`; Step 5b treats
    it as the candidate replacement.
-
-`skills/setup/SKILL.md:637` labels this "the Section 9 algorithm," but no
-section numbered 9 exists in that file or in
-`reference/vocabulary-transforms.md` — a stale cross-reference, not
-something to propagate here. What's cited above is the rule's actual text
-and location, not its broken label.
 
 ---
 
