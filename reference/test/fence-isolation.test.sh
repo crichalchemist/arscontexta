@@ -17,6 +17,15 @@
 # THE RUBRIC, which every assertion below serves: a failure must never render as
 # a plausible number. An EMPTY vault is a legitimate success (rc 0, value 0); a
 # NONEXISTENT vault must fail loudly.
+#
+# ASSERTION M'S BOUNDARY, stated here rather than only beside its own code
+# (Spec I Task 5 Step 4): M calls skills/upgrade/SKILL.md's
+# resolve_canonical_name (Task 1) and mechanically_compare (Task 3) with real
+# arguments against a constructed fixture, and proves those two bash
+# primitives behave correctly on it. It proves NOTHING about the render step
+# between them (Task 2) — that step is an LLM judgment call with no bash to
+# call, so a green M means "the primitive's bash half works," never "the
+# /upgrade skill's modification detection works" as a whole.
 
 set -u
 
@@ -53,7 +62,7 @@ mkdir -p "$WORK/fences" "$WORK/out" || {
 [ -n "${FENCE_GATE_KEEP:-}" ] || trap 'rm -rf "$WORK"' EXIT INT TERM
 
 fences=0; run=0; skipped=0
-h_fail=0; n_fail=0; setu_fail=0; known=0; stale=0; f_fail=0
+h_fail=0; n_fail=0; setu_fail=0; known=0; stale=0; f_fail=0; m_fail=0
 SKIP_LOG="$WORK/skips.txt"; : > "$SKIP_LOG"
 FAIL_LOG="$WORK/fails.txt"; : > "$FAIL_LOG"
 SETU_LOG="$WORK/setu.txt"; : > "$SETU_LOG"
@@ -130,7 +139,7 @@ build_fixture() {
   rm -rf "$v"
   mkdir -p "$v/ops/lib" "$v/ops/queue" "$v/ops/observations" "$v/ops/tensions" \
            "$v/ops/methodology" "$v/ops/sessions" "$v/self" "$v/self/memory" \
-           "$v/.claude/skills/stats" || return 1
+           "$v/.claude/skills/stats" "$v/.claude/skills/extract" "$v/.claude/skills/verify" || return 1
   : > "$v/.arscontexta"
   cp "$LINK_LIB_SRC" "$v/ops/lib/link-extraction.sh" || {
     printf 'harness: cannot copy %s into the fixture\n' "$LINK_LIB_SRC" >&2
@@ -155,10 +164,35 @@ build_fixture() {
   printf 'title: a session\n'                            > "$v/ops/sessions/session-one.md"
   printf -- '- id: one\n  status: pending\n- id: two\n  status: done\n' > "$v/ops/queue/queue.yaml"
   printf 'title: identity\n'                             > "$v/self/identity.md"
-  printf 'vocabulary:\n  notes: notes\n'                 > "$v/ops/derivation-manifest.md"
+  # Level 5/6/7 markers and one non-identity pair (reduce -> extract) added for
+  # assertion M (Spec I Task 5) -- resolve_canonical_name's own guard needs
+  # "# Level 5: Process verbs" present verbatim, and mechanically_compare's
+  # guard needs "# Level 7:" present verbatim, or both halt on THIS healthy
+  # fixture too (measured, not assumed -- see assertion M's own header comment
+  # for the two deliberately-malformed copies that test the halt paths).
+  # topic_map/hub mirror the REAL collision Task 3 found and fixed in this
+  # vault (hub: "index" re-matching the bare word "hub" inside topic_map's
+  # own correct value "graph hub") -- present so assertion M's zero-
+  # divergence case (below) actually exercises the asymmetry the fix depends
+  # on, not just an identity-mapped skill a symmetric-substitution regression
+  # would pass through unnoticed (measured: a deliberately reintroduced
+  # symmetric-substitution mutation was silently absorbed by the extract/
+  # stats pair alone, before this pair was added).
+  printf 'vocabulary:\n  notes: notes\n# Level 5: Process verbs\n  reduce: "extract"\n# Level 6: placeholder\n  topic_map: "graph hub"\n  hub: "index"\n# Level 7: Extraction categories\n' \
+                                                          > "$v/ops/derivation-manifest.md"
   printf 'derivation record\n'                           > "$v/ops/derivation.md"
   printf 'processing_depth: standard\n'                  > "$v/ops/config.yaml"
   printf 'name: stats\n'                                 > "$v/.claude/skills/stats/SKILL.md"
+  # "extract" is the derived name for canonical "reduce" per the pair above.
+  # Deliberately diverges from the canonical stub's substituted rendering
+  # ("Run extract on the material.") by one extra word, so assertion M's
+  # divergence case has real content to detect rather than a name-only stub.
+  printf 'Run extract on the raw material.\n'            > "$v/.claude/skills/extract/SKILL.md"
+  # "verify" is not vocabulary-derived (identity fallback); this is the
+  # zero-divergence, vocabulary-substitution-aware regression case -- the
+  # installed content is exactly the canonical stub's own topic_map ->
+  # "graph hub" substitution, already applied, i.e. genuinely unmodified.
+  printf 'Update the graph hub after verify.\n'          > "$v/.claude/skills/verify/SKILL.md"
   # Several fences reach for the JSON queue directly (`jq … ops/queue/queue.json`)
   # rather than through the YAML-or-JSON branch, so both forms must exist or the
   # fence fails on fixture shape rather than on anything it is being judged for.
@@ -268,6 +302,190 @@ build_fixture "$VAULT_HOLLOW" hollow || { echo "harness: cannot build hollow fix
 # there would repeat the same check ~72 times and report the last one.
 build_fixture "$VAULT_FULL" full || { echo "harness: cannot build full fixture" >&2; exit 1; }
 assert_frontmatter_three_ways "$VAULT_FULL" || f_fail=1
+
+# --- assertion M: /upgrade's modification-detection primitives, called with
+# real arguments -- not just defined and left uncalled -----------------------
+# Spec I Task 5. resolve_canonical_name (Task 1) and mechanically_compare
+# (Task 3) are DEFINED by fences elsewhere in this file's own generic sweep,
+# but a fence that only defines a function and never calls it passes H/N/U
+# trivially -- exactly the gap Task 1's and Task 3's own reports flagged as
+# deferred to this task. Also not per-fence, for the same reason as F: it runs
+# once against VAULT_FULL, not ~72 times inside the fence loop.
+#
+# STATED BOUNDARY OF WHAT THIS PROVES (Task 5 Step 4, required by the plan):
+# this covers Task 1's deterministic lookup and Task 3's diff-based
+# comparison -- both are pure bash, callable, and assertable with real
+# arguments. It proves NOTHING about Task 2's render step: that step is an
+# LLM judgment call with no bash to call, so a green result here means "the
+# two bash primitives behave correctly against this fixture," never "the
+# /upgrade skill's modification detection works" as a whole. A green M is
+# the bash half; Task 2's own Done-when check is a prose-review grep for
+# exactly that reason.
+#
+# NO NEW GLOB is introduced for the "for every skill" success criterion in
+# the brief -- all three skills this assertion cares about (extract, stats,
+# verify) are addressed by exact path, deliberately, rather than iterating
+# `.claude/skills/*/` and risking the zsh `nomatch` trap skill-sources/seed
+# f01 and skills/health f08 already carry (see KNOWN_OPEN above). Three named
+# skills covering all required outcomes (diverged -> MODIFIED, unmodified,
+# identity-mapped -> not, unmodified AND vocabulary-substitution-collision-
+# adjacent -> not) satisfy the brief's three success criteria without that
+# risk. `verify` is not optional: (c)'s identity-mapped stats/extract pair
+# alone does NOT catch the asymmetry regression Task 3's fix depends on --
+# see (c2) below, whose own comment records the mutation that proved it
+# (not cited by filename: .superpowers/sdd/ ledgers are gitignored scratch
+# and do not ship -- a citation into one resolves to nothing in a fresh
+# clone, this repo's own documented divergence 10).
+extract_shared_step() {   # extract_shared_step <heading> <next-heading> <outfile>
+  m_start=$(/usr/bin/grep -nF "$1" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
+  m_end=$(/usr/bin/grep -nF "$2" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
+  [ -n "$m_start" ] && [ -n "$m_end" ] || return 1
+  sed -n "${m_start},${m_end}p" "$ROOT/skills/upgrade/SKILL.md" \
+    | awk '/^```bash[[:space:]]*$/{f=1;next} /^```[[:space:]]*$/{if(f)exit} f' > "$3"
+}
+
+build_plugin_stub() {   # build_plugin_stub <dir>
+  d="$1"; rm -rf "$d"
+  mkdir -p "$d/skill-sources/reduce" "$d/skill-sources/stats" "$d/skill-sources/verify" || return 1
+  # Canonical stub for "reduce" -- the bare word "reduce" is what
+  # mechanically_compare's substitution table (built from the manifest's
+  # reduce: "extract" pair) rewrites to "extract" before diffing.
+  printf 'Run reduce on the material.\n' > "$d/skill-sources/reduce/SKILL.md"
+  # Canonical stub for "stats" -- byte-identical to the vault's installed
+  # .claude/skills/stats/SKILL.md, since "stats" is not vocabulary-derived
+  # (identity fallback) and this is the "zero divergence" regression case.
+  printf 'name: stats\n' > "$d/skill-sources/stats/SKILL.md"
+  # Canonical stub for "verify" -- uses "topic_map", whose substituted value
+  # ("graph hub") CONTAINS the bare word "hub", itself a separate table key
+  # (hub -> "index"). If the installed side were ever substituted too (the
+  # asymmetry regression Task 3 fixed), "hub" inside "graph hub" would get
+  # wrongly re-matched. This is the second, vocabulary-aware zero-divergence
+  # regression case; "extract"/"stats" alone do not exercise this collision.
+  printf 'Update the topic_map after verify.\n' > "$d/skill-sources/verify/SKILL.md"
+}
+
+assert_modification_detection() {   # assert_modification_detection <vault> <plugin-root>
+  m_vault="$1"; m_plugin="$2"; m_fail=0
+  m_rcn="$WORK/upgrade-resolve.sh"; m_mc="$WORK/upgrade-compare.sh"
+  extract_shared_step '## Shared Step: Resolving a Vault Skill to Its Canonical Template' \
+                       "## Shared Step: Rendering the Canonical Template in This Vault's Vocabulary" \
+                       "$m_rcn" || {
+    printf 'M  could not extract resolve_canonical_name from skills/upgrade/SKILL.md -- heading text may have drifted\n' >> "$FAIL_LOG"
+    m_fail=1; return 1
+  }
+  extract_shared_step '## Shared Step: Mechanically Comparing a Vault Skill Against Its Canonical Template' \
+                       '## Step 1: Inventory Current System' \
+                       "$m_mc" || {
+    printf 'M  could not extract mechanically_compare from skills/upgrade/SKILL.md -- heading text may have drifted\n' >> "$FAIL_LOG"
+    m_fail=1; return 1
+  }
+  [ -s "$m_rcn" ] && [ -s "$m_mc" ] || {
+    printf 'M  extracted fence(s) empty -- heading text found but no bash fence between them\n' >> "$FAIL_LOG"
+    m_fail=1; return 1
+  }
+
+  # (a) genuine divergence -> MODIFIED (non-empty diff, rc != 0 from diff itself)
+  {
+    printf '. %s\n' "$m_rcn"
+    printf '. %s\n' "$m_mc"
+    printf 'canon=$(resolve_canonical_name extract)\n'
+    printf 'mechanically_compare "$CLAUDE_PLUGIN_ROOT/skill-sources/$canon/SKILL.md" ".claude/skills/extract/SKILL.md"\n'
+  } > "$WORK/m-driver-a.sh"
+  m_out=$(cd "$m_vault" && CLAUDE_PLUGIN_ROOT="$m_plugin" "$SELF" "$WORK/m-driver-a.sh" 2>"$WORK/m-a.err")
+  if [ -z "$m_out" ]; then
+    printf 'M  (a) extract vs. reduce should report MODIFIED (non-empty diff); got empty output, stderr=[%s]\n' "$(cat "$WORK/m-a.err")" >> "$FAIL_LOG"
+    m_fail=1
+  fi
+
+  # (b) two real halt paths, each naming what failed -- not a silent skip
+  m_bad="$WORK/vault-bad-manifest"
+  rm -rf "$m_bad"; cp -R "$m_vault" "$m_bad" 2>/dev/null || { printf 'M  (b) cannot copy vault fixture for the malformed-manifest case\n' >> "$FAIL_LOG"; m_fail=1; }
+  # vocabulary: present, but no "# Level 7:" marker -- mechanically_compare's
+  # own guard, not resolve_canonical_name's (which has markers of its own:
+  # "# Level 5:" AND "# Level 6:", the latter added once resolve_canonical_name
+  # gained the same unguarded-range hazard mechanically_compare's Level-7 guard
+  # already closed -- omitting it here would make resolve_canonical_name halt
+  # first, on a DIFFERENT guard, before this driver ever reaches
+  # mechanically_compare, silently testing the wrong function).
+  printf 'vocabulary:\n  notes: notes\n# Level 5: Process verbs\n  reduce: "extract"\n# Level 6: placeholder\n' > "$m_bad/ops/derivation-manifest.md"
+  m_err=$(cd "$m_bad" && CLAUDE_PLUGIN_ROOT="$m_plugin" "$SELF" "$WORK/m-driver-a.sh" 2>&1 1>/dev/null)
+  m_rc2=$?
+  [ "$m_rc2" -ne 0 ] || { printf 'M  (b) manifest missing "# Level 7:" should halt (rc != 0); got rc=0\n' >> "$FAIL_LOG"; m_fail=1; }
+  # Key on text unique to THIS guard's own halt message (mechanically_compare's
+  # "# Level 7:" marker check), not a substring ("derivation-manifest.md")
+  # every halt in this file happens to share -- a predicate that broad would
+  # still pass if resolve_canonical_name's own Level-5 guard fired instead
+  # (it names the same manifest path), silently testing the wrong function.
+  case "$m_err" in
+    *'Level 7'*) : ;;
+    *) printf 'M  (b) halt on malformed manifest was not mechanically_compare'"'"'s "# Level 7:" guard: [%s]\n' "$m_err" >> "$FAIL_LOG"; m_fail=1 ;;
+  esac
+  rm -rf "$m_bad"
+
+  m_noman="$WORK/vault-no-manifest"
+  rm -rf "$m_noman"; cp -R "$m_vault" "$m_noman" 2>/dev/null || { printf 'M  (b) cannot copy vault fixture for the missing-manifest case\n' >> "$FAIL_LOG"; m_fail=1; }
+  rm -f "$m_noman/ops/derivation-manifest.md"
+  printf '. %s\nresolve_canonical_name extract\n' "$m_rcn" > "$WORK/m-driver-b.sh"
+  m_err2=$(cd "$m_noman" && "$SELF" "$WORK/m-driver-b.sh" 2>&1 1>/dev/null)
+  m_rc3=$?
+  [ "$m_rc3" -ne 0 ] || { printf 'M  (b) resolve_canonical_name on a missing manifest should halt (rc != 0); got rc=0\n' >> "$FAIL_LOG"; m_fail=1; }
+  # resolve_canonical_name has TWO halts and both interpolate $derived into
+  # their message, so "*extract*" alone cannot tell which one fired -- a
+  # mutation removing only the missing-file guard (this fixture's actual
+  # condition) still halts via the downstream "Level 5" guard on the same
+  # nonexistent path, and that message also contains "extract" (measured:
+  # this is exactly what the report's own mutation-2 found). Key on "cannot
+  # resolve", unique to the missing-manifest-FILE guard's own wording --
+  # the Level-5 guard says "cannot verify" instead.
+  case "$m_err2" in
+    *'cannot resolve'*) : ;;
+    *) printf 'M  (b) halt on a missing manifest was not resolve_canonical_name'"'"'s own missing-file guard: [%s]\n' "$m_err2" >> "$FAIL_LOG"; m_fail=1 ;;
+  esac
+  rm -rf "$m_noman"
+
+  # (c) zero divergence -> not modified (empty diff, rc 0) -- the regression
+  # check: nothing before this plan should start reporting differently on an
+  # unmodified vault.
+  {
+    printf '. %s\n' "$m_rcn"
+    printf '. %s\n' "$m_mc"
+    printf 'canon=$(resolve_canonical_name stats)\n'
+    printf 'mechanically_compare "$CLAUDE_PLUGIN_ROOT/skill-sources/$canon/SKILL.md" ".claude/skills/stats/SKILL.md"\n'
+  } > "$WORK/m-driver-c.sh"
+  m_out2=$(cd "$m_vault" && CLAUDE_PLUGIN_ROOT="$m_plugin" "$SELF" "$WORK/m-driver-c.sh" 2>"$WORK/m-c.err")
+  m_rc4=$?
+  if [ "$m_rc4" -ne 0 ] || [ -n "$m_out2" ]; then
+    printf 'M  (c) unmodified stats skill should report empty diff (not MODIFIED); rc=%s out=[%s] stderr=[%s]\n' \
+      "$m_rc4" "$m_out2" "$(cat "$WORK/m-c.err")" >> "$FAIL_LOG"
+    m_fail=1
+  fi
+
+  # (c2) same regression, but vocabulary-substitution-aware: "verify" is
+  # unmodified AND its canonical text contains "topic_map" (substituted
+  # value "graph hub" contains the separate table key "hub"). This is the
+  # one the identity-mapped "stats" case above cannot exercise -- confirmed
+  # by mutation: reintroducing installed-side substitution passed (c) above
+  # silently and is caught only here.
+  {
+    printf '. %s\n' "$m_rcn"
+    printf '. %s\n' "$m_mc"
+    printf 'canon=$(resolve_canonical_name verify)\n'
+    printf 'mechanically_compare "$CLAUDE_PLUGIN_ROOT/skill-sources/$canon/SKILL.md" ".claude/skills/verify/SKILL.md"\n'
+  } > "$WORK/m-driver-c2.sh"
+  m_out3=$(cd "$m_vault" && CLAUDE_PLUGIN_ROOT="$m_plugin" "$SELF" "$WORK/m-driver-c2.sh" 2>"$WORK/m-c2.err")
+  m_rc5=$?
+  if [ "$m_rc5" -ne 0 ] || [ -n "$m_out3" ]; then
+    printf 'M  (c2) unmodified verify skill (topic_map/hub collision case) should report empty diff (not MODIFIED); rc=%s out=[%s] stderr=[%s]\n' \
+      "$m_rc5" "$m_out3" "$(cat "$WORK/m-c2.err")" >> "$FAIL_LOG"
+    m_fail=1
+  fi
+
+  return "$m_fail"
+}
+
+PLUGIN_STUB="$WORK/plugin-stub"
+build_plugin_stub "$PLUGIN_STUB" || { echo "harness: cannot build plugin-root stub" >&2; exit 1; }
+assert_modification_detection "$VAULT_FULL" "$PLUGIN_STUB" || m_fail=1
 
 # --- preconditions ----------------------------------------------------------
 # Asserted, not assumed. A missing tool makes a fence exit 127, which this gate
@@ -758,12 +976,13 @@ printf 'N (no notes dir: never rc 0 with digits):   %s failing\n' "$n_fail"
 printf 'U (set -u: no read of an undefined var):    %s failing\n' "$setu_fail"
 printf 'S (no stale entry in either table):        %s failing\n' "$stale"
 printf 'F (frontmatter parser, three ways 2/1/4):   %s failing\n' "$f_fail"
+printf 'M (upgrade: resolve+compare called for real):%s failing\n' "$m_fail"
 if [ -s "$FAIL_LOG" ]; then echo; echo "FAILURES:"; cat "$FAIL_LOG"; fi
 if [ -s "$WORK/stale.txt" ]; then echo; echo "STALE TABLE ENTRIES:"; cat "$WORK/stale.txt"; fi
 
 echo
 if [ "$h_fail" -eq 0 ] && [ "$n_fail" -eq 0 ] && [ "$setu_fail" -eq 0 ] && [ "$stale" -eq 0 ] \
-   && [ "$f_fail" -eq 0 ]; then
+   && [ "$f_fail" -eq 0 ] && [ "$m_fail" -eq 0 ]; then
   echo "FENCE ISOLATION: PASS"; exit 0
 else
   echo "FENCE ISOLATION: FAIL"; exit 1

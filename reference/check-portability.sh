@@ -573,23 +573,29 @@ fi
 # the contrasting case and IS scanned — those recipes compose into a generated
 # vault's CLAUDE.md verbatim.
 #
-# BORN RED AT 74 ACROSS 25 FILES AND 16 FIELDS, and that is the point rather
-# than a defect. The plan's Step 1 says count the copies first: if any exist,
-# this is a conversion and not a gate. Converting 74 sites is not this task;
-# making them visible and un-growable is. A GREEN RUN THEREFORE MEANS "no NEW
-# hand-rolled parse", NEVER "none exists".
+# BORN RED AT 74 ACROSS 25 FILES AND 16 FIELDS at the time this check was
+# written; three sites converted to reference/lib/frontmatter.sh's own
+# list_notes_by_field on fix/spec-h-enforcement-gap, moving the count to 71
+# without changing the file count or the field-name count. Still the point
+# rather than a defect. The plan's Step 1 says count the copies first: if any
+# exist, this is a conversion and not a gate. Converting the remaining 71 sites
+# is not this task; making them visible and un-growable is. A GREEN RUN
+# THEREFORE MEANS "no NEW hand-rolled parse", NEVER "none exists".
 #
-# THREE DIFFERENT QUANTITIES: 74 LINES match, carrying 77 FIELD REFERENCES (some
-# lines name two), across 16 DISTINCT NAMES. Spec G framed this ban as being
-# about `status:` alone; the spread is `type` 24, `description` 14, `status` 11,
-# `topics` 8, `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each,
-# then seven singletons — 9 named + 7 = 16.
+# THREE DIFFERENT QUANTITIES: 71 LINES match, carrying 71 FIELD REFERENCES
+# (the three converted sites each carried two — `type` and `status` — which is
+# why LINES and REFERENCES moved by different amounts, 74→71 and 77→71), across
+# 16 DISTINCT NAMES, unchanged. Spec G framed this ban as being about `status:`
+# alone; the spread is now `type` 21, `description` 14, `topics` 8, `status` 8,
+# `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each, then seven
+# singletons — 9 named + 7 = 16.
 #
 # THE RE-DERIVE COMMAND MUST USE THIS CHECK'S OWN DETECTOR, and the first version
 # of this comment did not. It matched a BARE `'^field:'` with no command prefix,
-# which yields 75/78/17 — it picks up reference/test/threshold-namespace.test.sh,
-# where `'^self_evolution:'` is an argument to a test helper rather than a
-# pattern given to grep. So the published derivation disagreed with the gated 74
+# which now yields 72/72/17 — it still picks up
+# reference/test/threshold-namespace.test.sh, where `'^self_evolution:'` is an
+# argument to a test helper rather than a pattern given to grep. So the
+# published derivation disagreed with the gated 71 (formerly 74)
 # sitting three lines above it, inside the comment written to stop precisely
 # that. Keep the `(grep|rg)` prefix; it is what makes the numbers one measurement.
 #
@@ -622,7 +628,7 @@ fi
 # word-splits under bash and NOT under zsh: zsh ran one iteration with the whole
 # string as the pattern, so only the first entry was exempt and
 # reference/test/fence-isolation.test.sh reported UNLISTED. bash rc 0, zsh rc 1,
-# fm_exempt_p identifies paths excluded from the hand-rolled frontmatter parsing scan.
+# from one line. A `case` needs no splitting and behaves identically in both.
 fm_exempt_p() { # fm_exempt_p <relative-path> -> rc 0 when structurally exempt
   case "$1" in
     reference/lib/*)                        return 0 ;;  # the library itself
@@ -672,7 +678,7 @@ skills/upgrade/SKILL.md 2 conversion backlog
 #
 # NOT scan_or_die: sed's stderr is discarded, so an unreadable FILE yields 0 hits
 # and is indistinguishable from a clean one. Recorded rather than fixed here; the
-# fm_hits_in counts hand-rolled frontmatter parsing patterns in a repository-relative file. It outputs the number of matching lines after removing comments.
+# scan-scope roots are the level at which this guard checks readability.
 fm_hits_in() { # fm_hits_in <relative-path> -> live hit count
   sed 's/#.*$//' "$ROOT/$1" 2>/dev/null \
     | "$GREP" -cE "(grep|rg) [^|]*'\^[a-z_]+:" || true

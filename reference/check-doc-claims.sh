@@ -160,7 +160,7 @@ truth_fence_suites() {
 # Kernel primitives declared in kernel.yaml. Counted because both README.md and
 # CLAUDE.md said 15 for a tree that declares 16 — `unique-addresses` is a full
 # primitive that validate-kernel.sh numbers `10A` rather than renumbering, so the
-# truth_kernel_primitives counts primitive declarations in reference/kernel.yaml and prints the count.
+# highest LABEL is 15 and the COUNT is 16, and the label was read as the total.
 truth_kernel_primitives() {
     local _n
     [ -r reference/kernel.yaml ] || return 1
@@ -171,7 +171,7 @@ truth_kernel_primitives() {
 
 # check 7's allowlist totals. Ungated, these drift the moment an entry drains —
 # the check goes green at 73/24 while CLAUDE.md still says 74/25. Global
-# truth_fm_sites counts the configured frontmatter allowlist sites and prints the count.
+# constraint: gate every number you mint, in the commit that mints it.
 truth_fm_sites() {
     local _n
     [ -f reference/check-portability.sh ] || return 1
@@ -464,7 +464,11 @@ fi
 # agreeing with each other would read PASS. The expected count is therefore
 # declared, and a move in EITHER direction is rc 2, not a quiet pass.
 #   /usr/bin/grep -rc 'preliminary' generators/ --include='*.md' | grep -v ':0'   # 4 across 3 files
-#   /usr/bin/grep -rn 'type: tension' generators/ --include='*.md' | grep -c 'status: ('   # 3
+#   /usr/bin/grep -rn 'list_notes_by_field.*type tension' generators/ --include='*.md'   # 3
+# (The recipe shape moved on fix/spec-h-enforcement-gap from an inline
+# `status: (pending|open)` to a list_notes_by_field call whose FOLLOWING line
+# names the values via `[ "$s" = "..." ]`. The anchor above tracks the new
+# shape; TENSION_RECIPES itself is unchanged, since the same 3 sites moved.)
 NOTE_ENUM_DECLS=4
 TENSION_RECIPES=3
 
@@ -472,7 +476,7 @@ TENSION_RECIPES=3
 # the line has it (the table row), else after `status`, then drop punctuation.
 # The value set is compared, never the text — the four sites legitimately spell
 # the same enum three ways (`a | b`, `[a, b]`, and backticked table cells), so a
-# enum_values extracts and sorts unique status enum values from input text.
+# textual diff reports a split that is not there.
 enum_values() { sed 's/.*enum//' | sed 's/.*status[`:]*//' | tr -d '`|,[]' \
                 | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' '\n' | grep -v '^$' | LC_ALL=C sort -u; }
 
@@ -509,7 +513,12 @@ fi
 
 printf '  %-18s %-30s ' "generators/" "tension recipes match enum"
 tenum=$(/usr/bin/grep -rh 'status:.*dissolved' generators/ --include='*.md' 2>/dev/null | head -1 | enum_values)
-recipes=$(/usr/bin/grep -rn 'type: tension' generators/ --include='*.md' 2>/dev/null | /usr/bin/grep 'status: (')
+# The recipe used to be one line, `type: tension` piped to `status: (a|b)`, so
+# the values were extractable from the same line matched. Since the conversion
+# to list_notes_by_field (fix/spec-h-enforcement-gap), the values live on the
+# FOLLOWING line instead — `[ "$s" = "pending" ] || [ "$s" = "open" ]` — so this
+# check now reads one line past each match rather than parsing the match itself.
+recipes=$(/usr/bin/grep -rn 'list_notes_by_field.*type tension' generators/ --include='*.md' 2>/dev/null)
 n_rec=$(printf '%s\n' "$recipes" | grep -c . || true)
 if [ -z "$tenum" ]; then
     echo "ERROR  tension enum not found (anchor 'dissolved') — cannot evaluate"
@@ -521,8 +530,11 @@ else
     undeclared=""
     while IFS= read -r r; do
         [ -n "$r" ] || continue
-        site=$(printf '%s' "$r" | cut -d: -f1-2)
-        for v in $(printf '%s' "$r" | sed 's/.*status: (\([^)]*\)).*/\1/' | tr '|' ' '); do
+        f=$(printf '%s' "$r" | cut -d: -f1)
+        ln=$(printf '%s' "$r" | cut -d: -f2)
+        site="$f:$ln"
+        follow=$(sed -n "$((ln + 1))p" "$f")
+        for v in $(printf '%s' "$follow" | /usr/bin/grep -oE '"\$s" = "[a-zA-Z_]+"' | sed 's/.*"\([a-zA-Z_]*\)"$/\1/'); do
             printf '%s\n' "$tenum" | grep -qxF "$v" || undeclared="$undeclared $site:$v"
         done
     done <<EOF_REC

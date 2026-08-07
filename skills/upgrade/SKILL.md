@@ -27,7 +27,12 @@ Read these files to configure domain-specific behavior:
 
 3. **`ops/derivation.md`** — derivation state and engine version
 
-If these files don't exist, use universal defaults.
+If these files don't exist, use universal defaults for domain-specific *content* (vocabulary,
+processing depth). This does NOT extend to Step 1's modification check: `resolve_canonical_name`
+and `mechanically_compare` (shared steps below) both halt on a missing `ops/derivation-manifest.md`
+rather than defaulting, since neither can determine a skill's canonical name or divergence status
+without it — see the "No ops/derivation-manifest.md" Edge Case below for what that means for the
+inventory.
 
 ## EXECUTE NOW
 
@@ -63,6 +68,294 @@ Generated skills and meta-skills follow fundamentally different upgrade mechanis
 
 ---
 
+## Shared Step: Resolving a Vault Skill to Its Canonical Template
+
+Step 1 and Step 5 both need to know, for a skill installed in this vault, which
+`skill-sources/<canonical-name>/SKILL.md` in the plugin it came from.
+
+**Only 6 of the 16 canonical skills are ever vocabulary-transformable.**
+`skills/setup/SKILL.md`'s own manifest template (its "Level 5: Process verbs"
+section) declares exactly `reduce`, `reflect`, `reweave`, `verify`, `validate`,
+`rethink` as renameable — every other canonical name (`graph`, `next`,
+`pipeline`, `ralph`, `refactor`, `remember`, `seed`, `stats`, `tasks`, `learn`)
+keeps its canonical name as the vault's directory name in *every* generated
+vault, unconditionally, by generator design — not by omission. A first version
+of this step assumed all 16 were vocabulary-derived and halted on 11 of them
+when tested against a real vault, even though all 11 have a `skill-sources/`
+counterpart — a false halt on the common case, not the rare one. Fixed by
+scoping the reverse lookup to exactly the 6 transformable keys and falling
+back to identity for everything else, rather than guessing at directory
+existence on the plugin side (which this file's own Step 6a note says a shell
+fence cannot check — `${CLAUDE_PLUGIN_ROOT}` is unset in a shell; it resolves
+for the agent, not for a subprocess).
+
+```bash
+# Given a vault-local skill directory name, resolve the canonical
+# skill-sources/ name it was generated from. Needs only this vault's own
+# ops/derivation-manifest.md -- no plugin-side path is read here, so this
+# never depends on ${CLAUDE_PLUGIN_ROOT} resolving in a shell.
+resolve_canonical_name() {
+  local derived="$1" manifest="ops/derivation-manifest.md"
+  [[ -f "$manifest" ]] || { echo "HALT: no $manifest — cannot resolve '$derived' to a canonical name" >&2; return 1; }
+  # Scoped to the "Level 5: Process verbs" section only -- the sole part of
+  # the vocabulary: block whose keys are skill names. Scoping any wider (the
+  # whole block) risks matching a folder- or field-level derived value that
+  # happens to coincide with a skill's domain term; scoping narrower would
+  # miss a real rename. The two comment markers are the generator's own
+  # section boundaries (skills/setup/SKILL.md), not this vault's wording, so
+  # this holds across every generated vault, not just this one.
+  grep -q '# Level 5: Process verbs' "$manifest" || { echo "HALT: $manifest has no 'Level 5: Process verbs' section — cannot verify '$derived' is not a renamed skill, and falling back to identity here would be a silent guess" >&2; return 1; }
+  # Same hazard mechanically_compare's Level 7 parse guards against: a range
+  # (Level 5 present, # Level 6: absent) runs to EOF and silently absorbs
+  # everything after Level 5 into $level5 -- checked before the sed, not after.
+  grep -q '# Level 6:' "$manifest" || { echo "HALT: $manifest has no '# Level 6:' marker -- cannot bound the 'Level 5: Process verbs' section's extraction, and running it to EOF would silently absorb unrelated content" >&2; return 1; }
+  local level5 key value line canonical=""
+  level5=$(sed -n '/# Level 5: Process verbs/,/# Level 6:/{/^  [a-z_]*: /p;}' "$manifest")
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    key=$(printf '%s' "$line" | sed 's/^  \([a-z_]*\): .*/\1/')
+    value=$(printf '%s' "$line" | sed 's/^  [a-z_]*: "\(.*\)"$/\1/')
+    # First match wins; the six process-verb domain terms are meant to be
+    # distinct per vault, so this is not expected to matter in practice.
+    [ "$value" = "$derived" ] && { canonical="$key"; break; }
+  done <<EOF_LEVEL5
+$level5
+EOF_LEVEL5
+  # No match means $derived was never one of the six renameable terms, so it
+  # already IS the canonical name -- not a failure, the common case.
+  printf '%s\n' "${canonical:-$derived}"
+}
+```
+
+**This resolver never halts on a valid derived name — only on a missing or
+unparseable manifest** (no manifest file, or a manifest present but missing
+its `# Level 5: Process verbs` marker), since every non-renamed skill
+legitimately resolves to itself. Whether the *resulting* canonical name
+actually has a `skill-sources/` template is a separate question this
+function does not answer: that check belongs to whichever step reads the
+plugin side, which today is both `render_current_template`'s step 1 (below)
+and `mechanically_compare`'s own file guards (further below) — each needs
+agent-carried plugin-root resolution for its own reasons, this resolver
+does not.
+
+**Placement decision, stated rather than implied:** this lives inline here,
+not as a third file in `reference/lib/` alongside `frontmatter.sh` and
+`link-extraction.sh`, and the decision covers only this deterministic lookup
+— the render/substitution half (next) may end up living elsewhere. Nothing
+calls this yet, and a new shared library means a version constant, a Step 6a
+row, and a `skills/setup` copy-step change for a function with exactly one
+caller today. Revisit only if a second caller appears.
+
+---
+
+## Shared Step: Rendering the Canonical Template in This Vault's Vocabulary
+
+Together with `resolve_canonical_name` above, this is `render_current_template`
+— what Step 5b calls to reproduce what the plugin's *current*
+`skill-sources/` template would look like, in *this vault's* vocabulary, as
+the candidate replacement text. Step 1's modification test does **not** call
+this — see "Shared Step: Mechanically Comparing..." below for why an LLM
+render can't back that check, and what replaces it.
+
+Given a canonical name from `resolve_canonical_name`:
+
+1. **Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/<canonical>/SKILL.md`.** If it
+   doesn't exist — the installed plugin predates this skill, or the name
+   resolved above doesn't correspond to a real template — **halt evaluation of
+   this one skill and report it, mirroring Step 6a's row-scoped tag style**
+   (`halt this row and report it`, not a whole-run abort):
+   `<canonical>: no skill-sources/ template [skipped — plugin absent or
+   predates this skill]`. Move on to the next skill; never fall through to
+   treating the vault's installed copy as current for *this* skill when the
+   comparison can't actually be made — that is exactly the failure this plan
+   exists to close.
+
+2. **Apply vocabulary transformation the way `/setup` already does it — do
+   not restate or re-derive the rule here.** `skills/setup/SKILL.md:637`
+   describes this as "LLM-based contextual replacement, NOT string
+   find-replace" — a judgment call you make as you read the template, not a
+   substitution script. Its Structural Marker Protection rule
+   (`skills/setup/SKILL.md:702`) binds here too: YAML field names
+   (`description:`, `topics:`, `relevant_notes:`, `type:`, `status:`,
+   `_schema:`, and so on) stay universal; only values, prose, and
+   user-facing labels transform. Use this vault's own
+   `ops/derivation-manifest.md` `vocabulary:` block as the mapping — the
+   same one `resolve_canonical_name` reads.
+
+3. **The result is Step 5b's candidate replacement text** — the vault's
+   post-upgrade version of this skill, once the human approves swapping it
+   in. It is **not** used to decide `MODIFIED`; see the mechanical-comparison
+   step below for that.
+
+---
+
+## Shared Step: Mechanically Comparing a Vault Skill Against Its Canonical Template
+
+Step 1's modification check needs this, not `render_current_template` above.
+Measured on two canonical templates (~310 and ~740 lines, one with real
+`{vocabulary.*}` substitution activity): two independent LLM renders of the
+*identical* source diverge from each other — every diverging hunk was a
+missed or inconsistent vocabulary-term substitution, never open rephrasing.
+A diff between one such render and the installed file can't tell "the user
+edited this" from "this render's judgment call landed differently than
+whatever render produced the installed copy" — so `render_current_template`
+cannot back a MODIFIED verdict. This step is a separate, fully mechanical,
+deterministic substitution instead — no LLM judgment anywhere in it.
+
+Given a canonical name from `resolve_canonical_name` above:
+
+1. **Resolve `${CLAUDE_PLUGIN_ROOT}` yourself before calling the function
+   below, and confirm both files exist:** `${CLAUDE_PLUGIN_ROOT}` resolves
+   for you, the agent; it is unset in a shell (`:83-85` above), so handing
+   the literal, unexpanded string to `mechanically_compare` would let the
+   shell try to expand it itself and silently produce a nonexistent path
+   like `/skill-sources/<canonical>/SKILL.md` — no leading root, no halt,
+   because the guard below sees a string and correctly reports "does not
+   exist" for the wrong reason. Substitute the real absolute path
+   yourself, then confirm it and the installed `.claude/skills/<skill>/SKILL.md`
+   both exist. Same halt contract as `render_current_template`'s step 1 on
+   a missing template — halt evaluation of this one skill, report it, move
+   on. The function below takes both as *file paths*, already resolved,
+   not pre-read content — it reads them itself.
+
+2. **Unwrap the placeholder syntax on the canonical side, then fold, then
+   substitute.** `{vocabulary.X}` and the older `{DOMAIN:X}` spelling
+   (`reference/skill-authoring.md:45` documents the latter as still live)
+   are unified and stripped to the bare key `X` first — folding alone turns
+   the wrapper into extra `vocabulary`/`domain` tokens with no counterpart
+   on the installed side, which is already plain prose (measured: this
+   alone made an unmodified template diff non-empty against itself). *Then*
+   fold to lowercase and replace every character that is not alphanumeric,
+   `_`, or whitespace with a space. Then replace every token that exactly
+   matches one of this vault's `vocabulary:` block keys (Levels 1-6 — Level
+   7 is a nested list, not a substitution pair) with that key's value —
+   itself folded and trimmed the same way, so a value like
+   `cmd_reduce: "/extract"` matches what the installed side's own folding
+   already produced for it — plus one further pair sourced from
+   `reference/vocabulary-transforms.md`'s own "MOC" row — the documented
+   universal name for what the manifest calls `topic_map`/`topic_maps` —
+   mapped to this vault's value for those keys.
+
+3. **Fold the installed file the same way — case, punctuation, and
+   whitespace normalization only, never substitution.** The installed file
+   is already in vault vocabulary; running the same table on it risks a
+   real collision, not a hypothetical one: this vault's own `hub: "index"`
+   key re-matches the bare word "hub" inside `topic_map`'s *already-correct*
+   value "graph hub", corrupting it (measured). Substitute only the
+   canonical side, ever — that asymmetry is the fix, not an oversight. Both
+   sides get the identical whitespace-normalizing rebuild regardless of
+   whether a substitution fired on a given line — otherwise a substituted
+   line and an untouched line normalize differently for no reason connected
+   to real content (measured: this too made an unmodified template diff
+   non-empty against itself).
+
+4. **Diff the two, and read the RESULT from stdout, not from the exit
+   code.** `diff` itself returns 1 on any difference, the exact same value
+   every guard in step 1 (and the substitution-table build below) returns
+   on a halt — so exit code alone cannot tell "this skill is modified"
+   apart from "the comparison could not be made"; only the function's
+   *output* can. Non-empty stdout → `MODIFIED: $skill`, regardless of exit
+   code. Empty stdout with a non-zero exit and a `HALT:` line on stderr →
+   the comparison could not be made — halt evaluation of this one skill
+   and report it, per the tag convention above; never treat that as
+   `MODIFIED`. Empty stdout with exit 0 → not modified.
+
+```bash
+# Steps 2-4 above, portable bash/zsh. Takes both files as PATHS -- it reads
+# them itself; the caller does not need to pre-read either one.
+mechanically_compare() {
+  local manifest="ops/derivation-manifest.md" canon_file="$1" installed_file="$2"
+  [[ -f "$manifest" ]] || { echo "HALT: no $manifest -- cannot build the substitution table" >&2; return 1; }
+  [[ -f "$canon_file" && -r "$canon_file" ]] || { echo "HALT: $canon_file does not exist or is not readable" >&2; return 1; }
+  [[ -f "$installed_file" && -r "$installed_file" ]] || { echo "HALT: $installed_file does not exist or is not readable" >&2; return 1; }
+
+  local block line key value topic_map_val="" topic_maps_val="" pairs_file
+  pairs_file=$(mktemp)
+  # Presence-check the CLOSING marker before extracting -- an unclosed
+  # range (vocabulary: present, # Level 7: absent) runs to EOF and silently
+  # absorbs every later key: "value" line into the table (wrong answers,
+  # not just a missing block), so the emptiness check below can't catch
+  # it: that block would be non-empty, just contaminated. Mirrors
+  # resolve_canonical_name's own closing-marker guard above. (No separate
+  # opening-marker check is needed: if "vocabulary:" itself is absent the
+  # sed range below never opens and $block is empty, which the check
+  # after this loop already catches.)
+  grep -q '# Level 7:' "$manifest" || { echo "HALT: $manifest has no '# Level 7:' marker -- cannot bound the vocabulary: block's extraction, and running it to EOF would silently absorb unrelated content" >&2; rm -f "$pairs_file"; return 1; }
+  block=$(sed -n '/^vocabulary:/,/# Level 7:/p' "$manifest")
+  if [ -z "$block" ]; then
+    echo "HALT: $manifest has no 'vocabulary:' block -- cannot build the substitution table" >&2
+    rm -f "$pairs_file"; return 1
+  fi
+  while IFS= read -r line; do
+    case "$line" in *': "'*'"'*) : ;; *) continue ;; esac
+    key=$(printf '%s\n' "$line" | sed -n 's/^  \([a-zA-Z_]*\): .*/\1/p')
+    value=$(printf '%s\n' "$line" | sed -n 's/^  [a-zA-Z_]*: "\(.*\)"$/\1/p')
+    [ -n "$key" ] && [ -n "$value" ] || continue
+    # Fold the value the same way the text is folded -- a leading-slash
+    # command name like "/extract" must match what the installed side's
+    # own folding already produced for it, not the raw slash-prefixed form.
+    value=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_[:space:]' ' ' | awk '{$1=$1}1')
+    printf '%s\t%s\n' "$key" "$value" >> "$pairs_file"
+    [ "$key" = "topic_map" ] && topic_map_val="$value"
+    [ "$key" = "topic_maps" ] && topic_maps_val="$value"
+  done <<EOF_VOCAB
+$block
+EOF_VOCAB
+  [ -n "$topic_map_val" ]  && printf 'MOC\t%s\n' "$topic_map_val" >> "$pairs_file"
+  [ -n "$topic_maps_val" ] && printf 'MOCs\t%s\n' "$topic_maps_val" >> "$pairs_file"
+  if [ ! -s "$pairs_file" ]; then
+    echo "HALT: $manifest's vocabulary: block yielded no usable key/value pairs -- cannot build the substitution table" >&2
+    rm -f "$pairs_file"; return 1
+  fi
+
+  # Canonical side: unify placeholder spellings and strip the wrapper down
+  # to the bare key, fold+strip, then substitute -- the only side that
+  # ever gets substituted (see step 3 above).
+  local canon_text canon_folded canon_out
+  canon_text=$(sed -e 's/{DOMAIN:topic maps}/{vocabulary.topic_maps}/g' \
+                    -e 's/{DOMAIN:topic map}/{vocabulary.topic_map}/g' \
+                    -e 's/{DOMAIN:\([a-zA-Z_]*\)}/{vocabulary.\1}/g' \
+                    -e 's/{vocabulary\.\([a-zA-Z_]*\)}/\1/g' "$canon_file")
+  canon_folded=$(printf '%s' "$canon_text" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_[:space:]' ' ')
+  canon_out=$(printf '%s\n' "$canon_folded" | awk -v pf="$pairs_file" '
+    BEGIN { while ((getline line < pf) > 0) { n = split(line, f, "\t"); if (n == 2 && f[1] != "") map[tolower(f[1])] = f[2] }; close(pf) }
+    { for (i = 1; i <= NF; i++) if ($i in map) $i = map[$i]; $1 = $1; print }
+  ')
+  rm -f "$pairs_file"
+
+  # Installed side: same fold and the same forced whitespace rebuild, never
+  # the substitution table (see step 3 above). The rebuild is what keeps
+  # whitespace normalization identical to the canonical side's on every
+  # line, substituted or not -- it adds no substitution of its own.
+  local installed_folded
+  installed_folded=$(tr '[:upper:]' '[:lower:]' < "$installed_file" | tr -c '[:alnum:]_[:space:]' ' ' | awk '{$1=$1}1')
+
+  diff <(printf '%s\n' "$canon_out") <(printf '%s\n' "$installed_folded")
+}
+```
+
+**What this catches and what it doesn't — stated, not silent.** Covers the
+`{vocabulary.X}`/`{DOMAIN:X}` placeholder forms, the literal Levels-1-6 key
+names as bare words, and the one sourced MOC alias. It does NOT cover any
+other synonym outside that closed set: `{vocabulary.topic_map_plural}` — a
+spelling that does not literally match the manifest's declared key
+(`topic_maps`) — appears 24 times across 5 `skill-sources/` files (measured)
+and will not substitute, reading as false-positive divergence; a
+pre-existing naming mismatch this step does not fix. Nor does it cover
+`{DOMAIN:extraction_categories}` (a Level 7 nested list, never a
+substitution pair by design) — any template using it always shows that
+token as unsubstituted. Case-folding is exercised only against BSD `tr`
+(this repo's default); GNU `tr`'s handling of non-ASCII uppercase is
+untested and could fold differently across environments. And even a
+perfect substitution can't separate "the user edited this" from "the
+plugin's canonical template changed since generation" — there are no git
+tags to isolate an original baseline (Global Constraint). The honest
+predicate this produces is **diverges from the current canonical template**,
+not strictly *user-modified* — both conflate into the same non-empty diff,
+and Step 1's presentation says so rather than implying otherwise.
+
+---
+
 ## Step 1: Inventory Current System
 
 Gather the vault's current state:
@@ -89,20 +382,36 @@ Gather the vault's current state:
 
 4. Read `ops/config.yaml` for current dimensional positions
 
-5. Check for user modifications:
-   ```bash
-   # Detect skills modified after generation
-   for dir in .claude/skills/*/; do
-     skill=$(basename "$dir")
-     file="$dir/SKILL.md"
-     [[ ! -f "$file" ]] && continue
-     # Check git status — modified files indicate user customization
-     git_status=$(git status --porcelain "$file" 2>/dev/null)
-     if [[ -n "$git_status" ]]; then
-       echo "MODIFIED: $skill"
-     fi
-   done
-   ```
+5. **Check for user modifications — as instructions you carry out, not one
+   isolated fence.** For each installed skill directory (`.claude/skills/*/`):
+   a. Run `resolve_canonical_name` (shared step above) on the directory
+      name — a fresh, standalone invocation each time; a fence earlier in
+      this file does not persist into this one.
+   b. Run `mechanically_compare` (shared step above) — another standalone
+      invocation — with the RESOLVED absolute path to
+      `skill-sources/<canonical>/SKILL.md` under the plugin root (resolve
+      `${CLAUDE_PLUGIN_ROOT}` yourself first — it is unset in a shell, so
+      handing it unexpanded would let the shell silently build a
+      nonexistent path with no leading root) and the installed file's
+      path. It reads both itself; do not pre-read the canonical template
+      for this check (Step 5b's render step, which does need pre-read
+      content, is separate).
+   c. Read the RESULT from stdout, not from the exit code — `diff` itself
+      returns 1 on any difference, the same value every one of
+      `mechanically_compare`'s own guards returns on a halt, so exit code
+      alone cannot tell "modified" apart from "the comparison could not be
+      made." Non-empty stdout → `MODIFIED: $skill`, regardless of exit
+      code. Empty stdout with a non-zero exit (any file it needs is
+      missing, or the manifest's vocabulary block is missing or unusable)
+      → halt evaluation of this one skill and report it, same tag
+      convention as the two shared steps above — never treat that as
+      `MODIFIED`. Empty stdout with exit 0 → not modified.
+   d. Tally as you go — the three per-skill results above are the only
+      source for the header counts below. `{count}` = every skill this
+      loop ran against. `{modified_count}` = how many read `MODIFIED` in
+      (c). `{skipped_count}` = how many halted in (c). A skill that
+      halted is neither modified nor unmodified — do not fold it into
+      either count under the other label.
 
 Present inventory:
 
@@ -111,12 +420,23 @@ Present inventory:
 
 System: {domain description}
 Engine: arscontexta-{version}
-Skills: {count} installed ({modified_count} user-modified)
+Skills: {count} installed ({modified_count} diverge from the current template, {skipped_count} skipped)
 
   Skill               Version  Generated From    Modified
   /{vocabulary.reduce}    1.0  arscontexta-v1.6  no
   /{vocabulary.reflect}   1.0  arscontexta-v1.6  yes
+  /{vocabulary.reweave}   1.0  arscontexta-v1.6  skipped [reason from the tag]
   ...
+
+Note: "Modified" means diverges from the current canonical template, not
+strictly "the user edited this" -- a template that changed upstream since
+generation reads the same way, and there is no way to separate the two
+without git tag history (there is none). See the mechanical-comparison
+step above for what the substitution table covers and what it doesn't.
+"skipped" means the comparison itself could not be made (a halt from
+either shared step, per its own tag convention) -- never render a skipped
+skill as "no" (not modified); that would fabricate a clean result for a
+skill nothing actually checked.
 ```
 
 ---
@@ -166,11 +486,12 @@ For each skill being evaluated:
    | **Correction** | Knowledge base contradicts skill's approach | Outdated methodology, known anti-pattern |
    | **Extension** | Knowledge base covers scenario skill ignores | New edge case, new domain pattern |
 
-5. **Check user modifications:**
-   If the skill has been modified by the user, read both the current (user-modified) version and evaluate whether:
-   - The user's changes already incorporate the improvement (skip it)
-   - The user's changes are orthogonal to the improvement (can coexist)
-   - The user's changes conflict with the improvement (flag for side-by-side review)
+5. **Check divergence from the canonical template** (see the mechanical-comparison shared step
+   above for what "diverges" means here — not necessarily user-authored):
+   If the skill diverges, read both the current (diverging) version and evaluate whether:
+   - The divergence already incorporates the improvement (skip it)
+   - The divergence is orthogonal to the improvement (can coexist)
+   - The divergence conflicts with the improvement (flag for side-by-side review)
 
 ---
 
@@ -181,7 +502,7 @@ For each skill with available improvements, create a structured proposal:
 ```
 Skill: /{domain:skill-name}
 Status: {current | enhancement | correction | extension}
-User-modified: {yes | no}
+Diverges from template: {yes | no}
 
 Current approach:
   {2-3 sentences describing what the skill currently does}
@@ -207,26 +528,36 @@ Reversible: yes (previous version archived to ops/skills-archive/)
 | **Medium** | Modified behavior (different extraction strategy, changed search pattern). Output quality affected. |
 | **High** | Structural change (different phase ordering, changed handoff format). Pipeline coordination affected. |
 
-### Side-by-Side for User-Modified Skills
+### Side-by-Side for Skills That Diverge From Their Template
 
-When a skill has been modified by the user AND an upgrade is available, show a side-by-side comparison:
+When an installed skill diverges from its canonical template (per the mechanical-comparison shared
+step above — this may or may not be user-authored; see that step for why the two can't be told
+apart) AND an upgrade is available, show a side-by-side comparison:
 
-```
-Skill: /{domain:skill-name} (USER-MODIFIED)
+```text
+Skill: /{domain:skill-name} (DIVERGES FROM TEMPLATE)
 
 Your version:                     Recommended:
   [relevant section excerpt]        [what knowledge base suggests]
 
-Your customization:
-  {description of what the user changed and why it appears intentional}
+What differs:
+  {description of what the installed version does differently, and whether it looks
+   intentional -- do not assert the user made this change on purpose; the mechanical
+   comparison cannot distinguish a real edit from the template having moved since
+   generation}
 
 Options:
   (a) Keep your version unchanged
-  (b) Apply upgrade, preserving your customizations
   (c) Apply upgrade, replacing your version (archived to ops/skills-archive/)
 ```
 
-Option (b) requires the upgrade to be compatible with the user's changes. If they conflict, explain why and recommend (a) or (c).
+**Option (b), a merge preserving customizations, is not offered — not as a corner case, but as
+the real behavior every invocation of `/upgrade` gets today: there is no OLD-rendering
+available.** A merge needs the *original* canonical template this skill was generated from, and
+this repo carries no release tags to recover it. Without that baseline a merge is a guess, not a
+fact — exactly the render-noise problem the mechanical-comparison step above was built to avoid,
+not something to reintroduce here by another route. State this plainly to the human rather than
+presenting a third option that would fail silently or produce a guessed merge.
 
 ---
 
@@ -248,7 +579,7 @@ Upgrades available: {count}
      Research: "{claim title}"
      Risk: low
 
-  2. /{domain:skill-name} (USER-MODIFIED)
+  2. /{domain:skill-name} (DIVERGES FROM TEMPLATE)
      Type: Correction
      Change: {one-line summary}
      Research: "{claim title}", "{claim title}"
@@ -289,11 +620,14 @@ cp ".claude/skills/${SKILL_NAME}/SKILL.md" \
 
 ### 5b. Generate Updated Skill
 
-1. Read the skill's generation block from the plugin (if available)
+1. Resolve the canonical name (`resolve_canonical_name`, shared step above) and render it in
+   this vault's vocabulary (`render_current_template`, shared step above) — no "if available"
+   fallback: `resolve_canonical_name` halts on a missing or unparseable manifest and
+   `render_current_template` halts on a missing canonical template, each naming the exact skill
+   and lookup that failed. Neither silently skips, which is what the old phrasing here licensed.
 2. Apply the specific improvements identified in Step 2
 3. Preserve the user's vocabulary transformation from `ops/derivation-manifest.md`
 4. Preserve the user's dimensional positions from `ops/config.yaml`
-5. For user-modified skills with option (b): merge the user's customizations into the updated skill
 
 ### 5c. Update Version Tracking
 
@@ -591,7 +925,11 @@ After applying all approved upgrades:
 
 Applied: {N} upgrades
 Archived: {N} previous versions to ops/skills-archive/
-Skipped: {N} (user-modified, kept as-is)
+Kept as-is: {N} (diverges from template, human chose option (a) at Step 4)
+Unresolved: {N} (comparison could not be made at Step 1 -- see the
+  "skipped" rows in the inventory table; never evaluated in Step 2, never
+  offered a choice at Step 4 -- do not describe these as diverging or as
+  a human decision)
 
 Changes:
   - /{skill}: {what changed} (Research: "{claim}")
@@ -637,9 +975,9 @@ All upgrades are advisory. The user owns the files.
 
 **No generation manifest:** Treat all skills as version 0 (unknown generation state). Compare methodology against current knowledge base. This is fine — consultation reasons about approach, not version numbers.
 
-**Skill has been user-modified:** Present the side-by-side comparison. Offer three options: keep user version, merge upgrade with customizations, or replace (with archive). Never silently overwrite.
+**Skill diverges from its canonical template:** Present the side-by-side comparison. Offer only two options: keep the installed version, or replace (with archive) — merge preserving a real customization is not offered (see "Side-by-Side for Skills That Diverge From Their Template" above for why). Never silently overwrite.
 
-**No ops/derivation-manifest.md:** Use universal vocabulary for all output.
+**No ops/derivation-manifest.md:** Use universal vocabulary for all output — but note this is a different failure mode from Step 1's modification check: `resolve_canonical_name` and `mechanically_compare` (both shared steps above) halt on a missing manifest too, since neither can determine a skill's canonical name or diverge status without it. In this state, EVERY skill's modification status is unresolvable, not just its vocabulary — report all skills `skipped` (per the inventory presentation's third `Modified` value above), never silently proceed as though nothing diverges.
 
 **Plugin knowledge base unavailable:** Report that knowledge base consultation requires the Ars Contexta plugin. Without the plugin's bundled methodology/ and reference/ directories, /upgrade cannot evaluate skills.
 

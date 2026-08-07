@@ -65,16 +65,16 @@ for s in bash zsh; do
   $s reference/test/kernel-note-dirs.test.sh             # 68/68
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
-  $s reference/test/hook-config.test.sh                  # 56/56
+  $s reference/test/hook-config.test.sh                  # 57/57
 done
 ```
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 74 sites across 25 files** — 74 matching lines carrying 77 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 74 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 71 sites across 25 files** — 71 matching lines carrying 71 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 71 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
-| `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; and (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given |
+| `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given; and (assertion M) `mechanically_compare` substituting the installed side as well as the canonical side, which silently launders a real divergence into false agreement — caught via a fixture built on the real `topic_map`/`hub` vocabulary collision, the specific pair that makes symmetric substitution wrong |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear", and a bump that moves some declared sites and not others (including two fields of the *same* file, which no file-to-file comparison sees) |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
 | `hook-config.test.sh` | the only gate that executes `session-orient.sh` or `vaultguard.sh` at all. Before it, three of five hook scripts could be broken with every other gate green, and `session-orient.sh` had only TEXTUAL coverage — `threshold-namespace` checks that it NAMES its config key, so a break that keeps the name and ignores the value passes there (52/0) and fails only here. Measured by mutation, one script at a time. An unparseable config value silently becoming the default, and `session-orient.sh` ignoring its configured threshold, are the two defects divergence 3 documents; `vaultguard.sh` decides whether **every** plugin hook runs, so inverting its inertness fires auto-commit in every repo the plugin is installed in |
@@ -564,6 +564,15 @@ a slash command against a real vault** — a slash command runs in the session's
 cannot be pointed at another tree, so that gap is structural rather than merely undone. Its three
 repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`) remain prose contracts CI cannot
 exercise.
+
+A later branch on this same skill (Spec I) added a comparably sized prose contract to a different
+part of it — Step 1's modification check, Steps 2-4's divergence handling, and the Final Report's
+per-skill tallies — and it inherits the identical gap. Assertion M in `fence-isolation.test.sh`
+verifies `mechanically_compare` itself, at the bash-function level, against a fixture built on a
+real vocabulary collision. Nothing verifies the agent-level prose around it: that an agent reading
+its stdout correctly tallies `{modified_count}`/`{skipped_count}`, routes a `skipped` skill through
+Steps 2-4 without fabricating a divergence verdict for it, or reports it correctly at the end. Those
+are prose CI cannot exercise, for the same structural reason the three repairs above cannot be.
 
 What has now happened is narrower and worth the distinction: those steps were **carried out by hand**
 against an `rsync -a` copy of the field vault, in an as-is state and again with all three repairs

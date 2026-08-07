@@ -17,11 +17,13 @@
 # an unanchored or double-quoted equivalent, or an inlined copy of
 # link-extraction.sh, which remains convention only.
 #
-# It is born red at 74 allowlisted sites, so a green run means "no NEW
+# It is born red at 71 allowlisted sites, so a green run means "no NEW
 # hand-rolled parse", not "none exists". (That phrase is on ONE line on purpose:
-# check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 74 is GATED — see
+# check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 71 is GATED — see
 # the check-7 rows in check-doc-claims.sh, which read this file too; the number
-# stood at 39 here for one commit after the detector was widened, which is why.
+# stood at 39 here for one commit after the detector was widened, then at 74
+# until three sites converted to this library's own `list_notes_by_field` on
+# fix/spec-h-enforcement-gap, which is why it moves again here.
 #
 # Writing or editing a SKILL.md? Read reference/skill-authoring.md first.
 #
@@ -175,6 +177,7 @@ frontmatter_field() {
 }
 
 # list_notes_by_field <dir> <field> <value>... -> matching file paths, one per line
+# Recursive. Emits nothing and returns 0 when the tree holds no match.
 # list_notes_by_field recursively prints Markdown file paths whose frontmatter field matches any supplied value.
 # It returns a nonzero status if the field or values are missing or the directory tree cannot be fully scanned.
 # The field and values are provided after the directory path.
@@ -260,7 +263,7 @@ count_notes_by_field() {
 # files with no frontmatter at all. This is the dual of count_notes_by_field, and
 # it is the function the three-way fixture assertion keys on: only a parser that
 # actually reads the requested FIELD NAME can distinguish "missing status" from
-# count_notes_missing_field recursively counts Markdown files that do not define the specified frontmatter field.
+# "missing some-field-nothing-declares".
 count_notes_missing_field() {
   _fm_require_deps_and_dir "$1" || return 1
   local dir="$1" field="$2" errf missing p
