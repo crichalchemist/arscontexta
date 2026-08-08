@@ -18,8 +18,8 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.cmd_reflect` for connection-finding references
 
 2. **`ops/config.yaml`** — thresholds, processing preferences
-   - `self_evolution.observation_threshold`: number of pending observations before suggesting rethink (default: 10)
-   - `self_evolution.tension_threshold`: number of pending tensions before suggesting rethink (default: 5)
+   - `self_evolution.observation_threshold`: number of pending or open observations before suggesting rethink (default: 10)
+   - `self_evolution.tension_threshold`: number of pending or open tensions before suggesting rethink (default: 5)
 
 3. **`ops/methodology/`** — existing methodology notes (read all to understand current system self-knowledge)
 
@@ -32,7 +32,7 @@ The command name itself transforms per domain. The derivation manifest maps the 
 **Target: $ARGUMENTS**
 
 Parse immediately:
-- If target is empty: run full six-phase rethink (Phase 0 drift check + five evidence phases) on all pending observations and tensions
+- If target is empty: run full six-phase rethink (Phase 0 drift check + five evidence phases) on all pending or open observations and tensions
 - If target is "triage": run Phase 1 only (triage and methodology updates, no pattern detection)
 - If target is "patterns": skip triage, run Phases 3-5 only (analyze existing evidence for patterns)
 - If target is "drift": run Phase 0 only (drift check without triage or pattern detection)
@@ -172,9 +172,21 @@ fi
 
 # A directory that does not exist means that feature is not active — valid, and empty.
 # A scan that FAILS over a directory that DOES exist is not, and must not fold to empty.
+#
+# MATCHES "blocked" TOO, not just pending/open. BLOCKED is a real, triaged
+# disposition (see the table below) — "real, but waiting on work outside this
+# system" — and a blocked tension must stay VISIBLE to discovery so a human
+# can see what it is blocked on, even though it must not itself trip the
+# /{DOMAIN:rethink} threshold (that exclusion happens below, at TENSION_COUNT,
+# not here). Before this, a blocked tension was invisible to BOTH
+# TENSION_PENDING and TENSION_COUNT — not merely excluded from the count as
+# the design intends, but absent from triage entirely. BLOCKED is documented
+# as tensions-only (the table below), so widening this shared function is
+# harmless for OBS_PENDING: no observation is ever meant to carry
+# status:blocked in the first place.
 list_open_items() {                        # list_open_items <dir>
   [ -d "$1" ] || return 0
-  list_notes_by_field "$1" status pending open
+  list_notes_by_field "$1" status pending open blocked
 }
 
 OBS_PENDING=$(list_open_items ops/observations) || {
@@ -186,7 +198,24 @@ TENSION_PENDING=$(list_open_items ops/tensions) || {
   echo "error: tension scan failed; refusing to report pending evidence" >&2
   exit 1
 }
-TENSION_COUNT=$(printf '%s\n' "$TENSION_PENDING" | grep -c . || true)
+# TENSION_COUNT excludes blocked entries SPECIFICALLY -- visible to discovery
+# (TENSION_PENDING, above) but must not trip the threshold rule below.
+# Re-checks each already-fetched entry's OWN status rather than
+# re-scanning ops/tensions/ a second time with a second query. (No line
+# number cited here on purpose: an earlier version of this comment cited
+# one and it moved TWICE within the same commit that added it -- once from
+# this edit's own line count, then again fixing the first citation. Re-grep
+# 'Do NOT count it toward' if you need the exact spot.)
+TENSION_BLOCKED=0
+if [ -n "$TENSION_PENDING" ]; then
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    [ "$(frontmatter_field "$t" status)" = "blocked" ] && TENSION_BLOCKED=$((TENSION_BLOCKED + 1))
+  done <<EOF_TENSIONS
+$TENSION_PENDING
+EOF_TENSIONS
+fi
+TENSION_COUNT=$(( $(printf '%s\n' "$TENSION_PENDING" | grep -c . || true) - TENSION_BLOCKED ))
 ```
 
 Read each pending item fully. These are small atomic notes — load all of them. Understanding the full content is required for accurate triage. If zero pending items, report clean state and exit early.
@@ -488,11 +517,11 @@ Do not propose architectural changes based on thin evidence. The threshold scale
 
 ### /next Integration
 
-If 10+ pending observations or 5+ pending tensions remain after triage AND pattern detection did not consume them into proposals:
+If 10+ pending or open observations or 5+ pending or open tensions remain after triage AND pattern detection did not consume them into proposals:
 
 ```
   Threshold signal for /next:
-    [N] pending observations, [N] pending tensions remain
+    [N] pending or open observations, [N] pending or open tensions remain
     /next should prioritize {DOMAIN:rethink} at session priority
 ```
 

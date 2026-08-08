@@ -21,6 +21,13 @@
 # checkout at 0.9.0, absent from the installed 0.8.0). It catches the strictly
 # easier error: prose naming a path that does not exist at all.
 #
+# "0.9.0"/"0.8.0" ABOVE ARE A PINNED HISTORICAL COMPARISON, not a live version
+# claim -- the checkout genuinely was at 0.9.0 when this discrepancy was found,
+# and bumping either number to match a later release would misdate the anecdote
+# rather than correct it. Excluded from bump-version.sh's audit accordingly
+# (`.version-bump.json`'s `audit.exclude`), by filename, with this comment as
+# the stated reason.
+#
 # Read the run banner, not this header, for what a given run checked. The banner
 # prints every time for that reason.
 # ─────────────────────────────────────────────────────────────────────────────

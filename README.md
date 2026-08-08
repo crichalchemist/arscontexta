@@ -9,7 +9,7 @@ and note templates -- tailored to your domain and backed by 249 research claims.
 
 No templates. No configuration. Just conversation.
 
-**v0.9.0** · Claude Code plugin · MIT
+**v0.9.5** · Claude Code plugin · MIT
 
 ---
 
@@ -369,8 +369,10 @@ something and observe no change.
 
 The repo ships an executable gate suite: portability and prose-path checks, plus test
 suites that each run under both `bash` and `zsh` -- several shipped defects were shell
-forks, so one shell is not enough. Most run in CI on every push. Kernel validation is
-the exception, because it needs a generated vault to run against.
+forks, so one shell is not enough. Most run in CI on every push; kernel validation and
+`reference/test/check-doc-claims.test.sh` are the exceptions, the former because it needs
+a generated vault to run against and the latter deliberately, since each run already costs
+three invocations of the script it tests. See `CLAUDE.md`'s Verification section for why.
 
 `CONTRIBUTING.md` carries the commands and the contribution workflow. `CLAUDE.md`
 carries the gate table -- what each gate uniquely catches, and, more usefully, what

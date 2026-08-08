@@ -413,5 +413,91 @@ eq "check 2B reaches a .template"             "1" "$(rc_of "$I")"
 eq "check 2B names the .template"           "yes" \
    "$(out_of "$I" | grep -q 'probe.sh.template' && echo yes || echo no)"
 
+# --- CHECK 7 (frontmatter gate): its own three fixes, gone unguarded before
+# this section. `check-doc-claims.sh`'s CLAIMS table records the fix (71/25,
+# unchanged), but nothing here exercised the FAILURE paths those fixes added
+# -- the same gap this file's own header describes for the guard as a whole,
+# just three checks over.
+#
+# 7A: find's exit status, no longer swallowed by the pipe into `sort`. One
+# FM_SCAN root made unreadable; the scan must report the traversal failure,
+# not silently proceed on whatever the other eight roots yielded.
+#
+# Captured ONCE, same reason as FM_STALE_OUT below: the second assertion is
+# a negative check ("the healthy SKIP text is absent"), and an independent
+# second `out_of "$I"` call would pass that check vacuously if the guard had
+# crashed or produced no output at all under check 7 -- absent-because-wrong
+# and absent-because-nothing-ran read identically to a bare `grep -q`. Gating
+# it on the SAME capture the first (positive) assertion already proved
+# contains "find failed" closes that hole here too.
+I=$(mkroot)
+chmod 000 "$I/hooks"
+FM_ROOT_OUT=$(out_of "$I")
+eq "check 7: unreadable root -> find failed, not silent" "yes" \
+   "$(printf '%s' "$FM_ROOT_OUT" | grep -q 'find failed' && echo yes || echo no)"
+eq "check 7: unreadable root does NOT read as a healthy SKIP" "yes" \
+   "$(printf '%s' "$FM_ROOT_OUT" | grep -q 'find failed' || { echo no; exit; }; \
+      printf '%s' "$FM_ROOT_OUT" | grep -A1 '^7\.' | grep -q 'SKIP no allowlisted' && echo no || echo yes)"
+chmod 755 "$I/hooks"
+
+# 7B: fm_hits_in's UNREADABLE sentinel. A file `find` LISTED (needs only the
+# containing directory's execute bit) but cannot itself read must not count
+# as 0 hits -- indistinguishable from a genuinely clean file, which is what
+# the guard reported here before this fix existed.
+I=$(mkroot)
+printf "grep -rl '^status: open' dir/\\n" > "$I/skills/unreadable-fm.md"
+chmod 000 "$I/skills/unreadable-fm.md"
+eq "check 7: unreadable allowlist-shaped file -> UNREADABLE, not 0 hits" "yes" \
+   "$(out_of "$I" | grep -q 'UNREADABLE skills/unreadable-fm.md' && echo yes || echo no)"
+chmod 644 "$I/skills/unreadable-fm.md"
+
+# 7C: the branch-order fix. FM_ALLOW is hardcoded to real repo paths, so a
+# synthetic mkroot() fixture can never populate fm_present -- there is no
+# live-fixture way to exercise "every remaining allowlisted site converted
+# in one branch". Instead, extract the guard's OWN decision block (the
+# `if [ "$fm_scan_rc" -ne 0 ]; then ... fi` compound at the end of check 7)
+# by anchor, not by hardcoded line numbers, and inject the exact state the
+# task-6 report reproduced this defect with: fm_stale non-empty while the
+# "scan did not run" heuristic's own condition (fm_present>0 && fm_total==0)
+# is ALSO true. Pre-fix, that heuristic fired first and misdiagnosed a
+# healthy, fully-converted scan as a broken one. If the anchor ever drifts
+# (the block renamed or restructured), this fails loud with its own
+# diagnostic rather than silently testing stale text.
+fm_decision_block() {
+  awk '
+    /^if \[ "\$fm_scan_rc" -ne 0 \]; then$/ { f=1 }
+    f { print }
+    f && /^fi$/ { exit }
+  ' "$GUARD"
+}
+run_fm_decision() { # run_fm_decision <fm_scan_rc> <fm_present> <fm_total> <fm_files> <fm_bad> <fm_stale>
+  local block
+  block=$(fm_decision_block)
+  [ -n "$block" ] || { echo "error: check-portability.sh's fm decision block not found -- anchor drifted, this assertion can no longer run" >&2; return 2; }
+  (
+    red() { printf 'FAIL %s\n' "$1"; }
+    ok()  { printf 'PASS %s\n' "$1"; }
+    skip() { printf 'SKIP %s\n' "$1"; }
+    fm_scan_rc="$1"; fm_present="$2"; fm_total="$3"; fm_files="$4"; fm_bad="$5"; fm_stale="$6"
+    eval "$block"
+  )
+}
+FM_STALE_CASE="    STALE    generators/features/graph-analysis.md — allowlisted but no longer matches; site converted, so drop the entry
+"
+# Captured ONCE into a variable, then both assertions read the SAME output --
+# not two independent invocations. This matters for the second assertion: a
+# negative check ("the wrong message is absent") passes vacuously if
+# `run_fm_decision` produced NOTHING AT ALL (e.g. the anchor above stopped
+# matching), since an empty stream contains neither phrase. Gating the
+# negative check on the SAME capture that the positive check already proved
+# non-empty and on-topic closes that hole -- an anchor miss now fails BOTH
+# assertions instead of silently passing the second one for the wrong reason.
+FM_STALE_OUT=$(run_fm_decision 0 5 0 0 "" "$FM_STALE_CASE")
+eq "check 7: converted allowlist -> names the stale sites, not 'scan did not run'" "yes" \
+   "$(printf '%s' "$FM_STALE_OUT" | grep -q 'does not match the allowlist' && echo yes || echo no)"
+eq "check 7: converted allowlist does NOT misdiagnose the scan itself" "yes" \
+   "$(printf '%s' "$FM_STALE_OUT" | grep -q 'does not match the allowlist' || { echo no; exit; }; \
+      printf '%s' "$FM_STALE_OUT" | grep -q 'the scan did not run' && echo no || echo yes)"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

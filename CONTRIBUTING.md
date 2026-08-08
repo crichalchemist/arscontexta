@@ -81,7 +81,7 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all thirteen, expect exactly these results
+## Verification — run all fourteen, expect exactly these results
 
 Twelve run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
@@ -100,13 +100,14 @@ bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-prose-paths.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-doc-claims.sh  ;  echo "expect rc=0, got rc=$?"
 bash reference/check-placeholder-count.sh main ; echo "expect rc=0, got rc=$?"
+bash reference/test/check-doc-claims.test.sh | tail -1  # bash-only (see the suite's own header); expect: passed=13 failed=0
 
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=19 failed=0
-  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=55 failed=0
+  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=60 failed=0
   $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
   $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0
-  $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=68 failed=0
+  $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=76 failed=0
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0

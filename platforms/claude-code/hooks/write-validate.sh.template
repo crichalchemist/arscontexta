@@ -14,6 +14,13 @@
 # The written file path comes from the hook context
 FILE="${TOOL_INPUT_PATH:-$1}"
 
+# Early exit if no file path, or the path doesn't resolve to a real file --
+# mirrors hooks/scripts/write-validate.sh's own guard, in the same position
+# (right after FILE is assigned, before any of the git/size/link logic below
+# can run on a path that was never there to begin with).
+[ -z "$FILE" ] && exit 0
+[ ! -f "$FILE" ] && exit 0
+
 # ─────────────────────────────────────────────
 # Only validate notes in the knowledge space
 # ─────────────────────────────────────────────
@@ -60,9 +67,41 @@ esac
 # committed, or the repo has no commits. Two are REPORTED, because they mean the
 # guard could not run at all: git absent, or not a git repository.
 #
-# SCOPE LIMIT: this guard sees only the tool events your hooks.json routes to it.
-# If that matcher is "Write" alone — the default this system ships — then an Edit
-# or MultiEdit that destroys a note never reaches this guard at all.
+# SCOPE LIMITS — named here as TWO REAL ONES, not a closed count. A stated
+# list of limitations reads as complete to a future reader who stops at the
+# last number; this one isn't a claim that no others exist.
+#
+# 1. This guard sees only the tool events your hooks.json routes to it. If that
+#    matcher is "Write" alone — the default this system ships — then an Edit or
+#    MultiEdit that destroys a note never reaches this guard at all.
+# 2. THE CASE FILTER ABOVE READS `{{NOTES_DIR:-notes}}/*`, an UNSUBSTITUTED
+#    placeholder. That syntax is not shell parameter expansion here — it is a
+#    literal token /init is meant to replace with a real directory name, and
+#    nothing in this repo currently performs that substitution for this
+#    template (the sibling hook, `hooks/scripts/write-validate.sh`, hardcodes
+#    `*/notes/*` instead — a DIFFERENT defect, not this one). Left
+#    unsubstituted, the case arm compares "$FILE" against the literal string
+#    `{{NOTES_DIR:-notes}}/*`, which no real file path ever contains, so this
+#    branch of the filter matches nothing and every note falls through to the
+#    `*thinking/*` arm or is skipped entirely.
+#
+# A THIRD asymmetry survives even correct substitution, and is not fixed
+# here either: `{{NOTES_DIR:-notes}}/*` has no leading `*`, unlike the
+# sibling's `*/notes/*` — so once substituted to (say) `notes/*`, it matches
+# only a path that literally STARTS WITH `notes/`, never one where `notes/`
+# appears nested under something else (`/vault/notes/x.md` matches the
+# sibling's pattern and not this one). Verified directly: an absolute path
+# to a genuinely unhealthy note produced no warning at all under a
+# substituted copy of this template. Whether that is a bug or the intended
+# behavior for this hook's actual invocation context (Claude Code invokes
+# hooks with $CWD already at the vault root, so a relative path may be all
+# this hook is ever handed) is unresolved — recorded, not fixed.
+#
+# Neither is fixed here: widening the hooks.json matcher changes what fires on
+# every edit in every installed vault, and the substitution mechanism is a
+# separate, larger question this task's scope does not include (see the
+# commit message). What is fixed is naming both, instead of the one that was
+# already documented.
 #
 # It WARNS and does not block, like every check here: a legitimate split or
 # prune does shrink a note, and a guard that cries wolf gets switched off, which
@@ -88,10 +127,21 @@ else
     NOW_LINKS=$(grep -o '\[\[' "$FILE" 2>/dev/null | wc -l | tr -d ' ')
     # 200-byte floor so trimming a stub stays quiet; half is the threshold
     # because a legitimate edit rarely halves a developed note. Tune them to
-    # your own notes if they warn too often or too rarely — they are the only
-    # two numbers in this check. The generator that produced this file declares
-    # the same pair on its own side, and editing them here does not change them
-    # there; that is a one-way relationship and it is the expected one.
+    # your own notes if they warn too often or too rarely. The generator that
+    # produced this file declares the same pair on its own side, and editing
+    # them here does not change them there; that is a one-way relationship
+    # and it is the expected one.
+    #
+    # THE LINK ARM BELOW HAS NO FLOOR AND FIRES ON LOSING ONE LINK, which is a
+    # third number this comment used to claim did not exist ("the only two
+    # numbers in this check"). It is deliberate and it is a judgement call,
+    # not an oversight: a lost edge is invisible in the note and visible only
+    # in the graph, so the asymmetry with the byte thresholds above is
+    # intended. A vault's own /reduce and /reweave DO legitimately drop
+    # edges, so if this proves noisy in practice the fix is a floor here, not
+    # deleting the arm. Mirrored in hooks/scripts/write-validate.sh — edit
+    # both, they are two declarations and not one copy, so nothing but this
+    # note stops them drifting apart.
     if [ "${PREV_BYTES:-0}" -gt 200 ] && [ $((NOW_BYTES * 2)) -lt "$PREV_BYTES" ]; then
       echo "CONTENT WARN: $(basename "$FILE") shrank ${PREV_BYTES} -> ${NOW_BYTES} bytes (over half removed)"
       echo "  If this was a split or a prune, fine. If a pass wrote partial output, the rest is gone."
