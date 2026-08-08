@@ -172,9 +172,21 @@ fi
 
 # A directory that does not exist means that feature is not active — valid, and empty.
 # A scan that FAILS over a directory that DOES exist is not, and must not fold to empty.
+#
+# MATCHES "blocked" TOO, not just pending/open. BLOCKED is a real, triaged
+# disposition (see the table below) — "real, but waiting on work outside this
+# system" — and a blocked tension must stay VISIBLE to discovery so a human
+# can see what it is blocked on, even though it must not itself trip the
+# /{DOMAIN:rethink} threshold (that exclusion happens below, at TENSION_COUNT,
+# not here). Before this, a blocked tension was invisible to BOTH
+# TENSION_PENDING and TENSION_COUNT — not merely excluded from the count as
+# the design intends, but absent from triage entirely. BLOCKED is documented
+# as tensions-only (the table below), so widening this shared function is
+# harmless for OBS_PENDING: no observation is ever meant to carry
+# status:blocked in the first place.
 list_open_items() {                        # list_open_items <dir>
   [ -d "$1" ] || return 0
-  list_notes_by_field "$1" status pending open
+  list_notes_by_field "$1" status pending open blocked
 }
 
 OBS_PENDING=$(list_open_items ops/observations) || {
@@ -186,7 +198,20 @@ TENSION_PENDING=$(list_open_items ops/tensions) || {
   echo "error: tension scan failed; refusing to report pending evidence" >&2
   exit 1
 }
-TENSION_COUNT=$(printf '%s\n' "$TENSION_PENDING" | grep -c . || true)
+# TENSION_COUNT excludes blocked entries SPECIFICALLY -- visible to discovery
+# (TENSION_PENDING, above) but must not trip the threshold rule below (~line
+# 296 as of this commit). Re-checks each already-fetched entry's OWN status
+# rather than re-scanning ops/tensions/ a second time with a second query.
+TENSION_BLOCKED=0
+if [ -n "$TENSION_PENDING" ]; then
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    [ "$(frontmatter_field "$t" status)" = "blocked" ] && TENSION_BLOCKED=$((TENSION_BLOCKED + 1))
+  done <<EOF_TENSIONS
+$TENSION_PENDING
+EOF_TENSIONS
+fi
+TENSION_COUNT=$(( $(printf '%s\n' "$TENSION_PENDING" | grep -c . || true) - TENSION_BLOCKED ))
 ```
 
 Read each pending item fully. These are small atomic notes — load all of them. Understanding the full content is required for accurate triage. If zero pending items, report clean state and exit early.
