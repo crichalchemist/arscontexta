@@ -130,10 +130,15 @@ rm -rf "$tmp9"
 # --- Assertion 10: PLACEHOLDER_PAT exists in exactly one place -------------------------
 # Scoped to these three named files, not a tree-wide search -- it proves the two
 # scripts that consume the constant don't redefine it locally, not that no other
-# file anywhere ever declares a same-named variable. reference/skill-authoring.md
-# carries an inert, non-executing copy inside a ```text fence (a documented,
-# deferred item), outside this assertion's scope by design; it never executes and
-# a tree-wide grep would need its own reasoning about what "counts."
+# file anywhere ever declares a same-named variable. A tree-wide
+# `grep -rl '^PLACEHOLDER_PAT='` genuinely finds a second, quoting hit --
+# docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md, which spells
+# out the definition verbatim in prose. reference/skill-authoring.md:62 is a
+# DIFFERENT case, not caught by that same grep at all: it carries the same
+# regex VALUE but under the name `PAT=`, not `PLACEHOLDER_PAT=`, so no
+# variable-name search finds it regardless of scope (a documented, deferred
+# item -- see the plan's Deferrals section -- inert inside a ```text fence,
+# never executes).
 n_defs=$(/usr/bin/grep -rl "^PLACEHOLDER_PAT=" "$ROOT/check-placeholder-count.sh" "$ROOT/check-vocabulary-schema.sh" "$ROOT/lib/placeholder-pattern.sh" 2>/dev/null | wc -l | tr -d ' ')
 assert "$n_defs" "1" "PLACEHOLDER_PAT is defined once among check-placeholder-count.sh/check-vocabulary-schema.sh/lib/placeholder-pattern.sh -- never redefined locally by either consumer"
 

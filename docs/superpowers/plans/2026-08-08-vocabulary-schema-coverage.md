@@ -960,16 +960,19 @@ review that was not fixed, and where each landed. Everything else the reviews fo
 in a task's own fix round or the final review's fix wave — see `git log` for those; this section
 is only for what remains genuinely open.
 
-- **An independently-typed copy of `PLACEHOLDER_PAT` in `reference/skill-authoring.md:61`**
-  (inert — inside a ` ```text ` fence, never executes). Task 1's own scope was
-  `check-placeholder-count.sh` and the new gate only; this third copy predates this plan and
-  was deliberately left untouched. Landed in commit `71c3a02`'s message and in
-  `reference/test/vocabulary-schema.test.sh`'s assertion 10 comment (this repo), which now
-  states explicitly that the assertion's three-file scope does not cover it.
+- **An independently-typed copy of the same regex value, spelled `PAT=` (not `PLACEHOLDER_PAT=`),
+  in `reference/skill-authoring.md:62`** (inert — inside a ` ```text ` fence, never executes, and
+  its different variable name means a tree-wide `grep PLACEHOLDER_PAT` would not even find it).
+  Task 1's own scope was `check-placeholder-count.sh` and the new gate only; this third copy
+  predates this plan and was deliberately left untouched. Recorded here, and in
+  `reference/test/vocabulary-schema.test.sh`'s assertion 10 comment (this repo), which states
+  the assertion's three-file scope is deliberate, not exhaustive. Not recorded in any commit
+  message — none of this plan's commits actually names this file.
 - **A behavioral asymmetry between `check-vocabulary-schema.sh`'s `{DOMAIN:X}` fold and
   `mechanically_compare()`'s own transform**, for a non-identifier `X` (e.g. containing a
-  hyphen): the gate silently skips it (guarded against emptying `used_keys` entirely by
-  assertion 11/the `n_used` check, added in the final review's fix wave), while
+  hyphen): the gate silently skips it (guarded against emptying `used_keys` entirely by the
+  `n_used` check, added during Task 5's own fix round; test assertion 11 covering it is what
+  the final review's fix wave added), while
   `mechanically_compare()` instead leaves it as literal text, which fails to match installed
   text and reads as a loud `MODIFIED`. Not triggered by anything currently in `skill-sources/`
   — every real `{DOMAIN:X}` there is a clean identifier or one of the two special-cased

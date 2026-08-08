@@ -77,8 +77,10 @@ truth_suite() {   # truth_suite <suite-basename> -> passed count, ONLY if failed
     [ -n "$passed" ] || passed=$(printf '%s' "$line" | sed -n 's/.*[: ]\([0-9][0-9]*\) passed,.*/\1/p')
     [ -n "$failed" ] || failed=$(printf '%s' "$line" | sed -n 's/.*, \([0-9][0-9]*\) failed.*/\1/p')
     # THREE TOTAL FORMATS EXIST NOW. vocabulary-schema.test.sh prints a bare
-    # `P/T` (passed/total, e.g. `11/11`), added after this comment described
-    # "two" -- sed alone cannot compute failed = total - passed, so this branch
+    # `P/T` (passed/total, e.g. `12/12` -- a shape example, not a live claim;
+    # re-derive the real count rather than trusting this comment), added after
+    # this comment described "two" -- sed alone cannot compute failed = total
+    # minus passed, so this branch
     # captures both numbers and derives it in the shell rather than matching a
     # failed=N group that does not exist in this format.
     if [ -z "$passed" ]; then

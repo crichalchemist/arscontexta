@@ -81,12 +81,22 @@ ILLUSTRATIVE='skills/reseed f03~single git mv over literal placeholder operands 
 skill-sources/tasks f03~an if whose entire body is comments describing the steps; bash -n rejects the empty then-branch and zsh accepts it, so listing it keeps the two shells reporting the same counts'
 
 # --- known-open defects this gate FOUND and does not yet block on -----------
-# Every line below is a real defect, found by this gate on the tree it landed
+# Most lines below are real defects, found by this gate on the tree they landed
 # against, in a skill the hardening branch never touched. They are listed rather
 # than fixed because fixing them is a separate change with its own review: the
 # `seed` sites read `$FILE`, which is the argument the skill is invoked with, so
 # the repair is a design decision (re-derive per fence? read `$ARGUMENTS`?) and
 # not the stanza copy that closed the `graph` sites.
+#
+# THE reflect f01 / reweave f02 ENTRIES BELOW ARE A DIFFERENT KIND: not a
+# defect in the fence, a scope artifact in assertion N's own selector. Task 3
+# of docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md renamed
+# {vocabulary.notes_collection} to {vocabulary.notes}, which newly matches
+# N's `grep -q -e 'NOTES_DIR' -e '{vocabulary.notes}'` selector even though the
+# match here is a qmd COLLECTION name, not the notes-directory reference the
+# selector means to scope to -- and both fences were edited by the branch that
+# added them here, not left untouched. Reasons for these two entries say so
+# explicitly rather than reusing the "found, unrepaired" framing above.
 #
 # THE LIST IS CHECKED IN BOTH DIRECTIONS. A listed site that fails is reported
 # as KNOWN and does not block. A listed site that PASSES fails the gate, and so
