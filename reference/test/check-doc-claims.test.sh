@@ -38,6 +38,22 @@
 # assertions count `reference/` lines in those fences against the live
 # file count -- omitting it entirely would make check-doc-claims.sh fail
 # against its own healthy tree.
+#
+# NOT INDIVIDUALLY GATED: every other suite listed in CLAUDE.md/
+# CONTRIBUTING.md has its own `truth_suite` row in check-doc-claims.sh's
+# CLAIMS table, so a stale printed total (e.g. the "13/13" this file's own
+# fence lines quote) fails loud. This suite deliberately has NO such row.
+# Wiring one in would mean check-doc-claims.sh's own CLAIMS-verification
+# pass invokes THIS suite as a truth source -- and this suite itself
+# invokes check-doc-claims.sh three more times, each already paying the
+# cost of running every OTHER truth source (seven suites). That is a ~4x
+# cost multiplier on every check-doc-claims.sh run, paid on every
+# invocation, to guard against one specific document going stale. Left
+# unwired: if an assertion is ever added or removed here, the "13/13"
+# prose in CLAUDE.md/CONTRIBUTING.md will NOT be caught automatically --
+# whoever changes this file's assertion count must also update those two
+# prose sites by hand. Recorded here rather than left silent, per this
+# repo's own convention for stated, deliberate gaps.
 
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -149,6 +165,17 @@ rm -f "$RECIPE_BACKUP"; RECIPE_BACKUP=""
 # writes to a FILE, not a `$()` capture, because command substitution
 # strips trailing newlines and would introduce a spurious mismatch on a
 # byte-exact comparison.
+#
+# KNOWN NARROW TRADEOFF: comparing to HEAD, not to "whatever the file
+# looked like before this suite ran", means a contributor who already had
+# UNCOMMITTED local edits to graph-analysis.md before invoking this suite
+# gets a FALSE teardown FAIL -- the mutate/restore cycle above correctly
+# restores their actual prior (dirty) state via RECIPE_BACKUP, but that
+# state no longer matches HEAD, so this final assertion reports "no"
+# even though nothing was lost. Accepted deliberately: CI always runs on
+# a clean checkout, where "restored" and "matches HEAD" are the same
+# claim, and the alternative (a PRISTINE snapshot of "prior state") is
+# exactly the mechanism that produced the timing bug this replaced.
 HEAD_BLOB=$(mktemp) || exit 1
 if (cd "$ROOT" && git show HEAD:generators/features/graph-analysis.md > "$HEAD_BLOB" 2>/dev/null); then
   eq "teardown: recipe file restored byte-identical to git HEAD" "yes" \
