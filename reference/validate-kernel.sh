@@ -321,8 +321,13 @@ resolve_note_dirs() {
     # `[ -n "$_rn_d" ] || continue`, so a genuinely empty scan still produces
     # zero iterations, identical to the original direct-pipe behavior.
     # THE PER-CANDIDATE PROBE BELOW RUNS INSIDE THE while LOOP'S SUBSHELL --
-    # it reads from a pipe, so bash and zsh both fork it -- and a variable
-    # assignment made in there is discarded the moment the subshell exits.
+    # in bash the pipe itself forks the loop; zsh does not fork on a pipe,
+    # but the surrounding $( ) around the whole loop forks in BOTH shells,
+    # and that outer subshell is what actually discards a plain variable
+    # assignment made inside the loop body, regardless of which shell forked
+    # which stage. Measured directly: `V=orig; O=$(printf 'a\n' | while read
+    # -r x; do V=changed; done); echo "$V"` prints `orig` in both bash and
+    # zsh.
     # `_rn_resolver_err=true` set inside the loop body would never reach this
     # function's return value at all: the exact swallowed-in-a-subshell trap
     # this function's OWN header comment already names, and the one
@@ -334,6 +339,13 @@ resolve_note_dirs() {
     _rn_ops=$(resolve_ops_dir_name "$1")
     _rn_shape_raw=$(find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null); _rn_shape_rc=$?
     [ "$_rn_shape_rc" -eq 0 ] || _rn_resolver_err=true
+    # `rm -f` BEFORE FIRST USE, not merely on cleanup: $$ is recycled by the
+    # OS, so a same-PID leftover from an earlier, differently-killed run is
+    # debris rather than this run's own signal -- deleting it here means a
+    # stale file is never misread as a fresh error. No fixture proves this
+    # branch: doing so needs a way to plant debris under a FUTURE process's
+    # $$, which is not injectable from a test. Recorded rather than left
+    # implicit, matching this file's own "no silent caps" convention.
     _rn_probe_errf="/tmp/validate-kernel-probe-err-$$"
     rm -f "$_rn_probe_errf"
     _rn_out=$(printf '%s\n' "$_rn_shape_raw" | while IFS= read -r _rn_d; do
