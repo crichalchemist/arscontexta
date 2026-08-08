@@ -1143,7 +1143,7 @@ active_blocks:
 
 coherence_result: [passed | passed_with_warnings]
 
-domain_summary: "[domain term]"  # e.g., "day trading strategy research" -- one-line
+domain_summary: "[description]"  # e.g., "day trading strategy research" -- one-line
                                   # description of what this vault covers; used by
                                   # reduce/SKILL.md's selectivity gate. Collected the
                                   # same way for single- and multi-domain vaults.
