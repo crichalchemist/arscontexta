@@ -7,13 +7,13 @@
   },
   "metadata": {
     "description": "Conversational derivation engine for agent-native knowledge systems",
-    "version": "0.9.0"
+    "version": "0.9.5"
   },
   "plugins": [
     {
       "name": "arscontexta",
       "description": "Generate research-backed knowledge systems from natural conversation. 15 kernel primitives, 26 commands, 249 research claims, 3 presets.",
-      "version": "0.9.0",
+      "version": "0.9.5",
       "source": "./",
       "strict": false,
       "author": {
