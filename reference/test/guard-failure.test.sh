@@ -422,12 +422,22 @@ eq "check 2B names the .template"           "yes" \
 # 7A: find's exit status, no longer swallowed by the pipe into `sort`. One
 # FM_SCAN root made unreadable; the scan must report the traversal failure,
 # not silently proceed on whatever the other eight roots yielded.
+#
+# Captured ONCE, same reason as FM_STALE_OUT below: the second assertion is
+# a negative check ("the healthy SKIP text is absent"), and an independent
+# second `out_of "$I"` call would pass that check vacuously if the guard had
+# crashed or produced no output at all under check 7 -- absent-because-wrong
+# and absent-because-nothing-ran read identically to a bare `grep -q`. Gating
+# it on the SAME capture the first (positive) assertion already proved
+# contains "find failed" closes that hole here too.
 I=$(mkroot)
 chmod 000 "$I/hooks"
+FM_ROOT_OUT=$(out_of "$I")
 eq "check 7: unreadable root -> find failed, not silent" "yes" \
-   "$(out_of "$I" | grep -q 'find failed' && echo yes || echo no)"
+   "$(printf '%s' "$FM_ROOT_OUT" | grep -q 'find failed' && echo yes || echo no)"
 eq "check 7: unreadable root does NOT read as a healthy SKIP" "yes" \
-   "$(out_of "$I" | grep -A1 '^7\.' | grep -q 'SKIP no allowlisted' && echo no || echo yes)"
+   "$(printf '%s' "$FM_ROOT_OUT" | grep -q 'find failed' || { echo no; exit; }; \
+      printf '%s' "$FM_ROOT_OUT" | grep -A1 '^7\.' | grep -q 'SKIP no allowlisted' && echo no || echo yes)"
 chmod 755 "$I/hooks"
 
 # 7B: fm_hits_in's UNREADABLE sentinel. A file `find` LISTED (needs only the
