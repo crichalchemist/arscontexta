@@ -76,6 +76,20 @@ truth_suite() {   # truth_suite <suite-basename> -> passed count, ONLY if failed
     failed=$(printf '%s' "$line" | sed -n 's/.*failed=\([0-9][0-9]*\).*/\1/p')
     [ -n "$passed" ] || passed=$(printf '%s' "$line" | sed -n 's/.*[: ]\([0-9][0-9]*\) passed,.*/\1/p')
     [ -n "$failed" ] || failed=$(printf '%s' "$line" | sed -n 's/.*, \([0-9][0-9]*\) failed.*/\1/p')
+    # THREE TOTAL FORMATS EXIST NOW. vocabulary-schema.test.sh prints a bare
+    # `P/T` (passed/total, e.g. `11/11`), added after this comment described
+    # "two" -- sed alone cannot compute failed = total - passed, so this branch
+    # captures both numbers and derives it in the shell rather than matching a
+    # failed=N group that does not exist in this format.
+    if [ -z "$passed" ]; then
+        local p_slash t_slash
+        p_slash=$(printf '%s' "$line" | sed -n 's/^\([0-9][0-9]*\)\/[0-9][0-9]*$/\1/p')
+        t_slash=$(printf '%s' "$line" | sed -n 's/^[0-9][0-9]*\/\([0-9][0-9]*\)$/\1/p')
+        if [ -n "$p_slash" ] && [ -n "$t_slash" ]; then
+            passed="$p_slash"
+            failed=$((t_slash - p_slash))
+        fi
+    fi
     [ -n "$passed" ] || return 1
     # A FAILING SUITE MUST NOT PRODUCE A TRUTH VALUE. The extract anchors on
     # `failed=0` in the document but nothing asserted the tree agreed, so a suite
@@ -294,6 +308,7 @@ CONTRIBUTING.md|kernel-note-dirs suite total|s/.*kernel-note-dirs.*passed=\([0-9
 CONTRIBUTING.md|threshold-namespace suite total|s/.*threshold-namespace.*expect: \([0-9][0-9]*\) passed,.*/\1/p|truth_suite|threshold-namespace
 CONTRIBUTING.md|placeholder-count suite total|s/.*placeholder-count.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|placeholder-count
 CONTRIBUTING.md|hook-config suite total|s/.*hook-config.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|hook-config
+CONTRIBUTING.md|vocabulary-schema suite total|s/.*vocabulary-schema.*# expect: \([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|vocabulary-schema
 CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z-]*\) CI steps must pass.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z-]*\) CI steps ran.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z-]*\),.*/\1/p|truth_check_files|
@@ -309,6 +324,7 @@ CLAUDE.md|kernel-note-dirs fence total|s/^ *\$s reference\/test\/kernel-note-dir
 CLAUDE.md|threshold-namespace fence total|s/^ *\$s reference\/test\/threshold-namespace\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|threshold-namespace
 CLAUDE.md|placeholder-count fence total|s/^ *\$s reference\/test\/placeholder-count\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|placeholder-count
 CLAUDE.md|hook-config fence total|s/^ *\$s reference\/test\/hook-config\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|hook-config
+CLAUDE.md|vocabulary-schema fence total|s/^ *\$s reference\/test\/vocabulary-schema\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|vocabulary-schema
 CLAUDE.md|executable check count|s/^ls reference\/check-\*\.sh [^#]*# *\([0-9][0-9]*\).*/\1/p|truth_check_files|'
 
 while IFS='|' read -r file label extract truthfn arg; do

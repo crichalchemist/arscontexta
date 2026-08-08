@@ -128,8 +128,26 @@ assert "$?" "2" "schema with no bounding '# Level 7:' marker -> cannot conclude 
 rm -rf "$tmp9"
 
 # --- Assertion 10: PLACEHOLDER_PAT exists in exactly one place -------------------------
+# Scoped to these three named files, not a tree-wide search -- it proves the two
+# scripts that consume the constant don't redefine it locally, not that no other
+# file anywhere ever declares a same-named variable. reference/skill-authoring.md
+# carries an inert, non-executing copy inside a ```text fence (a documented,
+# deferred item), outside this assertion's scope by design; it never executes and
+# a tree-wide grep would need its own reasoning about what "counts."
 n_defs=$(/usr/bin/grep -rl "^PLACEHOLDER_PAT=" "$ROOT/check-placeholder-count.sh" "$ROOT/check-vocabulary-schema.sh" "$ROOT/lib/placeholder-pattern.sh" 2>/dev/null | wc -l | tr -d ' ')
-assert "$n_defs" "1" "PLACEHOLDER_PAT is defined in exactly one file (lib/placeholder-pattern.sh), never redefined locally"
+assert "$n_defs" "1" "PLACEHOLDER_PAT is defined once among check-placeholder-count.sh/check-vocabulary-schema.sh/lib/placeholder-pattern.sh -- never redefined locally by either consumer"
+
+# --- Assertion 11: n_used guards against a non-identifier {DOMAIN:X} silently ----------
+# emptying used_keys, distinct from assertion 3's already-covered case (the
+# documented extraction_categories exception). Added after a whole-branch review
+# found this exact scenario had no assertion of its own -- only manually verified
+# during Task 5's fix round, not covered by the shipped suite.
+tmp11=$(mktemp -d); mkdir -p "$tmp11/scan"
+fixture_schema "$tmp11/schema.md"
+echo '{DOMAIN:not-a-valid-key}' > "$tmp11/scan/x.md"
+SCAN_ROOT="$tmp11/scan" SCHEMA_FILE="$tmp11/schema.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "2" "a sole non-identifier {DOMAIN:X} (e.g. containing a hyphen) leaves used_keys empty -> cannot conclude, never a false-clean pass"
+rm -rf "$tmp11"
 
 echo "$pass/$((pass+fail))"
 [ "$fail" -eq 0 ]

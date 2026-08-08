@@ -112,7 +112,7 @@ for s in bash zsh; do
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0
-  $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 11/11
+  $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes

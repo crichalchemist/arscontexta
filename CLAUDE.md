@@ -68,7 +68,7 @@ for s in bash zsh; do
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 57/57
-  $s reference/test/vocabulary-schema.test.sh            # 11/11
+  $s reference/test/vocabulary-schema.test.sh            # 12/12
 done
 ```
 

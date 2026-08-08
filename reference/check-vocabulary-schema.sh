@@ -96,6 +96,17 @@ used_keys=$(printf '%s\n' "$raw_matches" | while IFS= read -r m; do
     '{DOMAIN:topic map}')  printf 'topic_map\n' ;;
     '{DOMAIN:'*'}')
       k=${m#\{DOMAIN:}; k=${k%\}}
+      # A non-identifier X here (whitespace/punctuation other than the two
+      # special-cased "topic map(s)" spellings above) can't fold to a bare key
+      # -- skipped, guarded against silently emptying used_keys entirely (see
+      # the n_used check below). Known asymmetry with mechanically_compare(),
+      # not yet triggered by anything in skill-sources/: that function leaves
+      # such a token as literal text on the canonical side, which then fails
+      # to match installed text and reads as MODIFIED -- a loud divergence,
+      # where this gate's silent skip would only be visible if it were the
+      # SOLE match in scope (n_used guard) or a real declared key happened to
+      # coexist alongside it (silently correct either way, by luck rather than
+      # design). Revisit if a real {DOMAIN:X} with punctuation ever ships.
       case "$k" in *[!a-zA-Z_]*) continue ;; esac
       printf '%s\n' "$k" ;;
     '{vocabulary.'*'}')
