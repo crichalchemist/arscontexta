@@ -14,7 +14,7 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
    - Use `vocabulary.reweave` for the process verb in output
-   - Use `vocabulary.topic_map` / `vocabulary.topic_map_plural` for MOC references
+   - Use `vocabulary.topic_map` / `vocabulary.topic_maps` for MOC references
    - Use `vocabulary.cmd_verify` for the next-phase suggestion
 
 2. **`ops/config.yaml`** — processing depth, pipeline chaining
@@ -37,7 +37,7 @@ If these files don't exist, use universal defaults.
 | Scope | Behavior |
 |-------|----------|
 | related | Search {vocabulary.note_plural} directly related to the target (same {vocabulary.topic_map}, semantic neighbors) |
-| broad | Search across all {vocabulary.topic_map_plural} and semantic space for potential connections |
+| broad | Search across all {vocabulary.topic_maps} and semantic space for potential connections |
 | full | Complete review including potential splits, rewrites, and claim challenges |
 
 ## EXECUTE NOW
@@ -55,7 +55,7 @@ Parse immediately:
 
 1. **Read the target {vocabulary.note} fully** — understand its current claim, connections, and age
 2. **Ask the reweave question:** "If I wrote this {vocabulary.note} today, with everything I now know, what would be different?"
-3. **If a task file exists** (pipeline execution): read it to see what /reflect discovered. The Reflect section shows which connections were just added and which {vocabulary.topic_map_plural} were updated — this is your starting context for the backward pass.
+3. **If a task file exists** (pipeline execution): read it to see what /reflect discovered. The Reflect section shows which connections were just added and which {vocabulary.topic_maps} were updated — this is your starting context for the backward pass.
 4. **Search for newer related {vocabulary.note_plural}** — use dual discovery (semantic search + {vocabulary.topic_map} browsing) to find {vocabulary.note_plural} created AFTER the target that should connect
 5. **Evaluate what needs changing:**
    - Add connections to newer {vocabulary.note_plural} that did not exist when this was written
@@ -64,7 +64,7 @@ Parse immediately:
    - Challenge the claim if new evidence contradicts it
    - Rewrite prose if understanding is deeper now
 6. **Make the changes** — edit the {vocabulary.note} with new connections (inline links with context), improved prose, sharper claim if needed
-7. **Update {vocabulary.topic_map_plural}** — if the {vocabulary.note}'s topic membership changed, update relevant {vocabulary.topic_map_plural}
+7. **Update {vocabulary.topic_maps}** — if the {vocabulary.note}'s topic membership changed, update relevant {vocabulary.topic_maps}
 8. **If task file exists:** update the {vocabulary.reweave} section
 9. **Report** — structured summary of what changed and why
 10. If `--handoff` in target: output RALPH HANDOFF block
@@ -152,7 +152,7 @@ Read the target {vocabulary.note} completely. Understand:
 
 **Also read the task file** if one exists (pipeline execution). The task file's Reflect section shows:
 - What connections /reflect just added
-- Which {vocabulary.topic_map_plural} were updated
+- Which {vocabulary.topic_maps} were updated
 - What synthesis opportunities were flagged
 - What the discovery trace looked like
 
@@ -170,7 +170,7 @@ From the {vocabulary.note}'s Topics footer, identify which {vocabulary.topic_map
 - What newer {vocabulary.note_plural} in Core Ideas should this {vocabulary.note} reference?
 - What tensions involve this {vocabulary.note}?
 
-**Path 2: Semantic Search** — find what {vocabulary.topic_map_plural} might miss
+**Path 2: Semantic Search** — find what {vocabulary.topic_maps} might miss
 
 **Three-tier fallback for semantic search:**
 
@@ -198,7 +198,7 @@ until mkdir "$LOCKDIR" 2>/dev/null; do
 done
 # Releases on the error paths below too, which a trailing rm alone would skip.
 trap 'rm -rf "$LOCKDIR"' EXIT
-qmd query "[note's core concepts]" --collection {vocabulary.notes_collection} --limit 15 2>/dev/null
+qmd query "[note's core concepts]" --collection {vocabulary.notes} --limit 15 2>/dev/null
 rm -rf "$LOCKDIR"
 ```
 

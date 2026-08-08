@@ -17,7 +17,7 @@ Read these files to configure domain-specific behavior:
 1. **`ops/derivation-manifest.md`** — vocabulary mapping, platform hints
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
-   - Use `vocabulary.topic_map` / `vocabulary.topic_map_plural` for MOC references
+   - Use `vocabulary.topic_map` / `vocabulary.topic_maps` for MOC references
    - Use `vocabulary.cmd_reflect` for connection-finding command name
    - Use `vocabulary.cmd_reweave` for backward-pass command name
 
@@ -193,7 +193,7 @@ If graph helper scripts exist in `ops/scripts/graph/`, use them instead of inlin
 ```
 --=={ graph health }==--
 
-  {vocabulary.note_plural}: [N] (plus [M] {vocabulary.topic_map_plural})
+  {vocabulary.note_plural}: [N] (plus [M] {vocabulary.topic_maps})
   Connections: [N] (avg [X] per {vocabulary.note})
   Graph density: [0.XX]
   {vocabulary.topic_map} coverage: [N]% of {vocabulary.note_plural} appear in at least one {vocabulary.topic_map}
@@ -413,7 +413,7 @@ Use BFS/DFS to find all connected components:
 For each cluster:
 - Size (number of {vocabulary.note_plural})
 - Key {vocabulary.note_plural} (highest link count within cluster)
-- Topic coverage (which {vocabulary.topic_map_plural} are represented)
+- Topic coverage (which {vocabulary.topic_maps} are represented)
 - Isolation level (how many links cross cluster boundaries)
 
 **Step 4: Present findings**

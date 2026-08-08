@@ -123,8 +123,8 @@ NOW read the complete note. Compare against your prediction.
 
 Test whether the description enables semantic retrieval:
 
-- Tier 1 (preferred): `mcp__qmd__query` with searches = [{type:"vec", query:"[the note's description text]"}], collections = ["{vocabulary.notes_collection}"], rerank = false, limit = 10
-- Tier 2 (CLI fallback): `qmd vsearch "[the note's description text]" --collection {vocabulary.notes_collection} -n 10`
+- Tier 1 (preferred): `mcp__qmd__query` with searches = [{type:"vec", query:"[the note's description text]"}], collections = ["{vocabulary.notes}"], rerank = false, limit = 10
+- Tier 2 (CLI fallback): `qmd vsearch "[the note's description text]" --collection {vocabulary.notes} -n 10`
 - Tier 3: if both MCP and qmd CLI are unavailable, report "retrieval test deferred (semantic search unavailable)" — do NOT skip silently
 
 Check where the note appears in results:

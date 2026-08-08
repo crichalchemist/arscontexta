@@ -113,8 +113,8 @@ Parse immediately:
 2. **Source size check:** If source exceeds 2500 lines, STOP. Plan chunks of 350-1200 lines. Process each chunk with fresh context. See "Large Source Handling" section below.
 3. Hunt for insights that serve the domain (see extraction categories below)
 4. For each candidate:
-   - Tier 1 (preferred): use `mcp__qmd__query` with searches=[{type:"vec", query:"[claim as sentence]"}], collections=["{vocabulary.notes_collection}"], rerank=false, limit=5
-   - Tier 2 (CLI fallback): `qmd vsearch "[claim as sentence]" --collection {vocabulary.notes_collection} -n 5`
+   - Tier 1 (preferred): use `mcp__qmd__query` with searches=[{type:"vec", query:"[claim as sentence]"}], collections=["{vocabulary.notes}"], rerank=false, limit=5
+   - Tier 2 (CLI fallback): `qmd vsearch "[claim as sentence]" --collection {vocabulary.notes} -n 5`
    - Tier 3 fallback if qmd is unavailable: use keyword grep duplicate checks
    - If duplicate exists: evaluate for enrichment or skip
    - Classify as OPEN (needs more investigation) or CLOSED (standalone, ready)
@@ -353,11 +353,11 @@ This is the critical step that prevents over-rejection. Categorize FIRST, then r
 For each candidate, run duplicate detection:
 
 ```
-mcp__qmd__query  searches=[{type:"vec", query:"[proposed claim as sentence]"}]  collections=["{vocabulary.notes_collection}"]  rerank=false  limit=5
+mcp__qmd__query  searches=[{type:"vec", query:"[proposed claim as sentence]"}]  collections=["{vocabulary.notes}"]  rerank=false  limit=5
 ```
 If MCP is unavailable, run:
 ```bash
-qmd vsearch "[proposed claim as sentence]" --collection {vocabulary.notes_collection} -n 5
+qmd vsearch "[proposed claim as sentence]" --collection {vocabulary.notes} -n 5
 ```
 If qmd CLI is unavailable, fall back to keyword grep duplicate checks.
 
@@ -912,7 +912,7 @@ ten million claims, past any plausible corpus, so the question does not come bac
   simply continues past its own ceiling unpadded — `…-999.md` is followed by `…-1000.md`. Widening
   those retroactively is a rename, and a rename is a broken link.
 
-`/{vocabulary.seed}` reads **width-agnostically** — three digits or more, padded or not — so both
+`/seed` reads **width-agnostically** — three digits or more, padded or not — so both
 populations validate under one scan.
 
 **Example:** If `article-name.md` task has `next_claim_start: 10`, claims are:
