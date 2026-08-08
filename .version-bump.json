@@ -11,7 +11,8 @@
       ".superpowers",
       ".version-bump.json",
       "bump-version.sh",
-      "superpowers"
+      "superpowers",
+      "check-prose-paths.sh"
     ]
   }
 }

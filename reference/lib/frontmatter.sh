@@ -143,6 +143,27 @@ _fm_require_deps_and_dir() { # _fm_require_deps_and_dir <dir>
   return 0
 }
 
+# _fm_find_md <dir> -> markdown file list on stdout, one path per line
+#
+# -H so a SYMLINKED root is followed rather than treated as a 0-byte leaf --
+# the same class of silent-empty-scan bug _fm_require_deps_and_dir's own
+# comment describes for an unreadable root, one level up: a symlinked <dir>
+# with `-H` absent counted the symlink itself, not what it points to,
+# reading as a genuinely empty directory rather than the mistake it was.
+#
+# EXIT STATUS IS find'S OWN, not this function's -- there is no `return`
+# statement here on purpose, so `$(_fm_find_md "$dir")`'s exit status is
+# exactly find's. Every caller MUST capture it on the SAME line as the
+# call: `_fm_list=$(_fm_find_md "$dir"); _fm_find_rc=$?`. NEVER
+# `local x=$(_fm_find_md "$dir")` -- that reads `local`'s own exit status
+# (always 0) and silently discards find's, the identical trap
+# count_notes_by_field's own comment already documents for `local out=$(f)`
+# a few lines below, now doubly true here since this wraps find in ANOTHER
+# layer of command substitution a careless caller could flatten into one line.
+_fm_find_md() {
+  find -H "$1" -type f -name '*.md' 2>/dev/null
+}
+
 # frontmatter_field <file> <field> -> value on stdout
 #   rc 0  field present in frontmatter (value may be the empty string)
 #   rc 1  no frontmatter, unclosed frontmatter, or field absent
@@ -183,7 +204,7 @@ frontmatter_field() {
 # The field and values are provided after the directory path.
 list_notes_by_field() {
   _fm_require_deps_and_dir "$1" || return 1
-  local dir="$1" field="$2" errf p fm_val want
+  local dir="$1" field="$2" errf p fm_val want _fm_list _fm_find_rc
   shift 2
   if [ -z "$field" ] || [ $# -eq 0 ]; then
     echo "error: frontmatter: list_notes_by_field needs <dir> <field> <value>..." >&2
@@ -214,7 +235,7 @@ list_notes_by_field() {
   # of this function checks the ROOT only, and its message claimed more than that.
   # Measured: 2-note fixture with one note under a chmod-000 subdirectory
   # returned count=1 rc=0.
-  _fm_list=$(find -H "$dir" -type f -name '*.md' 2>/dev/null); _fm_find_rc=$?
+  _fm_list=$(_fm_find_md "$dir"); _fm_find_rc=$?
   if [ "$_fm_find_rc" -ne 0 ]; then
     rm -f "$errf"
     echo "error: frontmatter: cannot fully traverse '$dir' (find rc=$_fm_find_rc)" >&2
@@ -266,7 +287,7 @@ count_notes_by_field() {
 # "missing some-field-nothing-declares".
 count_notes_missing_field() {
   _fm_require_deps_and_dir "$1" || return 1
-  local dir="$1" field="$2" errf missing p
+  local dir="$1" field="$2" errf missing p _fm_list _fm_find_rc
   if [ -z "$field" ]; then
     echo "error: frontmatter: count_notes_missing_field needs <dir> <field>" >&2
     return 1
@@ -279,7 +300,7 @@ count_notes_missing_field() {
   # — false for the function 45 lines below it in the same file. Measured before
   # this fix, on a 2-note fixture: symlinked dir 0 (truth 1), note under a
   # chmod-000 subdirectory counted short at rc 0.
-  _fm_list=$(find -H "$dir" -type f -name '*.md' 2>/dev/null); _fm_find_rc=$?
+  _fm_list=$(_fm_find_md "$dir"); _fm_find_rc=$?
   if [ "$_fm_find_rc" -ne 0 ]; then
     rm -f "$errf"
     echo "error: frontmatter: cannot fully traverse '$dir' (find rc=$_fm_find_rc)" >&2

@@ -240,8 +240,8 @@ When you notice friction, surprises, process gaps, or methodology insights durin
 When two {DOMAIN:notes} contradict each other, or an implementation conflicts with methodology, capture the tension in ops/tensions/. Each tension names the conflicting notes and tracks a resolution status. The status vocabulary is declared in the Self-Evolution block below; this line does not repeat it, so the two cannot disagree.
 
 ### Accumulation Triggers
-- **10+ pending observations** → Run /{DOMAIN:rethink} to triage and process
-- **5+ pending tensions** → Run /{DOMAIN:rethink} to resolve conflicts
+- **10+ pending or open observations** → Run /{DOMAIN:rethink} to triage and process
+- **5+ pending or open tensions** → Run /{DOMAIN:rethink} to resolve conflicts
 - /{DOMAIN:rethink} triages each into exactly one disposition. The dispositions and what each one writes are defined in /{DOMAIN:rethink} itself; this line does not list them, because a partial copy here would read as exhaustive and fall behind.
 ```
 

@@ -464,13 +464,25 @@ fi
 # agreeing with each other would read PASS. The expected count is therefore
 # declared, and a move in EITHER direction is rc 2, not a quiet pass.
 #   /usr/bin/grep -rc 'preliminary' generators/ --include='*.md' | grep -v ':0'   # 4 across 3 files
+#   /usr/bin/grep -rn 'status:.*dissolved' generators/ --include='*.md'   # 1
 #   /usr/bin/grep -rn 'list_notes_by_field.*type tension' generators/ --include='*.md'   # 3
 # (The recipe shape moved on fix/spec-h-enforcement-gap from an inline
 # `status: (pending|open)` to a list_notes_by_field call whose FOLLOWING line
 # names the values via `[ "$s" = "..." ]`. The anchor above tracks the new
 # shape; TENSION_RECIPES itself is unchanged, since the same 3 sites moved.)
+#
+# TENSION_ENUM_DECLS EXISTS FOR THE SAME REASON NOTE_ENUM_DECLS DOES, added
+# because the tension enum's own count guard didn't. Before this pin, `tenum`
+# was read with `| head -1` and no declaration count check at all — a SECOND
+# `status:...dissolved` line anywhere in generators/ would be silently and
+# arbitrarily chosen between, with no signal that a choice had even been made.
+# Reproduced directly: with a decoy second declaration present, `head -1`
+# picked the decoy over the real enum, and the check reported a MISMATCH
+# blaming the wrong cause (`pending`/`open` "not declared") rather than
+# surfacing the actual defect (two declarations, an arbitrary pick).
 NOTE_ENUM_DECLS=4
 TENSION_RECIPES=3
+TENSION_ENUM_DECLS=1
 
 # Normalisation is two rules and no vocabulary: take everything after `enum` if
 # the line has it (the table row), else after `status`, then drop punctuation.
@@ -512,7 +524,14 @@ EOF_DECLS
 fi
 
 printf '  %-18s %-30s ' "generators/" "tension recipes match enum"
-tenum=$(/usr/bin/grep -rh 'status:.*dissolved' generators/ --include='*.md' 2>/dev/null | head -1 | enum_values)
+# TENSION_ENUM_DECLS GUARD, MIRRORING NOTE_ENUM_DECLS FIVE LINES ABOVE (the
+# sibling NOTE-enum check). Before this guard, `tenum` was read with a bare
+# `| head -1` and no declaration-count check at all: a SECOND `status:...
+# dissolved` line anywhere in generators/ would be silently and arbitrarily
+# chosen between, with nothing to say a choice had even been made. Count
+# first, require exactly one, error otherwise — same shape as NOTE_ENUM_DECLS.
+tdecls=$(/usr/bin/grep -rn 'status:.*dissolved' generators/ --include='*.md' 2>/dev/null)
+n_tdecls=$(printf '%s\n' "$tdecls" | grep -c . || true)
 # The recipe used to be one line, `type: tension` piped to `status: (a|b)`, so
 # the values were extractable from the same line matched. Since the conversion
 # to list_notes_by_field (fix/spec-h-enforcement-gap), the values live on the
@@ -520,27 +539,48 @@ tenum=$(/usr/bin/grep -rh 'status:.*dissolved' generators/ --include='*.md' 2>/d
 # check now reads one line past each match rather than parsing the match itself.
 recipes=$(/usr/bin/grep -rn 'list_notes_by_field.*type tension' generators/ --include='*.md' 2>/dev/null)
 n_rec=$(printf '%s\n' "$recipes" | grep -c . || true)
-if [ -z "$tenum" ]; then
+if [ "$n_tdecls" -eq 0 ]; then
     echo "ERROR  tension enum not found (anchor 'dissolved') — cannot evaluate"
+    errors=$((errors + 1))
+elif [ "$n_tdecls" -ne "$TENSION_ENUM_DECLS" ]; then
+    echo "ERROR  found $n_tdecls tension-enum declaration(s), expected $TENSION_ENUM_DECLS — the set moved; re-derive and re-pin"
     errors=$((errors + 1))
 elif [ "$n_rec" -ne "$TENSION_RECIPES" ]; then
     echo "ERROR  found $n_rec tension recipe(s), expected $TENSION_RECIPES — the set moved; re-derive and re-pin"
     errors=$((errors + 1))
 else
+    tenum_file=$(printf '%s' "$tdecls" | cut -d: -f1)
+    tenum=$(/usr/bin/grep -h 'status:.*dissolved' "$tenum_file" 2>/dev/null | enum_values)
     undeclared=""
+    zero_extract=""
     while IFS= read -r r; do
         [ -n "$r" ] || continue
         f=$(printf '%s' "$r" | cut -d: -f1)
         ln=$(printf '%s' "$r" | cut -d: -f2)
         site="$f:$ln"
         follow=$(sed -n "$((ln + 1))p" "$f")
-        for v in $(printf '%s' "$follow" | /usr/bin/grep -oE '"\$s" = "[a-zA-Z_]+"' | sed 's/.*"\([a-zA-Z_]*\)"$/\1/'); do
+        vals=$(printf '%s' "$follow" | /usr/bin/grep -oE '"\$s" = "[a-zA-Z_]+"' | sed 's/.*"\([a-zA-Z_]*\)"$/\1/')
+        # A ZERO-VALUE EXTRACTION IS AN ERROR, NOT A SILENT "ok". The old
+        # shape read the follow-line, found nothing to iterate, and the `for`
+        # loop below simply ran zero times — undeclared stayed empty, and
+        # "ok $n_rec recipes, all values declared" printed having checked
+        # NOTHING for this recipe. Reproduced directly: reordering one
+        # recipe's follow-line left this check green while validating zero
+        # of its three sites.
+        if [ -z "$vals" ]; then
+            zero_extract="$zero_extract $site"
+            continue
+        fi
+        for v in $vals; do
             printf '%s\n' "$tenum" | grep -qxF "$v" || undeclared="$undeclared $site:$v"
         done
     done <<EOF_REC
 $recipes
 EOF_REC
-    if [ -n "$undeclared" ]; then
+    if [ -n "$zero_extract" ]; then
+        echo "ERROR  recipe(s) at$zero_extract extracted zero values from the follow-line — the recipe shape moved"
+        errors=$((errors + 1))
+    elif [ -n "$undeclared" ]; then
         echo "MISMATCH  recipe matches value(s) the enum does not declare:$undeclared"
         mismatches=$((mismatches + 1))
     else

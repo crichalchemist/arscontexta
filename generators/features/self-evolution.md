@@ -188,13 +188,15 @@ Your system generates two types of signals during normal operation:
 **Tensions** — contradictions between {DOMAIN:notes}, conflicting methodology claims, implementation vs theory mismatches. These go to `ops/tensions/` as atomic notes. They tell you where your understanding is inconsistent.
 
 Both signal types accumulate over time. The system monitors their count and suggests action when thresholds are crossed:
-- **10+ pending observations** → suggest running /{DOMAIN:rethink}
-- **5+ pending tensions** → suggest running /{DOMAIN:rethink}
+- **10+ pending or open observations** → suggest running /{DOMAIN:rethink}
+- **5+ pending or open tensions** → suggest running /{DOMAIN:rethink}
 
-The /{DOMAIN:rethink} command triages accumulated signals. For each pending note, it decides one of four actions:
+The /{DOMAIN:rethink} command triages accumulated signals. For each pending or open note, it decides one of six dispositions:
 - **PROMOTE** to {DOMAIN:notes}/ — the observation crystallized into a genuine insight worth keeping as a permanent {DOMAIN:note}
 - **IMPLEMENT** as system change — the observation points to a concrete improvement in ops/context.md, templates, or workflows
-- **ARCHIVE** — the observation was session-specific or no longer relevant
+- **METHODOLOGY** — a behavioral learning about how to operate, not a domain insight or a system change; captured as a methodology note in ops/methodology/
+- **ARCHIVE** — the item was session-specific or no longer relevant
+- **BLOCKED** (tensions only) — real, but waiting on work outside this system; not counted toward the threshold until the blocker clears
 - **KEEP PENDING** — not enough evidence yet to decide; let it accumulate with others
 
 This is the scientific method applied to your knowledge system: observe, accumulate evidence, evaluate when patterns emerge, and revise the system based on what you find.

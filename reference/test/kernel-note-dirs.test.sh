@@ -390,6 +390,13 @@ c1() { # c1 <vault>  -> C1's own result line
   [ -z "$_c1" ] && printf 'VALIDATOR-PRODUCED-NO-OUTPUT' || printf '%s' "$_c1"
 }
 
+p12() { # p12 <vault>  -> primitive 12's own result line
+  _p12=$("$SELF" "$VALIDATOR" "$1" 2>/dev/null \
+    | sed "s/${ESC}\\[[0-9;]*m//g" \
+    | awk '/^12\. /{on=1; next} /^13\. /{on=0} on')
+  [ -z "$_p12" ] && printf 'VALIDATOR-PRODUCED-NO-OUTPUT' || printf '%s' "$_p12"
+}
+
 # ALL FOUR (directory x status) SPECS GET A VIOLATION. The first version of this
 # fixture had a promoted TENSION but no promoted OBSERVATION, so deleting the
 # `ops/observations:promoted` spec from the validator changed nothing observable
@@ -594,6 +601,130 @@ else
 fi
 chmod 755 "$V/ops/observations" 2>/dev/null
 rm -rf "$ROOT"
+
+# RESOLVER ERROR ON A VOCABULARY-DECLARED CUSTOM OPS NAME, not a hardcoded
+# one. The "renamed ops" fixtures above prove resolve_ops_dir can FIND a
+# manifest-declared directory; this one makes that directory itself
+# unreadable, so the manifest that would declare its name can never be read
+# either -- reachable ONLY through its vocabulary-declared name, and that
+# whole path is an I/O error. Before this task, resolve_ops_dir had no third
+# state: this returned the same rc as "no ops dir at all", and C1 read it as
+# WARN "self-evolution not enabled" -- a false statement about a vault whose
+# self-evolution tree exists and simply could not be read.
+#
+# chmod 000 does not restrict root, so this assertion would SILENTLY pass
+# when the suite runs as root -- same guard as the block above, checked
+# first, reporting SKIPPED-AS-ROOT rather than a green tick that never ran.
+V=$(mkoutcomes) || exit 1; ROOT=$(dirname "$V")
+mkdir -p "$V/zzz-ops-err"
+mv "$V/ops/observations" "$V/ops/tensions" "$V/zzz-ops-err/"
+printf 'vocabulary:\n  notes: "zzz-arbitrary"\n  ops: "zzz-ops-err"\n' > "$V/zzz-ops-err/derivation-manifest.md"
+rm -rf "$V/ops"
+# REVIEW TRIGGER AND RETHINK PRESENCE, ADDED SO checks_passed CAN REACH 2
+# FROM THESE TWO ALONE -- without them, mkoutcomes()'s own fixture has
+# neither, so checks_passed stays 0 regardless of the observations/tensions
+# resolver state, and the "not absorbed into a partial-loop WARN" assertion
+# below would be checking a branch this fixture can never reach either way
+# -- a coincidental pass, not a real one. Verified by mutation: without
+# these two lines, disabling the priority check still left that assertion
+# green, because "No operational learning loop detected" (the else branch)
+# never contains "Partial learning loop" regardless of the mutation.
+printf '# CLAUDE.md\n\nRun /rethink to review pending observations.\n' > "$V/CLAUDE.md"
+mkdir -p "$V/.claude/skills/rethink"
+chmod 000 "$V/zzz-ops-err" 2>/dev/null
+if ls "$V/zzz-ops-err" >/dev/null 2>&1; then
+  printf '  SKIP C1/P12: resolver-error branch (running as root; chmod 000 does not restrict)\n'
+else
+  OUT=$(c1 "$V")
+  eq "C1: resolver error on a vocab-declared custom ops name FAILs, not warns" "fail" \
+     "$(printf '%s' "$OUT" | grep -q 'FAIL' && echo fail || echo other)"
+  eq "C1: resolver error -> does NOT read as self-evolution not enabled"      "absent" \
+     "$(printf '%s' "$OUT" | grep -q 'not applicable' && echo present || echo absent)"
+  eq "C1: resolver error -> message names it as a resolver error"            "present" \
+     "$(printf '%s' "$OUT" | grep -q 'resolver-error' && echo present || echo absent)"
+
+  # THE SAME FIXTURE ALSO EXERCISES PRIMITIVE 12's has_obs_dir/has_tensions_dir
+  # resolver-error arm -- generating that output and never asserting on it is
+  # this file's own recorded verdict on that move: "worse than not testing".
+  P12OUT=$(p12 "$V")
+  eq "P12: resolver error on the same fixture FAILs, not warns"               "fail" \
+     "$(printf '%s' "$P12OUT" | grep -q 'FAIL' && echo fail || echo other)"
+  eq "P12: resolver error -> not absorbed into a partial-loop WARN"           "absent" \
+     "$(printf '%s' "$P12OUT" | grep -q 'Partial learning loop' && echo present || echo absent)"
+  eq "P12: resolver error -> message names it as a resolver error"           "present" \
+     "$(printf '%s' "$P12OUT" | grep -q 'resolver error' && echo present || echo absent)"
+fi
+chmod 755 "$V/zzz-ops-err" 2>/dev/null
+rm -rf "$ROOT"
+
+# resolve_note_dirs' FOURTH find call site -- the per-candidate markdown
+# probe inside the shape-scan loop, distinct from the three the function's
+# own header names (manifest, config, the shape scan's own top-level find).
+# This one is easy to miss because it sits inside a loop, and an earlier
+# version of this task's own fix undercounted it at "three".
+#
+# ISOLATING THIS SITE FROM THE MANIFEST/CONFIG FINDS TOOK A SECOND ATTEMPT,
+# recorded because the first one silently tested the wrong thing. `find
+# -maxdepth 2` for the manifest/config search DESCENDS into every top-level
+# directory to look for depth-2 files -- so chmod 000 on the top-level
+# candidate ITSELF (the first version of this fixture) makes the manifest
+# find fail too, before the shape scan even runs, and rc 2 comes from THAT
+# site, not this one. Verified directly: with the top-level directory
+# chmod'd, mutating away only this probe's touch-file signal left the suite
+# green (76/76) -- the assertions were passing for a reason unrelated to
+# the code they were meant to cover.
+#
+# The nested version below isolates it for real: `zzz-onlycandidate/` stays
+# readable (755), so the manifest/config finds can list it at depth 2
+# without needing to enter it, and complete cleanly; only
+# `zzz-onlycandidate/sub/`, one level deeper (depth 2, outside the
+# manifest/config search's OWN maxdepth 2 boundary for descending further)
+# is unreadable. The shape scan's outer find lists `zzz-onlycandidate` by
+# name without descending into it either. Only the per-candidate probe --
+# which recurses into `zzz-onlycandidate` with no depth limit, looking for
+# ANY markdown file anywhere inside it -- ever tries to enter `sub/`, and
+# is the only find call this fixture can possibly fail. Confirmed by the
+# same mutation against THIS structure: it now flips the message
+# (see fix-round mutation log), which is the property "isolates this site"
+# actually requires.
+#
+# mkvault() is NOT used here -- it declares a manifest, so resolution would
+# resolve via that vocabulary route and never reach the shape-scan fallback
+# this fixture exists to exercise. A bare, manifest-free vault is built
+# directly instead.
+ROOT=$(mktemp -d) || exit 1; V="$ROOT/vault"
+mkdir -p "$V/zzz-onlycandidate/sub"
+printf 'body\n' > "$V/zzz-onlycandidate/sub/n.md"
+chmod 000 "$V/zzz-onlycandidate/sub" 2>/dev/null
+if ls "$V/zzz-onlycandidate/sub" >/dev/null 2>&1; then
+  printf '  SKIP resolve_note_dirs: probe-error branch (running as root; chmod 000 does not restrict)\n'
+else
+  P2OUT=$(p2 "$V")
+  eq "P2: sole unreadable candidate dir -> check does NOT run" "present" \
+     "$(printf '%s' "$P2OUT" | grep -q 'did NOT run' && echo present || echo absent)"
+  eq "P2: sole unreadable candidate dir -> names it a resolver error"  "present" \
+     "$(printf '%s' "$P2OUT" | grep -q 'resolver error' && echo present || echo absent)"
+fi
+chmod 755 "$V/zzz-onlycandidate/sub" 2>/dev/null
+rm -rf "$ROOT"
+
+# WHAT THIS DOES NOT CLOSE, RECORDED RATHER THAN LEFT SILENT: a vault with
+# MULTIPLE top-level candidates, where only SOME are unreadable, still
+# returns rc 0 (success) from resolve_note_dirs as long as at least one
+# candidate resolves -- the probe's own resolver-error signal is only
+# consulted on the function's failure path, never on its success path. A
+# note-bearing sibling directory can therefore still be silently dropped
+# from primitive 2's scan while the vault's OTHER directories keep it
+# reporting a confident "checked all N" PASS. Verified directly (not
+# merely asserted) against a two-directory fixture -- one readable, one
+# with an unreadable subdirectory -- before this comment was written:
+# post-fix, primitive 2 still printed "PASS ... scanned: <readable-dir-only>"
+# rather than a resolver-error message. Closing that would mean threading a
+# NEW partial-success warning signal through resolve_note_dirs and every
+# primitive 2 message branch, not merely capturing find's own exit status
+# the way this task's other 7 sites do -- a materially larger change than
+# "return a distinct code from not found," and left for a follow-up finding
+# rather than scope-crept into this task.
 
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

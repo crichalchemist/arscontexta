@@ -274,7 +274,13 @@ for s in bash zsh; do $s reference/test/fence-isolation.test.sh | tail -1; done
       print the suite's real exit status before the final `tail -1` line, rather than letting the
       pipeline discard it.
 - [ ] **Step 4 — fix the six MD031 blank-line violations**, low priority, while the file is open for
-      the other two fixes.
+      the other two fixes. **NOT SHIPPED — claim verified false.** Checked exhaustively against
+      the current file (`a138126`'s own commit message has the method and the count): the target
+      plan has exactly 5 "Done when" fenced blocks, not 6, and all 10 fence markers across those 5
+      pairs are correctly blank-line-separated on both sides. No MD031 violation exists to fix.
+      Per this repo's own CLAUDE.md divergence 10 ("a record that does not ship is not a record" —
+      a prior version of this exact defect class lived only in a commit message and a gitignored
+      ledger), the falsification is annotated here rather than left in `a138126` alone.
 - [ ] **Step 5 — explicitly do NOT touch the canonical-name resolver contract wording** at lines
       44-52 (or the matching spec design doc's lines 59-61) — the spec names this as already moot,
       and editing it now would be exactly the retroactive retcon this task's own Step 1 is careful to

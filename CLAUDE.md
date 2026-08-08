@@ -46,7 +46,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are thirteen executable checks. Twelve run in CI (`.github/workflows/checks.yml`) on every push.
+There are fourteen executable checks. Twelve run in CI (`.github/workflows/checks.yml`) on every push.
 Three defects shipped here were bash/zsh forks, so **the eight test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
@@ -57,12 +57,13 @@ bash reference/check-portability.sh                      # exit 0
 bash reference/check-prose-paths.sh                      # 0 missing (path count drifts)
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 bash reference/check-placeholder-count.sh main           # exit 0 (1 = a template lost placeholders)
+bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
-  $s reference/test/guard-failure.test.sh                # 55/55
+  $s reference/test/guard-failure.test.sh                # 60/60
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
-  $s reference/test/kernel-note-dirs.test.sh             # 68/68
+  $s reference/test/kernel-note-dirs.test.sh             # 76/76
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 57/57
@@ -156,8 +157,12 @@ visible rather than silent. Keying absorption on the message was rejected — it
 entry to the gate's own wording, so rewording a message would turn all entries stale, a new trap
 inside the mechanism built to drain them.
 
-The eighth check is kernel validation — the one that does **not** run in CI, because it needs a
-generated vault to run against:
+The eighth check is kernel validation, which does **not** run in CI, because it needs a
+generated vault to run against. It is no longer the only one: `reference/test/check-doc-claims.test.sh`
+is also not CI-wired, deliberately — a step there would also move the gated CI-step counts below,
+including the one that compares against `main` and rots on merge with no diff to notice. "Eighth"
+is stale numbering, kept because renumbering it is out of scope here, not because only one check
+sits outside CI:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -374,9 +379,12 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the thirteen checks above enforce — twelve of them
-in CI, `validate-kernel.sh` being the one that needs a vault — as defined by the twenty-four steps in
-`.github/workflows/checks.yml`.
+not a claim you should take on trust: it is what the fourteen checks above enforce — twelve of them
+in CI, as defined by the twenty-four steps in `.github/workflows/checks.yml`. The other two are
+`validate-kernel.sh`, which needs a generated vault to run against, and
+`reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
+three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
+counts below, one of which compares against `main` and rots on merge.
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
 RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
@@ -402,7 +410,7 @@ executable checks", "Twelve run in CI", `# 24` — sat correct in the same file.
 phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
 
 ```bash
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 14
 grep -c '^      - ' .github/workflows/checks.yml                                        # 24
 git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 24
 ```
@@ -423,7 +431,7 @@ grep -c '^      - ' .github/workflows/checks.yml                      # 24, this
 git show main:.github/workflows/checks.yml | grep -c '^      - '      # 24, main — equal
                                                                       # since the CI-hardening
                                                                       # branch merged
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 14
 ```
 
 What follows is what remains.

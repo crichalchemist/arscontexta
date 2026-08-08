@@ -108,7 +108,11 @@ bash reference/check-doc-claims.sh; echo rc=$?     # rc 0
 ```bash
 ./reference/validate-kernel.sh <a-fixture-vault>          # C1 fires on both bad notes
 ./reference/validate-kernel.sh ~/second-brain             # reports the 13 combined (6+7), does not crash
-for s in bash zsh; do $s reference/test/<suite>.test.sh | tail -1; done   # failed=0
+for s in bash zsh; do
+  out=$($s reference/test/kernel-note-dirs.test.sh); rc=$?
+  printf '%s\n' "$out" | tail -1
+  echo "rc=$rc"
+done   # failed=0, rc=0 for both -- captured separately so the pipe to tail can't discard it
 ```
 
 ---
@@ -160,17 +164,83 @@ for s in bash zsh; do $s reference/test/guard-failure.test.sh | tail -1; done  #
 
 ```bash
 # Structural validation: Deferrals section permits only "none" (when literally empty) or
-# one deferral row per line with a tracked-file reference. Must not be an unconstrained list.
+# real Markdown table rows, each naming a tracked file in its "Landed in" cell. The prior
+# version of this check treated the WHOLE LINE (including free-form Deferral-description
+# prose) as the thing to search for a path-like substring -- so a description that happened
+# to mention a path (e.g. "/arscontexta:upgrade") made an otherwise-unverified "Landed in"
+# cell pass for the wrong reason, while a row whose "Landed in" cell was legitimately
+# "this row" or "spec § ..." (both sanctioned below) failed for lacking a path ANYWHERE on
+# the line, even though no path claim was ever made. Never actually ran `git ls-files` on
+# anything, despite claiming to check for a "tracked-file reference".
 section=$(awk '/^## Deferrals/{f=1;next} /^## /{f=0} f' docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md)
-nonblank=$(printf '%s\n' "$section" | /usr/bin/grep -cE '^[^#].*[^ ]' || true)
-if [ "$nonblank" = 0 ]; then
-  printf '%s\n' "$section" | /usr/bin/grep -qE '^\s*none\s*$' || { echo "FAIL: empty deferrals require 'none'"; exit 1; }
+# Real table rows only: a leading pipe, a numeric # column, a second pipe. This excludes the
+# header row (`| # | Deferral | Landed in |` -- `#` is not a digit) and the `|---|---|---|`
+# separator automatically; free prose between/around the tables is never validated.
+#
+# TWO NAIVE-PARSING LIMITS, neither triggered by this table's current 14 rows (every row
+# splits to exactly 5 pipe-delimited fields, confirming no Deferral description contains a
+# literal `|`; no candidate path contains a space), named rather than left to be discovered:
+# an unescaped `|` inside a future Deferral description would shift field 4 to the wrong
+# cell, most likely producing a silently-empty $candidates rather than a wrong path (this
+# repo's own most-repeated failure shape -- silent, not loud); and `xargs` without `-d '\n'`
+# would mis-split a backticked path containing a space, were one ever added.
+table_rows=$(printf '%s\n' "$section" | /usr/bin/grep -E '^\|[[:space:]]*[0-9]+[[:space:]]*\|' || true)
+fail=0
+if [ -z "$table_rows" ]; then
+  printf '%s\n' "$section" | /usr/bin/grep -qE '^[[:space:]]*none[[:space:]]*$' || { echo "FAIL: empty deferrals require 'none'"; fail=1; }
 else
-  # Each non-comment, non-blank line must reference a tracked file (heuristic: contains a path or filename)
-  printf '%s\n' "$section" | /usr/bin/grep -E '^[^#].*[^ ]' | while IFS= read -r line; do
-    printf '%s\n' "$line" | /usr/bin/grep -qE '(\.md|\.sh|\.ya?ml|/)' || { echo "FAIL: deferral line lacks file reference: $line"; exit 1; }
-  done
+  while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    # "Landed in" is the 4th pipe-delimited field: | # | Deferral | Landed in |
+    landed=$(printf '%s\n' "$row" | awk -F'|' '{print $4}')
+    # Only BACKTICK-QUOTED tokens that themselves look like a path (a slash, or a known
+    # extension) are checked. This table's own convention wraps every real reference in
+    # backticks -- `FM_ALLOW`, `SCOPE LIMIT` etc. are backtick-quoted too, but name a
+    # constant or a comment heading, not a file, and the extension/slash filter correctly
+    # never sends them to git ls-files. A cell with NO such token ("this row", "spec §
+    # Deliberately not in scope") is a legitimate non-path reference this section's own
+    # rules already sanction, and is skipped entirely -- not a failure.
+    candidates=$(printf '%s\n' "$landed" | /usr/bin/grep -oE '`[^`]*`' | tr -d '`' | /usr/bin/grep -E '\.(md|sh|ya?ml)$|/' || true)
+    if [ -n "$candidates" ]; then
+      # NOT a second, nested heredoc-fed loop here, on purpose -- a minimal
+      # inner `while ... done <<EOF ... EOF` loop nested inside this outer
+      # one reproduced, repeatedly, in the sandboxed shell this fix was
+      # authored in: external-command resolution (awk/grep/tr) was lost
+      # starting on the OUTER loop's SECOND iteration, under zsh specifically.
+      # NOT independently reproducible, though: a later review pass tried six
+      # varied constructions in its own environment and could not trigger it.
+      # Recorded as environment-dependent rather than a settled zsh-language
+      # fact -- possibly specific to this session's execution sandbox, per
+      # this repo's own precedent for tooling masking a shell's real behavior
+      # (`grep -P` reads clean in-session because the harness aliases grep).
+      # The elimination stands regardless of the exact mechanism: nesting a
+      # second heredoc-fed loop here is unnecessary complexity either way,
+      # since `git ls-files --error-unmatch` already accepts multiple
+      # pathspecs in one call.
+      #
+      # NOT unquoted `$candidates` in command position either -- this one
+      # IS a settled, general fact, reproduced independently twice (by this
+      # fix and again on review): bash word-splits an unquoted multi-line
+      # variable on IFS by default, zsh does not (this repo's Global
+      # Constraints name it directly: "unquoted `$var` in a `for` list
+      # word-splits under bash and not zsh"). Passing `$candidates` bare
+      # split correctly into two pathspecs under bash and collapsed into ONE
+      # pathspec containing a literal embedded newline under zsh, which git
+      # correctly reported as unmatched -- a FALSE FAIL on two genuinely
+      # tracked files. `xargs` does its own whitespace/newline splitting on
+      # its stdin, independent of which shell invoked it, so it gives both
+      # shells the same argument list.
+      printf '%s\n' "$candidates" | xargs git ls-files --error-unmatch >/dev/null 2>&1 || {
+        flat=$(printf '%s\n' "$candidates" | tr '\n' ' ')
+        echo "FAIL: deferral row references an untracked path among [$flat]: $row"
+        fail=1
+      }
+    fi
+  done <<EOF_ROWS
+$table_rows
+EOF_ROWS
 fi
+[ "$fail" -eq 0 ] || exit 1
 bash reference/check-doc-claims.sh; echo rc=$?     # rc 0
 ```
 
