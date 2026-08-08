@@ -1,5 +1,15 @@
 #!/bin/bash
 # vocabulary-schema.test.sh -- mutation tests for reference/check-vocabulary-schema.sh
+#
+# Every assertion below invokes the gate as `bash "$GATE"`, unconditionally, even when
+# this test file itself is run under zsh -- so a `zsh` run of THIS suite proves the test
+# harness is zsh-portable, not that check-vocabulary-schema.sh runs correctly when
+# invoked as `zsh check-vocabulary-schema.sh` directly. Unlike guard-failure.test.sh's
+# identical-looking `bash "$GUARD"` (which is correct because nothing anywhere ever
+# invokes check-portability.sh by any other name), check-vocabulary-schema.sh has no
+# such single-invocation guarantee -- CI runs it directly too. That direct zsh coverage
+# belongs in CI's own step list (a `zsh reference/check-vocabulary-schema.sh` step,
+# alongside the bash one), not duplicated inside every assertion here.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"

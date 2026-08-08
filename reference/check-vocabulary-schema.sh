@@ -108,6 +108,15 @@ done | LC_ALL=C sort -u)
 # list, never a substitution pair by design. Never expected to resolve.
 used_keys=$(printf '%s\n' "$used_keys" | /usr/bin/grep -v '^extraction_categories$' || true)
 
+# raw_matches being non-empty does not guarantee used_keys is: the fold above silently
+# `continue`s any {DOMAIN:X} whose X isn't a clean identifier, and the line just above
+# can strip a SOLE surviving match if it was the extraction_categories exception. Both
+# leave used_keys empty even though real placeholder text was present in the tree --
+# the exact "checked zero, reported PASS" gap the raw_matches guard above exists to
+# prevent one step earlier. Guarding here closes it at the point it can actually recur.
+n_used=$(printf '%s\n' "$used_keys" | /usr/bin/grep -c . || true)
+[ "${n_used:-0}" -gt 0 ] || die2 "raw_matches was non-empty but folding/filtering left ZERO usable keys -- the fold logic or the exception list is stale, not the tree clean"
+
 # --- the check: used_keys minus declared_keys ----------------------------------------
 undeclared=$(LC_ALL=C comm -23 <(printf '%s\n' "$used_keys") <(printf '%s\n' "$declared_keys"))
 
