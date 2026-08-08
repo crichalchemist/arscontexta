@@ -324,6 +324,16 @@ EOF_VOCAB
   # frontmatter. Caller must have sourced reference/lib/frontmatter.sh first (same
   # convention as ${CLAUDE_PLUGIN_ROOT} resolution elsewhere in this file: a dependency
   # the caller provides, not one this function resolves for itself).
+  # ${CLAUDE_PLUGIN_ROOT} resolution above is effectively guarded: a wrong or
+  # unresolved value fails the -f checks a few lines up and halts loudly. An
+  # un-sourced frontmatter_field has no equivalent safety net -- calling an
+  # undefined function doesn't halt this one under `set -u` alone, it just
+  # leaves domain_val empty and the function continues, silently treating
+  # {vocabulary.domain} as unresolved. Since reduce/SKILL.md genuinely uses
+  # that marker, the canonical side would keep the literal token, never match
+  # real installed text, and read back as a false-positive MODIFIED for a
+  # clean install -- the silent-wrong-answer failure class, not a loud halt.
+  command -v frontmatter_field >/dev/null 2>&1 || { echo "HALT: frontmatter_field is not defined -- source reference/lib/frontmatter.sh before calling mechanically_compare" >&2; rm -f "$pairs_file"; return 1; }
   local domain_val
   domain_val=$(frontmatter_field "$manifest" domain_summary)
   if [ -n "$domain_val" ]; then
