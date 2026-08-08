@@ -67,8 +67,9 @@ esac
 # committed, or the repo has no commits. Two are REPORTED, because they mean the
 # guard could not run at all: git absent, or not a git repository.
 #
-# SCOPE LIMITS — TWO, and the second means this guard currently matches NO real
-# path in a generated vault, not merely a narrower set than intended.
+# SCOPE LIMITS — named here as TWO REAL ONES, not a closed count. A stated
+# list of limitations reads as complete to a future reader who stops at the
+# last number; this one isn't a claim that no others exist.
 #
 # 1. This guard sees only the tool events your hooks.json routes to it. If that
 #    matcher is "Write" alone — the default this system ships — then an Edit or
@@ -83,6 +84,18 @@ esac
 #    `{{NOTES_DIR:-notes}}/*`, which no real file path ever contains, so this
 #    branch of the filter matches nothing and every note falls through to the
 #    `*thinking/*` arm or is skipped entirely.
+#
+# A THIRD asymmetry survives even correct substitution, and is not fixed
+# here either: `{{NOTES_DIR:-notes}}/*` has no leading `*`, unlike the
+# sibling's `*/notes/*` — so once substituted to (say) `notes/*`, it matches
+# only a path that literally STARTS WITH `notes/`, never one where `notes/`
+# appears nested under something else (`/vault/notes/x.md` matches the
+# sibling's pattern and not this one). Verified directly: an absolute path
+# to a genuinely unhealthy note produced no warning at all under a
+# substituted copy of this template. Whether that is a bug or the intended
+# behavior for this hook's actual invocation context (Claude Code invokes
+# hooks with $CWD already at the vault root, so a relative path may be all
+# this hook is ever handed) is unresolved — recorded, not fixed.
 #
 # Neither is fixed here: widening the hooks.json matcher changes what fires on
 # every edit in every installed vault, and the substitution mechanism is a
