@@ -414,7 +414,7 @@ phrasing does not protect a synonym, and prose is where the synonyms live. Re-de
 ```bash
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 16
 grep -c '^      - ' .github/workflows/checks.yml                                        # 28
-git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 24
+git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 28
 ```
 
 **A claim about `main` rots on MERGE, not on edit, which is why it needs a gate rather than care.**
@@ -430,11 +430,14 @@ count, because `actions/checkout` carries no `name:`. Count step *items* (`^    
 
 ```bash
 grep -c '^      - ' .github/workflows/checks.yml                      # 28, this tree
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 24, main — not equal
-                                                                      # this branch has since
-                                                                      # added its own 4 CI
-                                                                      # steps (the vocabulary-
-                                                                      # schema-coverage plan)
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 28, main — now equal:
+                                                                      # this branch (its own 4
+                                                                      # CI steps from the
+                                                                      # vocabulary-schema-
+                                                                      # coverage plan included)
+                                                                      # merged into main via
+                                                                      # PR #6 since this
+                                                                      # paragraph was written
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 16
 ```
 
