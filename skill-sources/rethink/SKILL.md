@@ -199,9 +199,13 @@ TENSION_PENDING=$(list_open_items ops/tensions) || {
   exit 1
 }
 # TENSION_COUNT excludes blocked entries SPECIFICALLY -- visible to discovery
-# (TENSION_PENDING, above) but must not trip the threshold rule below (~line
-# 296 as of this commit). Re-checks each already-fetched entry's OWN status
-# rather than re-scanning ops/tensions/ a second time with a second query.
+# (TENSION_PENDING, above) but must not trip the threshold rule below.
+# Re-checks each already-fetched entry's OWN status rather than
+# re-scanning ops/tensions/ a second time with a second query. (No line
+# number cited here on purpose: an earlier version of this comment cited
+# one and it moved TWICE within the same commit that added it -- once from
+# this edit's own line count, then again fixing the first citation. Re-grep
+# 'Do NOT count it toward' if you need the exact spot.)
 TENSION_BLOCKED=0
 if [ -n "$TENSION_PENDING" ]; then
   while IFS= read -r t; do
