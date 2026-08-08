@@ -81,12 +81,22 @@ ILLUSTRATIVE='skills/reseed f03~single git mv over literal placeholder operands 
 skill-sources/tasks f03~an if whose entire body is comments describing the steps; bash -n rejects the empty then-branch and zsh accepts it, so listing it keeps the two shells reporting the same counts'
 
 # --- known-open defects this gate FOUND and does not yet block on -----------
-# Every line below is a real defect, found by this gate on the tree it landed
+# Most lines below are real defects, found by this gate on the tree they landed
 # against, in a skill the hardening branch never touched. They are listed rather
 # than fixed because fixing them is a separate change with its own review: the
 # `seed` sites read `$FILE`, which is the argument the skill is invoked with, so
 # the repair is a design decision (re-derive per fence? read `$ARGUMENTS`?) and
 # not the stanza copy that closed the `graph` sites.
+#
+# THE reflect f01 / reweave f02 ENTRIES BELOW ARE A DIFFERENT KIND: not a
+# defect in the fence, a scope artifact in assertion N's own selector. Task 3
+# of docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md renamed
+# {vocabulary.notes_collection} to {vocabulary.notes}, which newly matches
+# N's `grep -q -e 'NOTES_DIR' -e '{vocabulary.notes}'` selector even though the
+# match here is a qmd COLLECTION name, not the notes-directory reference the
+# selector means to scope to -- and both fences were edited by the branch that
+# added them here, not left untouched. Reasons for these two entries say so
+# explicitly rather than reusing the "found, unrepaired" framing above.
 #
 # THE LIST IS CHECKED IN BOTH DIRECTIONS. A listed site that fails is reported
 # as KNOWN and does not block. A listed site that PASSES fails the gate, and so
@@ -113,7 +123,9 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 # `zsh only:` -> bash PASSes. So in_scope now rejects anything that looks like a
 # scope marker but is not one of the two canonical spellings.
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
-skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01'
+skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01
+skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
+skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer'
 
 table_reason() {                    # table_reason <table> <label> [letter]
   printf '%s\n' "$1" | while IFS='~' read -r l a r; do
@@ -385,7 +397,14 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   }
 
   # (a) genuine divergence -> MODIFIED (non-empty diff, rc != 0 from diff itself)
+  #
+  # mechanically_compare now calls frontmatter_field (domain_summary: extraction,
+  # see docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) and
+  # HALTs if it's undefined -- source ops/lib/frontmatter.sh (already copied into
+  # the fixture by build_fixture, for assertion F) before mechanically_compare, the
+  # same ordering skills/upgrade/SKILL.md's own item 0 documents for real callers.
   {
+    printf '. ops/lib/frontmatter.sh\n'
     printf '. %s\n' "$m_rcn"
     printf '. %s\n' "$m_mc"
     printf 'canon=$(resolve_canonical_name extract)\n'
@@ -447,6 +466,7 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   # check: nothing before this plan should start reporting differently on an
   # unmodified vault.
   {
+    printf '. ops/lib/frontmatter.sh\n'
     printf '. %s\n' "$m_rcn"
     printf '. %s\n' "$m_mc"
     printf 'canon=$(resolve_canonical_name stats)\n'
@@ -467,6 +487,7 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   # by mutation: reintroducing installed-side substitution passed (c) above
   # silently and is caught only here.
   {
+    printf '. ops/lib/frontmatter.sh\n'
     printf '. %s\n' "$m_rcn"
     printf '. %s\n' "$m_mc"
     printf 'canon=$(resolve_canonical_name verify)\n'

@@ -41,8 +41,13 @@ D='{DOMAIN:notes}'
 
 mkrepo() {              # mkrepo -> path to a repo with a base commit on `base`
     local d; d=$(mktemp -d); TMPDIRS+=("$d")
-    mkdir -p "$d/reference" "$d/skill-sources/alpha" "$d/skill-sources/beta"
+    mkdir -p "$d/reference/lib" "$d/skill-sources/alpha" "$d/skill-sources/beta"
     cp "$GATE" "$d/reference/"
+    # PLACEHOLDER_PAT is sourced from lib/placeholder-pattern.sh, not defined
+    # inline in $GATE anymore -- every fixture repo needs its own copy or the
+    # sourcing fails and the whole suite reports unbound-variable noise instead
+    # of the specific behavior each test means to exercise.
+    cp "$(dirname "$GATE")/lib/placeholder-pattern.sh" "$d/reference/lib/"
     # alpha is a REALISTIC template — ~60 lines of stable prose plus its markers.
     # A one-line fixture would defeat the rename test for a reason that has
     # nothing to do with the gate: `-M` scores similarity, and a single line
@@ -86,13 +91,20 @@ staged() {              # staged <repo> <expected-branch> [<file-that-must-exist
 run()  { ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" 2>&1 ); }
 rc_of(){ ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" >/dev/null 2>&1; echo $? ); }
 allow(){ # allow <repo> <entries>  — substitute the allowlist in the repo's copy
+    # Matches the WHOLE current assignment (PLACEHOLDER_ALLOW="...") via regex,
+    # not a literal '""' — the shipped default is no longer empty (see
+    # docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md's
+    # one real allowlisted entry), and a literal-empty-string match would only
+    # ever have worked for that one specific starting value. No entry, shipped
+    # or test-supplied, contains an embedded double quote, so a non-greedy
+    # [^"]* is a safe delimiter.
     python3 - "$1/reference/check-placeholder-count.sh" "$2" <<'PY'
-import sys
+import sys, re
 p, entries = sys.argv[1], sys.argv[2]
 s = open(p).read()
-old = 'PLACEHOLDER_ALLOW=""'
-assert s.count(old) == 1, "allowlist assignment not found — did the script change?"
-open(p, 'w').write(s.replace(old, 'PLACEHOLDER_ALLOW="\n%s\n"' % entries))
+pat = re.compile(r'PLACEHOLDER_ALLOW="[^"]*"')
+assert len(pat.findall(s)) == 1, "allowlist assignment not found — did the script change?"
+open(p, 'w').write(pat.sub('PLACEHOLDER_ALLOW="\n%s\n"' % entries, s))
 PY
 }
 
@@ -311,7 +323,10 @@ eq "rc2: and rev-parse alone would NOT have caught it" "yes" \
    "$( ( cd "$R" && git rev-parse --verify unrelated >/dev/null 2>&1 ) && echo yes || echo no)"
 
 R=$(mkrepo)
-python3 - "$R/reference/check-placeholder-count.sh" <<'PY'
+# PLACEHOLDER_PAT lives in lib/placeholder-pattern.sh, sourced by $GATE -- not
+# inline in $GATE itself anymore, so the mutation targets the file where the
+# constant actually is.
+python3 - "$R/reference/lib/placeholder-pattern.sh" <<'PY'
 import sys
 p = sys.argv[1]; s = open(p).read()
 i = s.index("PLACEHOLDER_PAT='")

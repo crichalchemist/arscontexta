@@ -46,8 +46,8 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are fourteen executable checks. Twelve run in CI (`.github/workflows/checks.yml`) on every push.
-Three defects shipped here were bash/zsh forks, so **the eight test suites each run under both
+There are sixteen executable checks. Fourteen run in CI (`.github/workflows/checks.yml`) on every push.
+Three defects shipped here were bash/zsh forks, so **the nine test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
 harness rather than its subject.
@@ -57,6 +57,7 @@ bash reference/check-portability.sh                      # exit 0
 bash reference/check-prose-paths.sh                      # 0 missing (path count drifts)
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 bash reference/check-placeholder-count.sh main           # exit 0 (1 = a template lost placeholders)
+bash reference/check-vocabulary-schema.sh                # exit 0 (1 = an undeclared key; also runs under zsh in CI)
 bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
@@ -67,6 +68,7 @@ for s in bash zsh; do
   $s reference/test/threshold-namespace.test.sh          # 52/52
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 57/57
+  $s reference/test/vocabulary-schema.test.sh            # 12/12
 done
 ```
 
@@ -379,8 +381,8 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the fourteen checks above enforce — twelve of them
-in CI, as defined by the twenty-four steps in `.github/workflows/checks.yml`. The other two are
+not a claim you should take on trust: it is what the sixteen checks above enforce — fourteen of them
+in CI, as defined by the twenty-eight steps in `.github/workflows/checks.yml`. The other two are
 `validate-kernel.sh`, which needs a generated vault to run against, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
 three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
@@ -410,8 +412,8 @@ executable checks", "Twelve run in CI", `# 24` — sat correct in the same file.
 phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
 
 ```bash
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 14
-grep -c '^      - ' .github/workflows/checks.yml                                        # 24
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 16
+grep -c '^      - ' .github/workflows/checks.yml                                        # 28
 git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 24
 ```
 
@@ -427,11 +429,13 @@ Counting the CI steps takes the same care: `grep -c '^      - name:'` returns on
 count, because `actions/checkout` carries no `name:`. Count step *items* (`^      - `), not names:
 
 ```bash
-grep -c '^      - ' .github/workflows/checks.yml                      # 24, this tree
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 24, main — equal
-                                                                      # since the CI-hardening
-                                                                      # branch merged
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 14
+grep -c '^      - ' .github/workflows/checks.yml                      # 28, this tree
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 24, main — not equal
+                                                                      # this branch has since
+                                                                      # added its own 4 CI
+                                                                      # steps (the vocabulary-
+                                                                      # schema-coverage plan)
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 16
 ```
 
 What follows is what remains.

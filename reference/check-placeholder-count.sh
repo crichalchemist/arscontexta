@@ -24,12 +24,15 @@
 # that is still live. Measured across skill-sources/ when this gate was written:
 # 488 markers against 616. The 128-marker gap spans NINE files, and hardcoding a
 # `{DOMAIN:notes}` produced NO OUTPUT AT ALL from the documented check while the
-# three-family pattern reported 27 -> 21 on the same tree. This script is now the
-# single definition and CONTRIBUTING.md points at it.
+# three-family pattern reported 27 -> 21 on the same tree. This pattern was
+# consolidated here, and is now the single definition in
+# reference/lib/placeholder-pattern.sh; CONTRIBUTING.md still points at this
+# script to run the check.
 #
-# Do NOT widen to a bare `{…}`: that also matches ${TARGET} and ${FILE}, turning
-# a shell-variable count into a placeholder count. skill-authoring.md §2 says so.
-PLACEHOLDER_PAT='{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}\|{DOMAIN:[^}]*}'
+# The pattern itself now lives in reference/lib/placeholder-pattern.sh -- sourced,
+# not redefined, so this script and check-vocabulary-schema.sh can never
+# independently drift. See that file's own header for why the pattern has three
+# families and why it is not widened to a bare `{…}`.
 #
 # SCOPE IS skill-sources/ ONLY, and both exclusions are deliberate:
 #   * generators/features/*.md carry {DOMAIN:*} too (15 files), but they are
@@ -54,6 +57,7 @@ PLACEHOLDER_PAT='{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}\|{DOMAIN:[^}]*}'
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/lib/placeholder-pattern.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT" || { echo "check-placeholder-count: cannot cd to repo root '$ROOT'" >&2; exit 2; }
 
@@ -69,10 +73,9 @@ echo
 # an entry whose decrease no longer matches the tree is STALE and fails, so the
 # list drains rather than rots. Keyed on the COUNTS, not the filename alone —
 # a bare path would absorb a second, unrelated decrease in the same file later.
-# Empty today: no legitimate decrease has occurred. That is the honest state, and
-# an empty list must not be mistaken for an absent mechanism, so the staleness
-# half runs over it either way.
-PLACEHOLDER_ALLOW=""
+# The staleness half runs whether this is empty or not, so an entry here is
+# never a silent, permanent exemption.
+PLACEHOLDER_ALLOW="skill-sources/reduce/SKILL.md 132->131 seed is one of the ten canonical, never-vocabulary-transformable skill names per skills/upgrade/SKILL.md -- {vocabulary.seed} was substitution syntax wrapped around a name that should never have been wrapped; removing the wrapper legitimately drops the count by one. See docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md section 1b."
 
 fail=0
 rc2=0

@@ -16,7 +16,7 @@ Read these files to configure domain-specific behavior:
 1. **`ops/derivation-manifest.md`** — vocabulary mapping, dimension positions, platform hints
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
-   - Use `vocabulary.topic_map` / `vocabulary.topic_map_plural` for MOC references
+   - Use `vocabulary.topic_map` / `vocabulary.topic_maps` for MOC references
    - Use `vocabulary.inbox` for the inbox folder name
 
 2. **`ops/config.yaml`** — current live configuration (the "after" state)
@@ -359,7 +359,7 @@ Run kernel validation to confirm nothing broke:
   Content migration:
     [N] {vocabulary.note_plural} updated with new schema fields
     [N] wiki links updated
-    [N] {vocabulary.topic_map_plural} restructured
+    [N] {vocabulary.topic_maps} restructured
 
   Kernel validation: [N]/[N] checks PASS
   [Any warnings or issues]

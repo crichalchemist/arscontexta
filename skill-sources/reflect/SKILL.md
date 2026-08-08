@@ -14,7 +14,7 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
    - Use `vocabulary.reflect` for the process verb in output
-   - Use `vocabulary.topic_map` / `vocabulary.topic_map_plural` for MOC references
+   - Use `vocabulary.topic_map` / `vocabulary.topic_maps` for MOC references
    - Use `vocabulary.cmd_reweave` for the next-phase suggestion
    - Use `vocabulary.inbox` for the inbox folder name
 
@@ -45,7 +45,7 @@ Parse immediately:
 **Execute these steps:**
 
 1. Read the target {vocabulary.note} fully — understand its claim and context
-2. **Throughout discovery:** Capture which {vocabulary.topic_map_plural} you read, which queries you ran (with scores), which candidates you evaluated. This becomes the Discovery Trace — proving methodology was followed, not reconstructed.
+2. **Throughout discovery:** Capture which {vocabulary.topic_maps} you read, which queries you ran (with scores), which candidates you evaluated. This becomes the Discovery Trace — proving methodology was followed, not reconstructed.
 3. Run Phase 0 (index freshness check)
 4. Use dual discovery in parallel:
    - Browse relevant {vocabulary.topic_map}(s) for related {vocabulary.note_plural}
@@ -63,7 +63,7 @@ Parse immediately:
 
 # Reflect
 
-Find connections, weave the knowledge graph, update {vocabulary.topic_map_plural}. This is the forward-connection phase of the processing pipeline.
+Find connections, weave the knowledge graph, update {vocabulary.topic_maps}. This is the forward-connection phase of the processing pipeline.
 
 ## Philosophy
 
@@ -92,7 +92,7 @@ Check for recent additions:
 Focus on connecting a specific {vocabulary.note}:
 1. Read the target {vocabulary.note}
 2. Discover related content
-3. Add connections and update {vocabulary.topic_map_plural}
+3. Add connections and update {vocabulary.topic_maps}
 
 ### /reflect [topic area]
 
@@ -135,7 +135,7 @@ Before using semantic search, verify the index is current. This is self-healing:
    done
    # Releases on the error paths below too, which a trailing rm alone would skip.
    trap 'rm -rf "$LOCKDIR"' EXIT
-   qmd_count=$(qmd status 2>/dev/null | grep -A2 '{vocabulary.notes_collection}' | grep 'documents' | grep -oE '[0-9]+' | head -1)
+   qmd_count=$(qmd status 2>/dev/null | grep -A2 '{vocabulary.notes}' | grep 'documents' | grep -oE '[0-9]+' | head -1)
    rm -rf "$LOCKDIR"
    ```
 3. Count actual files:
@@ -172,7 +172,7 @@ For each {vocabulary.note} you are connecting:
 
 Use dual discovery: {vocabulary.topic_map} exploration AND semantic search in parallel. These are complementary, not sequential.
 
-**Capture discovery trace as you go.** Note which {vocabulary.topic_map_plural} you read, which queries you ran (with scores), which searches you tried. This becomes the Discovery Trace section in output — proving methodology was followed, not reconstructed after the fact.
+**Capture discovery trace as you go.** Note which {vocabulary.topic_maps} you read, which queries you ran (with scores), which searches you tried. This becomes the Discovery Trace section in output — proving methodology was followed, not reconstructed after the fact.
 
 **Primary discovery (run in parallel):**
 
@@ -186,9 +186,9 @@ If you know the topic (check the {vocabulary.note}'s Topics footer), start with 
 - Check Tensions and Gaps for context
 - What do agent notes reveal about navigation?
 
-{vocabulary.topic_map_plural} tell you what thinking exists and how it is organized. Someone already decided what matters for this topic.
+{vocabulary.topic_maps} tell you what thinking exists and how it is organized. Someone already decided what matters for this topic.
 
-**Path 2: Semantic Search** — find what {vocabulary.topic_map_plural} might miss
+**Path 2: Semantic Search** — find what {vocabulary.topic_maps} might miss
 
 **Three-tier fallback for semantic search:**
 
@@ -216,7 +216,7 @@ until mkdir "$LOCKDIR" 2>/dev/null; do
 done
 # Releases on the error paths below too, which a trailing rm alone would skip.
 trap 'rm -rf "$LOCKDIR"' EXIT
-qmd query "[note's core concepts]" --collection {vocabulary.notes_collection} --limit 15 2>/dev/null
+qmd query "[note's core concepts]" --collection {vocabulary.notes} --limit 15 2>/dev/null
 rm -rf "$LOCKDIR"
 ```
 
@@ -398,7 +398,7 @@ When you edit an older {vocabulary.note} to add a reverse link, you MAY flag it 
 | Note has >5 incoming links | Already a hub — one more link does not warrant full reconsideration |
 | Note has `type: tension` in YAML | Structural framework, not content that evolves |
 | Note was reweaved in current batch | Do not re-reweave what was just reweaved |
-| Note is a {vocabulary.topic_map} | {vocabulary.topic_map_plural} are navigation, not claims to reconsider |
+| Note is a {vocabulary.topic_map} | {vocabulary.topic_maps} are navigation, not claims to reconsider |
 
 **Check incoming links:**
 ```bash
@@ -474,9 +474,9 @@ echo "$LINK_COUNT"
 
 If >= 5, skip reweave flagging.
 
-### Phase 5: Update {vocabulary.topic_map_plural}
+### Phase 5: Update {vocabulary.topic_maps}
 
-{vocabulary.topic_map_plural} are synthesis hubs, not just indexes.
+{vocabulary.topic_maps} are synthesis hubs, not just indexes.
 
 **When to update a {vocabulary.topic_map}:**
 
@@ -633,7 +633,7 @@ If a {vocabulary.note} connects to 5+ {vocabulary.note_plural} across different 
 
 **Split detection criteria:**
 
-1. **Domain spread:** Connections span 3+ distinct {vocabulary.topic_map_plural}/topic areas
+1. **Domain spread:** Connections span 3+ distinct {vocabulary.topic_maps}/topic areas
 2. **Multiple claims:** The {vocabulary.note} makes more than one assertion that could stand alone
 3. **Linking drag:** You would want to link to part of the {vocabulary.note} but not all of it
 
@@ -737,7 +737,7 @@ After reflecting, report:
 Successful reflection:
 - Every connection passes the articulation test
 - Inline links read as natural prose
-- {vocabulary.topic_map_plural} gain synthesis, not just entries
+- {vocabulary.topic_maps} gain synthesis, not just entries
 - Agent notes reveal non-obvious paths
 - The knowledge graph becomes more traversable
 - Future agents will navigate more effectively
@@ -757,7 +757,7 @@ The test: if someone follows the links you added, do they find genuinely useful 
 - Verify link targets exist
 - Explain WHY connections exist
 - Consider bidirectionality
-- Update relevant {vocabulary.topic_map_plural}
+- Update relevant {vocabulary.topic_maps}
 - Add agent notes when navigation insights emerge
 - Capture discovery trace as you work
 
