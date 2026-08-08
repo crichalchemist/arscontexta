@@ -24,8 +24,10 @@
 # that is still live. Measured across skill-sources/ when this gate was written:
 # 488 markers against 616. The 128-marker gap spans NINE files, and hardcoding a
 # `{DOMAIN:notes}` produced NO OUTPUT AT ALL from the documented check while the
-# three-family pattern reported 27 -> 21 on the same tree. This script is now the
-# single definition and CONTRIBUTING.md points at it.
+# three-family pattern reported 27 -> 21 on the same tree. This pattern was
+# consolidated here, and is now the single definition in
+# reference/lib/placeholder-pattern.sh; CONTRIBUTING.md still points at this
+# script to run the check.
 #
 # The pattern itself now lives in reference/lib/placeholder-pattern.sh -- sourced,
 # not redefined, so this script and check-vocabulary-schema.sh can never
