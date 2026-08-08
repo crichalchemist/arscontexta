@@ -27,9 +27,10 @@
 # three-family pattern reported 27 -> 21 on the same tree. This script is now the
 # single definition and CONTRIBUTING.md points at it.
 #
-# Do NOT widen to a bare `{…}`: that also matches ${TARGET} and ${FILE}, turning
-# a shell-variable count into a placeholder count. skill-authoring.md §2 says so.
-PLACEHOLDER_PAT='{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}\|{DOMAIN:[^}]*}'
+# The pattern itself now lives in reference/lib/placeholder-pattern.sh -- sourced,
+# not redefined, so this script and check-vocabulary-schema.sh can never
+# independently drift. See that file's own header for why the pattern has three
+# families and why it is not widened to a bare `{…}`.
 #
 # SCOPE IS skill-sources/ ONLY, and both exclusions are deliberate:
 #   * generators/features/*.md carry {DOMAIN:*} too (15 files), but they are
@@ -54,6 +55,7 @@ PLACEHOLDER_PAT='{vocabulary\.[a-z_]*}\|{config\.[a-z_]*}\|{DOMAIN:[^}]*}'
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/lib/placeholder-pattern.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT" || { echo "check-placeholder-count: cannot cd to repo root '$ROOT'" >&2; exit 2; }
 
