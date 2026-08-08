@@ -180,7 +180,10 @@ Given a canonical name from `resolve_canonical_name`:
    `_schema:`, and so on) stay universal; only values, prose, and
    user-facing labels transform. Use this vault's own
    `ops/derivation-manifest.md` `vocabulary:` block as the mapping — the
-   same one `resolve_canonical_name` reads.
+   same one `resolve_canonical_name` reads. For `{vocabulary.domain}`
+   specifically, use the manifest's `domain_summary:` field rather than
+   the `vocabulary:` block — it is a standalone top-level field, not part
+   of the Levels 1-6 substitution table.
 
 3. **The result is Step 5b's candidate replacement text** — the vault's
    post-upgrade version of this skill, once the human approves swapping it
@@ -203,6 +206,12 @@ cannot back a MODIFIED verdict. This step is a separate, fully mechanical,
 deterministic substitution instead — no LLM judgment anywhere in it.
 
 Given a canonical name from `resolve_canonical_name` above:
+
+0. **Source `reference/lib/frontmatter.sh` before calling `mechanically_compare`
+   below** — it now reads `domain_summary:` via `frontmatter_field`, not a
+   hand-rolled grep (`reference/check-portability.sh` check 7 bans the latter).
+   Same convention as the `${CLAUDE_PLUGIN_ROOT}` resolution in the next step:
+   a dependency the caller provides, not one the function resolves for itself.
 
 1. **Resolve `${CLAUDE_PLUGIN_ROOT}` yourself before calling the function
    below, and confirm both files exist:** `${CLAUDE_PLUGIN_ROOT}` resolves
@@ -303,6 +312,25 @@ $block
 EOF_VOCAB
   [ -n "$topic_map_val" ]  && printf 'MOC\t%s\n' "$topic_map_val" >> "$pairs_file"
   [ -n "$topic_maps_val" ] && printf 'MOCs\t%s\n' "$topic_maps_val" >> "$pairs_file"
+
+  # domain_summary: is a standalone top-level manifest field, deliberately outside
+  # the vocabulary: block above (see
+  # docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) -- extracted
+  # separately, same fold-and-append shape as the topic_map/topic_maps aliasing just
+  # above, applied to a second source. Reads it via frontmatter_field, not a hand-rolled
+  # grep -- reference/check-portability.sh check 7 bans a line-anchored '^field:' grep
+  # here precisely because it would also match the same text inside the manifest's BODY
+  # (e.g. a fenced code block quoting a domain_summary: example), not just its
+  # frontmatter. Caller must have sourced reference/lib/frontmatter.sh first (same
+  # convention as ${CLAUDE_PLUGIN_ROOT} resolution elsewhere in this file: a dependency
+  # the caller provides, not one this function resolves for itself).
+  local domain_val
+  domain_val=$(frontmatter_field "$manifest" domain_summary)
+  if [ -n "$domain_val" ]; then
+    domain_val=$(printf '%s' "$domain_val" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_[:space:]' ' ' | awk '{$1=$1}1')
+    [ -n "$domain_val" ] && printf 'domain\t%s\n' "$domain_val" >> "$pairs_file"
+  fi
+
   if [ ! -s "$pairs_file" ]; then
     echo "HALT: $manifest's vocabulary: block yielded no usable key/value pairs -- cannot build the substitution table" >&2
     rm -f "$pairs_file"; return 1
