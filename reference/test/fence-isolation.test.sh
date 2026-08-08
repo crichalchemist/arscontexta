@@ -385,7 +385,14 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   }
 
   # (a) genuine divergence -> MODIFIED (non-empty diff, rc != 0 from diff itself)
+  #
+  # mechanically_compare now calls frontmatter_field (domain_summary: extraction,
+  # see docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) and
+  # HALTs if it's undefined -- source ops/lib/frontmatter.sh (already copied into
+  # the fixture by build_fixture, for assertion F) before mechanically_compare, the
+  # same ordering skills/upgrade/SKILL.md's own item 0 documents for real callers.
   {
+    printf '. ops/lib/frontmatter.sh\n'
     printf '. %s\n' "$m_rcn"
     printf '. %s\n' "$m_mc"
     printf 'canon=$(resolve_canonical_name extract)\n'
@@ -447,6 +454,7 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   # check: nothing before this plan should start reporting differently on an
   # unmodified vault.
   {
+    printf '. ops/lib/frontmatter.sh\n'
     printf '. %s\n' "$m_rcn"
     printf '. %s\n' "$m_mc"
     printf 'canon=$(resolve_canonical_name stats)\n'
@@ -467,6 +475,7 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   # by mutation: reintroducing installed-side substitution passed (c) above
   # silently and is caught only here.
   {
+    printf '. ops/lib/frontmatter.sh\n'
     printf '. %s\n' "$m_rcn"
     printf '. %s\n' "$m_mc"
     printf 'canon=$(resolve_canonical_name verify)\n'
