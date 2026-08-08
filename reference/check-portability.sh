@@ -679,7 +679,20 @@ skills/upgrade/SKILL.md 2 conversion backlog
 # NOT scan_or_die: sed's stderr is discarded, so an unreadable FILE yields 0 hits
 # and is indistinguishable from a clean one. Recorded rather than fixed here; the
 # scan-scope roots are the level at which this guard checks readability.
-fm_hits_in() { # fm_hits_in <relative-path> -> live hit count
+fm_hits_in() { # fm_hits_in <relative-path> -> live hit count, or UNREADABLE
+  # A file `find` LISTED (it needs only the containing directory's execute
+  # bit) can still be unreadable itself. Pre-fix, `sed ... 2>/dev/null` on an
+  # unreadable file emits nothing and its stderr is discarded, so the `grep
+  # -c` below counted 0 hits -- byte-for-byte the same output as a genuinely
+  # clean file. Reproduced directly: a chmod-000 allowlisted file with a real
+  # hand-rolled pattern inside it made check 7 report "no ... parse found —
+  # nothing here claims this property", the SKIP a healthy tree gets.
+  # UNREADABLE is a non-numeric sentinel so a caller doing `[ "$n" -gt 0 ]`
+  # cannot silently treat it as the integer 0.
+  if [ -e "$ROOT/$1" ] && [ ! -r "$ROOT/$1" ]; then
+    printf 'UNREADABLE\n'
+    return
+  fi
   sed 's/#.*$//' "$ROOT/$1" 2>/dev/null \
     | "$GREP" -cE "(grep|rg) [^|]*'\^[a-z_]+:" || true
 }
@@ -696,8 +709,22 @@ echo "7. No hand-rolled frontmatter parsing outside reference/lib/frontmatter.sh
 # exactly what the first version of this rewrite did — bash 74/25, zsh 0/0, both
 # green — three paragraphs below a comment explaining the same trap.
 FM_SCAN=(skills skill-sources reference generators platforms presets hooks agents scripts)
+# find's OWN exit status, captured separately from the pipe -- piping straight
+# into `| LC_ALL=C sort` (the prior shape) discards it, because `$?` after a
+# pipe reads the LAST stage's status, `sort`'s, which is 0 whether find found
+# everything or silently failed on one root (permission denied, or a root
+# renamed out from under it). GNU find returns >0 the moment ANY of its
+# starting points errors, even once every OTHER root was traversed fine, so
+# this genuinely distinguishes "some root failed" from "nothing exists" —
+# reproduced directly: a chmod-000 root produced a NONZERO find rc here while
+# scan_or_die's own grep-based scans (checks 1/2/3/6, same chmod'd root)
+# already reported "could not run" for the identical cause; only this one,
+# check 7's, stayed silent pre-fix. Sort runs as its own separate step now,
+# so find's rc reaches this shell undisturbed.
 fm_scan_files=$(cd "$ROOT" 2>/dev/null && find "${FM_SCAN[@]}" \
-                  \( -name '*.md' -o -name '*.sh' -o -name '*.template' \) 2>/dev/null | LC_ALL=C sort)
+                  \( -name '*.md' -o -name '*.sh' -o -name '*.template' \) 2>/dev/null)
+fm_scan_rc=$?
+fm_scan_files=$(printf '%s\n' "$fm_scan_files" | LC_ALL=C sort)
 
 # THE THREE-OUTCOME DISCRIMINATOR, keyed on the TREE and not on this script —
 # from check 6, whose comment records why: the allowlist is inline so it is never
@@ -721,6 +748,11 @@ if [ -n "$fm_scan_files" ]; then
     [ -n "$rel" ] || continue
     fm_exempt_p "$rel" && continue
     n=$(fm_hits_in "$rel")
+    if [ "$n" = "UNREADABLE" ]; then
+      fm_bad="$fm_bad    UNREADABLE $rel — cannot determine hand-rolled parse count
+"
+      continue
+    fi
     [ "${n:-0}" -gt 0 ] || continue
     fm_total=$((fm_total + n)); fm_files=$((fm_files + 1))
     listed=$(printf '%s\n' "$FM_ALLOW" | while IFS= read -r e; do
@@ -751,6 +783,8 @@ fm_stale=$(printf '%s\n' "$FM_ALLOW" | while IFS= read -r e; do
   f=$(printf '%s' "$e" | cut -d' ' -f1)
   if [ ! -e "$ROOT/$f" ]; then
     [ "$fm_present" -gt 0 ] && printf '    STALE    %s — allowlisted but file gone; drop the entry\n' "$f"
+  elif [ "$(fm_hits_in "$f")" = "UNREADABLE" ]; then
+    printf '    UNREADABLE %s — allowlisted file exists but cannot be read; cannot confirm it still matches\n' "$f"
   elif [ "$(fm_hits_in "$f")" = "0" ]; then
     printf '    STALE    %s — allowlisted but no longer matches; site converted, so drop the entry\n' "$f"
   fi
@@ -762,16 +796,50 @@ done)
 # nothing, the scan is broken — the two disagree about the same tree, and "PASS 0"
 # is the wrong answer to that. The stale half does not catch it, because it also
 # reads $ROOT directly and so sees the hits the scan missed.
-if [ "$fm_present" -gt 0 ] && [ "$fm_total" -eq 0 ]; then
-  red "frontmatter scan found 0 hits while $fm_present allowlisted file(s) are present — the scan did not run"
-elif [ "$fm_present" -eq 0 ] && [ "$fm_total" -eq 0 ]; then
-  skip "no allowlisted file present and no hand-rolled frontmatter parse found — nothing here claims this property"
+#
+# ORDER MATTERS, and fm_scan_rc / (fm_bad || fm_stale) both had to move
+# ahead of the consistency heuristic below, for two DIFFERENT reasons:
+#
+# fm_scan_rc first, unconditionally: if find itself failed on any FM_SCAN
+# root, fm_total and fm_bad were computed from a PARTIAL listing and cannot
+# be trusted for any of the branches below — this is the most fundamental
+# failure and every other signal is downstream of it.
+#
+# (fm_bad || fm_stale) before the "the scan did not run" heuristic,
+# deliberately, not the reverse: that heuristic (fm_present>0 &&
+# fm_total==0) is a symptom, not a cause, and TWO things other than a
+# broken scan produce that same symptom or its fm_present==0 sibling.
+# (1) Every remaining allowlisted site legitimately converted in one
+# branch: the scan ran fine (fm_scan_rc=0), fm_total is genuinely 0
+# because nothing left matches, fm_present stays positive because the
+# FILES still exist, and fm_stale lists every one of them by name. Pre-fix,
+# the heuristic below fired FIRST and reported "the scan did not run" —
+# actionable to nobody, since the scan was never broken. Reproduced
+# directly: injecting exactly that state (fm_total=0, fm_present=5,
+# fm_stale non-empty, fm_bad empty) into this block's pre-fix logic fired
+# the misdiagnosis. (2) An UNREADABLE file found by the scan (the
+# fm_hits_in guard above) `continue`s before it can contribute to
+# fm_total, so fm_bad can now be non-empty with fm_total STILL 0 and
+# fm_present EITHER value — unlike every other fm_bad entry (UNLISTED,
+# COUNT), which by construction requires n>0 and so already implied
+# fm_total>0. Left unmoved, an UNREADABLE-only finding with no allowlisted
+# file present would fall straight through both heuristic branches into
+# the plain SKIP below, vanishing exactly the way the pre-Step-3 defect
+# did. Checking fm_bad and fm_stale first instead means either kind of
+# concrete finding is reported before either heuristic gets a chance to
+# guess at a cause that may not be the real one.
+if [ "$fm_scan_rc" -ne 0 ]; then
+  red "frontmatter scan: find failed (rc=$fm_scan_rc) across one or more FM_SCAN roots — cannot conclude anything"
 elif [ -n "$fm_bad" ] || [ -n "$fm_stale" ]; then
   red "hand-rolled frontmatter parsing does not match the allowlist:"
   [ -n "$fm_bad" ] && printf '%s' "$fm_bad"
   [ -n "$fm_stale" ] && printf '%s\n' "$fm_stale"
   echo "    A line-anchored '^field:' grep matches the BODY too, including inside a fence."
   echo "    Use reference/lib/frontmatter.sh; allowlist only with a stated reason."
+elif [ "$fm_present" -gt 0 ] && [ "$fm_total" -eq 0 ]; then
+  red "frontmatter scan found 0 hits while $fm_present allowlisted file(s) are present — the scan did not run"
+elif [ "$fm_present" -eq 0 ] && [ "$fm_total" -eq 0 ]; then
+  skip "no allowlisted file present and no hand-rolled frontmatter parse found — nothing here claims this property"
 else
   ok "$fm_total hand-rolled frontmatter parse(s) across $fm_files allowlisted file(s), all accounted for"
 fi
