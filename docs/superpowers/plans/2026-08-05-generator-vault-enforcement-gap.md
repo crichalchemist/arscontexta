@@ -176,6 +176,14 @@ section=$(awk '/^## Deferrals/{f=1;next} /^## /{f=0} f' docs/superpowers/plans/2
 # Real table rows only: a leading pipe, a numeric # column, a second pipe. This excludes the
 # header row (`| # | Deferral | Landed in |` -- `#` is not a digit) and the `|---|---|---|`
 # separator automatically; free prose between/around the tables is never validated.
+#
+# TWO NAIVE-PARSING LIMITS, neither triggered by this table's current 14 rows (every row
+# splits to exactly 5 pipe-delimited fields, confirming no Deferral description contains a
+# literal `|`; no candidate path contains a space), named rather than left to be discovered:
+# an unescaped `|` inside a future Deferral description would shift field 4 to the wrong
+# cell, most likely producing a silently-empty $candidates rather than a wrong path (this
+# repo's own most-repeated failure shape -- silent, not loud); and `xargs` without `-d '\n'`
+# would mis-split a backticked path containing a space, were one ever added.
 table_rows=$(printf '%s\n' "$section" | /usr/bin/grep -E '^\|[[:space:]]*[0-9]+[[:space:]]*\|' || true)
 fail=0
 if [ -z "$table_rows" ]; then
@@ -194,23 +202,34 @@ else
     # rules already sanction, and is skipped entirely -- not a failure.
     candidates=$(printf '%s\n' "$landed" | /usr/bin/grep -oE '`[^`]*`' | tr -d '`' | /usr/bin/grep -E '\.(md|sh|ya?ml)$|/' || true)
     if [ -n "$candidates" ]; then
-      # NOT a second, nested heredoc-fed loop here, on purpose -- reproduced
-      # directly: an inner `while ... done <<EOF ... EOF` loop inside this
-      # outer one loses external-command resolution (awk/grep/tr all report
-      # "command not found") starting on the OUTER loop's SECOND iteration,
-      # under zsh specifically.
+      # NOT a second, nested heredoc-fed loop here, on purpose -- a minimal
+      # inner `while ... done <<EOF ... EOF` loop nested inside this outer
+      # one reproduced, repeatedly, in the sandboxed shell this fix was
+      # authored in: external-command resolution (awk/grep/tr) was lost
+      # starting on the OUTER loop's SECOND iteration, under zsh specifically.
+      # NOT independently reproducible, though: a later review pass tried six
+      # varied constructions in its own environment and could not trigger it.
+      # Recorded as environment-dependent rather than a settled zsh-language
+      # fact -- possibly specific to this session's execution sandbox, per
+      # this repo's own precedent for tooling masking a shell's real behavior
+      # (`grep -P` reads clean in-session because the harness aliases grep).
+      # The elimination stands regardless of the exact mechanism: nesting a
+      # second heredoc-fed loop here is unnecessary complexity either way,
+      # since `git ls-files --error-unmatch` already accepts multiple
+      # pathspecs in one call.
       #
-      # NOT unquoted `$candidates` in command position either, for the same
-      # reason -- reproduced directly, the other way: bash word-splits an
-      # unquoted multi-line variable on IFS by default, zsh does not (this
-      # repo's own two documented bash/zsh forks are exactly "unquoted
-      # word-splitting" and PIPESTATUS; this is the first). Passing
-      # `$candidates` bare split correctly into two pathspecs under bash and
-      # collapsed into ONE pathspec containing a literal embedded newline
-      # under zsh, which git correctly reported as unmatched -- a FALSE
-      # FAIL on two genuinely tracked files. `xargs` does its own
-      # whitespace/newline splitting on its stdin, independent of which
-      # shell invoked it, so it gives both shells the same argument list.
+      # NOT unquoted `$candidates` in command position either -- this one
+      # IS a settled, general fact, reproduced independently twice (by this
+      # fix and again on review): bash word-splits an unquoted multi-line
+      # variable on IFS by default, zsh does not (this repo's Global
+      # Constraints name it directly: "unquoted `$var` in a `for` list
+      # word-splits under bash and not zsh"). Passing `$candidates` bare
+      # split correctly into two pathspecs under bash and collapsed into ONE
+      # pathspec containing a literal embedded newline under zsh, which git
+      # correctly reported as unmatched -- a FALSE FAIL on two genuinely
+      # tracked files. `xargs` does its own whitespace/newline splitting on
+      # its stdin, independent of which shell invoked it, so it gives both
+      # shells the same argument list.
       printf '%s\n' "$candidates" | xargs git ls-files --error-unmatch >/dev/null 2>&1 || {
         flat=$(printf '%s\n' "$candidates" | tr '\n' ' ')
         echo "FAIL: deferral row references an untracked path among [$flat]: $row"
