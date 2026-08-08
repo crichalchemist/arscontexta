@@ -71,6 +71,27 @@ jobs:
         run: bash reference/test/placeholder-count.test.sh
       - name: Placeholder gate behavior (zsh)
         run: zsh reference/test/placeholder-count.test.sh
+      # Does every {vocabulary.X}/{DOMAIN:X} placeholder USED in skill-sources/
+      # resolve to a key the generator's own schema DECLARES? Whole-tree, not
+      # diff-relative like the gate above -- a schema key removed anywhere could
+      # silently orphan a placeholder in a completely unrelated, unchanged file, so
+      # this runs on every push unconditionally. Born from a real finding:
+      # skill-sources/reduce/SKILL.md shipped {vocabulary.domain} for years with no
+      # schema key anywhere ever declaring `domain` -- an unresolvable placeholder
+      # in every vault it ever generated into, invisible to the count-only gate
+      # above since the count itself never changed. Both shells run the gate
+      # directly here, not only via the test harness below: the test file's own
+      # assertions hardcode `bash "$GATE"` internally by design (see its header),
+      # so a `zsh` run of the SUITE proves the harness is zsh-portable, not that
+      # the gate itself runs correctly when invoked as `zsh check-vocabulary-schema.sh`.
+      - name: Vocabulary schema coverage (bash)
+        run: bash reference/check-vocabulary-schema.sh
+      - name: Vocabulary schema coverage (zsh)
+        run: zsh reference/check-vocabulary-schema.sh
+      - name: Vocabulary schema coverage tests (bash)
+        run: bash reference/test/vocabulary-schema.test.sh
+      - name: Vocabulary schema coverage tests (zsh)
+        run: zsh reference/test/vocabulary-schema.test.sh
       # hooks/scripts/ was four-fifths unprotected. Measured by mutating each
       # script and running every other gate: killing read_config.sh's dotted-key
       # routing IS caught (threshold-namespace, the positive control), but making

@@ -48,5 +48,88 @@ SCAN_ROOT="$tmp2/scan" SCHEMA_FILE="$tmp2/schema.md" bash "$GATE" >/dev/null 2>&
 assert "$?" "0" "negative control: only declared keys passes"
 rm -rf "$tmp2"
 
+# --- Assertion 3: the Level 7 exception is never flagged --------------------------------
+tmp3=$(mktemp -d); mkdir -p "$tmp3/scan"
+fixture_schema "$tmp3/schema.md"
+printf '{vocabulary.notes} {DOMAIN:extraction_categories}\n' > "$tmp3/scan/x.md"
+SCAN_ROOT="$tmp3/scan" SCHEMA_FILE="$tmp3/schema.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "0" "Level 7 exception (extraction_categories) is not flagged"
+rm -rf "$tmp3"
+
+# --- Assertion 4: mutating the exception out of the gate turns it red -------------------
+tmp4=$(mktemp -d); mkdir -p "$tmp4/scan"
+fixture_schema "$tmp4/schema.md"
+printf '{vocabulary.notes} {DOMAIN:extraction_categories}\n' > "$tmp4/scan/x.md"
+sed "s/\^extraction_categories\\\$/^DUMMY_EXCEPTION_NAME\$/" "$GATE" > "$tmp4/mutated_gate.sh"
+assert "$(grep -c 'DUMMY_EXCEPTION_NAME' "$tmp4/mutated_gate.sh")" "1" \
+  "mutation actually applied to the mutated gate copy"
+chmod +x "$tmp4/mutated_gate.sh"
+# The mutated copy computes HERE from its OWN location and sources
+# "$HERE/lib/placeholder-pattern.sh" relative to it -- same class of gap Task 1's
+# mkrepo() had. Bring the real dependency along, or the mutation test fails on an
+# unrelated "file not found" instead of exercising the mutation at all.
+mkdir -p "$tmp4/lib"
+cp "$ROOT/lib/placeholder-pattern.sh" "$tmp4/lib/placeholder-pattern.sh"
+SCAN_ROOT="$tmp4/scan" SCHEMA_FILE="$tmp4/schema.md" bash "$tmp4/mutated_gate.sh" >/dev/null 2>&1
+assert "$?" "1" "mutating away the exception makes extraction_categories flag (proves assertion 3 isn't vacuous)"
+rm -rf "$tmp4"
+
+# --- Assertion 5: the two special-cased space-containing DOMAIN: spellings resolve ------
+# Written as its own fixture, not fixture_schema() + append: an append lands after the
+# closing "# Level 7:" marker, outside the sed range that extracts declared keys --
+# exactly the bug this assertion needs to NOT have, caught by this assertion itself
+# failing during development (rc 1 instead of the expected 0) before this fix.
+tmp5=$(mktemp -d); mkdir -p "$tmp5/scan"
+cat > "$tmp5/schema.md" <<'EOF'
+vocabulary:
+  # Level 4: Navigation terms
+  topic_map: "[domain term]"
+  topic_maps: "[domain term]"
+# Level 7: Extraction categories
+  extraction_categories:
+EOF
+printf '{DOMAIN:topic map} {DOMAIN:topic maps}\n' > "$tmp5/scan/x.md"
+SCAN_ROOT="$tmp5/scan" SCHEMA_FILE="$tmp5/schema.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "0" "space-containing DOMAIN: spellings resolve via the same fold mechanically_compare uses"
+rm -rf "$tmp5"
+
+# --- Assertion 6: {config.X} is extracted but never flagged for resolution --------------
+tmp6=$(mktemp -d); mkdir -p "$tmp6/scan"
+fixture_schema "$tmp6/schema.md"
+printf '{vocabulary.notes} {config.something_no_schema_declares}\n' > "$tmp6/scan/x.md"
+SCAN_ROOT="$tmp6/scan" SCHEMA_FILE="$tmp6/schema.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "0" "{config.X} markers are never checked for resolution"
+rm -rf "$tmp6"
+
+# --- Assertion 7: zero-extraction guard -------------------------------------------------
+tmp7=$(mktemp -d); mkdir -p "$tmp7/scan"
+fixture_schema "$tmp7/schema.md"
+echo 'no placeholders in this file at all' > "$tmp7/scan/x.md"
+SCAN_ROOT="$tmp7/scan" SCHEMA_FILE="$tmp7/schema.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "2" "zero placeholders extracted -> cannot conclude, never a false-clean pass"
+rm -rf "$tmp7"
+
+# --- Assertion 8: schema file missing -> cannot conclude --------------------------------
+tmp8=$(mktemp -d); mkdir -p "$tmp8/scan"
+echo '{vocabulary.notes}' > "$tmp8/scan/x.md"
+SCAN_ROOT="$tmp8/scan" SCHEMA_FILE="$tmp8/does-not-exist.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "2" "missing schema file -> cannot conclude"
+rm -rf "$tmp8"
+
+# --- Assertion 9: schema missing the # Level 7: marker -> cannot conclude ---------------
+tmp9=$(mktemp -d); mkdir -p "$tmp9/scan"
+cat > "$tmp9/schema.md" <<'EOF'
+vocabulary:
+  notes: "[domain term]"
+EOF
+echo '{vocabulary.notes}' > "$tmp9/scan/x.md"
+SCAN_ROOT="$tmp9/scan" SCHEMA_FILE="$tmp9/schema.md" bash "$GATE" >/dev/null 2>&1
+assert "$?" "2" "schema with no bounding '# Level 7:' marker -> cannot conclude (unbounded range would silently absorb trailing content)"
+rm -rf "$tmp9"
+
+# --- Assertion 10: PLACEHOLDER_PAT exists in exactly one place -------------------------
+n_defs=$(/usr/bin/grep -rl "^PLACEHOLDER_PAT=" "$ROOT/check-placeholder-count.sh" "$ROOT/check-vocabulary-schema.sh" "$ROOT/lib/placeholder-pattern.sh" 2>/dev/null | wc -l | tr -d ' ')
+assert "$n_defs" "1" "PLACEHOLDER_PAT is defined in exactly one file (lib/placeholder-pattern.sh), never redefined locally"
+
 echo "$pass/$((pass+fail))"
 [ "$fail" -eq 0 ]
