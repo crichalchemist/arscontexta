@@ -159,8 +159,10 @@ inside the mechanism built to drain them.
 
 The eighth check is kernel validation, which does **not** run in CI, because it needs a
 generated vault to run against. It is no longer the only one: `reference/test/check-doc-claims.test.sh`
-is also not CI-wired, deliberately — its own header states why. "Eighth" is kept as this repo's
-numbering, not as a claim that only one check sits outside CI:
+is also not CI-wired, deliberately — a step there would also move the gated CI-step counts below,
+including the one that compares against `main` and rots on merge with no diff to notice. "Eighth"
+is stale numbering, kept because renumbering it is out of scope here, not because only one check
+sits outside CI:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -380,8 +382,9 @@ it.**
 not a claim you should take on trust: it is what the fourteen checks above enforce — twelve of them
 in CI, as defined by the twenty-four steps in `.github/workflows/checks.yml`. The other two are
 `validate-kernel.sh`, which needs a generated vault to run against, and
-`reference/test/check-doc-claims.test.sh`, deliberately not CI-wired (its own header states why —
-each run already costs three invocations of the ~100s script it tests).
+`reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
+three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
+counts below, one of which compares against `main` and rots on merge.
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
 RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
