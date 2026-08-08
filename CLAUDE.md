@@ -46,7 +46,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are thirteen executable checks. Twelve run in CI (`.github/workflows/checks.yml`) on every push.
+There are fourteen executable checks. Twelve run in CI (`.github/workflows/checks.yml`) on every push.
 Three defects shipped here were bash/zsh forks, so **the eight test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
@@ -57,6 +57,7 @@ bash reference/check-portability.sh                      # exit 0
 bash reference/check-prose-paths.sh                      # 0 missing (path count drifts)
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 bash reference/check-placeholder-count.sh main           # exit 0 (1 = a template lost placeholders)
+bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 19/19
   $s reference/test/guard-failure.test.sh                # 55/55
@@ -402,7 +403,7 @@ executable checks", "Twelve run in CI", `# 24` — sat correct in the same file.
 phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
 
 ```bash
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 14
 grep -c '^      - ' .github/workflows/checks.yml                                        # 24
 git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 24
 ```
@@ -423,7 +424,7 @@ grep -c '^      - ' .github/workflows/checks.yml                      # 24, this
 git show main:.github/workflows/checks.yml | grep -c '^      - '      # 24, main — equal
                                                                       # since the CI-hardening
                                                                       # branch merged
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 13
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 14
 ```
 
 What follows is what remains.
