@@ -73,10 +73,9 @@ echo
 # an entry whose decrease no longer matches the tree is STALE and fails, so the
 # list drains rather than rots. Keyed on the COUNTS, not the filename alone —
 # a bare path would absorb a second, unrelated decrease in the same file later.
-# Empty today: no legitimate decrease has occurred. That is the honest state, and
-# an empty list must not be mistaken for an absent mechanism, so the staleness
-# half runs over it either way.
-PLACEHOLDER_ALLOW=""
+# The staleness half runs whether this is empty or not, so an entry here is
+# never a silent, permanent exemption.
+PLACEHOLDER_ALLOW="skill-sources/reduce/SKILL.md 132->131 seed is one of the ten canonical, never-vocabulary-transformable skill names per skills/upgrade/SKILL.md -- {vocabulary.seed} was substitution syntax wrapped around a name that should never have been wrapped; removing the wrapper legitimately drops the count by one. See docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md section 1b."
 
 fail=0
 rc2=0

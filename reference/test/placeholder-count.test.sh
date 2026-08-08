@@ -91,13 +91,20 @@ staged() {              # staged <repo> <expected-branch> [<file-that-must-exist
 run()  { ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" 2>&1 ); }
 rc_of(){ ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" >/dev/null 2>&1; echo $? ); }
 allow(){ # allow <repo> <entries>  — substitute the allowlist in the repo's copy
+    # Matches the WHOLE current assignment (PLACEHOLDER_ALLOW="...") via regex,
+    # not a literal '""' — the shipped default is no longer empty (see
+    # docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md's
+    # one real allowlisted entry), and a literal-empty-string match would only
+    # ever have worked for that one specific starting value. No entry, shipped
+    # or test-supplied, contains an embedded double quote, so a non-greedy
+    # [^"]* is a safe delimiter.
     python3 - "$1/reference/check-placeholder-count.sh" "$2" <<'PY'
-import sys
+import sys, re
 p, entries = sys.argv[1], sys.argv[2]
 s = open(p).read()
-old = 'PLACEHOLDER_ALLOW=""'
-assert s.count(old) == 1, "allowlist assignment not found — did the script change?"
-open(p, 'w').write(s.replace(old, 'PLACEHOLDER_ALLOW="\n%s\n"' % entries))
+pat = re.compile(r'PLACEHOLDER_ALLOW="[^"]*"')
+assert len(pat.findall(s)) == 1, "allowlist assignment not found — did the script change?"
+open(p, 'w').write(pat.sub('PLACEHOLDER_ALLOW="\n%s\n"' % entries, s))
 PY
 }
 
