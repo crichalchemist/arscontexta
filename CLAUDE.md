@@ -381,8 +381,8 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the fourteen checks above enforce — twelve of them
-in CI, as defined by the twenty-four steps in `.github/workflows/checks.yml`. The other two are
+not a claim you should take on trust: it is what the sixteen checks above enforce — fourteen of them
+in CI, as defined by the twenty-eight steps in `.github/workflows/checks.yml`. The other two are
 `validate-kernel.sh`, which needs a generated vault to run against, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
 three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
