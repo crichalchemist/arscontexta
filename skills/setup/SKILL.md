@@ -1166,6 +1166,7 @@ vocabulary:
 
   # Level 4: Navigation terms
   topic_map: "[domain term]"    # e.g., "topic map", "theme", "decision register"
+  topic_maps: "[domain term]"   # e.g., "topic maps", "themes", "decision registers"
   hub: "[domain term]"          # e.g., "hub", "home", "overview"
 
   # Level 5: Process verbs
