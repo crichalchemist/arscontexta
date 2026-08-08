@@ -81,9 +81,9 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all fourteen, expect exactly these results
+## Verification — run all sixteen, expect exactly these results
 
-Twelve run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
+Fourteen run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
@@ -100,6 +100,7 @@ bash reference/check-portability.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-prose-paths.sh ;  echo "expect rc=0, got rc=$?"
 bash reference/check-doc-claims.sh  ;  echo "expect rc=0, got rc=$?"
 bash reference/check-placeholder-count.sh main ; echo "expect rc=0, got rc=$?"
+bash reference/check-vocabulary-schema.sh ;      echo "expect rc=0, got rc=$?"  # also runs under zsh in CI
 bash reference/test/check-doc-claims.test.sh | tail -1  # bash-only (see the suite's own header); expect: passed=13 failed=0
 
 for s in bash zsh; do
@@ -111,6 +112,7 @@ for s in bash zsh; do
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0
+  $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 11/11
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
@@ -143,7 +145,7 @@ primitive 2 for the opposite reason: it has no wiki links yet, and the check rep
 notes directory containing none. Neither is this repo failing; both are the validator describing
 the vault it was handed.
 
-**"Green" means all twenty-four CI steps ran and passed** — not that the previously-red step turned.
+**"Green" means all twenty-eight CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
 
 ```bash
@@ -345,5 +347,5 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All twenty-four CI steps must pass. State in the PR what is **not** claimed —
+Branch from `main`. All twenty-eight CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.
