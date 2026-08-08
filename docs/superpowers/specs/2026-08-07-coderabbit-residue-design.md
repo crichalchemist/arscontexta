@@ -266,7 +266,9 @@ own now-populated content:
   exit status — this same plan's own Global Constraints name this exact class of defect.
 - **Six "Done when" fenced blocks (starting ~60-63) violate markdownlint MD031** (no blank line
   before the fence). No CI in this repo currently runs markdownlint, so this is cosmetic and
-  low-priority, but free to fix alongside the other two while the file is open.
+  low-priority, but free to fix alongside the other two while the file is open. **NOT SHIPPED —
+  claim verified false against the target file** (see `a138126`'s commit message and the plan's
+  own Step 4 annotation): exactly 5 "Done when" blocks exist, not 6, and none violate MD031.
 
 **Explicitly not in scope for this task:** the canonical-name resolver contract wording CodeRabbit
 also flagged in this plan and its design spec (lines 44-52 / 59-61) is **already moot** — the shipped

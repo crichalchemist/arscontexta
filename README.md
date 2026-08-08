@@ -369,8 +369,9 @@ something and observe no change.
 
 The repo ships an executable gate suite: portability and prose-path checks, plus test
 suites that each run under both `bash` and `zsh` -- several shipped defects were shell
-forks, so one shell is not enough. Most run in CI on every push. Kernel validation is
-the exception, because it needs a generated vault to run against.
+forks, so one shell is not enough. Most run in CI on every push; kernel validation and
+one mutation-test suite are the exceptions, the former because it needs a generated
+vault to run against and the latter deliberately (its own header states why).
 
 `CONTRIBUTING.md` carries the commands and the contribution workflow. `CLAUDE.md`
 carries the gate table -- what each gate uniquely catches, and, more usefully, what

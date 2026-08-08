@@ -157,8 +157,10 @@ visible rather than silent. Keying absorption on the message was rejected — it
 entry to the gate's own wording, so rewording a message would turn all entries stale, a new trap
 inside the mechanism built to drain them.
 
-The eighth check is kernel validation — the one that does **not** run in CI, because it needs a
-generated vault to run against:
+The eighth check is kernel validation, which does **not** run in CI, because it needs a
+generated vault to run against. It is no longer the only one: `reference/test/check-doc-claims.test.sh`
+is also not CI-wired, deliberately — its own header states why. "Eighth" is kept as this repo's
+numbering, not as a claim that only one check sits outside CI:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -375,9 +377,11 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the thirteen checks above enforce — twelve of them
-in CI, `validate-kernel.sh` being the one that needs a vault — as defined by the twenty-four steps in
-`.github/workflows/checks.yml`.
+not a claim you should take on trust: it is what the fourteen checks above enforce — twelve of them
+in CI, as defined by the twenty-four steps in `.github/workflows/checks.yml`. The other two are
+`validate-kernel.sh`, which needs a generated vault to run against, and
+`reference/test/check-doc-claims.test.sh`, deliberately not CI-wired (its own header states why —
+each run already costs three invocations of the ~100s script it tests).
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
 RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
