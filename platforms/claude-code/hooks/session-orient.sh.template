@@ -168,19 +168,20 @@ if [ -d "$NOTES_DIR" ]; then
     # but a link from ANYWHERE BELOW NOTES_DIR rescues a note
     # (link_edge_map_recursive, column 2 = target). Self-edges excluded
     # ($1 != $2); LC_ALL=C on both comm inputs.
-    idx=$(mktemp) && raw=$(mktemp) && tgts=$(mktemp)
-    if [ -n "$idx" ] && [ -n "$raw" ] && [ -n "$tgts" ] \
+    idx=$(mktemp) && raw=$(mktemp) && tgts=$(mktemp) && tmp_awk=$(mktemp)
+    if [ -n "$idx" ] && [ -n "$raw" ] && [ -n "$tgts" ] && [ -n "$tmp_awk" ] \
        && existing_note_index "$NOTES_DIR" > "$idx" \
        && link_edge_map_recursive "$NOTES_DIR" > "$raw" \
        && LC_ALL=C sort -u -o "$idx" "$idx" \
-       && LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$raw" | LC_ALL=C sort -u > "$tgts" \
+       && LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$raw" > "$tmp_awk" \
+       && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
        && ORPHAN_COUNT=$(LC_ALL=C comm -23 "$idx" "$tgts" | grep -c .); then
-      rm -f "$idx" "$raw" "$tgts"
+      rm -f "$idx" "$raw" "$tgts" "$tmp_awk"
       if [ "$ORPHAN_COUNT" -gt 0 ]; then
         SIGNALS="${SIGNALS}CONDITION: ${ORPHAN_COUNT} orphan notes (no incoming links). Consider /{DOMAIN:reflect}.\n"
       fi
     else
-      rm -f "$idx" "$raw" "$tgts" 2>/dev/null
+      rm -f "$idx" "$raw" "$tgts" "$tmp_awk" 2>/dev/null
       echo "warning: orphan-note scan failed; orphan signal omitted" >&2
     fi
   else
