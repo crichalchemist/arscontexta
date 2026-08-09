@@ -242,46 +242,25 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
-# Replaced a recursive `grep -rl` whose pattern was the target title in
-# brackets. (Described, not quoted, for the reason given at the /graph backward
-# site.) Single-quoted and with a literal target rather than a variable, it
-# escaped the search string
-# divergence 6 was tracked by while carrying the same defects: it matched
-# neither case-folded nor through [[title|alias]], and it counted a link
-# quoted inside a ``` example as a real backlink.
+# Backlinks to a specific target. The link_edge_map function emits
+# source<TAB>target (both folded), allowing us to filter by target and extract
+# the source (filename). This replaces the per-file loop that stripped fences
+# and extracted links to check each against the target.
 TITLE="target note title"
 TARGET=$(printf '%s\n' "$TITLE" | _fold_lower)
-BL_SRC=$(mktemp) || exit 1
-BL_HITS=$(mktemp) || { rm -f "$BL_SRC"; exit 1; }
-BLF="/tmp/reweave-backlink-err-$$"
-rm -f "$BLF"
-
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  _strip_fences "$f" > "$BL_SRC" || { touch "$BLF"; continue; }
-  rg -o '\[\[([^\]|#]+)' -r '$1' "$BL_SRC" > "$BL_HITS"
-  if [ $? -gt 1 ]; then
-    touch "$BLF"; continue
-  fi
-  # grep -qxF, not a regex: a title containing `.` or `+` must match itself and
-  # nothing else.
-  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$BL_HITS" \
-       | _fold_lower | grep -qxF "$TARGET"; then
-    printf '%s\n' "$f"
-  fi
+EDGES=$(mktemp) || exit 1
+link_edge_map "$NOTES_DIR" > "$EDGES" || { rm -f "$EDGES"; exit 1; }
+# Find files (sources) that link to TARGET. The result is the filename (source).
+awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | while IFS= read -r source; do
+  printf '%s\n' "$source"
 done
-
-if [ -e "$BLF" ]; then
-  rm -f "$BL_SRC" "$BL_HITS" "$BLF"
-  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
-  exit 1
-fi
-rm -f "$BL_SRC" "$BL_HITS" "$BLF"
+rm -f "$EDGES"
 ```
 
 **Key question:** What do I know today that I did not know when this {vocabulary.note} was written?
