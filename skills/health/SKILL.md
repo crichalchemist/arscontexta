@@ -191,15 +191,24 @@ fi
 
 idx=$(mktemp) || exit 1
 tgts=$(mktemp) || { rm -f "$idx"; exit 1; }
-existing_note_index "{vocabulary.notes}" | LC_ALL=C sort -u > "$idx" \
-  || { rm -f "$idx" "$tgts"; exit 1; }
-link_edge_map_recursive "$VAULT_ROOT" \
-  | LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' \
-  | LC_ALL=C sort -u > "$tgts" || { rm -f "$idx" "$tgts"; exit 1; }
+edges=$(mktemp) || { rm -f "$idx" "$tgts"; exit 1; }
+tmp_awk=$(mktemp) || { rm -f "$idx" "$tgts" "$edges"; exit 1; }
+
+existing_note_index "{vocabulary.notes}" > "$edges" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+LC_ALL=C sort -u < "$edges" > "$idx" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+
+link_edge_map_recursive "$VAULT_ROOT" > "$edges" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" > "$tmp_awk" \
+  && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+
 LC_ALL=C comm -23 "$idx" "$tgts" | while IFS= read -r n; do
   echo "WARN: $n — no incoming links (orphan)"
 done
-rm -f "$idx" "$tgts"
+rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
 ```
 
 **Nuance:** Orphans are not automatically failures. A note created today that hasn't been through /{vocabulary.cmd_reflect} yet is expected to be orphaned temporarily. Check file age:
