@@ -242,46 +242,31 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
-# Replaced a recursive `grep -rl` whose pattern was the target title in
-# brackets. (Described, not quoted, for the reason given at the /graph backward
-# site.) Single-quoted and with a literal target rather than a variable, it
-# escaped the search string
-# divergence 6 was tracked by while carrying the same defects: it matched
-# neither case-folded nor through [[title|alias]], and it counted a link
-# quoted inside a ``` example as a real backlink.
+# Backlinks to a specific target. link_edge_map_recursive emits
+# source<TAB>target<TAB>source_path (source and target folded); see below for
+# why column 3 matters here. This replaces the per-file loop that stripped
+# fences and extracted links to check each against the target. Recursive: the
+# original scanned all of NOTES_DIR, not just its top level.
 TITLE="target note title"
 TARGET=$(printf '%s\n' "$TITLE" | _fold_lower)
-BL_SRC=$(mktemp) || exit 1
-BL_HITS=$(mktemp) || { rm -f "$BL_SRC"; exit 1; }
-BLF="/tmp/reweave-backlink-err-$$"
-rm -f "$BLF"
-
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  _strip_fences "$f" > "$BL_SRC" || { touch "$BLF"; continue; }
-  rg -o '\[\[([^\]|#]+)' -r '$1' "$BL_SRC" > "$BL_HITS"
-  if [ $? -gt 1 ]; then
-    touch "$BLF"; continue
-  fi
-  # grep -qxF, not a regex: a title containing `.` or `+` must match itself and
-  # nothing else.
-  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$BL_HITS" \
-       | _fold_lower | grep -qxF "$TARGET"; then
-    printf '%s\n' "$f"
-  fi
-done
-
-if [ -e "$BLF" ]; then
-  rm -f "$BL_SRC" "$BL_HITS" "$BLF"
+EDGES=$(mktemp) || exit 1
+link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
+  rm -f "$EDGES"
   echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
   exit 1
-fi
-rm -f "$BL_SRC" "$BL_HITS" "$BLF"
+}
+# Column 3 is the source path exactly as link_edge_map_recursive's own find
+# produced it, so no basename-to-path resolution is needed. Source basenames
+# collide across directories under a recursive scan, so we print and dedupe on
+# the path (column 3) itself, not the folded basename in column 1.
+awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $3}' "$EDGES" | LC_ALL=C sort -u
+rm -f "$EDGES"
 ```
 
 **Key question:** What do I know today that I did not know when this {vocabulary.note} was written?
@@ -718,14 +703,30 @@ When running interactively (NOT via /ralph), YOU must advance the phase in the q
 **After completing the workflow, advance the phase:**
 
 ```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/queue-edit.sh.
+QUEUE_LIB="ops/lib/queue-edit.sh"
+if [ -r "$QUEUE_LIB" ]; then
+  . "$QUEUE_LIB"
+else
+  echo "error: queue-edit library not found at '$QUEUE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${QUEUE_EDIT_VERSION:=0}"
+if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 # get timestamp
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # advance phase (current_phase -> next, append to completed_phases)
 # NEXT_PHASE is the phase after reweave in phase_order (i.e., verify)
-jq '(.tasks[] | select(.id=="TASK_ID")).current_phase = "{vocabulary.verify}" |
-    (.tasks[] | select(.id=="TASK_ID")).completed_phases += ["{vocabulary.reweave}"]' \
-    ops/queue/queue.json > tmp.json && mv tmp.json ops/queue/queue.json
+queue_edit '(.tasks[] | select(.id==$id)).current_phase = "{vocabulary.verify}" |
+    (.tasks[] | select(.id==$id)).completed_phases += ["{vocabulary.reweave}"]' \
+    ops/queue/queue.json --arg id "TASK_ID"
 ```
 
 The handoff block's "Queue Updates" section is not just output — it is your own todo list when running interactively.

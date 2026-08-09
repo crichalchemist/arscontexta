@@ -151,17 +151,46 @@ if [ "$INBOX_COUNT" -ge 3 ]; then
 fi
 
 # Orphan notes (any is a signal)
+# SessionStart contract, not skill contract: NEVER exit 1 (a missing library
+# must not break every session) and NEVER substitute 0 (the threshold below is
+# -gt 0, so a fabricated 0 would silently suppress the signal forever). Warn
+# on stderr and OMIT the line instead -- an omitted line is visible; a
+# fabricated 0 is not. Same rule for a computation failure, not only a
+# missing/stale library. See platforms/claude-code/hooks/session-orient.sh.template
+# resolutions (task 7) and hooks/scripts/session-orient.sh for precedent.
 NOTES_DIR="{{NOTES_DIR:-notes}}"
 ORPHAN_COUNT=0
 if [ -d "$NOTES_DIR" ]; then
-  for f in "$NOTES_DIR"/*.md; do
-    [ -f "$f" ] || continue
-    title=$(basename "$f" .md)
-    hits=$(grep -rl "\[\[$title\]\]" "$NOTES_DIR"/ 2>/dev/null | wc -l | tr -d ' ')
-    [ "$hits" -eq 0 ] && ORPHAN_COUNT=$((ORPHAN_COUNT + 1))
-  done
-  if [ "$ORPHAN_COUNT" -gt 0 ]; then
-    SIGNALS="${SIGNALS}CONDITION: ${ORPHAN_COUNT} orphan notes (no incoming links). Consider /{DOMAIN:reflect}.\n"
+  LINK_LIB="ops/lib/link-extraction.sh"
+  # Do NOT redirect stderr on this source: the library's own fold-probe
+  # (_link_probe_fold) warns here if no non-ASCII case folding is available,
+  # meaning orphan counts below will be OVER-reported. That is the one
+  # degradation this block cannot otherwise surface -- swallowing it would
+  # leave a silent wrong-number failure mode next to the loud ones below.
+  if [ -r "$LINK_LIB" ] && . "$LINK_LIB" \
+     && [ "${LINK_EXTRACTION_VERSION:-0}" -ge 3 ]; then
+    # Scope is asymmetric: candidates are FLAT in NOTES_DIR (existing_note_index),
+    # but a link from ANYWHERE BELOW NOTES_DIR rescues a note
+    # (link_edge_map_recursive, column 2 = target). Self-edges excluded
+    # ($1 != $2); LC_ALL=C on both comm inputs.
+    idx=$(mktemp) && raw=$(mktemp) && tgts=$(mktemp) && tmp_awk=$(mktemp)
+    if [ -n "$idx" ] && [ -n "$raw" ] && [ -n "$tgts" ] && [ -n "$tmp_awk" ] \
+       && existing_note_index "$NOTES_DIR" > "$idx" \
+       && link_edge_map_recursive "$NOTES_DIR" > "$raw" \
+       && LC_ALL=C sort -u -o "$idx" "$idx" \
+       && LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$raw" > "$tmp_awk" \
+       && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+       && ORPHAN_COUNT=$(LC_ALL=C comm -23 "$idx" "$tgts" | grep -c . || true); then
+      rm -f "$idx" "$raw" "$tgts" "$tmp_awk"
+      if [ "$ORPHAN_COUNT" -gt 0 ]; then
+        SIGNALS="${SIGNALS}CONDITION: ${ORPHAN_COUNT} orphan notes (no incoming links). Consider /{DOMAIN:reflect}.\n"
+      fi
+    else
+      rm -f "$idx" "$raw" "$tgts" "$tmp_awk" 2>/dev/null
+      echo "warning: orphan-note scan failed; orphan signal omitted" >&2
+    fi
+  else
+    echo "warning: link-extraction library unavailable; orphan signal omitted" >&2
   fi
 fi
 

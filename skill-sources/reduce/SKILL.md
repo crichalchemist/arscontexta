@@ -1107,11 +1107,28 @@ When running interactively (NOT via orchestrator), YOU must execute the queue up
 **After completing extraction, update the queue:**
 
 ```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/queue-edit.sh.
+QUEUE_LIB="ops/lib/queue-edit.sh"
+if [ -r "$QUEUE_LIB" ]; then
+  . "$QUEUE_LIB"
+else
+  echo "error: queue-edit library not found at '$QUEUE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${QUEUE_EDIT_VERSION:=0}"
+if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 # Get timestamp
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Mark extract task done (replace TASK_ID with actual task ID)
-jq '(.tasks[] | select(.id=="TASK_ID")).status = "done" | (.tasks[] | select(.id=="TASK_ID")).completed = "'"$TIMESTAMP"'"' ops/queue/queue.json > tmp.json && mv tmp.json ops/queue/queue.json
+queue_edit '(.tasks[] | select(.id==$id)).status = "done" | (.tasks[] | select(.id==$id)).completed = $ts' \
+  ops/queue/queue.json --arg id "TASK_ID" --arg ts "$TIMESTAMP"
 ```
 
 The handoff block's "Queue Updates" section is not just output — it is your own todo list when running interactively.

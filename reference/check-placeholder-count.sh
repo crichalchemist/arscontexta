@@ -75,7 +75,14 @@ echo
 # a bare path would absorb a second, unrelated decrease in the same file later.
 # The staleness half runs whether this is empty or not, so an entry here is
 # never a silent, permanent exemption.
-PLACEHOLDER_ALLOW="skill-sources/reduce/SKILL.md 132->131 seed is one of the ten canonical, never-vocabulary-transformable skill names per skills/upgrade/SKILL.md -- {vocabulary.seed} was substitution syntax wrapped around a name that should never have been wrapped; removing the wrapper legitimately drops the count by one. See docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md section 1b."
+# DRAINED 2026-08-08. The one entry -- skill-sources/reduce/SKILL.md 132->131,
+# the {vocabulary.seed} unwrapping -- was excusing a decrease that 752f38f4 has
+# since carried into main, so a range based on main can no longer exhibit it.
+# It lay dormant exactly as the range-relative note at the staleness half
+# predicts ("a fully obsolete entry survives until a range touches its file
+# again") and fired the moment an unrelated backport edited that same file.
+# Deleting it is the drain, not a workaround for it.
+PLACEHOLDER_ALLOW=""
 
 fail=0
 rc2=0

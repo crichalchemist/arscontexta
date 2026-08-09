@@ -708,14 +708,15 @@ It also ran each repair once per approved upgrade. The Final Report's `[current]
 
 ### 6a. Refresh the shared libraries
 
-Generated vaults carry their own copies of **two** versioned libraries under `ops/lib/`:
+Generated vaults carry their own copies of **three** versioned libraries under `ops/lib/`:
 
 | Vault file | Plugin source | Version constant |
 |---|---|---|
 | `ops/lib/link-extraction.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` | `LINK_EXTRACTION_VERSION` |
 | `ops/lib/frontmatter.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
+| `ops/lib/queue-edit.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/queue-edit.sh` | `QUEUE_EDIT_VERSION` |
 
-**Scope, stated rather than implied: this step reconciles those two files, not the whole of
+**Scope, stated rather than implied: this step reconciles those three files, not the whole of
 `ops/lib/`.** A vault's `ops/lib/` may also hold graph parsers and their tests. Those carry no version
 marker to compare against, so this step cannot reconcile them and must not claim to. Report the files;
 never report the directory as repaired.
@@ -752,14 +753,17 @@ Report, **one line per row** — every branch above has a line, including the on
 written:
 
 ```text
-link-extraction.sh: v0 (absent) → v2 [restored]
-link-extraction.sh: v1 → v2 [refreshed]
-link-extraction.sh: v2 [current]
-link-extraction.sh: v2 → v1 [vault ahead, skipped]
+link-extraction.sh: v0 (absent) → v3 [restored]
+link-extraction.sh: v1 → v3 [refreshed]
+link-extraction.sh: v2 → v3 [refreshed]
+link-extraction.sh: v3 [current]
+link-extraction.sh: v3 → v2 [vault ahead, skipped]
 link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
 frontmatter.sh:     v0 (absent) → v3 [restored]
 frontmatter.sh:     v1 → v3 [refreshed]
 frontmatter.sh:     v3 [current]
+queue-edit.sh:      v0 (absent) → v1 [restored]
+queue-edit.sh:      v1 [current]
 ```
 
 `frontmatter.sh` is absent from **every vault generated before it existed**, so `v0 (absent) → v3
@@ -771,7 +775,7 @@ examples track the constant — do not read them as pinned versions. Until that 
 perform it. A remedy message pointing at a step that does not restore the file would be the silent
 failure this repo is named for, wearing a helpful voice.
 
-When the vault's `ops/lib/` held files other than the two rows above, add the scope line so the user
+When the vault's `ops/lib/` held files other than the three rows above, add the scope line so the user
 is not left reading restored files as a restored directory: `other ops/lib/ files not checked`. A
 library swapped in without a line in the report is a change the user cannot audit — and these files
 decide what every link count and every status count in the vault reports.
@@ -929,6 +933,36 @@ One limit worth stating rather than discovering later: `read_config.sh` resolves
 nesting, which is all `self_evolution.*` needs. `maintenance.conditions.pending_observations_threshold`
 is three levels, so the hook cannot read that pair whichever way this step is resolved.
 
+### 6d. Backfill unresolved `{vocabulary.domain}` markers
+
+`{vocabulary.domain}` has no entry in the manifest's `vocabulary:` block (see "Shared Step: Rendering
+the Canonical Template..." above) — it resolves from the standalone `domain_summary:` field instead.
+A vault generated before `/{DOMAIN:setup}` carried that routing instruction ships the literal text
+`{vocabulary.domain}` into every installed skill that used it — currently 12 sites in
+`skill-sources/reduce/SKILL.md` alone, so `/{DOMAIN:reduce}` (or its vault-native name) is the
+skill most likely affected.
+
+**Scoped to `{vocabulary.domain}` specifically, not every unresolved `{vocabulary.*}` marker.** An
+unresolved marker for a *regular* vocabulary key (`{vocabulary.notes}`, `{vocabulary.reduce}`, …)
+has no safe mechanical substitute here — fixing one means re-deriving what the LLM render step would
+have produced, which is what Step 5b's `render_current_template` already does. `{vocabulary.domain}`
+is different only because it has exactly one correct source (`domain_summary:`), which is why it is
+safe to patch as plain text rather than route through a render.
+
+1. Read the vault's `ops/derivation-manifest.md` and get its `domain_summary:` field via
+   `frontmatter_field`. If absent, this step cannot run — report it and move on; do not guess a value.
+2. Search the vault's installed skills (`.claude/skills/*/SKILL.md`, or the platform-equivalent
+   location) for the literal text `{vocabulary.domain}`.
+3. For each file where it appears, replace every occurrence with the `domain_summary:` value and
+   report the file and occurrence count. Leave files with no occurrences unmentioned — same
+   restraint as 6a's "report the files; never report the directory as repaired."
+4. If no installed skill contains the literal marker, report `{vocabulary.domain}}: none found
+   [current]` — this step runs unconditionally, same as 6a-6c, so a healthy vault gets an explicit
+   clean line, not silence.
+
+Report per file: `<skill>/SKILL.md: 4 occurrences of {vocabulary.domain} -> "<domain_summary text>"
+[restored]`.
+
 ---
 
 ## Step 7: Validate
@@ -980,7 +1014,7 @@ Vault infrastructure (Step 6 — runs regardless of approvals):
   - frontmatter.sh:     v{vault} → v{plugin} [restored | refreshed | current
                                               | vault ahead, skipped
                                               | plugin copy absent, skipped]
-    {when ops/lib/ held files other than those two:} other ops/lib/ files not checked
+    {when ops/lib/ held files other than those three:} other ops/lib/ files not checked
   - queue lock dir: {absent → created [restored] | present [current]}
   - self_evolution: {absent → seeded (10/5) [restored] | present [current]
                      | present, agrees with maintenance.conditions ({n}/{n}) [current]

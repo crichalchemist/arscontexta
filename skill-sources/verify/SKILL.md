@@ -509,8 +509,28 @@ The chaining output uses domain-native vocabulary from the derivation manifest.
 When running interactively (NOT via orchestrator), YOU must execute queue updates:
 
 ```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/queue-edit.sh.
+# A bare `jq ... > tmp.json && mv tmp.json ...` (the naive form this replaced) has no lock:
+# two concurrent orchestrators both reading the old file and both writing produce a lost
+# update, silently.
+QUEUE_LIB="ops/lib/queue-edit.sh"
+if [ -r "$QUEUE_LIB" ]; then
+  . "$QUEUE_LIB"
+else
+  echo "error: queue-edit library not found at '$QUEUE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${QUEUE_EDIT_VERSION:=0}"
+if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-jq '(.tasks[] | select(.id=="TASK_ID")).status = "done" | (.tasks[] | select(.id=="TASK_ID")).completed = "'"$TIMESTAMP"'"' ops/queue/queue.json > tmp.json && mv tmp.json ops/queue/queue.json
+queue_edit '(.tasks[] | select(.id==$id)).status = "done" | (.tasks[] | select(.id==$id)).completed = $ts' \
+  ops/queue/queue.json --arg id "TASK_ID" --arg ts "$TIMESTAMP"
 ```
 
 The queue path uses the domain-native operations folder. Check `ops/` or equivalent.

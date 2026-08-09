@@ -33,6 +33,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 LINK_LIB_SRC="$ROOT/reference/lib/link-extraction.sh"
 FM_LIB_SRC="$ROOT/reference/lib/frontmatter.sh"
+QUEUE_LIB_SRC="$ROOT/reference/lib/queue-edit.sh"
 
 # Every spawned shell must be THIS harness's shell, not `sh`. On macOS `sh` is
 # bash 3.2 regardless of what launched the harness, so an `sh` site silently
@@ -123,7 +124,7 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 # `zsh only:` -> bash PASSes. So in_scope now rejects anything that looks like a
 # scope marker but is not one of the two canonical spellings.
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
-skills/health f08~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01
+skills/health f09~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01. Was f08 until 2026-08-08, when the Category 1 enum-value check added a fence ahead of it; the defect did not move, its INDEX did. This is the (letter, label) keying CLAUDE.md flags -- a renumber makes the entry read STALE and its unchanged subject read as a new failure, and only the message tells them apart
 skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
 skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer'
 
@@ -159,6 +160,10 @@ build_fixture() {
   }
   cp "$FM_LIB_SRC" "$v/ops/lib/frontmatter.sh" || {
     printf 'harness: cannot copy %s into the fixture\n' "$FM_LIB_SRC" >&2
+    return 1
+  }
+  cp "$QUEUE_LIB_SRC" "$v/ops/lib/queue-edit.sh" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_LIB_SRC" >&2
     return 1
   }
 

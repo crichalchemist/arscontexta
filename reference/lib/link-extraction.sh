@@ -50,7 +50,7 @@
 #      filesystem) violates this and produces false positives.
 
 # Contract version. Bump on any BEHAVIOR change (fold rules, termination, recursion semantics).
-LINK_EXTRACTION_VERSION=2
+LINK_EXTRACTION_VERSION=3
 
 # Case folding must fold NON-ASCII, and neither a locale name nor a tool name is
 # enough to know that it will:
@@ -281,4 +281,165 @@ existing_note_index_recursive() {
   find "$dir" -type f -name '*.md' | while IFS= read -r p; do
     basename "$p" .md
   done | _fold_lower | sort -u
+}
+
+# link_edge_map <dir> -> source<TAB>target<TAB>source_path edges (flat, no recursion)
+# Emits one tab-separated line per (source, target) pair found in <dir>'s markdown files.
+# Fenced code blocks are excluded. Targets are folded to lowercase.
+# Self-edges ARE included; backlink_counts filters them at the next layer.
+link_edge_map() {
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" f src stripped errf tmpdata rgtmp
+  stripped=$(mktemp) || return 1
+  tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
+  rgtmp=$(mktemp) || { rm -f "$stripped" "$tmpdata"; return 1; }
+  errf="/tmp/link-extraction-err-$$"
+
+  find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
+    src=$(basename "$f" .md | _fold_lower)
+    if ! _strip_fences "$f" > "$stripped" 2>/dev/null; then
+      touch "$errf"
+      continue
+    fi
+    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null > "$rgtmp"
+    if [ $? -gt 1 ]; then
+      touch "$errf"
+      continue
+    fi
+    cat "$rgtmp" \
+      | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+      | _fold_lower \
+      | while IFS= read -r tgt; do
+        [ -n "$tgt" ] || continue
+        printf '%s\t%s\t%s\n' "$src" "$tgt" "$f"
+      done >> "$tmpdata"
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$stripped" "$tmpdata" "$rgtmp" "$errf"
+    return 1
+  fi
+
+  cat "$tmpdata"
+  rm -f "$stripped" "$tmpdata" "$rgtmp" "$errf"
+}
+
+# link_edge_map_recursive <dir> -> source<TAB>target<TAB>source_path edges (recursive tree scan)
+link_edge_map_recursive() {
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" f src stripped errf tmpdata rgtmp
+  stripped=$(mktemp) || return 1
+  tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
+  rgtmp=$(mktemp) || { rm -f "$stripped" "$tmpdata"; return 1; }
+  errf="/tmp/link-extraction-err-$$"
+
+  find "$dir" -type f -name '*.md' -not -path '*/.git/*' | while IFS= read -r f; do
+    src=$(basename "$f" .md | _fold_lower)
+    if ! _strip_fences "$f" > "$stripped" 2>/dev/null; then
+      touch "$errf"
+      continue
+    fi
+    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null > "$rgtmp"
+    if [ $? -gt 1 ]; then
+      touch "$errf"
+      continue
+    fi
+    cat "$rgtmp" \
+      | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+      | _fold_lower \
+      | while IFS= read -r tgt; do
+        [ -n "$tgt" ] || continue
+        printf '%s\t%s\t%s\n' "$src" "$tgt" "$f"
+      done >> "$tmpdata"
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$stripped" "$tmpdata" "$rgtmp" "$errf"
+    return 1
+  fi
+
+  cat "$tmpdata"
+  rm -f "$stripped" "$tmpdata" "$rgtmp" "$errf"
+}
+
+# backlink_counts <dir> -> "<target>\t<count>", self-edges excluded, sorted by target.
+# A target with zero incoming links is ABSENT, not a zero row.
+backlink_counts() {
+  local edges
+  edges=$(mktemp) || return 1
+  link_edge_map "$1" > "$edges" || { rm -f "$edges"; return 1; }
+
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice.
+  # With column 3 (source path) present, "self-edge" could mean same-path instead.
+  # That's a separate behavioural question; the third column makes it reachable.
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
+    | LC_ALL=C sort \
+    | uniq -c \
+    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+
+  rm -f "$edges"
+}
+
+# backlink_counts_recursive <dir> -> same as backlink_counts but descends subdirectories.
+backlink_counts_recursive() {
+  local edges
+  edges=$(mktemp) || return 1
+  link_edge_map_recursive "$1" > "$edges" || { rm -f "$edges"; return 1; }
+
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice.
+  # With column 3 (source path) present, "self-edge" could mean same-path instead.
+  # That's a separate behavioural question; the third column makes it reachable.
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
+    | LC_ALL=C sort \
+    | uniq -c \
+    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+
+  rm -f "$edges"
+}
+
+# orphan_notes <dir> -> folded basenames with zero incoming links.
+# Uses set difference (comm), not per-note loop. Self-links and links inside fences
+# do not rescue a note from orphanhood.
+# Both comm inputs pin LC_ALL=C -- comm emits nonsense SILENTLY when its two streams
+# were sorted under different collations, and default sort is locale-dependent.
+orphan_notes() {
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" idx tgts edges tmp_awk
+  idx=$(mktemp)  || return 1
+  tgts=$(mktemp) || { rm -f "$idx"; return 1; }
+  edges=$(mktemp) || { rm -f "$idx" "$tgts"; return 1; }
+  tmp_awk=$(mktemp) || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+
+  existing_note_index "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+  LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+
+  link_edge_map "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice; see backlink_counts.
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" > "$tmp_awk" \
+    && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+    || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+
+  LC_ALL=C comm -23 "$idx" "$tgts"
+  rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
+}
+
+orphan_notes_recursive() {
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" idx tgts edges tmp_awk
+  idx=$(mktemp)  || return 1
+  tgts=$(mktemp) || { rm -f "$idx"; return 1; }
+  edges=$(mktemp) || { rm -f "$idx" "$tgts"; return 1; }
+  tmp_awk=$(mktemp) || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+
+  existing_note_index_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+  LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+
+  link_edge_map_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice; see backlink_counts.
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" > "$tmp_awk" \
+    && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+    || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+
+  LC_ALL=C comm -23 "$idx" "$tgts"
+  rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
 }

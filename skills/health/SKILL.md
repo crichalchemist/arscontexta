@@ -89,8 +89,50 @@ for f in {vocabulary.notes}/*.md; do
 done
 ```
 
+**Enum value check** — the threshold table below has always promised "Any invalid enum value →
+WARN"; this is that check, implemented against the note `type:` field specifically. (Other
+enum-like fields, e.g. `status`, vary too much by domain to check generically here — see
+`generators/features/schema.md`'s own note that a template's `_schema` block is the single source
+of truth, one per vault, not one per field.)
+
+```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+FM_LIB="ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# The declared enum lives in a template's _schema block (`enums: { type: [a, b, c] }`), not in
+# frontmatter — frontmatter_field() does not apply to it. A plain -E grep for the bracketed
+# `type:` line is deliberately used instead of a full YAML parse: the line shape is distinctive
+# enough (a note's own `type: insight` is a scalar, never a bracket) that this does not need one.
+SCHEMA_TEMPLATE=$(grep -lE '^[[:space:]]*type:[[:space:]]*\[.*\]' templates/*.md 2>/dev/null | head -1)
+if [ -z "$SCHEMA_TEMPLATE" ]; then
+  echo "WARN: no template declares a type: enum in its _schema block — cannot check enum values"
+else
+  # tr -d '[:space:]' here would strip the newlines tr ',' '\n' just introduced (newline IS
+  # whitespace), collapsing the whole list into one unbroken line — the exact-match check
+  # below would then never match ANY value, valid or not. Strip only leading/trailing
+  # whitespace PER LINE instead.
+  TYPE_ENUM=$(grep -E '^[[:space:]]*type:[[:space:]]*\[.*\]' "$SCHEMA_TEMPLATE" | head -1 \
+    | sed -E 's/^[^][]*\[([^]]*)\].*/\1/' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  for f in {vocabulary.notes}/*.md; do
+    [[ -f "$f" ]] || continue
+    # A note with no type: field is valid (the schema's own default, e.g. "insight") — nothing
+    # to check against the enum, so this is not itself a defect.
+    note_type=$(frontmatter_field "$f" type) || continue
+    [ -n "$note_type" ] || continue
+    printf '%s\n' "$TYPE_ENUM" | grep -qxF "$note_type" \
+      || echo "WARN: $f — type: $note_type is not in the declared enum ($(printf '%s' "$TYPE_ENUM" | tr '\n' ',' | sed 's/,$//'))"
+  done
+fi
+```
+
 **Additional checks:**
-- Domain-specific enum fields have valid values (check against template `_schema` blocks if templates exist)
 - `description` field is non-empty (not just present)
 - `topics` field contains at least one wiki link
 
@@ -124,16 +166,49 @@ done
 **How to check:**
 
 ```bash
-# For each note file, check if ANY other file links to it
-for f in {vocabulary.notes}/*.md; do
-  [[ -f "$f" ]] || continue
-  basename=$(basename "$f" .md)
-  # Search for [[basename]] in all other files
-  count=$(rg -l "\[\[$basename\]\]" --glob '*.md' | grep -v "$f" | wc -l | tr -d ' ')
-  if [[ "$count" -eq 0 ]]; then
-    echo "WARN: $f — no incoming links (orphan)"
-  fi
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# Scope: notes from {vocabulary.notes}, links from WHOLE VAULT
+# Compose from primitives: a link from anywhere rescues a note
+[ -d "{vocabulary.notes}" ] || {
+  echo "error: notes directory not found at {vocabulary.notes}" >&2
+  exit 1
+}
+
+idx=$(mktemp) || exit 1
+tgts=$(mktemp) || { rm -f "$idx"; exit 1; }
+edges=$(mktemp) || { rm -f "$idx" "$tgts"; exit 1; }
+tmp_awk=$(mktemp) || { rm -f "$idx" "$tgts" "$edges"; exit 1; }
+
+existing_note_index "{vocabulary.notes}" > "$edges" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+LC_ALL=C sort -u < "$edges" > "$idx" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+
+link_edge_map_recursive "$VAULT_ROOT" > "$edges" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" > "$tmp_awk" \
+  && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+  || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; exit 1; }
+
+LC_ALL=C comm -23 "$idx" "$tgts" | while IFS= read -r n; do
+  echo "WARN: $n — no incoming links (orphan)"
 done
+rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
 ```
 
 **Nuance:** Orphans are not automatically failures. A note created today that hasn't been through /{vocabulary.cmd_reflect} yet is expected to be orphaned temporarily. Check file age:
@@ -453,9 +528,33 @@ For each {vocabulary.note}:
 3. Flag notes with: modified > 30 days ago AND < 2 incoming links
 
 ```bash
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+[ -d "{vocabulary.notes}" ] || {
+  echo "error: notes directory not found at {vocabulary.notes}" >&2
+  exit 1
+}
+
+COUNTS=$(mktemp) || exit 1
+backlink_counts_recursive "$VAULT_ROOT" > "$COUNTS" || { rm -f "$COUNTS"; exit 1; }
+
 for f in {vocabulary.notes}/*.md; do
-  [[ -f "$f" ]] || continue
-  basename=$(basename "$f" .md)
+  [ -e "$f" ] || continue
+  basename=$(basename "$f" .md | _fold_lower)
 
   # Last modified (days ago). GNU `-c` first, BSD `-f` second — the order is
   # load-bearing. GNU reads `-f` as "filesystem status" and treats `%m` as a
@@ -463,13 +562,15 @@ for f in {vocabulary.notes}/*.md; do
   # chain never falls through, it feeds filesystem text into this arithmetic.
   mod_days=$(( ($(date +%s) - $(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)) / 86400 ))
 
-  # Incoming link count
-  incoming=$(rg -l "\[\[$basename\]\]" --glob '*.md' | grep -v "$f" | wc -l | tr -d ' ')
+  # Incoming link count (from pre-computed table, excluding self-links)
+  incoming=$(LC_ALL=C awk -F'\t' -v n="$basename" '$1==n{print $2}' "$COUNTS")
+  incoming=${incoming:-0}
 
   if [[ $mod_days -gt 30 ]] && [[ $incoming -lt 2 ]]; then
     echo "STALE: $f — $mod_days days old, $incoming incoming links"
   fi
 done
+rm -f "$COUNTS"
 ```
 
 **Thresholds:**
@@ -508,19 +609,45 @@ For each {vocabulary.topic_map} file:
 3. Verify context phrases exist on Core Ideas links (not bare links)
 
 ```bash
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+[ -d "{vocabulary.notes}" ] || {
+  echo "error: notes directory not found at {vocabulary.notes}" >&2
+  exit 1
+}
+
+COUNTS=$(mktemp) || exit 1
+backlink_counts "{vocabulary.notes}" > "$COUNTS" || { rm -f "$COUNTS"; exit 1; }
+
 # For each topic map
 for moc in {vocabulary.notes}/*.md; do
-  [[ -f "$moc" ]] || continue
+  [ -e "$moc" ] || continue
   # Check if this is a topic map (has type: moc in frontmatter)
   rg -q '^type: moc' "$moc" || continue
 
-  moc_name=$(basename "$moc" .md)
+  moc_name=$(basename "$moc" .md | _fold_lower)
 
   # Count notes linking to this topic map
-  note_count=$(rg -l "\[\[$moc_name\]\]" {vocabulary.notes}/ --glob '*.md' | grep -v "$moc" | wc -l | tr -d ' ')
+  note_count=$(LC_ALL=C awk -F'\t' -v n="$moc_name" '$1==n{print $2}' "$COUNTS")
+  note_count=${note_count:-0}
 
   echo "$moc_name: $note_count notes"
 done
+rm -f "$COUNTS"
 ```
 
 **Thresholds:**

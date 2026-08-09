@@ -431,7 +431,7 @@ All generated systems ship with full automation from day one. There are no tiers
 | Context file | Always | Comprehensive, all sections |
 | 16 processing skills + 10 plugin commands | Always | Processing skills vocabulary-transformed with full quality gates |
 | All hooks | Always | Orient, capture, validate, commit |
-| Shared libraries | Always | ops/lib/link-extraction.sh + ops/lib/frontmatter.sh |
+| Shared libraries | Always | ops/lib/link-extraction.sh + ops/lib/frontmatter.sh + ops/lib/queue-edit.sh |
 | Queue system | Always | ops/tasks.md + ops/queue/ + ops/queue/.locks/ |
 | Templates | Always | With _schema blocks |
 | Self space | If opted in | self/ or ops/ fallback |
@@ -1313,7 +1313,7 @@ The 16 skill sources to install:
 
 For each skill:
 1. Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/[name]/SKILL.md`
-2. Apply vocabulary transformation — rename and update ALL internal references using the vocabulary mapping from `ops/derivation.md`
+2. Apply vocabulary transformation — rename and update ALL internal references using the vocabulary mapping from `ops/derivation.md`. **For `{vocabulary.domain}` specifically, use the manifest's `domain_summary:` field rather than the `vocabulary:` block** — it is a standalone top-level field, not part of the Levels 1-6 substitution table, and `domain` has no entry there to substitute from. Without this instruction, `{vocabulary.domain}` (12 sites in `skill-sources/reduce/SKILL.md`) ships unresolved into every generated vault.
 3. Adjust skill metadata (set `context: fork` for fresh context per invocation)
 4. Write the transformed SKILL.md to the user's skills directory
 
@@ -1443,14 +1443,15 @@ Generate all four hook scripts: session-orient.sh, session-capture.sh, validate-
 
 Generated systems are self-contained. A vault's own skills never read from the plugin directory, because the plugin can be uninstalled, moved, or upgraded independently of any vault it produced. The shared libraries are therefore **copied into** the vault rather than referenced from it.
 
-Create the directory `ops/lib/` in the vault, then copy **both** of these into it, preserving the executable bit:
+Create the directory `ops/lib/` in the vault, then copy **all three** of these into it, preserving the executable bit:
 
 | From | To | Version constant |
 |---|---|---|
 | `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` | `ops/lib/link-extraction.sh` | `LINK_EXTRACTION_VERSION` |
 | `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `ops/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
+| `${CLAUDE_PLUGIN_ROOT}/reference/lib/queue-edit.sh` | `ops/lib/queue-edit.sh` | `QUEUE_EDIT_VERSION` |
 
-**Perform these copies yourself — do not emit them as shell commands.** `${CLAUDE_PLUGIN_ROOT}` resolves for you, who knows where the plugin is installed; it is *unset* inside a bash block, so a shell copy would silently read from `/reference/lib/…`, fail, and leave `ops/lib/` empty. The generated vault would then look like it needs an upgrade rather than a repaired copy. This applies identically to both files.
+**Perform these copies yourself — do not emit them as shell commands.** `${CLAUDE_PLUGIN_ROOT}` resolves for you, who knows where the plugin is installed; it is *unset* inside a bash block, so a shell copy would silently read from `/reference/lib/…`, fail, and leave `ops/lib/` empty. The generated vault would then look like it needs an upgrade rather than a repaired copy. This applies identically to all three files.
 
 **Verify each file landed — not that the copy step ran.** For *each* row above, confirm all three:
 
