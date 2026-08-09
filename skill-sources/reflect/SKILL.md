@@ -424,47 +424,30 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
-# Replaced a recursive `grep -r` over "$NOTES_DIR" whose pattern was the target
-# name in brackets. (Described, not quoted, for the reason given at the /graph
-# backward site.) The rc discipline below is
-# UNCHANGED and is still the point: the form before that one piped grep into wc,
-# which discards grep's status, so an unreadable tree rendered 0. What changed is
-# only the matcher — the old one counted a link quoted inside a ``` example,
-# did not case-fold, and could not see [[note name|alias]].
-#
-# It also counted LINES, not files: two links in one note counted twice. The
-# replacement counts distinct linking FILES, which is what "incoming links"
-# means everywhere else in this system.
-TARGET=$(printf '%s\n' "note name" | _fold_lower)
-RL_SRC=$(mktemp) || exit 1
-RL_HITS=$(mktemp) || { rm -f "$RL_SRC"; exit 1; }
-RLF="/tmp/reflect-links-err-$$"
-rm -f "$RLF"
+# Count incoming links to a specific target. The link_edge_map function emits
+# source<TAB>target (both folded), allowing us to filter by target and count
+# distinct linking files. This replaces the per-file loop that stripped fences,
+# extracted links, and checked each against the target.
+TARGET=$(printf '%s
+' "note name" | _fold_lower)
+EDGES=$(mktemp) || exit 1
+link_edge_map "$NOTES_DIR" > "$EDGES" || { rm -f "$EDGES"; exit 1; }
+# Find distinct files (sources) that link to TARGET and count them.
+LINK_COUNT=$(awk -F'	' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
+if [ $? -gt 0 ]; then
+  rm -f "$EDGES"
+  echo "error: backlink count failed reading '$NOTES_DIR'; refusing to report a link count" >&2
+  exit 1
+fi
+rm -f "$EDGES"
+echo "$LINK_COUNT"
 
-LINK_COUNT=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  _strip_fences "$f" > "$RL_SRC" || { touch "$RLF"; continue; }
-  rg -o '\[\[([^\]|#]+)' -r '$1' "$RL_SRC" > "$RL_HITS"
-  if [ $? -gt 1 ]; then
-    touch "$RLF"; continue
-  fi
-  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$RL_HITS" \
-       | _fold_lower | grep -qxF "$TARGET"; then
-    printf '%s\n' "$f"
-  fi
-done | wc -l | tr -d ' ')
-
-# Checked AFTER the capture, like the rc test it replaces: `find | while` runs
-# the body in a subshell, so a flag variable would be discarded at the pipe and
-# a failed scan would render as a plausible 0 — the exact defect the original
-# comment was written about.
-if [ -e "$RLF" ]; then
-  rm -f "$RL_SRC" "$RL_HITS" "$RLF"
   echo "error: link scan failed reading '$NOTES_DIR'; refusing to report a link count" >&2
   exit 1
 fi
