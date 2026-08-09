@@ -122,7 +122,7 @@ eq "guarded call: caller survives rg failure" "reached" \
    "$(RIPGREP_CONFIG_PATH="$BADRC" "$SELF" -c ". '$LIB'; if count_links '$N' >/dev/null 2>&1; then :; fi; printf reached" 2>/dev/null)"
 rm -f "$BADRC"
 
-# --- link_edge_map: source<TAB>target edges --------------------------------
+# --- link_edge_map: source<TAB>target<TAB>source_path edges -----------------
 # Every note makes a different wrong implementation fail. Do not trim the fixture.
 # a.b/axb pair catches interpolation bug; fenced note tests _strip_fences.
 EDGE_DIR=$(mktemp -d)
