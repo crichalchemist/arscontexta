@@ -540,8 +540,8 @@ fi
   exit 1
 }
 
-COUNTS=$(mktemp)
-backlink_counts_recursive "$VAULT_ROOT" > "$COUNTS"
+COUNTS=$(mktemp) || exit 1
+backlink_counts_recursive "$VAULT_ROOT" > "$COUNTS" || { rm -f "$COUNTS"; exit 1; }
 
 for f in {vocabulary.notes}/*.md; do
   [ -e "$f" ] || continue
@@ -621,8 +621,8 @@ fi
   exit 1
 }
 
-COUNTS=$(mktemp)
-backlink_counts "{vocabulary.notes}" > "$COUNTS"
+COUNTS=$(mktemp) || exit 1
+backlink_counts "{vocabulary.notes}" > "$COUNTS" || { rm -f "$COUNTS"; exit 1; }
 
 # For each topic map
 for moc in {vocabulary.notes}/*.md; do
