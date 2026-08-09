@@ -135,7 +135,7 @@ printf -- '---\ntitle: axb\n---\n[[not-a-match]]\n' > "$EDGE_DIR/notes/axb.md"
 printf -- 'target linking itself\n[[target]]\n' > "$EDGE_DIR/notes/target.md"
 printf -- '---\ntitle: Lonely\n---\nno links here\n' > "$EDGE_DIR/notes/lonely.md"
 printf -- '---\ntitle: Fenced\n---\n```\n[[in-code-fence]]\n```\n' > "$EDGE_DIR/notes/fenced.md"
-printf -- '---\ntitle: Über\n---\nno links, but name has non-ASCII for collation testing\n' > "$EDGE_DIR/notes/über.md"
+printf -- '---\ntitle: SelfOnly\n---\n[[selfonly]]\n' > "$EDGE_DIR/notes/selfonly.md"
 
 edges=$(link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
 
@@ -164,7 +164,7 @@ eq "link_edge_map: empty directory output empty" "" "$out"
 
 # 7. recursive variant tests
 edges_recursive=$(link_edge_map_recursive "$EDGE_DIR/notes" 2>/dev/null)
-eq "link_edge_map_recursive: basic functionality" "8" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
+eq "link_edge_map_recursive: basic functionality" "9" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
 
 # 8. recursive empty directory
 out=$(link_edge_map_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -259,12 +259,30 @@ eq "orphan_notes: lonely (no incoming links)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'lonely')"
 eq "orphan_notes: axb is orphan (not-a-match doesn't exist)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'axb')"
-eq "orphan_notes: target is NOT orphan (has incoming)" "0" \
+eq "orphan_notes: target is NOT orphan (has incoming from alpha, beta, gamma, a.b)" "0" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'target')"
 eq "orphan_notes: a.b is NOT orphan (linked from alpha)" "0" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'a.b')"
 eq "orphan_notes: fenced is orphan (link only in fence)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'fenced')"
+eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'selfonly')"
+
+# 18b. LC_ALL=C pinning is STRUCTURAL (not behaviorally testable on BSD sort)
+# Both sides of comm must be sorted under the same collation; pinning ensures it.
+# Grep the library to verify the pins are present, then mutation-prove by removing one.
+eq "orphan_notes: LC_ALL=C sort for index" "1" \
+  "$(sed -n '405,407p' reference/lib/link-extraction.sh | grep -c 'existing_note_index.*LC_ALL=C sort -u.*idx')"
+eq "orphan_notes: LC_ALL=C sort for targets" "1" \
+  "$(sed -n '407p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+eq "orphan_notes: LC_ALL=C comm call" "1" \
+  "$(sed -n '409p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+eq "orphan_notes_recursive: LC_ALL=C sort for index" "1" \
+  "$(sed -n '419,421p' reference/lib/link-extraction.sh | grep -c 'existing_note_index_recursive.*LC_ALL=C sort -u.*idx')"
+eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
+  "$(sed -n '421p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
+  "$(sed -n '423p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -288,6 +306,8 @@ eq "orphan_notes_recursive: a.b is NOT orphan" "0" \
   "$(printf '%s\n' "$orphans_r" | grep -Fxc 'a.b')"
 eq "orphan_notes_recursive: fenced is orphan" "1" \
   "$(printf '%s\n' "$orphans_r" | grep -Fxc 'fenced')"
+eq "orphan_notes_recursive: selfonly is orphan (self-link doesn't rescue)" "1" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'selfonly')"
 
 # 22. orphan_notes_recursive empty directory
 out=$(orphan_notes_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
