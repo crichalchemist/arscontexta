@@ -169,6 +169,47 @@ out=$(link_edge_map_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
 eq "link_edge_map_recursive: empty directory rc 0" "0" "$rc"
 eq "link_edge_map_recursive: empty directory output empty" "" "$out"
 
+# 9. rg failure handling in link_edge_map
+BADRC=$(mktemp)
+printf 'invalid-config' > "$BADRC"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" link_edge_map "$EDGE_DIR/notes" >/dev/null 2>&1); rc=$?
+eq "link_edge_map: rg failure returns 1" "1" "$rc"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
+eq "link_edge_map: rg failure prints NOTHING, not partial" "" "$out"
+rm -f "$BADRC"
+
+# 10. rg failure handling in link_edge_map_recursive
+BADRC=$(mktemp)
+printf 'invalid-config' > "$BADRC"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" link_edge_map_recursive "$EDGE_DIR/notes" >/dev/null 2>&1); rc=$?
+eq "link_edge_map_recursive: rg failure returns 1" "1" "$rc"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" link_edge_map_recursive "$EDGE_DIR/notes" 2>/dev/null)
+eq "link_edge_map_recursive: rg failure prints NOTHING, not partial" "" "$out"
+rm -f "$BADRC"
+
+# 11. partial failure scenario: some files succeed, later one fails
+PART_DIR=$(mktemp -d)
+mkdir -p "$PART_DIR/notes"
+printf -- '---\ntitle: Good1\n---\n[[Target]]\n' > "$PART_DIR/notes/good1.md"
+printf -- '---\ntitle: Good2\n---\n[[Other]]\n' > "$PART_DIR/notes/good2.md"
+chmod 000 "$PART_DIR/notes/good2.md"  # Make file unreadable to cause failure
+out=$(link_edge_map "$PART_DIR/notes" 2>/dev/null); rc=$?
+eq "link_edge_map: partial failure returns 1" "1" "$rc"
+eq "link_edge_map: partial failure prints NOTHING, not partial" "" "$out"
+chmod 644 "$PART_DIR/notes/good2.md"  # restore for cleanup
+rm -rf "$PART_DIR"
+
+# 12. recursive with nested directories (vs flat)
+NEST_DIR=$(mktemp -d)
+mkdir -p "$NEST_DIR/notes/sub"
+printf -- '---\ntitle: Root\n---\n[[Target]]\n' > "$NEST_DIR/notes/root.md"
+printf -- '---\ntitle: Nested\n---\n[[Target]]\n' > "$NEST_DIR/notes/sub/nested.md"
+flat_count=$(link_edge_map "$NEST_DIR/notes" 2>/dev/null | grep -c .)
+recursive_count=$(link_edge_map_recursive "$NEST_DIR/notes" 2>/dev/null | grep -c .)
+eq "link_edge_map: flat does NOT descend" "1" "$flat_count"
+eq "link_edge_map_recursive: recurses into subdirectories" "2" "$recursive_count"
+rm -rf "$NEST_DIR"
+
 rm -rf "$EDGE_DIR"
 
 # --- empty vault (legitimate state, not a failure) ----------------------------

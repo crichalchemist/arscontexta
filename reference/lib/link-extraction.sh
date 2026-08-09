@@ -289,8 +289,9 @@ existing_note_index_recursive() {
 # Self-edges ARE included; backlink_counts filters them at the next layer.
 link_edge_map() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" f src stripped errf
+  local dir="$1" f src stripped errf tmpdata
   stripped=$(mktemp) || return 1
+  tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
   errf="/tmp/link-extraction-err-$$"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
@@ -299,28 +300,37 @@ link_edge_map() {
       touch "$errf"
       continue
     fi
-    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null \
+    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null > /tmp/link-edge-map-rg-$$
+    if [ $? -gt 1 ]; then
+      touch "$errf"
+      rm -f /tmp/link-edge-map-rg-$$
+      continue
+    fi
+    cat /tmp/link-edge-map-rg-$$ \
       | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
       | _fold_lower \
       | while IFS= read -r tgt; do
         [ -n "$tgt" ] || continue
         printf '%s\t%s\n' "$src" "$tgt"
-      done
+      done >> "$tmpdata"
+    rm -f /tmp/link-edge-map-rg-$$
   done
 
   if [ -e "$errf" ]; then
-    rm -f "$stripped" "$errf"
+    rm -f "$stripped" "$tmpdata" "$errf"
     return 1
   fi
 
-  rm -f "$stripped" "$errf"
+  cat "$tmpdata"
+  rm -f "$stripped" "$tmpdata" "$errf"
 }
 
 # link_edge_map_recursive <dir> -> source<TAB>target edges (recursive tree scan)
 link_edge_map_recursive() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" f src stripped errf
+  local dir="$1" f src stripped errf tmpdata
   stripped=$(mktemp) || return 1
+  tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
   errf="/tmp/link-extraction-err-$$"
 
   find "$dir" -type f -name '*.md' -not -path '*/.git/*' | while IFS= read -r f; do
@@ -329,19 +339,27 @@ link_edge_map_recursive() {
       touch "$errf"
       continue
     fi
-    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null \
+    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null > /tmp/link-edge-map-recursive-rg-$$
+    if [ $? -gt 1 ]; then
+      touch "$errf"
+      rm -f /tmp/link-edge-map-recursive-rg-$$
+      continue
+    fi
+    cat /tmp/link-edge-map-recursive-rg-$$ \
       | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
       | _fold_lower \
       | while IFS= read -r tgt; do
         [ -n "$tgt" ] || continue
         printf '%s\t%s\n' "$src" "$tgt"
-      done
+      done >> "$tmpdata"
+    rm -f /tmp/link-edge-map-recursive-rg-$$
   done
 
   if [ -e "$errf" ]; then
-    rm -f "$stripped" "$errf"
+    rm -f "$stripped" "$tmpdata" "$errf"
     return 1
   fi
 
-  rm -f "$stripped" "$errf"
+  cat "$tmpdata"
+  rm -f "$stripped" "$tmpdata" "$errf"
 }
