@@ -133,6 +133,7 @@ printf -- '---\ntitle: Gamma\n---\nlinks [[Target#a-heading]]\n' > "$EDGE_DIR/no
 printf -- '---\ntitle: a.b\n---\n[[Target]]\n' > "$EDGE_DIR/notes/a.b.md"
 printf -- '---\ntitle: axb\n---\n[[not-a-match]]\n' > "$EDGE_DIR/notes/axb.md"
 printf -- 'target linking itself\n[[target]]\n' > "$EDGE_DIR/notes/target.md"
+printf -- '---\ntitle: Lonely\n---\nno links here\n' > "$EDGE_DIR/notes/lonely.md"
 printf -- '---\ntitle: Fenced\n---\n```\n[[in-code-fence]]\n```\n' > "$EDGE_DIR/notes/fenced.md"
 
 edges=$(link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
