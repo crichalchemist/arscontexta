@@ -264,6 +264,192 @@ blind spot divergence 15's amendment documents and `bump-version.test.sh` exists
 
 ---
 
+### 14. `fence-isolation.test.sh` uses a fixed temp path, so two concurrent runs clobber each other
+
+**What:** `reference/test/fence-isolation.test.sh:50` sets `WORK="/tmp/fence-isolation-gate-$SELF"`.
+`$SELF` is the shell name, not a per-run token, so two runs of the same suite under the same shell
+share one directory. Observed while running the suite in the foreground beside a background sweep:
+the bash run reported `harness: extracted no fences — cannot conclude anything` and the zsh run died
+on `rm: Permission denied`.
+
+**Why not now:** CI cannot hit it — its steps are sequential — and the failure is LOUD rather than a
+false PASS, since the "cannot conclude anything" arm is doing exactly its job. `mktemp -d` fixes it
+in one line, but changing the gate's own working directory is a change to the gate, and this repo
+treats those as their own task. Recorded because a local contributor running the suite twice sees a
+failure with no obvious cause.
+
+**Reopens if:** CI ever runs the shells in parallel, or the fixed path is given to any check that
+fails soft instead of loud.
+
+**From:** `2026-08-04-ci-hardening.md` Task 2
+
+```bash
+/usr/bin/grep -n '/tmp/fence-isolation-gate-' reference/test/fence-isolation.test.sh   # line 50
+```
+
+---
+
+### 15. The PostToolUse matcher is `Write`, so `Edit`/`MultiEdit` bypass the content-destruction guard
+
+**What:** `hooks/hooks.json:17` matches `"Write"` only. `hooks/scripts/write-validate.sh` compares a
+written note against its last committed version to catch content destruction — and never runs when a
+note is changed with `Edit` or `MultiEdit`, which is how notes are usually changed.
+
+**Why not now:** Widening the matcher makes the guard fire on every edit in every installed vault.
+That is a scope decision about what the plugin does on other people's machines, not a defect fix, and
+it compounds with divergence 16: the guard is already gated behind a hardcoded `*/notes/*` filter, so
+on the field vault (`nodes/`) it cannot fire even for `Write`. Widening the matcher without also
+resolving the path filter would add load without adding coverage.
+
+**Reopens if:** the `*/notes/*` filter is made vocabulary-aware, at which point the matcher becomes
+the only remaining thing keeping the guard from running.
+
+**From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 1
+
+```bash
+/usr/bin/grep -n '"matcher"' hooks/hooks.json                    # line 17, "Write"
+/usr/bin/grep -n 'notes/' hooks/scripts/write-validate.sh | head -2
+```
+
+---
+
+### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths
+
+**What:** One reader, two code paths, differing in ways a caller cannot see. (a) A **present but
+empty** value fails LOUD on the dotted path (`exit 1`) and SILENTLY returns the default on the bare
+path — and returning the default is exactly how divergence 3's hardcoded `10` stayed invisible.
+(b) Key names are interpolated into an awk ERE, so a dot in the key matches any character:
+`self_evolution.obs.ervation` would match a line spelling `obsXervation`.
+
+**Why not now:** Neither is reachable from any key this repo ships — every dotted key in use is a
+clean identifier, and no shipped bare key is written-but-empty in a real `.arscontexta`. Fixing (b)
+means escaping the key before interpolation, which is the same class as `check-portability.sh` check
+6 and belongs with it rather than as a one-off.
+
+**Reopens if:** any consumer starts passing a user-supplied or vocabulary-derived string as a config
+key, which makes (b) reachable; or a bare key is added whose empty value is meaningful.
+
+**From:** `2026-08-04-ci-hardening.md` Task 4
+
+```bash
+/usr/bin/grep -n 'exit 1' hooks/scripts/read_config.sh          # the dotted path's loud arm
+/usr/bin/grep -n 'awk' hooks/scripts/read_config.sh             # the interpolation sites
+bash reference/test/threshold-namespace.test.sh | tail -1       # 52/52 — covers neither asymmetry
+```
+
+---
+
+### 17. `session-orient.sh` counts open notes recursively but their total non-recursively
+
+**What:** `hooks/scripts/session-orient.sh:151` counts open items with `count_notes_by_field`, which
+recurses; `:154`–`:155` compute `OBS_TOTAL`/`TENS_TOTAL` with `ls -1 ops/observations/*.md`, which
+does not. The two are combined in one sentence at `:207` — `"$OBS_COUNT pending observations (of
+$OBS_TOTAL total)"` — so a vault with open items under `ops/observations/archive/` can report a count
+larger than its own total.
+
+**Why not now:** Consistent today only by accident: no archive subdirectory in the field vault holds
+an `open` item. It is a display line that gates nothing — the threshold compares `OBS_COUNT` alone.
+
+**Reopens if:** any vault files an `open` observation or tension in a subdirectory, or `OBS_TOTAL`
+ever gains a second consumer that compares against it.
+
+**From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 1
+
+```bash
+/usr/bin/grep -n 'count_notes_by_field\|OBS_TOTAL=\|TENS_TOTAL=' hooks/scripts/session-orient.sh
+```
+
+---
+
+### 18. `check-placeholder-count.sh` is range-relative in two ways that let a real change through
+
+**What:** (a) `-M` pairs a rename with an edit only while the two sides stay similar; a template
+renamed *and* rewritten end-to-end arrives as an add plus a delete and is never compared. The shape
+is now NAMED rather than silent (`NOTE: template deleted, not compared`) but is not a failure,
+because deleting a template is legitimate. (b) Allowlist staleness is scoped to files in the diff
+range, so a fully obsolete entry survives until some range happens to touch its file again.
+
+**Why not now:** Both are the price of a range-relative gate, which is deliberate — it is the only
+gate that reads a git range, and that is what lets it catch a backport that drops placeholders.
+Closing (a) needs content-similarity pairing the gate does not have. Tree-relative checks exist
+alongside it and cover the standing state: `check-portability.sh` check 6 and
+`check-vocabulary-schema.sh`.
+
+**Reopens if:** a template is renamed and rewritten in one commit and placeholders are lost in the
+process — the exact case (a) cannot see.
+
+**From:** `2026-08-04-ci-hardening.md` Task 3
+
+```bash
+/usr/bin/grep -n '\-M' reference/check-placeholder-count.sh
+bash reference/check-placeholder-count.sh main; echo "rc=$?"    # 0 clean, 1 finding, 2 no merge base
+```
+
+---
+
+### 19. `check-portability.sh` check 6 — substring matching and a whitespace-split allowlist
+
+**What:** (a) `interp_hits_in` (`:436`, used at `:484` and `:497`) is an unanchored `-F` substring
+match, while the half it is compared against parses paths differently; any divergence produces a
+false FAIL, never a false PASS. (b) The allowlist is whitespace-delimited, so a path containing a
+space mis-parses silently.
+
+**Why not now:** (a) fails in the safe direction by construction — a gate that cries wolf gets
+investigated, and this one has, twice. (b) has no instance **in the trees check 6 scans**. Read that
+qualifier as load-bearing: **234 tracked paths do contain a space**, and the first version of this
+entry claimed "no path in the tree contains a space" on the strength of a command it had not run.
+All 234 are in `methodology/`, whose filenames are whole sentences and which the check's declared
+scope excludes; the scanned trees hold **zero**. State it as `234 = 234 methodology + 0 scanned`
+rather than filtering down to a bare `0`, which is the same one-number-hides-the-class error the
+guard itself exists to catch. Both findings sit inside the guard that divergence 12 warns is the one
+place where writing *about* matchers inflates the matcher count, so edits here are conservative.
+
+**Reopens if:** a path containing a space appears under any tree check 6 scans (`skill-sources/`,
+`skills/`, `platforms/`, `reference/`, `generators/`) — not merely anywhere in the repo — or check 6's
+allowlist grows an entry whose file is matched by another entry as a substring.
+
+**From:** `2026-08-04-ci-hardening.md` Task 2 (findings M-2 and M-5)
+
+**`core.quotePath=false` is required and its absence is silent.** `git ls-files` quotes any path
+holding a non-ASCII byte, so that line arrives as `"methodology/notes are skills \342\200\224 …"` —
+starting with `"`, not `m`. A `grep -v '^methodology/'` therefore reports **1** path outside
+`methodology/` when the true answer is **0**, and the survivor looks like a real finding rather than
+a quoting artifact. Exactly one tracked path is affected today, which is the worst case: enough to
+make the filter wrong, too few to look broken.
+
+```bash
+/usr/bin/grep -n 'interp_hits_in' reference/check-portability.sh          # 436, 484, 497
+git -c core.quotePath=false ls-files | /usr/bin/grep -c ' '               # 234, all methodology/
+git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
+  | /usr/bin/grep -cv '^methodology/'                                     # 0 — none outside it
+git ls-files | /usr/bin/grep -c '^"'                                      # 1 — the quoted path
+git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
+  | /usr/bin/grep -c '^\(skill-sources\|skills\|platforms\|reference\|generators\)/'   # 0 — scanned trees
+```
+
+---
+
+### 20. `validate-kernel.sh`'s C1 violation list caps at five
+
+**What:** `reference/validate-kernel.sh:1093` prints five offenders then `... and $((c1_missing - 5))
+more`. On the field vault C1 reports 13 violations and names 5.
+
+**Why not now:** It discloses the remainder in the same line, so it is a truncated *display* and not
+a sampled *measurement* — the count itself is exhaustive. That is the distinction divergence 11 turned
+on: the dangling-link scan was fixed because it sampled the computation; this samples only the
+printout.
+
+**Reopens if:** the cap is ever applied to the computation rather than the display, or the "and N
+more" suffix is dropped, at which point the output stops disclosing its own truncation.
+
+**From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 3
+
+```bash
+/usr/bin/grep -n 'and \$((c1_missing' reference/validate-kernel.sh        # line 1093
+```
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.
