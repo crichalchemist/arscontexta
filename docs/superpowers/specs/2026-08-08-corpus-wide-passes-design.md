@@ -4,8 +4,8 @@
 **Status:** approved, not yet planned
 **Origin:** three field-vault findings from `~/second-brain`, triaged 2026-08-08
 **Revision:** rev 3. Two Fable-model review passes, 9 defects each; rev 2's own
-corrections introduced 4 of the second batch (see [Review provenance](#review-provenance))
-**Blocking open question:** [status values — literal or vocabulary key?](#open-question--are-status-values-canonical-literals-or-vocabulary)
+corrections introduced 4 of the second batch (see [Review provenance](#review-provenance)).
+Rev 3 also resolves the status-value question: **vocabulary, not literals.**
 
 ---
 
@@ -457,34 +457,94 @@ idiom demands a sum. Rev 1 stated only the 12.
 The 681 are **explicitly out of scope**: the stamp is forward-only and does not reach
 notes that predate it. See [Deferrals](#deferrals).
 
-### OPEN QUESTION — are status values canonical literals or vocabulary?
+### Status values are VOCABULARY, not literals
 
-**This is the one decision the spec does not make, and a plan cannot proceed without
-it.** When `/reduce` writes `status: preliminary` and `/verify` matches on
-`preliminary`, is that string a literal, or a `{vocabulary.*}` placeholder?
+**Decided.** `/reduce` writes `status: {vocabulary.status_preliminary}` and `/verify`
+matches the same placeholder. The field vault's `draft` becomes *conforming dialect*
+rather than a non-conforming rename.
 
-Neither answer is currently supported by anything:
+**Why not literals.** A literal `preliminary` ships a `/verify` that promotes a value
+the vault never writes, in exactly the vaults that renamed it — which is rev 1's
+defect in shipped form, one level up. The field vault demonstrates the rename is not
+hypothetical.
+
+**This is a new placeholder FAMILY, not a new key.** Nothing today maps enum values:
 
 ```bash
 /usr/bin/grep -n 'status' reference/vocabulary-transforms.md   # command-name rows only
-/usr/bin/grep -rn 'vocabulary\.\(status\|preliminary\)' skill-sources/ skills/ generators/
-#   no {vocabulary.status*} marker exists anywhere
+/usr/bin/grep -rn 'vocabulary\.status' skill-sources/ skills/ generators/   # no hits
 ```
 
-`reference/vocabulary-transforms.md` maps **command names** only. There is no key
-family for enum values, so a status placeholder would be a new vocabulary family, not
-a new key in an existing one.
+#### The gate's extractor dictates the shape — read this before naming anything
 
-**The stakes are rev 1's defect in shipped form.** If the values are literals, a vault
-whose derivation renames them — *exactly what the field vault did with `draft`* — gets
-a `/verify` that promotes a value nothing writes. The transition compiles, ships, and
-never fires: the same failure this revision exists to fix, one level up. If they are
-vocabulary, the placeholder family has to be designed, and `check-vocabulary-schema.sh`
-has to resolve it.
+`check-vocabulary-schema.sh` resolves declared keys with:
 
-The testing table's row *"`check-vocabulary-schema.sh` — any new `{vocabulary.*}`
-marker must resolve"* hints a marker might exist without deciding whether one is
-needed. **That hedge is the defect.** Decide before planning.
+```bash
+sed -n '/^vocabulary:/,/# Level 7:/{/^  [a-zA-Z_]*: /p;}' skills/setup/SKILL.md
+```
+
+Three constraints fall out, and two of them are silent traps:
+
+| constraint | consequence |
+|---|---|
+| pattern is `[a-zA-Z_]*` — **no dots** | `{vocabulary.status.entry}` can never resolve. Use flat underscore keys |
+| **two-space indent**, single level | a nested YAML block under `status:` is invisible to the extractor |
+| range **ends at `# Level 7:`** | keys appended after that line fall outside the range and are treated as undeclared, while looking correctly placed in the file |
+
+The one-level limit is the same structural constraint `read_config.sh` hit in
+divergence 3, where a three-level key was unreachable and the fix was to stop nesting
+rather than to deepen the parser.
+
+**The dotted form was tested against both extractors, not reasoned about.** Result:
+
+| marker | used key produced | declarable? |
+|---|---|---|
+| `{vocabulary.status.entry}` | `status.entry` | **NO — and it fails both ways round** |
+| `{vocabulary.enstatus}` | `enstatus` | yes |
+| `{vocabulary.status_preliminary}` | `status_preliminary` | yes ← **chosen** |
+
+`status.entry` is unrepresentable because *both* declaration shapes fail: a flat
+`  status.entry:` is rejected by the `[a-zA-Z_]` class, and a nested `  status:` /
+`    entry:` is rejected by the two-space single-level indent. Reproduce:
+
+```bash
+tmp=$(mktemp)
+printf 'vocabulary:\n  status.entry: "x"\n  status_preliminary: "x"\n  status:\n    entry: "x"\n# Level 7: end\n' > "$tmp"
+sed -n '/^vocabulary:/,/# Level 7:/{/^  [a-zA-Z_]*: /p;}' "$tmp"   # only status_preliminary survives
+rm -f "$tmp"
+```
+
+**And it would not error.** The used-key side takes the marker text verbatim
+(`k=${m#\{vocabulary.}`), so a dotted marker parses happily and yields a key that
+matches nothing — reported as *undeclared*, not as *malformed*. A plan that reaches
+for the dotted form will read that message as "I forgot to declare it" and try to
+declare it, which cannot succeed.
+
+**Four flat keys, inserted before the `# Level 7:` marker:**
+
+```yaml
+  # Level 6b: Lifecycle states (the note status enum)
+  status_preliminary: "[domain term]"  # e.g., "preliminary", "draft", "seedling"
+  status_open: "[domain term]"         # e.g., "open", "in progress"
+  status_active: "[domain term]"       # e.g., "active", "established"
+  status_archived: "[domain term]"     # e.g., "archived", "retired"
+```
+
+#### What this adds to the work
+
+| surface | change |
+|---|---|
+| `skills/setup` | derive and write all four during the derivation conversation |
+| `skills/upgrade` | **backfill** — an existing vault has no `status_*` keys, so `/upgrade` must add them without resetting a vault that already tuned its enum. This is 5g's failure mode, which seeded defaults beneath a vault's configured values because its guard tested only for the block's presence |
+| `reference/vocabulary-transforms.md` | its first non-command rows |
+| `generators/features/{schema,templates,atomic-notes}.md` | the enum declarations become placeholder-bearing — which moves them into `check-placeholder-count.sh`'s scope |
+| `check-vocabulary-schema.sh` | no change needed **if** the flat/in-range rules above are followed. That is the test of whether they were |
+
+**The backfill is the risky half.** A vault whose enum is already `draft | active |
+superseded | archived` must end up with `status_preliminary: "draft"`, not
+`status_preliminary: "preliminary"`. Deriving that mapping from an existing vault's
+template enum is the part a plan must specify precisely — and `superseded` has no
+canonical counterpart, so the mapping is partial in that direction too.
 
 ### The vocabulary mapping is not one-to-one
 
@@ -530,7 +590,8 @@ own spec.
 | 2 | `fence-isolation.test.sh` green in **both** shells for every converted fence; each newly library-sourcing fence mutation-proved by deleting its `.`-source and confirming the gate reddens |
 | 2 | `check-portability.sh` check 6 allowlist drained for the 5 converted sites |
 | 1, 3 | `check-placeholder-count.sh` — the normalizer and the promotion must not hardcode vocabulary |
-| 1, 3 | `check-vocabulary-schema.sh` — any new `{vocabulary.*}` marker must resolve |
+| 3 | `check-vocabulary-schema.sh` — the four new `status_*` keys must resolve. This is not a formality: it is the direct test of whether they were declared flat, two-space, and **before the `# Level 7:` marker**. A key placed after that line looks right in the file and reads as undeclared to the gate |
+| 1 | `check-vocabulary-schema.sh` — item 1 adds no markers, so this must stay at its current pass rather than change |
 | 1, 2, 3 | `check-doc-claims.sh` — for the counts **CLAUDE.md** states, if this work moves any |
 
 ### No gate reads this document
