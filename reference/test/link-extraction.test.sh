@@ -272,17 +272,17 @@ eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
 # Both sides of comm must be sorted under the same collation; pinning ensures it.
 # Grep the library to verify the pins are present, then mutation-prove by removing one.
 eq "orphan_notes: LC_ALL=C sort for index" "1" \
-  "$(sed -n '405,407p' reference/lib/link-extraction.sh | grep -c 'existing_note_index.*LC_ALL=C sort -u.*idx')"
+  "$(sed -n '407p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
 eq "orphan_notes: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '407p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(sed -n '410p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
 eq "orphan_notes: LC_ALL=C comm call" "1" \
-  "$(sed -n '409p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(sed -n '413p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 eq "orphan_notes_recursive: LC_ALL=C sort for index" "1" \
-  "$(sed -n '419,421p' reference/lib/link-extraction.sh | grep -c 'existing_note_index_recursive.*LC_ALL=C sort -u.*idx')"
+  "$(sed -n '425p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
 eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '421p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(sed -n '428p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
 eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
-  "$(sed -n '423p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(sed -n '431p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -318,6 +318,24 @@ eq "orphan_notes_recursive: empty directory output empty" "" "$out"
 out=$(orphan_notes_recursive "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
 eq "orphan_notes_recursive: missing directory returns 1" "1" "$rc"
 eq "orphan_notes_recursive: missing directory prints NOTHING" "" "$out"
+
+# 24. orphan_notes mid-scan producer failure (link_edge_map fails)
+BADRC=$(mktemp)
+printf 'invalid-config' > "$BADRC"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" orphan_notes "$EDGE_DIR/notes" >/dev/null 2>&1); rc=$?
+eq "orphan_notes: link_edge_map failure returns 1" "1" "$rc"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" orphan_notes "$EDGE_DIR/notes" 2>/dev/null)
+eq "orphan_notes: link_edge_map failure prints NOTHING" "" "$out"
+rm -f "$BADRC"
+
+# 25. orphan_notes_recursive mid-scan producer failure (link_edge_map_recursive fails)
+BADRC=$(mktemp)
+printf 'invalid-config' > "$BADRC"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" orphan_notes_recursive "$EDGE_DIR/notes" >/dev/null 2>&1); rc=$?
+eq "orphan_notes_recursive: link_edge_map_recursive failure returns 1" "1" "$rc"
+out=$(RIPGREP_CONFIG_PATH="$BADRC" orphan_notes_recursive "$EDGE_DIR/notes" 2>/dev/null)
+eq "orphan_notes_recursive: link_edge_map_recursive failure prints NOTHING" "" "$out"
+rm -f "$BADRC"
 
 rm -rf "$EDGE_DIR"
 
