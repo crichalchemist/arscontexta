@@ -150,11 +150,11 @@ MOC_INDEX=$(printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
   [ -n "$m" ] && basename "$m" .md
 done | _fold_lower | sort -u)
 
-# Targets linked FROM MOCs. link_edge_map_recursive emits source<TAB>target (both
-# folded), allowing us to filter by source. We select rows whose source is a MOC
-# note and extract the target column. MOC_INDEX is already folded, so the
-# comparison and the downstream comm work correctly. Recursive: the original
-# scanned all of NOTES_DIR, not just its top level.
+# Targets linked FROM MOCs. link_edge_map_recursive emits
+# source_basename<TAB>target<TAB>source_path (columns 1-2 folded). Basenames
+# collide across directories under a recursive scan, so we filter by source
+# PATH (column 3) against MOC_FILES rather than by folded basename — a non-MOC
+# sharing a MOC's basename must not contribute to coverage.
 EDGE_MAP=$(mktemp) || exit 1
 link_edge_map_recursive "$NOTES_DIR" > "$EDGE_MAP" || {
   rm -f "$EDGE_MAP"
@@ -162,10 +162,10 @@ link_edge_map_recursive "$NOTES_DIR" > "$EDGE_MAP" || {
   exit 1
 }
 MOC_SRC=$(mktemp) || { rm -f "$EDGE_MAP"; exit 1; }
-printf '%s\n' "$MOC_INDEX" > "$MOC_SRC"  # MOC_INDEX is already built and folded
+printf '%s\n' "$MOC_FILES" | grep -v '^$' | LC_ALL=C sort -u > "$MOC_SRC"
 # -F'\t': the default FS splits on any whitespace, which corrupts the split when
 # a note name contains a space (link_edge_map_recursive's columns are tab-separated).
-MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
+MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $3 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
 rm -f "$EDGE_MAP" "$MOC_SRC"
 
 # Both operands reach comm already folded and sorted, which is what makes it valid.
@@ -523,9 +523,10 @@ AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   FOLDED=$(printf '%s\n' "$NAME" | _fold_lower)
   # Count incoming links by finding rows where target equals this note, excluding
-  # self-loops. sort -u dedupes to distinct (source, target) pairs before
-  # counting, per the comment above.
-  INCOMING=$(awk -F'\t' -v tgt="$FOLDED" '$2 == tgt && $1 != tgt' "$TMP_EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
+  # self-loops. Source basenames collide across directories under a recursive
+  # scan, so we dedupe on the source PATH (column 3), not the folded basename —
+  # two files sharing a basename are two distinct sources, per the comment above.
+  INCOMING=$(awk -F'\t' -v tgt="$FOLDED" '$2 == tgt && $1 != tgt {print $3}' "$TMP_EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
   echo "AUTH:$INCOMING:$NAME"
 done)
 rm -f "$TMP_EDGES"
@@ -740,27 +741,12 @@ link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
   echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
   exit 1
 }
-# The source column above is a folded basename with no path or extension
-# (reference/lib/link-extraction.sh:290-325 builds it from `basename … .md`).
-# The pre-library version printed the real find path, and the caller opens
-# that file directly, so resolve each folded basename back to its path here.
-# A recursive scan means the path can't be reconstructed from NOTES_DIR plus
-# basename alone.
-PATH_RAW=$(mktemp) || { rm -f "$EDGES"; exit 1; }
-find "$NOTES_DIR" -type f -name '*.md' -not -path '*/.git/*' > "$PATH_RAW" || {
-  rm -f "$EDGES" "$PATH_RAW"
-  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
-  exit 1
-}
-PATH_INDEX=$(mktemp) || { rm -f "$EDGES" "$PATH_RAW"; exit 1; }
-while IFS= read -r f; do
-  printf '%s\t%s\n' "$(basename "$f" .md | _fold_lower)" "$f"
-done < "$PATH_RAW" > "$PATH_INDEX"
-# Find files (sources) that link to TARGET, then print the real path for each.
-awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | while IFS= read -r source; do
-  awk -F'\t' -v s="$source" '$1 == s {print $2; exit}' "$PATH_INDEX"
-done
-rm -f "$EDGES" "$PATH_RAW" "$PATH_INDEX"
+# Column 3 is the source path exactly as link_edge_map_recursive's own find
+# produced it, so no basename-to-path resolution is needed. Source basenames
+# collide across directories under a recursive scan, so we print and dedupe on
+# the path (column 3) itself, not the folded basename in column 1.
+awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $3}' "$EDGES" | LC_ALL=C sort -u
+rm -f "$EDGES"
 ```
 
 If `ops/scripts/graph/recursive-backlinks.sh` exists, use it with the note and depth arguments.
