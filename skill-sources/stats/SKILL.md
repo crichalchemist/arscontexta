@@ -259,17 +259,20 @@ fi
 # whole vault n times.
 MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
 
-# Targets linked FROM MOCs. The link_edge_map function emits source<TAB>target
-# (both folded), allowing us to filter by source. We select rows whose source is
-# a MOC note and extract the target column. MOC_INDEX is already folded, so the
-# comparison and the downstream comm work correctly.
+# Targets linked FROM MOCs. The link_edge_map_recursive function emits
+# source<TAB>target (both folded), allowing us to filter by source. We select
+# rows whose source is a MOC note and extract the target column. MOC_INDEX is
+# already folded, so the comparison and the downstream comm work correctly.
 EDGE_MAP=$(mktemp) || exit 1
-link_edge_map "$NOTES_DIR" > "$EDGE_MAP" || { rm -f "$EDGE_MAP"; exit 1; }
+link_edge_map_recursive "$NOTES_DIR" > "$EDGE_MAP" || {
+  rm -f "$EDGE_MAP"
+  echo "error: MOC link scan failed; refusing to report a coverage figure" >&2
+  exit 1
+}
 MOC_SRC=$(mktemp) || { rm -f "$EDGE_MAP"; exit 1; }
 printf '%s\n' "$MOC_INDEX" > "$MOC_SRC"  # MOC_INDEX is already built and folded
-MOC_TARGETS=$(awk 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
+MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
 rm -f "$EDGE_MAP" "$MOC_SRC"
-
 
 # Denominator set is non-MOC notes, matching NOTE_COUNT, which also subtracts
 # MOCs. Both operands reach comm already folded and sorted.
