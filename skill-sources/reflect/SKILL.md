@@ -441,8 +441,11 @@ link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
   echo "error: link scan failed reading '$NOTES_DIR'; refusing to report a link count" >&2
   exit 1
 }
-# Find distinct files (sources) that link to TARGET and count them.
-LINK_COUNT=$(awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
+# Find distinct files (sources) that link to TARGET and count them. Source
+# basenames collide across directories under a recursive scan, so we dedupe
+# on the source PATH (column 3), not the folded basename (column 1) — two
+# files sharing a basename are two distinct sources.
+LINK_COUNT=$(awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $3}' "$EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
 rm -f "$EDGES"
 echo "$LINK_COUNT"
 ```
