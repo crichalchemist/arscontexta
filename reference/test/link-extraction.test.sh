@@ -126,7 +126,7 @@ rm -f "$BADRC"
 # Every note makes a different wrong implementation fail. Do not trim the fixture.
 # a.b/axb pair catches interpolation bug; fenced note tests _strip_fences.
 EDGE_DIR=$(mktemp -d)
-mkdir -p "$EDGE_DIR/notes"
+mkdir -p "$EDGE_DIR/notes" "$EDGE_DIR/empty"
 printf -- '---\ntitle: Alpha\n---\nlinks [[Target]] [[a.b]]\n' > "$EDGE_DIR/notes/alpha.md"
 printf -- '---\ntitle: Beta\n---\nlinks [[TARGET]] [[Target|an alias]]\n' > "$EDGE_DIR/notes/beta.md"
 printf -- '---\ntitle: Gamma\n---\nlinks [[Target#a-heading]]\n' > "$EDGE_DIR/notes/gamma.md"
@@ -209,6 +209,47 @@ recursive_count=$(link_edge_map_recursive "$NEST_DIR/notes" 2>/dev/null | grep -
 eq "link_edge_map: flat does NOT descend" "1" "$flat_count"
 eq "link_edge_map_recursive: recurses into subdirectories" "2" "$recursive_count"
 rm -rf "$NEST_DIR"
+
+# 13. backlink_counts: incoming edge counts with self-edges excluded
+counts=$(backlink_counts "$EDGE_DIR/notes" 2>/dev/null)
+
+# target has 6 raw edges (including self), ONE of which is its own self-link -> 5
+eq "backlink_counts: excludes the self-edge (6 raw edges -> 5 incoming)" "5" \
+  "$(printf '%s\n' "$counts" | LC_ALL=C awk -F'\t' '$1=="target"{print $2}')"
+
+# a note with no incoming links is ABSENT, not zero -- absence is the zero
+eq "backlink_counts: a target with no incoming links does not appear" "" \
+  "$(printf '%s\n' "$counts" | LC_ALL=C awk -F'\t' '$1=="lonely"{print $2}')"
+
+# a.b and axb tests (a.b.md links to target, alpha.md links to a.b)
+eq "backlink_counts: a.b counted exactly once, axb not at all" "1" \
+  "$(printf '%s\n' "$counts" | LC_ALL=C awk -F'\t' '$1=="a.b"{print $2}')"
+eq "backlink_counts: axb has no incoming links" "" \
+  "$(printf '%s\n' "$counts" | LC_ALL=C awk -F'\t' '$1=="axb"{print $2}')"
+
+out=$(backlink_counts "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
+eq "backlink_counts: missing directory returns 1" "1" "$rc"
+eq "backlink_counts: missing directory prints NOTHING" "" "$out"
+
+# 14. backlink_counts empty directory test (rc 0, empty output)
+out=$(backlink_counts "$EDGE_DIR/empty" 2>/dev/null); rc=$?
+eq "backlink_counts: empty directory rc 0" "0" "$rc"
+eq "backlink_counts: empty directory output empty" "" "$out"
+
+# 15. backlink_counts_recursive tests
+counts_recursive=$(backlink_counts_recursive "$EDGE_DIR/notes" 2>/dev/null)
+eq "backlink_counts_recursive: basic functionality, self-excluded" "5" \
+  "$(printf '%s\n' "$counts_recursive" | LC_ALL=C awk -F'\t' '$1=="target"{print $2}')"
+
+# 16. backlink_counts_recursive empty directory
+out=$(backlink_counts_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
+eq "backlink_counts_recursive: empty directory rc 0" "0" "$rc"
+eq "backlink_counts_recursive: empty directory output empty" "" "$out"
+
+# 17. backlink_counts_recursive failure handling (missing dir)
+out=$(backlink_counts_recursive "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
+eq "backlink_counts_recursive: missing directory returns 1" "1" "$rc"
+eq "backlink_counts_recursive: missing directory prints NOTHING" "" "$out"
 
 rm -rf "$EDGE_DIR"
 

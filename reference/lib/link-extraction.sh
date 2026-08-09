@@ -361,3 +361,32 @@ link_edge_map_recursive() {
   cat "$tmpdata"
   rm -f "$stripped" "$tmpdata" "$rgtmp" "$errf"
 }
+
+# backlink_counts <dir> -> "<target>\t<count>", self-edges excluded, sorted by target.
+# A target with zero incoming links is ABSENT, not a zero row.
+backlink_counts() {
+  local edges
+  edges=$(mktemp) || return 1
+  link_edge_map "$1" > "$edges" || { rm -f "$edges"; return 1; }
+
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
+    | LC_ALL=C sort \
+    | uniq -c \
+    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+
+  rm -f "$edges"
+}
+
+# backlink_counts_recursive <dir> -> same as backlink_counts but descends subdirectories.
+backlink_counts_recursive() {
+  local edges
+  edges=$(mktemp) || return 1
+  link_edge_map_recursive "$1" > "$edges" || { rm -f "$edges"; return 1; }
+
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
+    | LC_ALL=C sort \
+    | uniq -c \
+    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+
+  rm -f "$edges"
+}
