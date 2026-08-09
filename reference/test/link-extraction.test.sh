@@ -302,17 +302,17 @@ eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
 # Both sides of comm must be sorted under the same collation; pinning ensures it.
 # Grep the library to verify the pins are present, then mutation-prove by removing one.
 eq "orphan_notes: LC_ALL=C sort for index" "1" \
-  "$(sed -n '413p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(sed -n '414p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
 eq "orphan_notes: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '417p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(sed -n '419p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
 eq "orphan_notes: LC_ALL=C comm call" "1" \
-  "$(sed -n '420p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(sed -n '422p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 eq "orphan_notes_recursive: LC_ALL=C sort for index" "1" \
-  "$(sed -n '432p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(sed -n '435p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
 eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '436p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(sed -n '440p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
 eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
-  "$(sed -n '439p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(sed -n '443p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -366,6 +366,66 @@ eq "orphan_notes_recursive: link_edge_map_recursive failure returns 1" "1" "$rc"
 out=$(RIPGREP_CONFIG_PATH="$BADRC" orphan_notes_recursive "$EDGE_DIR/notes" 2>/dev/null)
 eq "orphan_notes_recursive: link_edge_map_recursive failure prints NOTHING" "" "$out"
 rm -f "$BADRC"
+
+# 26. orphan_notes transform-pipeline awk failure (selective stub)
+STUB_AWK=$(mktemp)
+STUB_DIR=$(mktemp -d)
+# Selective stub: fail on the transform pattern, pass through otherwise
+cat > "$STUB_AWK" <<'EOFAWK'
+#!/bin/bash
+# Selective awk stub for link-extraction test
+# Fail (return 1) on the orphan_notes transform invocation: awk -F'\t' '$1 != $2 { print $2 }'
+# Pass through to real awk for all other invocations
+
+# Check if this is the transform invocation by looking at argv
+case "$*" in
+  *'$1 != $2'*)
+    exit 1
+    ;;
+  *)
+    # Delegate to real awk
+    exec /usr/bin/awk "$@"
+    ;;
+esac
+EOFAWK
+chmod +x "$STUB_AWK"
+ln -s "$STUB_AWK" "$STUB_DIR/awk"
+
+out=$(PATH="$STUB_DIR:$PATH" orphan_notes "$EDGE_DIR/notes" >/dev/null 2>&1); rc=$?
+eq "orphan_notes: transform awk failure returns 1" "1" "$rc"
+out=$(PATH="$STUB_DIR:$PATH" orphan_notes "$EDGE_DIR/notes" 2>/dev/null)
+eq "orphan_notes: transform awk failure prints NOTHING" "" "$out"
+rm -rf "$STUB_DIR" "$STUB_AWK"
+
+# 27. orphan_notes_recursive transform-pipeline awk failure (selective stub)
+STUB_AWK=$(mktemp)
+STUB_DIR=$(mktemp -d)
+# Selective stub: fail on the transform pattern, pass through otherwise
+cat > "$STUB_AWK" <<'EOFAWK'
+#!/bin/bash
+# Selective awk stub for link-extraction test
+# Fail (return 1) on the orphan_notes_recursive transform invocation: awk -F'\t' '$1 != $2 { print $2 }'
+# Pass through to real awk for all other invocations
+
+# Check if this is the transform invocation by looking at argv
+case "$*" in
+  *'$1 != $2'*)
+    exit 1
+    ;;
+  *)
+    # Delegate to real awk
+    exec /usr/bin/awk "$@"
+    ;;
+esac
+EOFAWK
+chmod +x "$STUB_AWK"
+ln -s "$STUB_AWK" "$STUB_DIR/awk"
+
+out=$(PATH="$STUB_DIR:$PATH" orphan_notes_recursive "$EDGE_DIR/notes" >/dev/null 2>&1); rc=$?
+eq "orphan_notes_recursive: transform awk failure returns 1" "1" "$rc"
+out=$(PATH="$STUB_DIR:$PATH" orphan_notes_recursive "$EDGE_DIR/notes" 2>/dev/null)
+eq "orphan_notes_recursive: transform awk failure prints NOTHING" "" "$out"
+rm -rf "$STUB_DIR" "$STUB_AWK"
 
 rm -rf "$EDGE_DIR"
 

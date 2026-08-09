@@ -404,38 +404,42 @@ backlink_counts_recursive() {
 # were sorted under different collations, and default sort is locale-dependent.
 orphan_notes() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" idx tgts edges
+  local dir="$1" idx tgts edges tmp_awk
   idx=$(mktemp)  || return 1
   tgts=$(mktemp) || { rm -f "$idx"; return 1; }
   edges=$(mktemp) || { rm -f "$idx" "$tgts"; return 1; }
+  tmp_awk=$(mktemp) || { rm -f "$idx" "$tgts" "$edges"; return 1; }
 
-  existing_note_index "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
-  LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  existing_note_index "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+  LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
 
-  link_edge_map "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  link_edge_map "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
   # Self-edge semantics: same-basename (not same-path). Deliberate choice; see backlink_counts.
-  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" | LC_ALL=C sort -u > "$tgts" \
-    || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" > "$tmp_awk" \
+    && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+    || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
 
   LC_ALL=C comm -23 "$idx" "$tgts"
-  rm -f "$idx" "$tgts" "$edges"
+  rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
 }
 
 orphan_notes_recursive() {
   _require_deps_and_dir "$1" || return 1
-  local dir="$1" idx tgts edges
+  local dir="$1" idx tgts edges tmp_awk
   idx=$(mktemp)  || return 1
   tgts=$(mktemp) || { rm -f "$idx"; return 1; }
   edges=$(mktemp) || { rm -f "$idx" "$tgts"; return 1; }
+  tmp_awk=$(mktemp) || { rm -f "$idx" "$tgts" "$edges"; return 1; }
 
-  existing_note_index_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
-  LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  existing_note_index_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
+  LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
 
-  link_edge_map_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  link_edge_map_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
   # Self-edge semantics: same-basename (not same-path). Deliberate choice; see backlink_counts.
-  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" | LC_ALL=C sort -u > "$tgts" \
-    || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" > "$tmp_awk" \
+    && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
+    || { rm -f "$idx" "$tgts" "$edges" "$tmp_awk"; return 1; }
 
   LC_ALL=C comm -23 "$idx" "$tgts"
-  rm -f "$idx" "$tgts" "$edges"
+  rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
 }
