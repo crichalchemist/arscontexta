@@ -30,6 +30,13 @@ question gets re-litigated, or worse, silently answered the other way.
   quietly drops items is the status-file-that-lies defect this repo already documents.
 - **Numbers here go stale like numbers anywhere.** Where an entry cites one, it carries
   the command that re-derives it.
+- **A `**From:**` field names its source by BARE FILENAME, never by path** — every entry
+  below does, deliberately, so the reference survives the file being moved. It also means
+  the name alone does not tell you where the file is. Completed plans and their specs now
+  live under `docs/superpowers/plans/archive/` and `docs/superpowers/specs/archive/`; only
+  plans still being executed sit at `docs/superpowers/plans/*.md`. Resolve a `**From:**` by
+  looking in both. Prose elsewhere in this file cites full paths and was rewritten when the
+  archive was created — the two addressing styles are intentional, not drift.
 
 ---
 
