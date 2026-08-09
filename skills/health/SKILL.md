@@ -89,8 +89,50 @@ for f in {vocabulary.notes}/*.md; do
 done
 ```
 
+**Enum value check** — the threshold table below has always promised "Any invalid enum value →
+WARN"; this is that check, implemented against the note `type:` field specifically. (Other
+enum-like fields, e.g. `status`, vary too much by domain to check generically here — see
+`generators/features/schema.md`'s own note that a template's `_schema` block is the single source
+of truth, one per vault, not one per field.)
+
+```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/frontmatter.sh.
+FM_LIB="ops/lib/frontmatter.sh"
+if [ -r "$FM_LIB" ]; then
+  . "$FM_LIB"
+else
+  echo "error: frontmatter library not found at '$FM_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+
+# The declared enum lives in a template's _schema block (`enums: { type: [a, b, c] }`), not in
+# frontmatter — frontmatter_field() does not apply to it. A plain -E grep for the bracketed
+# `type:` line is deliberately used instead of a full YAML parse: the line shape is distinctive
+# enough (a note's own `type: insight` is a scalar, never a bracket) that this does not need one.
+SCHEMA_TEMPLATE=$(grep -lE '^[[:space:]]*type:[[:space:]]*\[.*\]' templates/*.md 2>/dev/null | head -1)
+if [ -z "$SCHEMA_TEMPLATE" ]; then
+  echo "WARN: no template declares a type: enum in its _schema block — cannot check enum values"
+else
+  # tr -d '[:space:]' here would strip the newlines tr ',' '\n' just introduced (newline IS
+  # whitespace), collapsing the whole list into one unbroken line — the exact-match check
+  # below would then never match ANY value, valid or not. Strip only leading/trailing
+  # whitespace PER LINE instead.
+  TYPE_ENUM=$(grep -E '^[[:space:]]*type:[[:space:]]*\[.*\]' "$SCHEMA_TEMPLATE" | head -1 \
+    | sed -E 's/^[^][]*\[([^]]*)\].*/\1/' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  for f in {vocabulary.notes}/*.md; do
+    [[ -f "$f" ]] || continue
+    # A note with no type: field is valid (the schema's own default, e.g. "insight") — nothing
+    # to check against the enum, so this is not itself a defect.
+    note_type=$(frontmatter_field "$f" type) || continue
+    [ -n "$note_type" ] || continue
+    printf '%s\n' "$TYPE_ENUM" | grep -qxF "$note_type" \
+      || echo "WARN: $f — type: $note_type is not in the declared enum ($(printf '%s' "$TYPE_ENUM" | tr '\n' ',' | sed 's/,$//'))"
+  done
+fi
+```
+
 **Additional checks:**
-- Domain-specific enum fields have valid values (check against template `_schema` blocks if templates exist)
 - `description` field is non-empty (not just present)
 - `topics` field contains at least one wiki link
 

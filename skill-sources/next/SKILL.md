@@ -74,38 +74,84 @@ Before collecting state, evaluate all maintenance conditions and reconcile the q
 
 Create maintenance task:
 ```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/queue-edit.sh.
+QUEUE_LIB="ops/lib/queue-edit.sh"
+if [ -r "$QUEUE_LIB" ]; then
+  . "$QUEUE_LIB"
+else
+  echo "error: queue-edit library not found at '$QUEUE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${QUEUE_EDIT_VERSION:=0}"
+if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 MAINT_MAX=$(jq '[.tasks[] | select(.id | startswith("maint-")) | .id | ltrimstr("maint-") | tonumber] | max // 0' ops/queue/queue.json)
 NEXT_MAINT=$((MAINT_MAX + 1))
 
-jq --arg id "maint-$(printf '%03d' $NEXT_MAINT)" \
+queue_edit '.tasks += [{"id": $id, "type": "maintenance", "priority": $priority, "status": "pending", "condition_key": $key, "target": $target, "action": $action, "auto_generated": true, "created": $ts}]' \
+   ops/queue/queue.json \
+   --arg id "maint-$(printf '%03d' $NEXT_MAINT)" \
    --arg priority "{priority}" \
    --arg key "{condition_key}" \
    --arg target "{description}" \
    --arg action "{recommended command}" \
-   --arg ts "$TIMESTAMP" \
-   '.tasks += [{"id": $id, "type": "maintenance", "priority": $priority, "status": "pending", "condition_key": $key, "target": $target, "action": $action, "auto_generated": true, "created": $ts}]' \
-   ops/queue/queue.json > tmp.json && mv tmp.json ops/queue/queue.json
+   --arg ts "$TIMESTAMP"
 ```
 
 3. **If condition is satisfied AND a pending task with this condition_key exists:**
 
 Auto-close it:
 ```bash
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/queue-edit.sh.
+QUEUE_LIB="ops/lib/queue-edit.sh"
+if [ -r "$QUEUE_LIB" ]; then
+  . "$QUEUE_LIB"
+else
+  echo "error: queue-edit library not found at '$QUEUE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${QUEUE_EDIT_VERSION:=0}"
+if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-jq --arg key "{condition_key}" --arg ts "$TIMESTAMP" \
-   '(.tasks[] | select(.condition_key == $key and .status == "pending")).status = "done" |
+queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).status = "done" |
     (.tasks[] | select(.condition_key == $key and .status == "pending")).completed = $ts' \
-    ops/queue/queue.json > tmp.json && mv tmp.json ops/queue/queue.json
+    ops/queue/queue.json --arg key "{condition_key}" --arg ts "$TIMESTAMP"
 ```
 
 4. **If condition fires AND a pending task already exists:**
 
 Update the target description (specifics may have changed):
 ```bash
-jq --arg key "{condition_key}" --arg target "{new description}" \
-   '(.tasks[] | select(.condition_key == $key and .status == "pending")).target = $target' \
-   ops/queue/queue.json > tmp.json && mv tmp.json ops/queue/queue.json
+# Sourced, never re-implemented — convention, not a gate. See reference/lib/queue-edit.sh.
+QUEUE_LIB="ops/lib/queue-edit.sh"
+if [ -r "$QUEUE_LIB" ]; then
+  . "$QUEUE_LIB"
+else
+  echo "error: queue-edit library not found at '$QUEUE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${QUEUE_EDIT_VERSION:=0}"
+if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).target = $target' \
+   ops/queue/queue.json --arg key "{condition_key}" --arg target "{new description}"
 ```
 
 ---

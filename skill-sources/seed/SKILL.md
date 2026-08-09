@@ -202,11 +202,36 @@ FILE_MAX=$(printf '%s\n' "$ISSUED_FILES" | highest_in)
 QUEUE_MAX=$(find ops -maxdepth 2 \( -name 'queue*.yaml' -o -name 'queue*.json' \) \
   -exec grep -ohE -- '-[0-9]{3,}\.md' {} + 2>/dev/null | grep -oE '[0-9]{3,}' | sort -n | tail -1)
 
+# RESERVED BUT UNEXTRACTED RANGES ARE STILL A BLIND SPOT WITHOUT THIS. An extract
+# task carries `next_claim_start: NNN` the moment /seed creates it, but issues no
+# claim files and no per-claim queue entries until /reduce actually runs — invisible
+# to both FILE_MAX and QUEUE_MAX above. A second /seed run on a different source,
+# started before the first source's /reduce has fired, sees neither scan reflect the
+# first run's reservation and computes the SAME NEXT_CLAIM_START: a collision
+# confirmed in practice (a 16-source batch had to be started at a manually-chosen
+# 500 to clear two such pending reservations).
+#
+# THE RESERVATION NEEDS A WIDTH, NOT JUST A FLOOR. Taking next_claim_start itself as
+# a floor is not enough: if a pending task reserved 403 and a concurrent run set its
+# own start at 404, it would collide with the pending task's own claims (404, 405,
+# …) the moment that task is actually extracted. A single dispatch caps near 20
+# claims in practice — reserve 50 past every pending start as a heuristic margin,
+# not a guarantee: an unusually large single-source batch could still exceed it.
+# Matches both `next_claim_start: NNN` (YAML) and `"next_claim_start": NNN` (JSON).
+# Scans ALL occurrences, not just pending ones — an already-extracted task's old
+# reservation is a harmless, monotonically-safe extra floor, and grep cannot tell
+# pending from done without parsing structure this scan deliberately avoids.
+RESERVED_MAX=$(find ops -maxdepth 2 \( -name 'queue*.yaml' -o -name 'queue*.json' \) \
+  -exec grep -ohE -- 'next_claim_start["'"'"']?[[:space:]]*:[[:space:]]*[0-9]+' {} + 2>/dev/null \
+  | grep -oE '[0-9]+$' | sort -n | tail -1)
+
 # BASE 10, EXPLICITLY. Zero-padded numbers are OCTAL to shell arithmetic:
 # $((0000010)) is 8, and $((0000019)) is a fatal "value too great for base". With a
 # seven-digit pad every claim number hits this. `10#` forces base 10.
 FILE_MAX=$((10#${FILE_MAX:-0}))
 QUEUE_MAX=$((10#${QUEUE_MAX:-0}))
+RESERVED_MAX=$((10#${RESERVED_MAX:-0}))
+[ "$RESERVED_MAX" -gt 0 ] && RESERVED_MAX=$((RESERVED_MAX + 50))
 
 # THE GUARD USES THE SCANNER'S OWN DETECTOR. A previous version detected claims by
 # filename glob while the scan detected them by content, so the two disagreed about
@@ -228,8 +253,10 @@ fi
 # is a claim file that lost its frontmatter — a corrupt state reduce cannot produce —
 # and the queue record above still carries its number, so the counter does not
 # restart over it.
-# Next claim starts after the highest number seen anywhere — disk or queue record.
-NEXT_CLAIM_START=$((FILE_MAX > QUEUE_MAX ? FILE_MAX + 1 : QUEUE_MAX + 1))
+# Next claim starts after the highest number seen anywhere — disk, queue record, or a
+# pending reservation (with its margin) still awaiting extraction.
+CONSUMED_MAX=$((FILE_MAX > QUEUE_MAX ? FILE_MAX : QUEUE_MAX))
+NEXT_CLAIM_START=$((CONSUMED_MAX > RESERVED_MAX ? CONSUMED_MAX + 1 : RESERVED_MAX + 1))
 ```
 
 Claim numbers are globally unique and never reused across batches. This ensures every claim file name (`{source}-{NNN}.md`) is unique vault-wide.

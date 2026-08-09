@@ -33,6 +33,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 LINK_LIB_SRC="$ROOT/reference/lib/link-extraction.sh"
 FM_LIB_SRC="$ROOT/reference/lib/frontmatter.sh"
+QUEUE_LIB_SRC="$ROOT/reference/lib/queue-edit.sh"
 
 # Every spawned shell must be THIS harness's shell, not `sh`. On macOS `sh` is
 # bash 3.2 regardless of what launched the harness, so an `sh` site silently
@@ -159,6 +160,10 @@ build_fixture() {
   }
   cp "$FM_LIB_SRC" "$v/ops/lib/frontmatter.sh" || {
     printf 'harness: cannot copy %s into the fixture\n' "$FM_LIB_SRC" >&2
+    return 1
+  }
+  cp "$QUEUE_LIB_SRC" "$v/ops/lib/queue-edit.sh" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_LIB_SRC" >&2
     return 1
   }
 
