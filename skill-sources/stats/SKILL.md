@@ -173,8 +173,8 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
@@ -259,31 +259,17 @@ fi
 # whole vault n times.
 MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null)
 
-# Targets linked FROM MOCs. Extraction is inlined rather than delegated because
-# the library exposes directory-scoped functions only, and nothing that answers
-# "what does this particular SET of files link to" — see divergence 12.
-COV_SRC=$(mktemp) || exit 1
-COV_HITS=$(mktemp) || { rm -f "$COV_SRC"; exit 1; }
-COVF="/tmp/stats-cov-err-$$"
-rm -f "$COVF"
-printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
-  [ -n "$m" ] || continue
-  _strip_fences "$m" >> "$COV_SRC" || touch "$COVF"
-done
-if [ -e "$COVF" ]; then
-  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
-  echo "error: MOC fence-stripping failed; refusing to report a coverage figure" >&2
-  exit 1
-fi
-# rc 1 is "no MOC links at all", a real answer; only rc >1 is a failure.
-rg -o '\[\[([^\]|#]+)' -r '$1' "$COV_SRC" > "$COV_HITS"
-if [ $? -gt 1 ]; then
-  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
-  echo "error: MOC link extraction failed; refusing to report a coverage figure" >&2
-  exit 1
-fi
-MOC_TARGETS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$COV_HITS" | _fold_lower | sort -u)
-rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+# Targets linked FROM MOCs. The link_edge_map function emits source<TAB>target
+# (both folded), allowing us to filter by source. We select rows whose source is
+# a MOC note and extract the target column. MOC_INDEX is already folded, so the
+# comparison and the downstream comm work correctly.
+EDGE_MAP=$(mktemp) || exit 1
+link_edge_map "$NOTES_DIR" > "$EDGE_MAP" || { rm -f "$EDGE_MAP"; exit 1; }
+MOC_SRC=$(mktemp) || { rm -f "$EDGE_MAP"; exit 1; }
+printf '%s\n' "$MOC_INDEX" > "$MOC_SRC"  # MOC_INDEX is already built and folded
+MOC_TARGETS=$(awk 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
+rm -f "$EDGE_MAP" "$MOC_SRC"
+
 
 # Denominator set is non-MOC notes, matching NOTE_COUNT, which also subtracts
 # MOCs. Both operands reach comm already folded and sorted.
