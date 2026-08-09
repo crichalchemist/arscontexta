@@ -420,7 +420,6 @@ echo "6. Wiki-link matchers do not interpolate a note name into the pattern"
 # A bare path without a count would let skills/health quietly grow a fourth site
 # behind its three.
 INTERP_ALLOW="
-skills/architect/SKILL.md 1 link counts in evolution advice; nothing acts on the number
 platforms/claude-code/hooks/session-orient.sh.template 1 runs on EVERY SessionStart, where sourcing a library turns a missing file into a broken session rather than a wrong number
 reference/testing-milestones.md 1 a test SPEC's own example; teaching the pattern is not shipping it
 generators/features/maintenance.md 1 a recipe emitted into a generated vault's docs; a recipe cannot source a library the way a fence can, so converting it changes what generation emits

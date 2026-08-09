@@ -173,13 +173,6 @@ For each FAIL/WARN:
 # the directory is empty.
 NOTE_COUNT=$(find "{vocabulary.notes}" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
 
-# Find orphans (notes with no incoming links)
-find "{vocabulary.notes}" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  LINKS=$(grep -rl "\[\[$NAME\]\]" "{vocabulary.notes}"/ 2>/dev/null | wc -l | tr -d ' ')
-  [[ "$LINKS" -eq 0 ]] && echo "ORPHAN: $NAME"
-done
-
 # Source link-extraction library (fails loud if missing).
 # Vault root: same mechanism as hooks/scripts/read_config.sh:20, and the same
 # expression /stats, /graph and /health Category 9 use.
@@ -200,11 +193,23 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
+
+# Find orphans (notes with no incoming links)
+ORPHANS=$(orphan_notes_recursive "{vocabulary.notes}") || {
+  echo "error: orphan index build failed; refusing to report orphans" >&2
+  exit 1
+}
+# Captured and CHECKED BEFORE the loop: piping extraction into `while` yields the
+# loop's status, so a failed extraction would read as "no orphans" — and this
+# evidence feeds evolution proposals, so a false clean bill is worse here.
+printf '%s\n' "$ORPHANS" | while IFS= read -r NAME; do
+  [ -n "$NAME" ] && echo "ORPHAN: $NAME"
+done
 
 # Find dangling links (folded both sides — reference/lib/link-extraction.sh)
 NOTE_INDEX=$(existing_note_index_recursive "{vocabulary.notes}") || {
