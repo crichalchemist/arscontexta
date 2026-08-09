@@ -122,6 +122,55 @@ eq "guarded call: caller survives rg failure" "reached" \
    "$(RIPGREP_CONFIG_PATH="$BADRC" "$SELF" -c ". '$LIB'; if count_links '$N' >/dev/null 2>&1; then :; fi; printf reached" 2>/dev/null)"
 rm -f "$BADRC"
 
+# --- link_edge_map: source<TAB>target edges --------------------------------
+# Every note makes a different wrong implementation fail. Do not trim the fixture.
+# a.b/axb pair catches interpolation bug; fenced note tests _strip_fences.
+EDGE_DIR=$(mktemp -d)
+mkdir -p "$EDGE_DIR/notes"
+printf -- '---\ntitle: Alpha\n---\nlinks [[Target]] [[a.b]]\n' > "$EDGE_DIR/notes/alpha.md"
+printf -- '---\ntitle: Beta\n---\nlinks [[TARGET]] [[Target|an alias]]\n' > "$EDGE_DIR/notes/beta.md"
+printf -- '---\ntitle: Gamma\n---\nlinks [[Target#a-heading]]\n' > "$EDGE_DIR/notes/gamma.md"
+printf -- '---\ntitle: a.b\n---\n[[Target]]\n' > "$EDGE_DIR/notes/a.b.md"
+printf -- '---\ntitle: axb\n---\n[[not-a-match]]\n' > "$EDGE_DIR/notes/axb.md"
+printf -- 'target linking itself\n[[target]]\n' > "$EDGE_DIR/notes/target.md"
+printf -- '---\ntitle: Fenced\n---\n```\n[[in-code-fence]]\n```\n' > "$EDGE_DIR/notes/fenced.md"
+
+edges=$(link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
+
+# 1. case folds both sides: [[TARGET]], [[Target]] both -> target from beta (also alpha -> target)
+eq "link_edge_map: case folds both sides" "3" "$(printf '%s\n' "$edges" | LC_ALL=C awk -F'\t' '$2=="target" && ($1=="alpha" || $1=="beta")' | grep -c .)"
+
+# 2. a.b is literal not regex: [[a.b]] matches only a.b, not axb
+eq "link_edge_map: a.b resolves itself exactly once" "1" "$(printf '%s\n' "$edges" | LC_ALL=C awk -F'\t' '$2=="a.b"' | grep -c .)"
+
+# 3. fences: fenced note contributes NO edge
+eq "link_edge_map: link inside fence not an edge" "0" "$(printf '%s\n' "$edges" | LC_ALL=C awk -F'\t' '$1=="fenced"' | grep -c .)"
+
+# 4. self-edges ARE present at layer (Task 2's backlink_counts removes them)
+eq "link_edge_map: self-edges emitted here" "1" "$(printf '%s\n' "$edges" | LC_ALL=C awk -F'\t' '$1=="target" && $2=="target"' | grep -c .)"
+
+# 5. failure must never number
+out=$(link_edge_map "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
+eq "link_edge_map: missing directory returns 1" "1" "$rc"
+eq "link_edge_map: missing directory prints NOTHING, not 0" "" "$out"
+
+# 6. empty directory is legitimate: rc 0, empty output
+mkdir -p "$EDGE_DIR/empty"
+out=$(link_edge_map "$EDGE_DIR/empty" 2>/dev/null); rc=$?
+eq "link_edge_map: empty directory rc 0" "0" "$rc"
+eq "link_edge_map: empty directory output empty" "" "$out"
+
+# 7. recursive variant tests
+edges_recursive=$(link_edge_map_recursive "$EDGE_DIR/notes" 2>/dev/null)
+eq "link_edge_map_recursive: basic functionality" "8" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
+
+# 8. recursive empty directory
+out=$(link_edge_map_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
+eq "link_edge_map_recursive: empty directory rc 0" "0" "$rc"
+eq "link_edge_map_recursive: empty directory output empty" "" "$out"
+
+rm -rf "$EDGE_DIR"
+
 # --- empty vault (legitimate state, not a failure) ----------------------------
 EMPTY=$(mktemp -d); mkdir -p "$EMPTY/notes"
 eq "empty dir: count_links yields 0"          "zero" \

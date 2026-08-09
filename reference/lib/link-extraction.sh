@@ -50,7 +50,7 @@
 #      filesystem) violates this and produces false positives.
 
 # Contract version. Bump on any BEHAVIOR change (fold rules, termination, recursion semantics).
-LINK_EXTRACTION_VERSION=2
+LINK_EXTRACTION_VERSION=3
 
 # Case folding must fold NON-ASCII, and neither a locale name nor a tool name is
 # enough to know that it will:
@@ -281,4 +281,67 @@ existing_note_index_recursive() {
   find "$dir" -type f -name '*.md' | while IFS= read -r p; do
     basename "$p" .md
   done | _fold_lower | sort -u
+}
+
+# link_edge_map <dir> -> source<TAB>target edges (flat, no recursion)
+# Emits one tab-separated line per (source, target) pair found in <dir>'s markdown files.
+# Fenced code blocks are excluded. Targets are folded to lowercase.
+# Self-edges ARE included; backlink_counts filters them at the next layer.
+link_edge_map() {
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" f src stripped errf
+  stripped=$(mktemp) || return 1
+  errf="/tmp/link-extraction-err-$$"
+
+  find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
+    src=$(basename "$f" .md | _fold_lower)
+    if ! _strip_fences "$f" > "$stripped" 2>/dev/null; then
+      touch "$errf"
+      continue
+    fi
+    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null \
+      | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+      | _fold_lower \
+      | while IFS= read -r tgt; do
+        [ -n "$tgt" ] || continue
+        printf '%s\t%s\n' "$src" "$tgt"
+      done
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$stripped" "$errf"
+    return 1
+  fi
+
+  rm -f "$stripped" "$errf"
+}
+
+# link_edge_map_recursive <dir> -> source<TAB>target edges (recursive tree scan)
+link_edge_map_recursive() {
+  _require_deps_and_dir "$1" || return 1
+  local dir="$1" f src stripped errf
+  stripped=$(mktemp) || return 1
+  errf="/tmp/link-extraction-err-$$"
+
+  find "$dir" -type f -name '*.md' -not -path '*/.git/*' | while IFS= read -r f; do
+    src=$(basename "$f" .md | _fold_lower)
+    if ! _strip_fences "$f" > "$stripped" 2>/dev/null; then
+      touch "$errf"
+      continue
+    fi
+    rg -o '\[\[([^\]|#]+)' -r '$1' "$stripped" 2>/dev/null \
+      | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+      | _fold_lower \
+      | while IFS= read -r tgt; do
+        [ -n "$tgt" ] || continue
+        printf '%s\t%s\n' "$src" "$tgt"
+      done
+  done
+
+  if [ -e "$errf" ]; then
+    rm -f "$stripped" "$errf"
+    return 1
+  fi
+
+  rm -f "$stripped" "$errf"
 }

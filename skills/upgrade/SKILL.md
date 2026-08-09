@@ -753,10 +753,11 @@ Report, **one line per row** — every branch above has a line, including the on
 written:
 
 ```text
-link-extraction.sh: v0 (absent) → v2 [restored]
-link-extraction.sh: v1 → v2 [refreshed]
-link-extraction.sh: v2 [current]
-link-extraction.sh: v2 → v1 [vault ahead, skipped]
+link-extraction.sh: v0 (absent) → v3 [restored]
+link-extraction.sh: v1 → v3 [refreshed]
+link-extraction.sh: v2 → v3 [refreshed]
+link-extraction.sh: v3 [current]
+link-extraction.sh: v3 → v2 [vault ahead, skipped]
 link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
 frontmatter.sh:     v0 (absent) → v3 [restored]
 frontmatter.sh:     v1 → v3 [refreshed]
