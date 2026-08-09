@@ -1565,7 +1565,7 @@ be read as "we fixed it for vaults not yet created".
   converted to the library, leaving two survivors (`skills/health/SKILL.md:661` and
   `reference/testing-milestones.md:425`). Divergence 12's residual table adds two sites promoted from
   prose into documentation-table rows (`skill-sources/graph/SKILL.md:789`, `:794`), for **four**
-  residual sites total (none executable-and-interpolating) — and **divergence 13**, which counted the cost
+  residual sites total, only two of them executable (one non-interpolating, one interpolating); the other two are documentation-table rows — and **divergence 13**, which counted the cost
   at seven sites inlining link *extraction* then (now closed within `skill-sources/` and `skills/`;
   divergence 13 names the one site still outside that scope), because the library answers directory-
   scoped questions only and nothing asks "which files link to X".
