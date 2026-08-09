@@ -171,10 +171,10 @@ if [ -d "$NOTES_DIR" ]; then
     idx=$(mktemp) && raw=$(mktemp) && tgts=$(mktemp)
     if [ -n "$idx" ] && [ -n "$raw" ] && [ -n "$tgts" ] \
        && existing_note_index "$NOTES_DIR" > "$idx" \
-       && link_edge_map_recursive "$NOTES_DIR" > "$raw"; then
-      LC_ALL=C sort -u -o "$idx" "$idx"
-      LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$raw" | LC_ALL=C sort -u > "$tgts"
-      ORPHAN_COUNT=$(LC_ALL=C comm -23 "$idx" "$tgts" | grep -c .)
+       && link_edge_map_recursive "$NOTES_DIR" > "$raw" \
+       && LC_ALL=C sort -u -o "$idx" "$idx" \
+       && LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$raw" | LC_ALL=C sort -u > "$tgts" \
+       && ORPHAN_COUNT=$(LC_ALL=C comm -23 "$idx" "$tgts" | grep -c .); then
       rm -f "$idx" "$raw" "$tgts"
       if [ "$ORPHAN_COUNT" -gt 0 ]; then
         SIGNALS="${SIGNALS}CONDITION: ${ORPHAN_COUNT} orphan notes (no incoming links). Consider /{DOMAIN:reflect}.\n"
