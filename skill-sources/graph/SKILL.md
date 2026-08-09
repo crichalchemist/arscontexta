@@ -150,15 +150,22 @@ MOC_INDEX=$(printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
   [ -n "$m" ] && basename "$m" .md
 done | _fold_lower | sort -u)
 
-# Targets linked FROM MOCs. The link_edge_map function emits source<TAB>target
-# (both folded), allowing us to filter by source. We select rows whose source is
-# a MOC note and extract the target column. MOC_INDEX is already folded, so the
-# comparison and the downstream comm work correctly.
+# Targets linked FROM MOCs. link_edge_map_recursive emits source<TAB>target (both
+# folded), allowing us to filter by source. We select rows whose source is a MOC
+# note and extract the target column. MOC_INDEX is already folded, so the
+# comparison and the downstream comm work correctly. Recursive: the original
+# scanned all of NOTES_DIR, not just its top level.
 EDGE_MAP=$(mktemp) || exit 1
-link_edge_map "$NOTES_DIR" > "$EDGE_MAP" || { rm -f "$EDGE_MAP"; exit 1; }
+link_edge_map_recursive "$NOTES_DIR" > "$EDGE_MAP" || {
+  rm -f "$EDGE_MAP"
+  echo "error: MOC link extraction failed; refusing to report a coverage figure" >&2
+  exit 1
+}
 MOC_SRC=$(mktemp) || { rm -f "$EDGE_MAP"; exit 1; }
 printf '%s\n' "$MOC_INDEX" > "$MOC_SRC"  # MOC_INDEX is already built and folded
-MOC_TARGETS=$(awk 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
+# -F'\t': the default FS splits on any whitespace, which corrupts the split when
+# a note name contains a space (link_edge_map_recursive's columns are tab-separated).
+MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
 rm -f "$EDGE_MAP" "$MOC_SRC"
 
 # Both operands reach comm already folded and sorted, which is what makes it valid.
@@ -256,33 +263,45 @@ fi
 # both sides via the library. Comparing unfolded targets here against folded
 # ones there makes [[Zettelkasten]] and [[zettelkasten]] two distinct nodes, so
 # closure detection misses triangles rather than reporting an error.
-TMP_STRIPPED=$(mktemp) || exit 1
-TMP_LINKS=$(mktemp) || { rm -f "$TMP_STRIPPED"; exit 1; }
-# The failure flag is a FILE, not a variable: this loop body runs in a subshell
-# (find | while), so an assignment would be discarded at the pipe and a broken
-# scan would read as "no triangles". PIPESTATUS is bash-only — empty under zsh.
-ERRF="/tmp/graph-triangles-err-$$"
-rm -f "$ERRF"
 
-# Extract outgoing links for each note using link_edge_map, which already
-# handles fence stripping and link extraction. Output in FROM/TO format for
-# triangle detection.
+# Extract outgoing links for each note using link_edge_map_recursive, which
+# already handles fence stripping and link extraction. Output in FROM/TO format
+# for triangle detection. Recursive: the original scanned all of NOTES_DIR, not
+# just its top level.
 EDGE_MAP=$(mktemp) || exit 1
-link_edge_map "$NOTES_DIR" > "$EDGE_MAP" || { rm -f "$EDGE_MAP"; exit 1; }
+link_edge_map_recursive "$NOTES_DIR" > "$EDGE_MAP" || {
+  rm -f "$EDGE_MAP"
+  echo "error: link extraction failed; refusing to report an empty triangle set" >&2
+  exit 1
+}
+# The source column above is a folded basename (reference/lib/link-extraction.sh
+# builds it via `basename ... .md | _fold_lower`). The original printed the
+# UNFOLDED basename for the FROM: label — folding was applied only to targets,
+# for case-insensitive matching — so triangle output shows each note's real
+# title case. Build a folded -> unfolded basename index to restore that.
+NAME_RAW=$(mktemp) || { rm -f "$EDGE_MAP"; exit 1; }
+find "$NOTES_DIR" -type f -name '*.md' -not -path '*/.git/*' > "$NAME_RAW" || {
+  rm -f "$EDGE_MAP" "$NAME_RAW"
+  echo "error: link extraction failed; refusing to report an empty triangle set" >&2
+  exit 1
+}
+NAME_INDEX=$(mktemp) || { rm -f "$EDGE_MAP" "$NAME_RAW"; exit 1; }
+while IFS= read -r f; do
+  NAME=$(basename "$f" .md)
+  printf '%s\t%s\n' "$(printf '%s\n' "$NAME" | _fold_lower)" "$NAME"
+done < "$NAME_RAW" > "$NAME_INDEX"
+# Notes with zero outgoing links never appear in $1 below and so emit no FROM:
+# line, unlike the original, which printed FROM:$NAME for every note regardless.
+# Deliberately not restored: such a note has no B/C to form a triangle with, so
+# Step 2 below cannot use the line either way.
 awk -F'\t' '{print $1}' "$EDGE_MAP" | LC_ALL=C sort -u | while IFS= read -r src; do
-  echo "FROM:$src"
+  DISPLAY=$(awk -F'\t' -v s="$src" '$1 == s {print $2; exit}' "$NAME_INDEX")
+  echo "FROM:${DISPLAY:-$src}"
   awk -F'\t' -v s="$src" '$1 == s {print $2}' "$EDGE_MAP" | LC_ALL=C sort -u | while read -r target; do
     [ -n "$target" ] && echo "  TO:$target"
   done
 done
-rm -f "$EDGE_MAP"
-
-if [ -e "$ERRF" ]; then
-  rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
-  echo "error: link extraction failed; refusing to report an empty triangle set" >&2
-  exit 1
-fi
-rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
+rm -f "$EDGE_MAP" "$NAME_RAW" "$NAME_INDEX"
 ```
 
 If `ops/scripts/graph/find-triangles.sh` exists, use it directly.
@@ -486,18 +505,27 @@ fi
 # Edges are built ONCE into a file and then counted per note, rather than
 # re-scanning the whole tree once per note. One line per (source file, distinct
 # target) pair: `grep -rl | wc -l` counted FILES, not link occurrences, and that
-# is the semantics being preserved.
+# is the semantics being preserved — deduped below, since link_edge_map_recursive
+# emits one row per link OCCURRENCE with no dedup, and a note linking twice to
+# the same target must not inflate that target's authority score.
 TMP_EDGES=$(mktemp) || exit 1
-# Build the edge list for authority ranking. The link_edge_map function returns
+# Build the edge list for authority ranking. link_edge_map_recursive returns
 # source<TAB>target (both folded), and we extract targets, excluding self-loops,
-# to count incoming links. This replaces the per-file extraction loop.
-link_edge_map "$NOTES_DIR" > "$TMP_EDGES" || { rm -f "$TMP_EDGES"; exit 1; }
+# to count incoming links. This replaces the per-file extraction loop. Recursive:
+# the original scanned all of NOTES_DIR, not just its top level.
+link_edge_map_recursive "$NOTES_DIR" > "$TMP_EDGES" || {
+  rm -f "$TMP_EDGES"
+  echo "error: authority scan failed; refusing to report an influence ranking" >&2
+  exit 1
+}
 
 AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   FOLDED=$(printf '%s\n' "$NAME" | _fold_lower)
-  # Count incoming links by finding rows where target equals this note, excluding self-loops
-  INCOMING=$(awk -F'\t' -v tgt="$FOLDED" '$2 == tgt && $1 != tgt' "$TMP_EDGES" | wc -l | tr -d ' ')
+  # Count incoming links by finding rows where target equals this note, excluding
+  # self-loops. sort -u dedupes to distinct (source, target) pairs before
+  # counting, per the comment above.
+  INCOMING=$(awk -F'\t' -v tgt="$FOLDED" '$2 == tgt && $1 != tgt' "$TMP_EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
   echo "AUTH:$INCOMING:$NAME"
 done)
 rm -f "$TMP_EDGES"
@@ -698,18 +726,41 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
 fi
 
 NAME="[note name]"
-# Backlinks to a specific note. The link_edge_map function emits source<TAB>target
-# (both folded), allowing us to filter by target and extract the source (filename).
+# Backlinks to a specific note. link_edge_map_recursive emits source<TAB>target
+# (both folded), allowing us to filter by target and extract the source. This
+# replaces the per-file loop that stripped fences and extracted links to check
+# each against the target. Recursive: the original scanned all of NOTES_DIR,
+# not just its top level.
 # A backlink list is not a count, so its failure mode is worse than a wrong number:
 # resolution is delegated to the library; the per-file machinery is no longer needed.
 TARGET=$(printf '%s\n' "$NAME" | _fold_lower)
 EDGES=$(mktemp) || exit 1
-link_edge_map "$NOTES_DIR" > "$EDGES" || { rm -f "$EDGES"; exit 1; }
-# Find files (sources) that link to TARGET. The result is the filename (source).
+link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
+  rm -f "$EDGES"
+  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
+  exit 1
+}
+# The source column above is a folded basename with no path or extension
+# (reference/lib/link-extraction.sh:290-325 builds it from `basename … .md`).
+# The pre-library version printed the real find path, and the caller opens
+# that file directly, so resolve each folded basename back to its path here.
+# A recursive scan means the path can't be reconstructed from NOTES_DIR plus
+# basename alone.
+PATH_RAW=$(mktemp) || { rm -f "$EDGES"; exit 1; }
+find "$NOTES_DIR" -type f -name '*.md' -not -path '*/.git/*' > "$PATH_RAW" || {
+  rm -f "$EDGES" "$PATH_RAW"
+  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
+  exit 1
+}
+PATH_INDEX=$(mktemp) || { rm -f "$EDGES" "$PATH_RAW"; exit 1; }
+while IFS= read -r f; do
+  printf '%s\t%s\n' "$(basename "$f" .md | _fold_lower)" "$f"
+done < "$PATH_RAW" > "$PATH_INDEX"
+# Find files (sources) that link to TARGET, then print the real path for each.
 awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | while IFS= read -r source; do
-  printf '%s\n' "$source"
+  awk -F'\t' -v s="$source" '$1 == s {print $2; exit}' "$PATH_INDEX"
 done
-rm -f "$EDGES"
+rm -f "$EDGES" "$PATH_RAW" "$PATH_INDEX"
 ```
 
 If `ops/scripts/graph/recursive-backlinks.sh` exists, use it with the note and depth arguments.
