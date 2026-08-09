@@ -162,7 +162,12 @@ NOTES_DIR="{{NOTES_DIR:-notes}}"
 ORPHAN_COUNT=0
 if [ -d "$NOTES_DIR" ]; then
   LINK_LIB="ops/lib/link-extraction.sh"
-  if [ -r "$LINK_LIB" ] && . "$LINK_LIB" 2>/dev/null \
+  # Do NOT redirect stderr on this source: the library's own fold-probe
+  # (_link_probe_fold) warns here if no non-ASCII case folding is available,
+  # meaning orphan counts below will be OVER-reported. That is the one
+  # degradation this block cannot otherwise surface -- swallowing it would
+  # leave a silent wrong-number failure mode next to the loud ones below.
+  if [ -r "$LINK_LIB" ] && . "$LINK_LIB" \
      && [ "${LINK_EXTRACTION_VERSION:-0}" -ge 3 ]; then
     # Scope is asymmetric: candidates are FLAT in NOTES_DIR (existing_note_index),
     # but a link from ANYWHERE BELOW NOTES_DIR rescues a note
@@ -175,7 +180,7 @@ if [ -d "$NOTES_DIR" ]; then
        && LC_ALL=C sort -u -o "$idx" "$idx" \
        && LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$raw" > "$tmp_awk" \
        && LC_ALL=C sort -u "$tmp_awk" > "$tgts" \
-       && ORPHAN_COUNT=$(LC_ALL=C comm -23 "$idx" "$tgts" | grep -c .); then
+       && ORPHAN_COUNT=$(LC_ALL=C comm -23 "$idx" "$tgts" | grep -c . || true); then
       rm -f "$idx" "$raw" "$tgts" "$tmp_awk"
       if [ "$ORPHAN_COUNT" -gt 0 ]; then
         SIGNALS="${SIGNALS}CONDITION: ${ORPHAN_COUNT} orphan notes (no incoming links). Consider /{DOMAIN:reflect}.\n"
