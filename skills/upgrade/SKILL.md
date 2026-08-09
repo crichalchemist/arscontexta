@@ -315,7 +315,7 @@ EOF_VOCAB
 
   # domain_summary: is a standalone top-level manifest field, deliberately outside
   # the vocabulary: block above (see
-  # docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) -- extracted
+  # docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md) -- extracted
   # separately, same fold-and-append shape as the topic_map/topic_maps aliasing just
   # above, applied to a second source. Reads it via frontmatter_field, not a hand-rolled
   # grep -- reference/check-portability.sh check 7 bans a line-anchored '^field:' grep

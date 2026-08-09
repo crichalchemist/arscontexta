@@ -726,7 +726,7 @@ all three:
 | What is **actually** still lying | named by neither | `2026-08-02-skill-authoring-reference.md` at **0/29** — with a complete ledger (16 completion lines, `final-review.md`) and its 181-line deliverable `reference/skill-authoring.md` on disk. |
 
 ```bash
-for p in docs/superpowers/plans/*.md; do
+for p in docs/superpowers/plans/*.md docs/superpowers/plans/archive/*.md; do
   printf '%-58s %s/%s\n' "$(basename "$p")" \
     "$(grep -c '^- \[x\]' "$p")" "$(grep -c '^- \[[x ]\]' "$p")"
 done
@@ -823,7 +823,7 @@ its evidence supports; reconciling them with one vault's practice is a separate 
 different owner.
 
 **10. A ticked plan step for a check that was built and never shipped.**
-`docs/superpowers/plans/2026-08-03-fourteen-open-items.md` Task 2 Step 4 is `[x]` for an assertion —
+`docs/superpowers/plans/archive/2026-08-03-fourteen-open-items.md` Task 2 Step 4 is `[x]` for an assertion —
 "every `[A-Z_]*` field named in an output-format contract must have an assignment in the same file" —
 that mis-fired on three healthy templates (`graph`, `next`, `remember`) and was deliberately dropped.
 Commit `741b2b7` says it was "recorded in the ledger"; the ledger is `.superpowers/`, which is
@@ -839,7 +839,7 @@ list, not because the earlier claims were true. **A record that does not ship is
 
 The two instances differ in a way worth keeping, because it is what defeats the obvious gate.
 `741b2b7` touched no tracked record at all — only two `skill-sources` templates. `c122d9e` **did**
-touch a tracked file, `docs/superpowers/plans/2026-08-03-fourteen-open-items.md`, and its diff is
+touch a tracked file, `docs/superpowers/plans/archive/2026-08-03-fourteen-open-items.md`, and its diff is
 seven lines ticking two Task 6 checkboxes; not one of the three findings appears in it. So the
 checkable proposition is not "did a tracked file change" — one instance passes that — but "is the
 record *in* the change", which needs a reader. Re-derive both:
@@ -857,22 +857,22 @@ where a record actually goes. And **every plan written from this branch forward*
 `## Deferrals` slot whose value is one line per deferral naming the tracked file it landed in, or
 the literal word `none`.
 
-**That is forward-binding, not a description of the directory — it is 3 of 9 today.** The six older
+**That is forward-binding, not a description of the directory — it is 9 of 15 today.** The six older
 plans have no such section, and retrofitting `none` into plans nobody has audited for deferrals
 would manufacture the exact kind of record this entry exists to stop. The wording here first read
 "every plan under `docs/superpowers/plans/` now carries", which was false by one command inside the
 commit whose subject is records not matching reality:
 
 ```bash
-for p in docs/superpowers/plans/*.md; do
+for p in docs/superpowers/plans/*.md docs/superpowers/plans/archive/*.md; do
   printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
-done                                    # 3 of 9 carry it; the other six predate the convention
+done                                    # 9 of 15 carry it; the other six predate the convention
 ``` A commit-message gate was assessed and **rejected**, measured in both
 directions — the reasoning and the numbers are in
-`docs/superpowers/plans/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
+`docs/superpowers/plans/archive/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
 plan-file gate that would replace it is deferred to the CI-hardening spec. The original subject of
 this entry — an assertion tying contract fields to assignments — still needs a contract marker in
-the templates and is deferred to `docs/superpowers/plans/2026-08-04-ci-hardening.md`, item 18. The
+the templates and is deferred to `docs/superpowers/plans/archive/2026-08-04-ci-hardening.md`, item 18. The
 Spec E plan step is now annotated `not shipped` rather than reading as a delivered check.
 
 **11. The dangling-link check sampled 100 links and did not scan them all — FIXED on
@@ -1086,7 +1086,7 @@ divergence 3 (which is where it was found and where its evidence lives) rather t
 its own; this line exists so a reader scanning headings finds it at all.
 
 **15. Two gates a merged branch was expected to leave behind do not exist, and the expectation lived
-only in a plan.** `docs/superpowers/specs/2026-08-04-ci-hardening-design.md` items 22 and 23 carry
+only in a plan.** `docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md` items 22 and 23 carry
 forward an expectation from Spec F's Task 3: that closing the `status` enum split would be followed
 by (a) an assertion that the enum stays consistent across `generators/`, and (b) a
 `check-portability.sh` ban on inlining `reference/lib/frontmatter.sh`, once that library existed.

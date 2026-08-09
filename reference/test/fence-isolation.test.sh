@@ -91,7 +91,7 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 #
 # THE reflect f01 / reweave f02 ENTRIES BELOW ARE A DIFFERENT KIND: not a
 # defect in the fence, a scope artifact in assertion N's own selector. Task 3
-# of docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md renamed
+# of docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md renamed
 # {vocabulary.notes_collection} to {vocabulary.notes}, which newly matches
 # N's `grep -q -e 'NOTES_DIR' -e '{vocabulary.notes}'` selector even though the
 # match here is a qmd COLLECTION name, not the notes-directory reference the
@@ -125,7 +125,7 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 # scope marker but is not one of the two canonical spellings.
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f09~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01. Was f08 until 2026-08-08, when the Category 1 enum-value check added a fence ahead of it; the defect did not move, its INDEX did. This is the (letter, label) keying CLAUDE.md flags -- a renumber makes the entry read STALE and its unchanged subject read as a new failure, and only the message tells them apart
-skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
+skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
 skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer'
 
 table_reason() {                    # table_reason <table> <label> [letter]
@@ -404,7 +404,7 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   # (a) genuine divergence -> MODIFIED (non-empty diff, rc != 0 from diff itself)
   #
   # mechanically_compare now calls frontmatter_field (domain_summary: extraction,
-  # see docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) and
+  # see docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md) and
   # HALTs if it's undefined -- source ops/lib/frontmatter.sh (already copied into
   # the fixture by build_fixture, for assertion F) before mechanically_compare, the
   # same ordering skills/upgrade/SKILL.md's own item 0 documents for real callers.

@@ -20,7 +20,7 @@ actually supports."
 
 ## Why a new spec, not an amendment to an existing one
 
-The obvious destination — `docs/superpowers/specs/2026-08-04-ci-hardening-design.md`, and its
+The obvious destination — `docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md`, and its
 matching plan — does not accept new items: the plan is complete (22/22 checked) and the design spec
 is written as a closed document (a "Success criteria" section, an "Explicitly out of scope" section,
 no open-items slot). Retrofitting either would repeat the exact anti-pattern this repo's own
@@ -245,7 +245,7 @@ then subtract blocked-status entries when computing `TENSION_COUNT` specifically
 threshold-counting rule still holds. **This changes what a real, consumed variable computes** — it
 needs a fixture and a verification pass, not a one-line patch taken on faith.
 
-### 10. `docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md` — its own acceptance-script mechanics, not its recorded content
+### 10. `docs/superpowers/plans/archive/2026-08-05-generator-vault-enforcement-gap.md` — its own acceptance-script mechanics, not its recorded content
 
 **Verdict: real, worth fixing; does not conflict with this repo's "don't retrofit completed plans" convention, because the target is the verification script, not the decision record.**
 
@@ -279,7 +279,7 @@ shipped code, which is the only place it needs to.
 
 ## Deliberately not in scope
 
-- **Any change to `docs/superpowers/plans/2026-08-04-ci-hardening.md` or its design spec.** Both are
+- **Any change to `docs/superpowers/plans/archive/2026-08-04-ci-hardening.md` or its design spec.** Both are
   closed, completed records — this spec's whole reason for existing is to avoid retrofitting them.
 - **CodeRabbit's docstring-bot behavior itself.** `f199e43`'s comment destruction was already fixed
   directly on `fix/spec-h-enforcement-gap` (`57c8657`). Whether to disable or reconfigure that bot's
@@ -295,7 +295,7 @@ shipped code, which is the only place it needs to.
 - Each of the ten findings above either has a shipped fix with a mutation-proved test, or (finding 3)
   an explicit authorial decision recorded in the plan, or (finding 4) is explicitly scoped as its own
   follow-up rather than attempted inline.
-- No task in the plan that follows edits `docs/superpowers/plans/2026-08-04-ci-hardening.md` or its
+- No task in the plan that follows edits `docs/superpowers/plans/archive/2026-08-04-ci-hardening.md` or its
   design spec.
 - Every fix that changes a counted, gated quantity (assertion totals, allowlist counts) updates every
   document that declares that count, verified by `reference/check-doc-claims.sh` passing clean —

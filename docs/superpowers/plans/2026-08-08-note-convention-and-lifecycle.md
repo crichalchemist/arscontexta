@@ -8,7 +8,7 @@
 
 **Tech Stack:** Markdown skill templates, YAML frontmatter, bash fences, `reference/lib/frontmatter.sh`.
 
-**Source spec:** `docs/superpowers/specs/2026-08-08-corpus-wide-passes-design.md` — items 1 and 3. Item 2 is `docs/superpowers/plans/2026-08-08-link-edge-map.md` and is independent of this plan; either may land first.
+**Source spec:** `docs/superpowers/specs/2026-08-08-corpus-wide-passes-design.md` — items 1 and 3. Item 2 is `docs/superpowers/plans/archive/2026-08-08-link-edge-map.md` and is independent of this plan; either may land first.
 
 ## Why items 1 and 3 are one plan
 

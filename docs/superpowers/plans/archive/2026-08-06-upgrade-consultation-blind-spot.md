@@ -1,6 +1,6 @@
 # Plan — Spec I: `/upgrade`'s modification test is blind to committed local patches
 
-Spec: `docs/superpowers/specs/2026-08-06-upgrade-consultation-blind-spot-design.md`
+Spec: `docs/superpowers/specs/archive/2026-08-06-upgrade-consultation-blind-spot-design.md`
 
 ## Global Constraints
 
@@ -190,7 +190,7 @@ requirement.
 
 - True historical-version retrieval for a real three-way merge (needs release git tags; none exist
   in this repo today) — tracked in
-  `docs/superpowers/specs/2026-08-06-upgrade-consultation-blind-spot-design.md`, "Deliberately not
+  `docs/superpowers/specs/archive/2026-08-06-upgrade-consultation-blind-spot-design.md`, "Deliberately not
   in scope."
 - Root-causing why `pipeline`/`ralph`/`seed` have never been archived once — tracked in the same
   file.

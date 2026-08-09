@@ -2,7 +2,7 @@
 # check-vocabulary-schema.sh -- does every {vocabulary.X}/{DOMAIN:X} used in skill-sources/
 # resolve to a key the generator's own schema declares?
 #
-# See docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md. Short version:
+# See docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md. Short version:
 # skill-sources/reduce/SKILL.md shipped {vocabulary.domain} for years with no schema key
 # anywhere ever declaring `domain` -- an unresolvable placeholder in every vault it ever
 # generated into. This is a whole-tree static check (not diff-relative like

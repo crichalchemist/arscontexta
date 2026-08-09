@@ -1,6 +1,6 @@
 # Plan — Spec H: the generator/vault enforcement gap
 
-Spec: `docs/superpowers/specs/2026-08-05-generator-vault-enforcement-gap-design.md`
+Spec: `docs/superpowers/specs/archive/2026-08-05-generator-vault-enforcement-gap-design.md`
 
 ## Global Constraints
 
@@ -172,7 +172,7 @@ for s in bash zsh; do $s reference/test/guard-failure.test.sh | tail -1; done  #
 # "this row" or "spec § ..." (both sanctioned below) failed for lacking a path ANYWHERE on
 # the line, even though no path claim was ever made. Never actually ran `git ls-files` on
 # anything, despite claiming to check for a "tracked-file reference".
-section=$(awk '/^## Deferrals/{f=1;next} /^## /{f=0} f' docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md)
+section=$(awk '/^## Deferrals/{f=1;next} /^## /{f=0} f' docs/superpowers/plans/archive/2026-08-05-generator-vault-enforcement-gap.md)
 # Real table rows only: a leading pipe, a numeric # column, a second pipe. This excludes the
 # header row (`| # | Deferral | Landed in |` -- `#` is not a digit) and the `|---|---|---|`
 # separator automatically; free prose between/around the tables is never validated.

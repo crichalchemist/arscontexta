@@ -132,7 +132,7 @@ rm -rf "$tmp9"
 # scripts that consume the constant don't redefine it locally, not that no other
 # file anywhere ever declares a same-named variable. A tree-wide
 # `grep -rl '^PLACEHOLDER_PAT='` genuinely finds a second, quoting hit --
-# docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md, which spells
+# docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md, which spells
 # out the definition verbatim in prose. reference/skill-authoring.md:62 is a
 # DIFFERENT case, not caught by that same grep at all: it carries the same
 # regex VALUE but under the name `PAT=`, not `PLACEHOLDER_PAT=`, so no

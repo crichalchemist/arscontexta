@@ -8,7 +8,7 @@
 # schema key). One definition, not two independently-typed copies -- this repo has already
 # shipped that exact divergence twice (CONTRIBUTING.md's copy vs. skill-authoring.md's;
 # three spellings of the note-status enum). See
-# docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md.
+# docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md.
 #
 # Do NOT widen to a bare {...}: that also matches ${TARGET} and ${FILE}, turning a
 # shell-variable count into a placeholder count. skill-authoring.md section 2 says so.

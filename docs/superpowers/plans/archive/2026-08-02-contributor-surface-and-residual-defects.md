@@ -10,7 +10,7 @@
 **Goal:** Close the last place a validator measures a proxy, and convert every remaining "known
 open" item into either a fix or a stated decision.
 
-**Spec:** `docs/superpowers/specs/2026-08-02-contributor-surface-and-residual-defects-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-02-contributor-surface-and-residual-defects-design.md`
 
 **Architecture:** Task 1 is mechanical and was never gated. Tasks 2-5 depended on decisions D1-D3,
 which were **ruled before execution began** (see below) — all five tasks are now unblocked.
@@ -88,7 +88,7 @@ semantic search satisfied while every call failed and each skill's documented "f
 path quietly stood in. A presence check cannot detect a surface change.
 
 This task supersedes Task 5 of
-`docs/superpowers/plans/2026-08-02-stale-contracts-and-dead-configuration.md`, which now points here.
+`docs/superpowers/plans/archive/2026-08-02-stale-contracts-and-dead-configuration.md`, which now points here.
 Two copies would drift — the same hazard as `skill-sources/` vs `platforms/shared/skill-blocks/`.
 
 - [x] **Step 1: Establish the control — confirm the current check passes while broken**
@@ -182,7 +182,7 @@ exist in the script is aspirational, not enforced.
 
 - [x] **Step 5: Point the superseded task here**
 
-In `docs/superpowers/plans/2026-08-02-stale-contracts-and-dead-configuration.md`, replace Task 5's
+In `docs/superpowers/plans/archive/2026-08-02-stale-contracts-and-dead-configuration.md`, replace Task 5's
 steps with a one-line pointer to this task.
 
 - [x] **Step 6: Gates and commit**
@@ -199,7 +199,7 @@ done
 
 ```bash
 git add reference/kernel.yaml reference/validate-kernel.sh \
-        docs/superpowers/plans/2026-08-02-stale-contracts-and-dead-configuration.md
+        docs/superpowers/plans/archive/2026-08-02-stale-contracts-and-dead-configuration.md
 git commit -m "Assert qmd tool names resolve, not merely that qmd is installed
 
 Primitive 10 checked for the qmd binary. qmd was installed throughout the

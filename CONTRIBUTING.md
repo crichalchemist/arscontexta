@@ -278,7 +278,7 @@ done
 ```
 
 Nothing enforces this. A gate keyed on plan structure is the one viable candidate and is deferred to
-`docs/superpowers/plans/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
+`docs/superpowers/plans/archive/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
 next author copies the last plan.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully

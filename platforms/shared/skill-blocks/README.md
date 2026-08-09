@@ -80,4 +80,4 @@ when editing a shared behavior"* — drew four commits of guard-porting work int
 generates nothing. If you have a reason to change a template here, change the gate deliberately and
 say why in the commit; do not delete the rule to let an edit through.
 
-See `docs/superpowers/specs/2026-08-02-skill-authoring-reference-design.md`.
+See `docs/superpowers/specs/archive/2026-08-02-skill-authoring-reference-design.md`.

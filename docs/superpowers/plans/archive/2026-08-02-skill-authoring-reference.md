@@ -1,6 +1,6 @@
 # Plan — Skill authoring reference, and the vestigial template directory
 
-**Spec:** `docs/superpowers/specs/2026-08-02-skill-authoring-reference-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-02-skill-authoring-reference-design.md`
 **Branch:** `docs/skill-authoring-reference`, cut fresh from `main` — **not** stacked on
 `fix/spec-c-primitive-10` (9 commits, complete, unpushed; keep it reviewable on its own).
 

@@ -11,7 +11,7 @@ convention exists because of divergence 10 — two commits claimed findings were
 "recorded" when they had been written only to the git-ignored `.superpowers/` ledger,
 and **a record that does not ship is not a record.** The plan sections fixed the
 shipping half and left the reading half broken: a deferral in
-`docs/superpowers/plans/2026-08-04-ci-hardening.md` is tracked, but nobody opens a
+`docs/superpowers/plans/archive/2026-08-04-ci-hardening.md` is tracked, but nobody opens a
 four-month-old plan to find out whether a question was already settled. So the same
 question gets re-litigated, or worse, silently answered the other way.
 
@@ -195,7 +195,7 @@ cannot distinguish a documented-but-computed-elsewhere field from a stale one.
 **Reopens if:** contract markers are added to the templates.
 
 **From:** CLAUDE.md divergence 10; deferred to
-`docs/superpowers/specs/2026-08-04-ci-hardening-design.md` item 18
+`docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md` item 18
 
 ### 11. Divergence 16 — the three-tier validation gap
 

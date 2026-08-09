@@ -75,7 +75,7 @@ before touching anything, since this is the number the refactor must not change)
 # schema key). One definition, not two independently-typed copies -- this repo has already
 # shipped that exact divergence twice (CONTRIBUTING.md's copy vs. skill-authoring.md's;
 # three spellings of the note-status enum). See
-# docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md.
+# docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md.
 #
 # Do NOT widen to a bare {...}: that also matches ${TARGET} and ${FILE}, turning a
 # shell-variable count into a placeholder count. skill-authoring.md section 2 says so.
@@ -387,7 +387,7 @@ immediately after it). Insert this new block immediately after that aliasing, be
 
 ```bash
   # domain_summary: is a standalone top-level manifest field, deliberately outside the
-  # vocabulary: block above (see docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md)
+  # vocabulary: block above (see docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md)
   # -- extracted separately, same fold-and-append shape as the topic_map/topic_maps
   # aliasing just above, applied to a second source.
   domain_line=$(grep '^domain_summary:' "$manifest")
@@ -585,7 +585,7 @@ cat > reference/check-vocabulary-schema.sh <<'SCRIPTEOF'
 # check-vocabulary-schema.sh -- does every {vocabulary.X}/{DOMAIN:X} used in skill-sources/
 # resolve to a key the generator's own schema declares?
 #
-# See docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md. Short version:
+# See docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md. Short version:
 # skill-sources/reduce/SKILL.md shipped {vocabulary.domain} for years with no schema key
 # anywhere ever declaring `domain` -- an unresolvable placeholder in every vault it ever
 # generated into. This is a whole-tree static check (not diff-relative like
@@ -981,7 +981,7 @@ is only for what remains genuinely open.
 
 ---
 
-**Plan complete and saved to `docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md`.**
+**Plan complete and saved to `docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md`.**
 Two execution options:
 
 **1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between
