@@ -135,6 +135,7 @@ printf -- '---\ntitle: axb\n---\n[[not-a-match]]\n' > "$EDGE_DIR/notes/axb.md"
 printf -- 'target linking itself\n[[target]]\n' > "$EDGE_DIR/notes/target.md"
 printf -- '---\ntitle: Lonely\n---\nno links here\n' > "$EDGE_DIR/notes/lonely.md"
 printf -- '---\ntitle: Fenced\n---\n```\n[[in-code-fence]]\n```\n' > "$EDGE_DIR/notes/fenced.md"
+printf -- '---\ntitle: Über\n---\nno links, but name has non-ASCII for collation testing\n' > "$EDGE_DIR/notes/über.md"
 
 edges=$(link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
 
@@ -251,6 +252,52 @@ eq "backlink_counts_recursive: empty directory output empty" "" "$out"
 out=$(backlink_counts_recursive "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
 eq "backlink_counts_recursive: missing directory returns 1" "1" "$rc"
 eq "backlink_counts_recursive: missing directory prints NOTHING" "" "$out"
+
+# 18. orphan_notes basic functionality
+orphans=$(orphan_notes "$EDGE_DIR/notes" 2>/dev/null)
+eq "orphan_notes: lonely (no incoming links)" "1" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'lonely')"
+eq "orphan_notes: axb is orphan (not-a-match doesn't exist)" "1" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'axb')"
+eq "orphan_notes: target is NOT orphan (has incoming)" "0" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'target')"
+eq "orphan_notes: a.b is NOT orphan (linked from alpha)" "0" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'a.b')"
+eq "orphan_notes: fenced is orphan (link only in fence)" "1" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'fenced')"
+
+# 19. orphan_notes empty directory (rc 0, empty output)
+out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
+eq "orphan_notes: empty directory rc 0" "0" "$rc"
+eq "orphan_notes: empty directory output empty" "" "$out"
+
+# 20. orphan_notes missing directory (rc 1, no output)
+out=$(orphan_notes "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
+eq "orphan_notes: missing directory returns 1" "1" "$rc"
+eq "orphan_notes: missing directory prints NOTHING" "" "$out"
+
+# 21. orphan_notes_recursive basic functionality
+orphans_r=$(orphan_notes_recursive "$EDGE_DIR/notes" 2>/dev/null)
+eq "orphan_notes_recursive: lonely is orphan" "1" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'lonely')"
+eq "orphan_notes_recursive: axb is orphan" "1" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'axb')"
+eq "orphan_notes_recursive: target is NOT orphan" "0" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'target')"
+eq "orphan_notes_recursive: a.b is NOT orphan" "0" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'a.b')"
+eq "orphan_notes_recursive: fenced is orphan" "1" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'fenced')"
+
+# 22. orphan_notes_recursive empty directory
+out=$(orphan_notes_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
+eq "orphan_notes_recursive: empty directory rc 0" "0" "$rc"
+eq "orphan_notes_recursive: empty directory output empty" "" "$out"
+
+# 23. orphan_notes_recursive missing directory
+out=$(orphan_notes_recursive "$EDGE_DIR/does-not-exist" 2>/dev/null); rc=$?
+eq "orphan_notes_recursive: missing directory returns 1" "1" "$rc"
+eq "orphan_notes_recursive: missing directory prints NOTHING" "" "$out"
 
 rm -rf "$EDGE_DIR"
 
