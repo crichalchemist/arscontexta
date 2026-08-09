@@ -261,27 +261,12 @@ link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
   echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
   exit 1
 }
-# The source column above is a folded basename with no path or extension
-# (reference/lib/link-extraction.sh:290-325 builds it from `basename … .md`).
-# The pre-library version printed the real find path, and the caller opens
-# that file directly, so resolve each folded basename back to its path here.
-# A recursive scan means the path can't be reconstructed from NOTES_DIR plus
-# basename alone.
-PATH_RAW=$(mktemp) || { rm -f "$EDGES"; exit 1; }
-find "$NOTES_DIR" -type f -name '*.md' -not -path '*/.git/*' > "$PATH_RAW" || {
-  rm -f "$EDGES" "$PATH_RAW"
-  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
-  exit 1
-}
-PATH_INDEX=$(mktemp) || { rm -f "$EDGES" "$PATH_RAW"; exit 1; }
-while IFS= read -r f; do
-  printf '%s\t%s\n' "$(basename "$f" .md | _fold_lower)" "$f"
-done < "$PATH_RAW" > "$PATH_INDEX"
-# Find files (sources) that link to TARGET, then print the real path for each.
-awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | while IFS= read -r source; do
-  awk -F'\t' -v s="$source" '$1 == s {print $2; exit}' "$PATH_INDEX"
-done
-rm -f "$EDGES" "$PATH_RAW" "$PATH_INDEX"
+# Column 3 is the source path exactly as link_edge_map_recursive's own find
+# produced it, so no basename-to-path resolution is needed. Source basenames
+# collide across directories under a recursive scan, so we print and dedupe on
+# the path (column 3) itself, not the folded basename in column 1.
+awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $3}' "$EDGES" | LC_ALL=C sort -u
+rm -f "$EDGES"
 ```
 
 **Key question:** What do I know today that I did not know when this {vocabulary.note} was written?
