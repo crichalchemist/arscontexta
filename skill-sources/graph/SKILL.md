@@ -77,8 +77,8 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
@@ -150,31 +150,16 @@ MOC_INDEX=$(printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
   [ -n "$m" ] && basename "$m" .md
 done | _fold_lower | sort -u)
 
-# Targets linked FROM MOCs. Extraction is inlined rather than delegated because
-# the library exposes directory-scoped functions only, and nothing that answers
-# "what does this particular SET of files link to" — see divergence 12.
-COV_SRC=$(mktemp) || exit 1
-COV_HITS=$(mktemp) || { rm -f "$COV_SRC"; exit 1; }
-COVF="/tmp/graph-cov-err-$$"
-rm -f "$COVF"
-printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
-  [ -n "$m" ] || continue
-  _strip_fences "$m" >> "$COV_SRC" || touch "$COVF"
-done
-if [ -e "$COVF" ]; then
-  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
-  echo "error: MOC fence-stripping failed; refusing to report a coverage figure" >&2
-  exit 1
-fi
-# rc 1 is "no MOC links at all", a real answer; only rc >1 is a failure.
-rg -o '\[\[([^\]|#]+)' -r '$1' "$COV_SRC" > "$COV_HITS"
-if [ $? -gt 1 ]; then
-  rm -f "$COV_SRC" "$COV_HITS" "$COVF"
-  echo "error: MOC link extraction failed; refusing to report a coverage figure" >&2
-  exit 1
-fi
-MOC_TARGETS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$COV_HITS" | _fold_lower | sort -u)
-rm -f "$COV_SRC" "$COV_HITS" "$COVF"
+# Targets linked FROM MOCs. The link_edge_map function emits source<TAB>target
+# (both folded), allowing us to filter by source. We select rows whose source is
+# a MOC note and extract the target column. MOC_INDEX is already folded, so the
+# comparison and the downstream comm work correctly.
+EDGE_MAP=$(mktemp) || exit 1
+link_edge_map "$NOTES_DIR" > "$EDGE_MAP" || { rm -f "$EDGE_MAP"; exit 1; }
+MOC_SRC=$(mktemp) || { rm -f "$EDGE_MAP"; exit 1; }
+printf '%s\n' "$MOC_INDEX" > "$MOC_SRC"  # MOC_INDEX is already built and folded
+MOC_TARGETS=$(awk 'FNR==NR {moc[$1]=1; next} $1 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
+rm -f "$EDGE_MAP" "$MOC_SRC"
 
 # Both operands reach comm already folded and sorted, which is what makes it valid.
 COVERED=$(comm -12 \
@@ -250,8 +235,8 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
@@ -279,26 +264,18 @@ TMP_LINKS=$(mktemp) || { rm -f "$TMP_STRIPPED"; exit 1; }
 ERRF="/tmp/graph-triangles-err-$$"
 rm -f "$ERRF"
 
-# For each note, extract outgoing wiki links
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  NAME=$(basename "$f" .md)
-  awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$f" > "$TMP_STRIPPED" || {
-    touch "$ERRF"; continue
-  }
-  # rg runs as its own statement, not as a pipeline stage: $? would otherwise be
-  # sort's status and a broken RIPGREP_CONFIG_PATH would yield an empty set.
-  # rc 1 means "this file has no links" and is normal; only rc >1 is a failure.
-  rg -o '\[\[([^\]|#]+)' -r '$1' "$TMP_STRIPPED" > "$TMP_LINKS"
-  if [ $? -gt 1 ]; then
-    touch "$ERRF"; continue
-  fi
-  LINKS=$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$TMP_LINKS" \
-    | _fold_lower | sort -u)
-  echo "FROM:$NAME"
-  printf '%s\n' "$LINKS" | while read -r target; do
+# Extract outgoing links for each note using link_edge_map, which already
+# handles fence stripping and link extraction. Output in FROM/TO format for
+# triangle detection.
+EDGE_MAP=$(mktemp) || exit 1
+link_edge_map "$NOTES_DIR" > "$EDGE_MAP" || { rm -f "$EDGE_MAP"; exit 1; }
+awk -F'\t' '{print $1}' "$EDGE_MAP" | LC_ALL=C sort -u | while IFS= read -r src; do
+  echo "FROM:$src"
+  awk -F'\t' -v s="$src" '$1 == s {print $2}' "$EDGE_MAP" | LC_ALL=C sort -u | while read -r target; do
     [ -n "$target" ] && echo "  TO:$target"
   done
 done
+rm -f "$EDGE_MAP"
 
 if [ -e "$ERRF" ]; then
   rm -f "$TMP_STRIPPED" "$TMP_LINKS" "$ERRF"
@@ -475,8 +452,8 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
@@ -510,44 +487,20 @@ fi
 # re-scanning the whole tree once per note. One line per (source file, distinct
 # target) pair: `grep -rl | wc -l` counted FILES, not link occurrences, and that
 # is the semantics being preserved.
-TMP_EDGE_SRC=$(mktemp) || exit 1
-TMP_EDGE_HITS=$(mktemp) || { rm -f "$TMP_EDGE_SRC"; exit 1; }
-TMP_EDGES=$(mktemp) || { rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS"; exit 1; }
-# The failure flag is a FILE, not a variable: this loop body runs in a subshell
-# (find | while), so an assignment would be discarded at the pipe and a broken
-# scan would read as "nothing links to anything". PIPESTATUS is bash-only.
-AUTHF="/tmp/graph-auth-err-$$"
-rm -f "$AUTHF"
-
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  SRC=$(basename "$f" .md | _fold_lower)
-  _strip_fences "$f" > "$TMP_EDGE_SRC" || { touch "$AUTHF"; continue; }
-  # rg runs as its own statement, not as a pipeline stage: $? would otherwise be
-  # sed's status. rc 1 means "this file has no links" and is normal; only rc >1
-  # is a failure.
-  rg -o '\[\[([^\]|#]+)' -r '$1' "$TMP_EDGE_SRC" > "$TMP_EDGE_HITS"
-  if [ $? -gt 1 ]; then
-    touch "$AUTHF"; continue
-  fi
-  sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$TMP_EDGE_HITS" \
-    | _fold_lower | sort -u | while IFS= read -r target; do
-      [ -n "$target" ] && [ "$target" != "$SRC" ] && printf '%s\n' "$target"
-    done >> "$TMP_EDGES"
-done
-
-if [ -e "$AUTHF" ]; then
-  rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS" "$TMP_EDGES" "$AUTHF"
-  echo "error: authority scan failed; refusing to report an influence ranking" >&2
-  exit 1
-fi
+TMP_EDGES=$(mktemp) || exit 1
+# Build the edge list for authority ranking. The link_edge_map function returns
+# source<TAB>target (both folded), and we extract targets, excluding self-loops,
+# to count incoming links. This replaces the per-file extraction loop.
+link_edge_map "$NOTES_DIR" > "$TMP_EDGES" || { rm -f "$TMP_EDGES"; exit 1; }
 
 AUTH_RAW=$(find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
   NAME=$(basename "$f" .md)
   FOLDED=$(printf '%s\n' "$NAME" | _fold_lower)
-  INCOMING=$(grep -cxF "$FOLDED" "$TMP_EDGES" || true)
+  # Count incoming links by finding rows where target equals this note, excluding self-loops
+  INCOMING=$(awk -F'\t' -v tgt="$FOLDED" '$2 == tgt && $1 != tgt' "$TMP_EDGES" | wc -l | tr -d ' ')
   echo "AUTH:$INCOMING:$NAME"
 done)
-rm -f "$TMP_EDGE_SRC" "$TMP_EDGE_HITS" "$TMP_EDGES" "$AUTHF"
+rm -f "$TMP_EDGES"
 
 # Hub score: outgoing links per note.
 # The failure flag is a FILE, not a variable: the loop body runs in a subshell
@@ -738,47 +691,25 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 1 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 1" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
 NAME="[note name]"
-# Replaced an `-exec grep -l` whose pattern was this note's name in brackets.
-# (Described, not quoted: the literal spelling is what the class is searched for,
-# so a comment containing it answers that search with itself.)
-# A backlink list is not a count, so
-# its failure mode is worse than a wrong number: a note reached through
-# [[Name|alias]], or spelled in different case, was simply ABSENT from the
-# traversal, and an absent row looks like a note that legitimately has no
-# backlinks. Resolution is delegated; only the per-file test is local.
+# Backlinks to a specific note. The link_edge_map function emits source<TAB>target
+# (both folded), allowing us to filter by target and extract the source (filename).
+# A backlink list is not a count, so its failure mode is worse than a wrong number:
+# resolution is delegated to the library; the per-file machinery is no longer needed.
 TARGET=$(printf '%s\n' "$NAME" | _fold_lower)
-BL_SRC=$(mktemp) || exit 1
-BL_HITS=$(mktemp) || { rm -f "$BL_SRC"; exit 1; }
-BLF="/tmp/graph-backlink-err-$$"
-rm -f "$BLF"
-
-find "$NOTES_DIR" -type f -name '*.md' | while IFS= read -r f; do
-  _strip_fences "$f" > "$BL_SRC" || { touch "$BLF"; continue; }
-  rg -o '\[\[([^\]|#]+)' -r '$1' "$BL_SRC" > "$BL_HITS"
-  if [ $? -gt 1 ]; then
-    touch "$BLF"; continue
-  fi
-  # grep -qxF, not a regex: a note named `a.b` must not be reported as a
-  # backlink source merely because the file links to [[axb]].
-  if sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$BL_HITS" \
-       | _fold_lower | grep -qxF "$TARGET"; then
-    printf '%s\n' "$f"
-  fi
+EDGES=$(mktemp) || exit 1
+link_edge_map "$NOTES_DIR" > "$EDGES" || { rm -f "$EDGES"; exit 1; }
+# Find files (sources) that link to TARGET. The result is the filename (source).
+awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | while IFS= read -r source; do
+  printf '%s\n' "$source"
 done
-
-if [ -e "$BLF" ]; then
-  rm -f "$BL_SRC" "$BL_HITS" "$BLF"
-  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
-  exit 1
-fi
-rm -f "$BL_SRC" "$BL_HITS" "$BLF"
+rm -f "$EDGES"
 ```
 
 If `ops/scripts/graph/recursive-backlinks.sh` exists, use it with the note and depth arguments.
