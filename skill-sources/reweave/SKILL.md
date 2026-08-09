@@ -248,19 +248,40 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
   exit 1
 fi
 
-# Backlinks to a specific target. The link_edge_map function emits
-# source<TAB>target (both folded), allowing us to filter by target and extract
-# the source (filename). This replaces the per-file loop that stripped fences
-# and extracted links to check each against the target.
+# Backlinks to a specific target. link_edge_map_recursive emits source<TAB>target
+# (both folded), allowing us to filter by target and extract the source. This
+# replaces the per-file loop that stripped fences and extracted links to check
+# each against the target. Recursive: the original scanned all of NOTES_DIR,
+# not just its top level.
 TITLE="target note title"
 TARGET=$(printf '%s\n' "$TITLE" | _fold_lower)
 EDGES=$(mktemp) || exit 1
-link_edge_map "$NOTES_DIR" > "$EDGES" || { rm -f "$EDGES"; exit 1; }
-# Find files (sources) that link to TARGET. The result is the filename (source).
+link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
+  rm -f "$EDGES"
+  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
+  exit 1
+}
+# The source column above is a folded basename with no path or extension
+# (reference/lib/link-extraction.sh:290-325 builds it from `basename … .md`).
+# The pre-library version printed the real find path, and the caller opens
+# that file directly, so resolve each folded basename back to its path here.
+# A recursive scan means the path can't be reconstructed from NOTES_DIR plus
+# basename alone.
+PATH_RAW=$(mktemp) || { rm -f "$EDGES"; exit 1; }
+find "$NOTES_DIR" -type f -name '*.md' -not -path '*/.git/*' > "$PATH_RAW" || {
+  rm -f "$EDGES" "$PATH_RAW"
+  echo "error: backlink scan failed; refusing to report a partial backlink list" >&2
+  exit 1
+}
+PATH_INDEX=$(mktemp) || { rm -f "$EDGES" "$PATH_RAW"; exit 1; }
+while IFS= read -r f; do
+  printf '%s\t%s\n' "$(basename "$f" .md | _fold_lower)" "$f"
+done < "$PATH_RAW" > "$PATH_INDEX"
+# Find files (sources) that link to TARGET, then print the real path for each.
 awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | while IFS= read -r source; do
-  printf '%s\n' "$source"
+  awk -F'\t' -v s="$source" '$1 == s {print $2; exit}' "$PATH_INDEX"
 done
-rm -f "$EDGES"
+rm -f "$EDGES" "$PATH_RAW" "$PATH_INDEX"
 ```
 
 **Key question:** What do I know today that I did not know when this {vocabulary.note} was written?
