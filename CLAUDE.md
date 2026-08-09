@@ -60,7 +60,7 @@ bash reference/check-placeholder-count.sh main           # exit 0 (1 = a templat
 bash reference/check-vocabulary-schema.sh                # exit 0 (1 = an undeclared key; also runs under zsh in CI)
 bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
-  $s reference/test/link-extraction.test.sh              # 19/19
+  $s reference/test/link-extraction.test.sh              # 91/91
   $s reference/test/guard-failure.test.sh                # 60/60
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
@@ -916,13 +916,14 @@ suite plants them into fixtures. `check-portability.sh` applies exactly this exc
 `EXEMPT_PATHS` and says why in its header. The published command did not, so writing about matchers
 inside a gate incremented the count: `fix/ci-hardening` took it from **10 to 12** (`check-portability.sh`
 1→2, `guard-failure.test.sh` 0→1) purely by adding check 6 and its coverage. Measured with the
-exclusion, the same branch moves it **9 → 9**. A count that rises when a gate is documented is
-measuring the documentation:
+exclusion, the same branch moved it **9 → 9**. A count that rises when a gate is documented is
+measuring the documentation — and the count has since fallen further still, as sites that branch
+counted were converted to the library rather than merely written about:
 
 ```bash
 /usr/bin/grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' \
     skill-sources/ skills/ platforms/claude-code/ reference/ \
-  | /usr/bin/grep -Ev 'reference/+(check-portability\.sh|test/guard-failure\.test\.sh):'   # 9
+  | /usr/bin/grep -Ev 'reference/+(check-portability\.sh|test/guard-failure\.test\.sh):'   # 4
 ```
 
 **`/+` is doing two jobs and both are load-bearing.** `grep -r` emits `reference//check-portability.sh`
@@ -937,110 +938,130 @@ first draft.) That is the one-rename evasion
 `check-portability.sh`'s own header describes rejecting for `--exclude`, and it was reintroduced here in
 prose before this line was fixed.
 
-Verified against the tree, not remembered: **9 hits**, of which **7 are executable**, **2 are a
-documentation table**, and **0 executable sites are in `skill-sources/`** (the criterion above, met
-on `fix/spec-f-divergence-drain`). The split is `9 = 7 + 2`; keep it that way, because an earlier
-revision of this entry said "8 are executable" here while saying "seven executable sites" twice
-below. The two hits that *are* in `skill-sources/` are the documentation-table rows named below —
-which is exactly why the unqualified "0 are in `skill-sources/`" that stood here was wrong, and why
-`9 − 7 = 2` makes it measurable.
+Verified against the tree, not remembered: **4 hits**, and the claim worth making is what they are
+not: zero of the four are executable code that inlines a matcher inside `skill-sources/` — the
+governed property above holds, and holds more tightly than the `9 = 7 + 2` split this entry used to
+publish. The decomposition is `4 = 2 + 1 + 1`, not a bare total:
 
-**Divergence 13 also publishes `9 = 7 + 2`, about a different set — do not merge them.** Here the 9
-is *matcher* hits and the 2 are documentation-table rows; there the 9 is `rg -o '\[\['` hits and the
-2 are bracket **counters**, a different operation. The arithmetic coinciding is exactly the trap this
-file already records for the five literal `30`s and for `validate-kernel.sh`'s `PASS: 15` matching its
-target twice for two unrelated reasons. Read the subject, not the sum.
-
-**Six of these seven executable rows are now gated by check 6** — every one that interpolates a note
-name. The exception is `skills/health/SKILL.md:543`, which takes no title. None was touched by this
-branch:
-
-| Site | Spelling | What it feeds |
+| Site | Role | Why it survives |
 |---|---|---|
-| `skills/health/SKILL.md:132` | `rg -l` | orphan detection |
-| `skills/health/SKILL.md:467` | `rg -l` | incoming-link count |
-| `skills/health/SKILL.md:520` | `rg -l` | MOC note count |
-| `skills/health/SKILL.md:543` | `rg` | MOC *list shape*, not a backlink — carries `portability-exempt` |
-| `skills/architect/SKILL.md:179` | `grep -rl` | link counts in evolution advice |
-| `platforms/claude-code/hooks/session-orient.sh.template:160` | `grep -rl` | SessionStart orientation |
-| `reference/testing-milestones.md:410` | `grep -rl` | a test spec's own MOC-ref check |
+| `skill-sources/graph/SKILL.md:789` | documentation-table row | `rg '^topics:.*\[\[X\]\]'`, outside any fence — prose about a matcher, not one that runs |
+| `skill-sources/graph/SKILL.md:794` | documentation-table row | same table, `rg '^source:.*\[\[X\]\]'` |
+| `skills/health/SKILL.md:661` | shape matcher | `rg '^\s*- \[\[' \| grep -v ' — '` — takes no note title at all; carries `portability-exempt` |
+| `reference/testing-milestones.md:425` | test spec | `grep -rl "\[\[$TITLE\]\]"` — a test SPEC's own worked example, not shipped code |
 
-The two hits in `skill-sources/` are `skill-sources/graph/SKILL.md:820` and `:825`, a documentation table
-of frontmatter query syntax (`rg '^topics:.*\[\[X\]\]'`) — a different operation, outside any fence,
-correctly out of scope.
+Two are documentation-table rows, never executable at all. One interpolates nothing, so it was never
+a check-6 candidate — a matcher with no `$` after `\[\[` regexes nothing but its own literal text. The
+last is `testing-milestones.md`'s own MOC-ref check, teaching the pattern rather than shipping it.
+**Zero executable interpolating sites remain in the governed trees.**
+
+**Divergence 13 also publishes a decomposition of its own residual count — do not merge the two.**
+Divergence 12's residue here is two documentation rows, a non-interpolating shape check, and a test
+spec's worked example; divergence 13's residue is a different operation entirely — a bracket-counting
+`rg -o '\[\['` that was never the extraction class to begin with, and that class is now empty. Read
+the subject, not the sum.
+
+**What closed the other three rows this table used to carry** —
+`skills/health/SKILL.md:132,467,520`, `skills/architect/SKILL.md:179` and
+`platforms/claude-code/hooks/session-orient.sh.template:160` — **is the library, not documentation.**
+Each was converted to `reference/lib/link-extraction.sh`'s functions, one commit at a time, and the
+library gained three callers built for exactly this: `link_edge_map` (and its `_recursive` variant)
+builds the full edge set once; `backlink_counts` derives per-note incoming counts from it;
+`orphan_notes` derives the zero-incoming set. `LINK_EXTRACTION_VERSION` is now 3, and a third column,
+`source_path`, was added to the edge map's output specifically to disambiguate two notes that fold to
+the same lowercased basename in different directories — a real collision hit during this conversion,
+not a hypothetical one.
 
 **Known limitation of even this pattern:** `[^|]*` fails on any site where a pipe sits between the
 command and its pattern. No current site does. Start the next widening from that edge rather than
 rediscovering it.
 
-**The line numbers in that table drift, and one of them was wrong when check 6 was built** — the
-template's site read `:149` against a true `:160`, moved by an unrelated edit. Every other entry was
-re-verified at the same time and holds. Do not trust a number here without re-running the pattern
-above; check 6's allowlist deliberately keys on file and count rather than line for exactly this
-reason, and the guard comment it replaced gave "no line numbers here" as a considered choice.
+**The line numbers in that table drift** — the table above was re-derived fresh, not carried forward,
+because the previous table's line numbers had already moved once by the time they were checked. Do
+not trust a number here without re-running the pattern above; check 6's allowlist deliberately keys
+on file and count rather than line for exactly this reason.
 
-**Six of the seven are now GATED, and the seventh is correctly outside.** That sentence read "No gate
-catches any of them" until `check-portability.sh` check 6 landed on `fix/ci-hardening`. Check 6 keys
+**Of the four, exactly one is check-6-gated, and the other three were never candidates.** Check 6 keys
 on the *interpolation* — a `$` expanded directly after `\[\[`, which makes every character of a note
-name a regex — and every executable site above carries one except `skills/health/SKILL.md:543`, which
-takes no note title at all and is the same site already carrying `portability-exempt`. Check 6 also
-gates a **seventh** site this table never listed, `generators/features/maintenance.md`, found because
-the table's own search string required an `-l` flag and that site spells `rg -q`.
+name a regex. Only `reference/testing-milestones.md:425` carries one; the two `graph` documentation
+rows spell a literal `X`, and `skills/health/SKILL.md:661` takes no title at all. Check 6's allowlist
+carries a **second** entry, `generators/features/maintenance.md` — but that site's matcher lives at
+line 20, inside `generators/`, which sits outside the four trees this entry's own scan covers
+(`skill-sources/ skills/ platforms/claude-code/ reference/`). It is a real site, found by check 6's
+broader scan, but it is not one of the four hits above; its extraction-site counterpart at line 29 is
+divergence 13's subject, not this entry's.
 
 **Still ungated, and the distinction matters:** check 2 flags a link capture whose negated class omits
 the `|`/`#` terminators — it keys on `[^` being *present*, and a fixed-name bracket grep has no
 negated class at all. So a matcher that interpolates nothing (`grep -l '[[Index]]'`) is caught by
-neither check. And nothing enforces "do not inline the library's functions" — see the gate table near
-the top of this file, and divergence 13. Both belong to the CI-hardening spec.
+neither check — which is exactly why the two `graph` documentation rows and the health shape matcher
+above are unreachable by either gate and rely on this entry's own scan instead. And nothing enforces
+"do not inline the library's functions" — see the gate table near the top of this file, and divergence
+13. Both belong to the CI-hardening spec.
 
-The sites themselves are **not converted**, on purpose, and check 6 allowlists each with a stated
-reason rather than pretending otherwise. The blast radii differ: `session-orient.sh.template` runs on
-**every** SessionStart, where a fail-loud version guard turns a missing library into a broken session
-rather than a wrong number. Porting the library into a shipped template unreviewed at the end of a
-branch is how the previous divergence in this family was made. What changed is that the list can no
-longer rot silently — an entry whose site is fixed, or whose count moves, now fails the gate.
+**What remains unconverted is now deliberate, not merely undone.** `reference/testing-milestones.md`
+teaches the matcher pattern inside a test spec's worked example, and `generators/features/maintenance.md`
+emits a matcher as a recipe into a generated vault's own documentation — a recipe cannot source a
+library the way a fence can, so converting either changes what generation emits or teaches, not what
+ships as executable matching code today. `session-orient.sh.template`, `skills/architect` and
+`skills/health` no longer belong in that category: they were the previous divergence in this family,
+and they are now converted, not merely documented as risky. What changed structurally is that the
+list can no longer rot silently — an entry whose site is fixed, or whose count moves, now fails the
+gate.
 
-**13. Seven sites inline link extraction because the library has no function for "which files link
-to X".** `reference/lib/link-extraction.sh` exposes directory-scoped functions only — `count_links`,
-`extract_link_targets`, `existing_note_index` and their `_recursive` variants. Nothing answers
-per-file or per-target questions, so every caller that needs backlinks, per-note incoming counts, or
-"what does this SET of files link to" re-inlines the same three-stage pipeline:
-`_strip_fences` → `rg -o '\[\[([^\]|#]+)' -r '$1'` → `_fold_lower`.
+**13. The extraction class is closed within `skill-sources/` and `skills/` — not closed everywhere,
+and this entry now says which scope, not a bare "closed."** `reference/lib/link-extraction.sh` used
+to expose directory-scoped functions only — `count_links`, `extract_link_targets`,
+`existing_note_index` and their `_recursive` variants — which answered nothing about per-file or
+per-target questions. Every caller that needed backlinks, per-note incoming counts, or "what does
+this SET of files link to" re-inlined the same three-stage pipeline: `_strip_fences` →
+`rg -o '\[\[([^\]|#]+)' -r '$1'` → `_fold_lower`.
 
-Count derived, not estimated: **7 sites** — `skill-sources/graph/SKILL.md` ×4, and one each in
-`stats`, `reflect`, `reweave`. One predates this branch (`graph`'s triangles fence); one arrived with
-the authority-loop fix; five arrived with the divergence-6 matcher conversions, which had no other
-way to spell the work.
+**Closure was the library gaining functions, not the callers being rewritten around the old
+pipeline.** `link_edge_map` (and `_recursive`), `backlink_counts` (and `_recursive`), and
+`orphan_notes` (and `_recursive`) now exist — `LINK_EXTRACTION_VERSION` moved to 3, and a third
+output column, `source_path`, was added to the edge map specifically to disambiguate two notes whose
+lowercased basenames collide across directories, a real collision hit during the conversion, not a
+hypothetical one. Every site that inlined the pipeline for a per-file or per-target question inside
+these two trees now calls one of these functions instead.
 
-**Re-derive it, and expect 9 rather than 7 — the difference is the entry's own scope, not drift.**
-The distinguishing property is the *capture*: this class extracts a target with `([^\]|#]+)' -r '$1'`.
-A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which is a link **count**, a
-different operation with none of the per-target problem this entry describes. Two such sites exist
-(`skill-sources/graph/SKILL.md:569`, `skill-sources/stats/SKILL.md:397`), so `9 = 7 + 2`. **Divergence
-12 publishes the same sum for a different set** — there the 9 is matcher hits and the 2 are
-documentation-table rows; here the 9 is `rg -o` hits and the 2 are bracket counters. Same arithmetic,
-different subject; do not merge them. Match the capture, not the brackets:
+**Re-derive it, and expect 2, not 9 — what remains is a different operation, and was never this
+class.** The distinguishing property is the *capture*: this class extracts a target with
+`([^\]|#]+)' -r '$1'`. A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which
+is a link **count**, a different operation with none of the per-target problem this entry describes.
+Two such sites exist (`skill-sources/graph/SKILL.md:552`, `skill-sources/stats/SKILL.md:386`), so
+`2 = 0 + 2`. **Divergence 12 now publishes `4 = 2 + 1 + 1` for a different set** — there the residue
+is two documentation-table rows, a non-interpolating shape matcher and a test spec's worked example;
+here it is only the bracket counters, a different operation entirely. Same "publish the
+decomposition" idiom, different subject; do not merge them. Match the capture, not the brackets:
 
 ```bash
-grep -rnF "rg -o '\[\["      skill-sources/ skills/ | wc -l   # 9, both operations
-grep -rnF "rg -o '\[\[([^"   skill-sources/ skills/ | wc -l   # 7, this class
+grep -rnF "rg -o '\[\["      skill-sources/ skills/ | wc -l   # 2, both operations
+grep -rnF "rg -o '\[\[([^"   skill-sources/ skills/ | wc -l   # 0, this class
 grep -rnF "rg -o '\[\[' "    skill-sources/ skills/ | wc -l   # 2, the bracket counters
 ```
 
 `-F` is load-bearing in all three. Without it the middle pattern's `[^` opens a bracket expression
-and the command returns **2** — a wrong answer that looks like a plausible count rather than an
-error, which is this repo's failure mode exactly. The trailing space in the third pattern is also
-load-bearing: it is what separates `'\[\['` from `'\[\[([^…'`.
+and the command returns a count instead of erroring — a wrong answer that looks like a plausible
+result rather than a failure, which is this repo's failure mode exactly. The trailing space in the
+third pattern is also load-bearing: it is what separates `'\[\['` from `'\[\[([^…'`.
 
-That is the cost of closing divergence 6 without an API change, and it is recorded rather than paid:
-adding an edges function is a library API addition needing its own fixture and a
-`LINK_EXTRACTION_VERSION` bump, and it was ruled out of scope for that branch deliberately —
-extraction and matching are different problems, and that branch closed matching. The argument for
-doing it is this number; if it grows, the argument gets stronger.
+**The scope qualifier is load-bearing, because the class survives one line outside it.**
+`generators/features/maintenance.md:29` spells `rg -oNI '\[\[([^\]|#]+)' {DOMAIN:notes/} -r '$1'` — a
+recipe emitted into a generated vault's own documentation, not code that runs here, but the identical
+capture pattern this entry is about. It is missed by the verification commands above for **two
+independent reasons**, not one: first, `generators/` is outside the two trees those commands scan
+(`skill-sources/ skills/`); second, even a scan that reached it would miss it as spelled, because it
+uses `rg -oNI` and the fixed-string pattern above is `"rg -o '\[\[([^"` — the `-oNI` never matches
+`-o '`. That second reason is divergence 12's own lesson recurring inside this entry: a search string
+narrower than the class it claims to measure. It is not converted for the same reason
+`generators/features/maintenance.md`'s matcher (divergence 12's second check-6 entry, at line 20 in
+the same file) is not: a recipe cannot source a library the way a fence can, so fixing it changes what
+generation emits rather than what ships as executable code today.
 
-Note the interaction with divergence 12: because these sites use `rg -o` with a negated class and no
-closing `\]\]`, the class-wide matcher pattern correctly does **not** flag them. They are a separate
-defect, not a residue of the same one.
+Note the interaction with divergence 12's matcher-class pattern: because the bracket-counter sites use
+`rg -o` with a negated class and no closing `\]\]`, that class-wide matcher pattern correctly does
+**not** flag them. They are a separate defect, not a residue of the same one.
 
 **14 — pointer, not a new entry: the platform hook template's two threshold placeholders are
 substituted by nothing in this repo** — knobs that look configurable and are not. Filed inside
@@ -1522,10 +1543,13 @@ be read as "we fixed it for vaults not yet created".
   proved for the two fences that newly source the library — removing the `.`-source from each makes
   `fence-isolation.test.sh` report `H skill-sources/reweave f03` and `H skill-sources/reflect f03`.
 
-  **What this still does not do is remove the class from the repo — see divergence 12**, which lists
-  the seven executable sites outside `skill-sources/`, and **divergence 13**, which counts the cost:
-  seven sites now inline link *extraction*, because the library answers directory-scoped questions
-  only and nothing asks "which files link to X".
+  **What this still does not do is remove the class from the repo — see divergence 12**, which listed
+  seven executable sites outside `skill-sources/` when this branch closed — three have since been
+  converted to the library, and divergence 12 now reports **four** residual sites (none executable-
+  and-interpolating) with the current decomposition — and **divergence 13**, which counted the cost
+  at seven sites inlining link *extraction* then (now closed within `skill-sources/` and `skills/`;
+  divergence 13 names the one site still outside that scope), because the library answers directory-
+  scoped questions only and nothing asks "which files link to X".
 
 - **`validate-kernel.sh` soft-passed the dangling-link primitive** — was divergence 1, and the
   highest blast radius entry on the list: the kernel contract, run against every generated vault,
@@ -1593,9 +1617,11 @@ be read as "we fixed it for vaults not yet created".
   other way. Commit `741b2b7`'s claim that the spelling is "gone from executable code in both files"
   overstated it then, because sites remained in both. It is finally true of these two files as of the
   second round on `fix/spec-f-divergence-drain` — but only of `skill-sources/`, and only for
-  *matching*: see divergence 12 for the seven executable sites elsewhere, and divergence 13 for the
-  extraction the fix inlined. `stale_notes` was redefined in prose to the definition the code can
-  actually compute — "not modified in 30+ days" — instead of shipping a fifth reading of "stale".
+  *matching*: see divergence 12 for the executable sites elsewhere (seven when this branch closed,
+  four today), and divergence 13 for the extraction the fix inlined (also seven then, now closed
+  within `skill-sources/` and `skills/`). `stale_notes` was redefined in prose to the definition the
+  code can actually compute — "not modified in 30+ days" — instead of shipping a fifth reading of
+  "stale".
 - **The claim counter truncated at three digits.** `{source}-999.md` was not a cap but a *collision*:
   the scan matched exactly three digits, so the maximum went backwards once numbering passed 999.
   Padding is now seven digits minimum, wider values pass through unchanged, and existing files are

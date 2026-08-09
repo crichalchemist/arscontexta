@@ -248,11 +248,11 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
   exit 1
 fi
 
-# Backlinks to a specific target. link_edge_map_recursive emits source<TAB>target
-# (both folded), allowing us to filter by target and extract the source. This
-# replaces the per-file loop that stripped fences and extracted links to check
-# each against the target. Recursive: the original scanned all of NOTES_DIR,
-# not just its top level.
+# Backlinks to a specific target. link_edge_map_recursive emits
+# source<TAB>target<TAB>source_path (source and target folded); see below for
+# why column 3 matters here. This replaces the per-file loop that stripped
+# fences and extracted links to check each against the target. Recursive: the
+# original scanned all of NOTES_DIR, not just its top level.
 TITLE="target note title"
 TARGET=$(printf '%s\n' "$TITLE" | _fold_lower)
 EDGES=$(mktemp) || exit 1

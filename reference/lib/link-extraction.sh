@@ -283,7 +283,7 @@ existing_note_index_recursive() {
   done | _fold_lower | sort -u
 }
 
-# link_edge_map <dir> -> source<TAB>target edges (flat, no recursion)
+# link_edge_map <dir> -> source<TAB>target<TAB>source_path edges (flat, no recursion)
 # Emits one tab-separated line per (source, target) pair found in <dir>'s markdown files.
 # Fenced code blocks are excluded. Targets are folded to lowercase.
 # Self-edges ARE included; backlink_counts filters them at the next layer.
@@ -324,7 +324,7 @@ link_edge_map() {
   rm -f "$stripped" "$tmpdata" "$rgtmp" "$errf"
 }
 
-# link_edge_map_recursive <dir> -> source<TAB>target edges (recursive tree scan)
+# link_edge_map_recursive <dir> -> source<TAB>target<TAB>source_path edges (recursive tree scan)
 link_edge_map_recursive() {
   _require_deps_and_dir "$1" || return 1
   local dir="$1" f src stripped errf tmpdata rgtmp

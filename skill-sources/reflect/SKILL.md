@@ -431,9 +431,10 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
 fi
 
 # Count incoming links to a specific target. The link_edge_map_recursive function
-# emits source<TAB>target (both folded), allowing us to filter by target and count
-# distinct linking files. This replaces the per-file loop that stripped fences,
-# extracted links, and checked each against the target.
+# emits source<TAB>target<TAB>source_path (source and target folded), allowing us
+# to filter by target and count distinct linking files. This replaces the
+# per-file loop that stripped fences, extracted links, and checked each against
+# the target.
 TARGET=$(printf '%s\n' "note name" | _fold_lower)
 EDGES=$(mktemp) || exit 1
 link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {

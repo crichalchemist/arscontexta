@@ -510,9 +510,10 @@ fi
 # the same target must not inflate that target's authority score.
 TMP_EDGES=$(mktemp) || exit 1
 # Build the edge list for authority ranking. link_edge_map_recursive returns
-# source<TAB>target (both folded), and we extract targets, excluding self-loops,
-# to count incoming links. This replaces the per-file extraction loop. Recursive:
-# the original scanned all of NOTES_DIR, not just its top level.
+# source<TAB>target<TAB>source_path (source and target folded), and we extract
+# targets, excluding self-loops, to count incoming links. This replaces the
+# per-file extraction loop. Recursive: the original scanned all of NOTES_DIR,
+# not just its top level.
 link_edge_map_recursive "$NOTES_DIR" > "$TMP_EDGES" || {
   rm -f "$TMP_EDGES"
   echo "error: authority scan failed; refusing to report an influence ranking" >&2
@@ -727,11 +728,11 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
 fi
 
 NAME="[note name]"
-# Backlinks to a specific note. link_edge_map_recursive emits source<TAB>target
-# (both folded), allowing us to filter by target and extract the source. This
-# replaces the per-file loop that stripped fences and extracted links to check
-# each against the target. Recursive: the original scanned all of NOTES_DIR,
-# not just its top level.
+# Backlinks to a specific note. link_edge_map_recursive emits
+# source<TAB>target<TAB>source_path (source and target folded); see below for
+# why column 3 matters here. This replaces the per-file loop that stripped
+# fences and extracted links to check each against the target. Recursive: the
+# original scanned all of NOTES_DIR, not just its top level.
 # A backlink list is not a count, so its failure mode is worse than a wrong number:
 # resolution is delegated to the library; the per-file machinery is no longer needed.
 TARGET=$(printf '%s\n' "$NAME" | _fold_lower)
