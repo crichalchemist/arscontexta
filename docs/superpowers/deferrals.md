@@ -212,6 +212,31 @@ generator" in this repo as "we fixed it for vaults not yet created."
 
 **From:** CLAUDE.md divergence 16
 
+### 12. The `generators/` status enum declarations are not placeholder-bearing
+
+**What:** once status values are vocabulary (`{vocabulary.status_preliminary}` et al.),
+the enum declarations in `generators/features/atomic-notes.md`, `schema.md` (×2) and
+`templates.md` still spell canonical literals.
+
+**Why not now:** converting four declarations across three files changes what
+`check-placeholder-count.sh` measures in all of them. Doing that inside a plan whose
+risk is already "what a newly created note looks like" mixes two unrelated failure
+modes — if a count moves, you cannot attribute it.
+
+**Note the file-vs-declaration trap:** it is **4 declarations in 3 files** —
+`schema.md` carries two. A file-to-file survey sees three and misses one, which is the
+blind spot divergence 15's amendment documents and `bump-version.test.sh` exists for.
+
+**Reopens:** immediately after the note-convention-and-lifecycle plan lands. This is a
+"next, separately", not a "never".
+
+**From:** `2026-08-08-note-convention-and-lifecycle.md` self-review
+
+```bash
+/usr/bin/grep -rn 'preliminary' generators/          # 4 declarations
+/usr/bin/grep -rl 'preliminary' generators/ | wc -l  # 3 files -- NOT the same number
+```
+
 ---
 
 ## Design-track — not deferrals, listed so they are not mistaken for open work
