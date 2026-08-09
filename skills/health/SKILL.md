@@ -166,16 +166,40 @@ fi
 **How to check:**
 
 ```bash
-# For each note file, check if ANY other file links to it
-for f in {vocabulary.notes}/*.md; do
-  [[ -f "$f" ]] || continue
-  basename=$(basename "$f" .md)
-  # Search for [[basename]] in all other files
-  count=$(rg -l "\[\[$basename\]\]" --glob '*.md' | grep -v "$f" | wc -l | tr -d ' ')
-  if [[ "$count" -eq 0 ]]; then
-    echo "WARN: $f — no incoming links (orphan)"
-  fi
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# Scope: notes from {vocabulary.notes}, links from WHOLE VAULT
+# Compose from primitives: a link from anywhere rescues a note
+[ -d "{vocabulary.notes}" ] || {
+  echo "error: notes directory not found at {vocabulary.notes}" >&2
+  exit 1
+}
+
+idx=$(mktemp) || exit 1
+tgts=$(mktemp) || { rm -f "$idx"; exit 1; }
+existing_note_index "{vocabulary.notes}" | LC_ALL=C sort -u > "$idx" \
+  || { rm -f "$idx" "$tgts"; exit 1; }
+link_edge_map_recursive "$VAULT_ROOT" \
+  | LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' \
+  | LC_ALL=C sort -u > "$tgts" || { rm -f "$idx" "$tgts"; exit 1; }
+LC_ALL=C comm -23 "$idx" "$tgts" | while IFS= read -r n; do
+  echo "WARN: $n — no incoming links (orphan)"
 done
+rm -f "$idx" "$tgts"
 ```
 
 **Nuance:** Orphans are not automatically failures. A note created today that hasn't been through /{vocabulary.cmd_reflect} yet is expected to be orphaned temporarily. Check file age:
@@ -495,9 +519,33 @@ For each {vocabulary.note}:
 3. Flag notes with: modified > 30 days ago AND < 2 incoming links
 
 ```bash
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+[ -d "{vocabulary.notes}" ] || {
+  echo "error: notes directory not found at {vocabulary.notes}" >&2
+  exit 1
+}
+
+COUNTS=$(mktemp)
+backlink_counts_recursive "$VAULT_ROOT" > "$COUNTS"
+
 for f in {vocabulary.notes}/*.md; do
-  [[ -f "$f" ]] || continue
-  basename=$(basename "$f" .md)
+  [ -e "$f" ] || continue
+  basename=$(basename "$f" .md | _fold_lower)
 
   # Last modified (days ago). GNU `-c` first, BSD `-f` second — the order is
   # load-bearing. GNU reads `-f` as "filesystem status" and treats `%m` as a
@@ -505,13 +553,15 @@ for f in {vocabulary.notes}/*.md; do
   # chain never falls through, it feeds filesystem text into this arithmetic.
   mod_days=$(( ($(date +%s) - $(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)) / 86400 ))
 
-  # Incoming link count
-  incoming=$(rg -l "\[\[$basename\]\]" --glob '*.md' | grep -v "$f" | wc -l | tr -d ' ')
+  # Incoming link count (from pre-computed table, excluding self-links)
+  incoming=$(LC_ALL=C awk -F'\t' -v n="$basename" '$1==n{print $2}' "$COUNTS")
+  incoming=${incoming:-0}
 
   if [[ $mod_days -gt 30 ]] && [[ $incoming -lt 2 ]]; then
     echo "STALE: $f — $mod_days days old, $incoming incoming links"
   fi
 done
+rm -f "$COUNTS"
 ```
 
 **Thresholds:**
@@ -550,19 +600,45 @@ For each {vocabulary.topic_map} file:
 3. Verify context phrases exist on Core Ideas links (not bare links)
 
 ```bash
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
+if [ -r "$LINK_LIB" ]; then
+  . "$LINK_LIB"
+else
+  echo "error: link-extraction library not found at '$LINK_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+: "${LINK_EXTRACTION_VERSION:=0}"
+if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+[ -d "{vocabulary.notes}" ] || {
+  echo "error: notes directory not found at {vocabulary.notes}" >&2
+  exit 1
+}
+
+COUNTS=$(mktemp)
+backlink_counts "{vocabulary.notes}" > "$COUNTS"
+
 # For each topic map
 for moc in {vocabulary.notes}/*.md; do
-  [[ -f "$moc" ]] || continue
+  [ -e "$moc" ] || continue
   # Check if this is a topic map (has type: moc in frontmatter)
   rg -q '^type: moc' "$moc" || continue
 
-  moc_name=$(basename "$moc" .md)
+  moc_name=$(basename "$moc" .md | _fold_lower)
 
   # Count notes linking to this topic map
-  note_count=$(rg -l "\[\[$moc_name\]\]" {vocabulary.notes}/ --glob '*.md' | grep -v "$moc" | wc -l | tr -d ' ')
+  note_count=$(LC_ALL=C awk -F'\t' -v n="$moc_name" '$1==n{print $2}' "$COUNTS")
+  note_count=${note_count:-0}
 
   echo "$moc_name: $note_count notes"
 done
+rm -f "$COUNTS"
 ```
 
 **Thresholds:**
