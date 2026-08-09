@@ -430,28 +430,20 @@ if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
   exit 1
 fi
 
-# Count incoming links to a specific target. The link_edge_map function emits
-# source<TAB>target (both folded), allowing us to filter by target and count
+# Count incoming links to a specific target. The link_edge_map_recursive function
+# emits source<TAB>target (both folded), allowing us to filter by target and count
 # distinct linking files. This replaces the per-file loop that stripped fences,
 # extracted links, and checked each against the target.
-TARGET=$(printf '%s
-' "note name" | _fold_lower)
+TARGET=$(printf '%s\n' "note name" | _fold_lower)
 EDGES=$(mktemp) || exit 1
-link_edge_map "$NOTES_DIR" > "$EDGES" || { rm -f "$EDGES"; exit 1; }
-# Find distinct files (sources) that link to TARGET and count them.
-LINK_COUNT=$(awk -F'	' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
-if [ $? -gt 0 ]; then
+link_edge_map_recursive "$NOTES_DIR" > "$EDGES" || {
   rm -f "$EDGES"
-  echo "error: backlink count failed reading '$NOTES_DIR'; refusing to report a link count" >&2
-  exit 1
-fi
-rm -f "$EDGES"
-echo "$LINK_COUNT"
-
   echo "error: link scan failed reading '$NOTES_DIR'; refusing to report a link count" >&2
   exit 1
-fi
-rm -f "$RL_SRC" "$RL_HITS" "$RLF"
+}
+# Find distinct files (sources) that link to TARGET and count them.
+LINK_COUNT=$(awk -F'\t' -v tgt="$TARGET" '$2 == tgt {print $1}' "$EDGES" | LC_ALL=C sort -u | wc -l | tr -d ' ')
+rm -f "$EDGES"
 echo "$LINK_COUNT"
 ```
 
