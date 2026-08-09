@@ -210,6 +210,36 @@ flat_count=$(link_edge_map "$NEST_DIR/notes" 2>/dev/null | grep -c .)
 recursive_count=$(link_edge_map_recursive "$NEST_DIR/notes" 2>/dev/null | grep -c .)
 eq "link_edge_map: flat does NOT descend" "1" "$flat_count"
 eq "link_edge_map_recursive: recurses into subdirectories" "2" "$recursive_count"
+
+# 12a. link_edge_map: third column (source path) shape and content
+flat_edges=$(link_edge_map "$NEST_DIR/notes" 2>/dev/null)
+flat_edge_count=$(printf '%s\n' "$flat_edges" | grep -c .)
+eq "link_edge_map: all edges have exactly 3 tab-separated columns" "$flat_edge_count" \
+  "$(printf '%s\n' "$flat_edges" | awk -F'\t' 'NF==3' | grep -c .)"
+
+# 12b. link_edge_map_recursive: third column (source path) shape and content
+recurse_edges=$(link_edge_map_recursive "$NEST_DIR/notes" 2>/dev/null)
+recurse_edge_count=$(printf '%s\n' "$recurse_edges" | grep -c .)
+eq "link_edge_map_recursive: all edges have exactly 3 tab-separated columns" "$recurse_edge_count" \
+  "$(printf '%s\n' "$recurse_edges" | awk -F'\t' 'NF==3' | grep -c .)"
+eq "link_edge_map_recursive: nested path is in column 3, not just basename" "1" \
+  "$(printf '%s\n' "$recurse_edges" | LC_ALL=C awk -F'\t' '$3 ~ /sub\/nested/ {print "found"} END {print NR}' | grep -q 'found' && echo 1 || echo 0)"
+
+# 12c. duplicate basenames in different subdirectories have distinct paths in column 3
+DUP_DIR=$(mktemp -d)
+mkdir -p "$DUP_DIR/notes/a-dir" "$DUP_DIR/notes/b-dir"
+printf -- '---\ntitle: DupA\n---\n[[target]]\n' > "$DUP_DIR/notes/a-dir/dup.md"
+printf -- '---\ntitle: DupB\n---\n[[target]]\n' > "$DUP_DIR/notes/b-dir/dup.md"
+dup_edges=$(link_edge_map_recursive "$DUP_DIR/notes" 2>/dev/null)
+dup_paths=$(printf '%s\n' "$dup_edges" | LC_ALL=C awk -F'\t' '{print $3}' | LC_ALL=C sort -u)
+dup_path_count=$(printf '%s\n' "$dup_paths" | grep -c .)
+eq "link_edge_map_recursive: basename collision produces distinct paths in column 3" "2" "$dup_path_count"
+eq "link_edge_map_recursive: first dup path is a-dir/dup.md" "1" \
+  "$(printf '%s\n' "$dup_paths" | grep -c 'a-dir/dup.md')"
+eq "link_edge_map_recursive: second dup path is b-dir/dup.md" "1" \
+  "$(printf '%s\n' "$dup_paths" | grep -c 'b-dir/dup.md')"
+rm -rf "$DUP_DIR"
+
 rm -rf "$NEST_DIR"
 
 # 13. backlink_counts: incoming edge counts with self-edges excluded
@@ -272,17 +302,17 @@ eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
 # Both sides of comm must be sorted under the same collation; pinning ensures it.
 # Grep the library to verify the pins are present, then mutation-prove by removing one.
 eq "orphan_notes: LC_ALL=C sort for index" "1" \
-  "$(sed -n '407p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(sed -n '413p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
 eq "orphan_notes: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '410p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(sed -n '417p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
 eq "orphan_notes: LC_ALL=C comm call" "1" \
-  "$(sed -n '413p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(sed -n '420p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 eq "orphan_notes_recursive: LC_ALL=C sort for index" "1" \
-  "$(sed -n '425p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(sed -n '432p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
 eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '428p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(sed -n '436p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
 eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
-  "$(sed -n '431p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(sed -n '439p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
 
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?

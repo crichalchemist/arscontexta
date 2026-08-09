@@ -311,7 +311,7 @@ link_edge_map() {
       | _fold_lower \
       | while IFS= read -r tgt; do
         [ -n "$tgt" ] || continue
-        printf '%s\t%s\n' "$src" "$tgt"
+        printf '%s\t%s\t%s\n' "$src" "$tgt" "$f"
       done >> "$tmpdata"
   done
 
@@ -349,7 +349,7 @@ link_edge_map_recursive() {
       | _fold_lower \
       | while IFS= read -r tgt; do
         [ -n "$tgt" ] || continue
-        printf '%s\t%s\n' "$src" "$tgt"
+        printf '%s\t%s\t%s\n' "$src" "$tgt" "$f"
       done >> "$tmpdata"
   done
 
@@ -369,6 +369,9 @@ backlink_counts() {
   edges=$(mktemp) || return 1
   link_edge_map "$1" > "$edges" || { rm -f "$edges"; return 1; }
 
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice.
+  # With column 3 (source path) present, "self-edge" could mean same-path instead.
+  # That's a separate behavioural question; the third column makes it reachable.
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
     | LC_ALL=C sort \
     | uniq -c \
@@ -383,6 +386,9 @@ backlink_counts_recursive() {
   edges=$(mktemp) || return 1
   link_edge_map_recursive "$1" > "$edges" || { rm -f "$edges"; return 1; }
 
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice.
+  # With column 3 (source path) present, "self-edge" could mean same-path instead.
+  # That's a separate behavioural question; the third column makes it reachable.
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
     | LC_ALL=C sort \
     | uniq -c \
@@ -407,6 +413,7 @@ orphan_notes() {
   LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
 
   link_edge_map "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice; see backlink_counts.
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" | LC_ALL=C sort -u > "$tgts" \
     || { rm -f "$idx" "$tgts" "$edges"; return 1; }
 
@@ -425,6 +432,7 @@ orphan_notes_recursive() {
   LC_ALL=C sort -u < "$edges" > "$idx" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
 
   link_edge_map_recursive "$dir" > "$edges" || { rm -f "$idx" "$tgts" "$edges"; return 1; }
+  # Self-edge semantics: same-basename (not same-path). Deliberate choice; see backlink_counts.
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" | LC_ALL=C sort -u > "$tgts" \
     || { rm -f "$idx" "$tgts" "$edges"; return 1; }
 
