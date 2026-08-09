@@ -135,12 +135,41 @@ user has.
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
-it to 0, and the block exits 0 with a plausible number. It extracts all 75 fences from 27 files,
-substitutes vocabulary placeholders, and runs each standalone against a healthy fixture and a
-missing-vault fixture. It supplies `ARGUMENTS` so the healthy fixture models a healthy *invocation*
-and not merely a healthy vault. It carries an allowlist of known-open defects — now 2, both
-zsh-only, down from 8 — **checked in both directions**: a listed entry that starts passing, or whose
-fence no longer exists, fails the gate, so the list drains rather than rots.
+it to 0, and the block exits 0 with a plausible number. It extracts 78 fences from 27 files,
+substitutes vocabulary placeholders, and runs 75 of them standalone against a healthy fixture and a
+missing-vault fixture — printing the 3 it skips and the stated rule each fell under, because a
+silently skipped fence is the same defect class the gate exists to catch. Read the run count and the
+extracted count as two numbers: this sentence said "extracts all 75", which is the run count wearing
+the extraction label, and a skip rule that quietly began matching a fourth fence would not have
+moved it. It supplies `ARGUMENTS` so the healthy fixture models a healthy *invocation*
+and not merely a healthy vault. It carries an allowlist of known-open defects — now 4, and the
+composition carries the meaning rather than the total: two `ZSH ONLY:` entries against assertion H
+(the non-matching-glob fork, down from 8 such at its peak) and two shell-agnostic entries against
+assertion N — **checked in both directions**: a listed entry that starts passing, or whose fence no
+longer exists, fails the gate, so the list drains rather than rots.
+
+**That sentence read "now 2, both zsh-only" from 2026-08-02 until 2026-08-08**, while the
+vocabulary-schema work added the two N entries and merged. It is an ungated prose numeral of exactly
+the class the divergence list below is about, sitting in the paragraph that explains the mechanism
+built to stop entries rotting — the mechanism drained the list correctly; the prose describing it
+did not follow.
+
+**Re-derive it, and do not read the gate's own `known-open=` as the table size — it is SHELL-SCOPED.**
+The header counts entries in scope for the shell running it, so the same unchanged table reports
+`known-open=2` under bash and `known-open=4` under zsh: the two `ZSH ONLY:` entries are correctly out
+of scope under bash. A reader taking either number as "how many known-open defects are there" gets a
+different answer depending on which shell they happened to run, and both look authoritative. Count
+the table for the total; run both shells for the split:
+
+```bash
+# 5 = 4 table entries + 1 comment line, the one documenting the fabricated
+# `.probe-skill f01~H~` absorption probe. Stated as a sum rather than filtered with
+# an exclusion, per the idiom divergence 12 uses: an exclusion rots silently and can
+# quietly match nothing, whereas a sum fails loudly the moment it stops adding up.
+/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 5 = 4 + 1
+bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 2 — in scope for bash
+zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 4 — in scope for zsh
+```
 
 It also carries one assertion that is **not** about fences: **F**, which runs once against a
 four-note discriminating set and pins `reference/lib/frontmatter.sh` three ways — correct parser 2,
