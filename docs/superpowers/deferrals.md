@@ -237,6 +237,24 @@ blind spot divergence 15's amendment documents and `bump-version.test.sh` exists
 /usr/bin/grep -rl 'preliminary' generators/ | wc -l  # 3 files -- NOT the same number
 ```
 
+### 13. Conflation in orphan-count computation on SessionStart
+
+**What:** `platforms/claude-code/hooks/session-orient.sh.template:183` uses `grep -c .
+|| true` to count lines piped from `comm -23`. This command has two distinct non-zero-exit causes: (1) zero matches (healthy, ORPHAN_COUNT should be 0) and (2) upstream failure (broken computation, signal should omit). The `|| true` collapses both to ORPHAN_COUNT=0, which contradicts the block's own comment at :154–159 that states: "NEVER substitute 0 … a fabricated 0 would silently suppress the signal forever … Same rule for a computation failure, not only a missing/stale library."
+
+**Why not now:** The `|| true` was added because the earlier false-positive "scan failed" warning fired on every healthy SessionStart (when `grep -c .` exits 1 on empty input), training users to ignore the signal. A query-breaking `comm` failure is unreachable under normal conditions — sort, awk, grep, mktemp, and the library all work correctly in healthy cases. The trade moved from "false positive on 100% of healthy starts" to "silent 0 on rare failure". It is not a clean win; it is a trade, which is why it is recorded rather than left to rot in memory.
+
+**Reopens if:** A second failure mode surfaces that can empty `$tgts` or `$idx` without tripping an earlier guard (the `[ -n "$idx" ]` and `[ -d "$NOTES_DIR" ]` checks at :165, :162). Such a mode would make the conflation reachable and remedy 1 required.
+
+**From:** `2026-08-08-link-edge-map.md` final whole-branch review
+
+```bash
+/usr/bin/grep -n 'grep -c \. \|\| true' platforms/claude-code/hooks/session-orient.sh.template  # line 183
+/usr/bin/grep -n 'grep -c \. \|\| true' skill-sources/graph/SKILL.md                          # line 174
+/usr/bin/grep -n 'grep -c \. \|\| true' skill-sources/stats/SKILL.md                          # lines 225, 282
+/usr/bin/grep -n 'NEVER substitute 0' platforms/claude-code/hooks/session-orient.sh.template  # line 155
+```
+
 ---
 
 ## Design-track — not deferrals, listed so they are not mistaken for open work
