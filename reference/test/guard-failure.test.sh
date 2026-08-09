@@ -348,8 +348,8 @@ eq "interp: and is named STALE, by the FIXED arm"  "yes" \
 I=$(mkroot); printf '%s\n' "$INTERP" > "$I/reference/testing-milestones.md"
 eq "interp: a listed file that is GONE fails"     "1" "$(rc_of "$I")"
 eq "interp: and is named STALE, by the GONE arm"  "yes" \
-   "$(out_of "$I" | grep -q 'STALE skills/architect/SKILL.md — allowlisted but the file is gone' \
-      && echo yes || echo no)"
+   "$(out_of "$I" | grep -q 'STALE generators/features/maintenance.md — allowlisted but the file is gone' \
+      && echo yes || echo no)" # a deferred entry, so draining a converted site cannot break this fixture again
 # ...and the file that IS present with its declared count must NOT be reported.
 eq "interp: a correct entry is not reported"      "yes" \
    "$(out_of "$I" | grep -q 'testing-milestones' && echo no || echo yes)"
