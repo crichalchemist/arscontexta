@@ -500,9 +500,31 @@ under bash and `rm: Permission denied` under zsh.
 very suite. Adding rows to a harness that can corrupt its own workspace when run twice is the
 wrong order of operations.
 
-`mktemp -d` replaces the fixed path. **The failure is currently LOUD, not a false PASS** — the
-"cannot conclude anything" arm is doing its job — so this is a contributor-ergonomics fix, and
-the criterion must not claim it closes a correctness hole.
+**`mktemp -d` is the wrong remedy, and D14 proposed it because it did not read the four
+comment lines above `:50`.** They record that the fixed path IS the fix for a different
+defect: assertion N asks whether a fence emitted digits on stdout, `has_digit` (`:701`) tests
+the **whole captured file**, and an `mktemp` path like `/var/folders/f2/9vss9brn…` carries
+digits — so any fence echoing a path under that root reports a defect against correct code.
+That was measured as a near-miss false Critical before the path was pinned. Swapping in
+`mktemp -d` would trade a loud collision for a silent false finding, which is the worse
+direction and the one this whole spec is about.
+
+**Both properties are wanted at once: digit-free AND unique per run.** `$SELF` is only
+`bash`/`zsh` (`:42`), which is why it separates the two CI jobs but not two runs of the same
+shell. Add a digit-free per-process token by mapping the PID's digits to letters:
+
+```bash
+WORK="/tmp/fence-isolation-gate-$SELF-$(printf '%s' "$$" | tr '0-9' 'abcdefghij')"
+```
+
+`91553` becomes `jbffd`. The path stays free of digits, so assertion N is untouched, and two
+concurrent same-shell runs no longer share a directory. **The comment block above `:50` must
+be extended, not replaced** — it is the only record of why a plain `mktemp -d` is forbidden
+here, and deleting it invites the next reader to "simplify" this back into the false Critical.
+
+**The failure is currently LOUD, not a false PASS** — the "cannot conclude anything" arm is
+doing its job — so this is a contributor-ergonomics fix, and the criterion must not claim it
+closes a correctness hole.
 
 ```bash
 /usr/bin/grep -n '/tmp/fence-isolation-gate-' reference/test/fence-isolation.test.sh   # :50
@@ -716,6 +738,7 @@ the whole set pass with them undone. That is the same defect as a test that cann
 | 23 | A key containing a `.` no longer matches a line where that position holds a different character — a fixture spelling `obsXervation` is **not** returned for `self_evolution.obs.ervation` | §9 (D16) |
 | 24 | `OBS_TOTAL`/`TENS_TOTAL` count recursively; a fixture with an open item under `ops/observations/archive/` reports a total **≥** its open count, and the `:207` sentence is consistent | §10 (D17) |
 | 25 | Two concurrent runs of `fence-isolation.test.sh` under the same shell both complete; no run reports `extracted no fences`. Criterion is contributor ergonomics — it must **not** be written as closing a correctness hole, because the pre-fix failure was already loud | §11 (D14) |
+| 25a | **The new `$WORK` contains no digit** — `printf '%s' "$WORK" \| tr -cd '0-9'` is empty — and the comment block above `:50` still states why `mktemp -d` is forbidden. A fix that makes the suite concurrency-safe by reintroducing digits into the path has traded a loud collision for the silent false Critical that comment records | §11 (D14) |
 | 26 | `interp_hits_in` is anchored, and an allowlist entry whose path contains a space parses as one entry — both mutation-proved. The scanned-tree space count is re-derived **with `core.quotePath=false`**, since without it the check reports a spurious survivor | §12 (D19) |
 | 26a | **Reconciles with criterion 1, which is otherwise read as "no gate changes".** Two gates' *internals* move here while the gate *count and composition* do not: §12 rewrites check 6 inside `check-portability.sh`, and §14 takes `check-prose-paths.sh`'s SCOPE from 8 files to 10. Both must go **red under their own mutation and green after** — criterion 1's "unchanged" governs the sixteen-gate inventory and the fence-gate `files=/run=/skipped=` counts, never the contents of an individual check | §12, §14 |
 | 27 | `/usr/bin/grep -rn 'LINK_LIB=' skill-sources/` returns **9 prefixed, 0 bare**, and `/next`'s reported numbers are unchanged before and after — the fix is behaviour-neutral or it is not this fix | §13 (D3) |
