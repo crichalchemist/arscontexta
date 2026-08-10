@@ -273,10 +273,24 @@ the bash run reported `harness: extracted no fences — cannot conclude anything
 on `rm: Permission denied`.
 
 **Why not now:** CI cannot hit it — its steps are sequential — and the failure is LOUD rather than a
-false PASS, since the "cannot conclude anything" arm is doing exactly its job. `mktemp -d` fixes it
-in one line, but changing the gate's own working directory is a change to the gate, and this repo
-treats those as their own task. Recorded because a local contributor running the suite twice sees a
-failure with no obvious cause.
+false PASS, since the "cannot conclude anything" arm is doing exactly its job. Recorded because a
+local contributor running the suite twice sees a failure with no obvious cause.
+
+**CORRECTED 2026-08-09 — this entry originally said "`mktemp -d` fixes it in one line". It does
+not; it would reintroduce a defect the code already fixed.** The four comment lines above `:50`
+state why the path is pinned: assertion N asks whether a fence emitted digits, `has_digit` (`:701`)
+tests the **whole** captured file, and an `mktemp` path like `/var/folders/f2/9vss9brn…` carries
+digits — so any fence echoing a path under that root reports a defect against correct code. That was
+a measured near-miss false Critical. The entry proposed the remedy without reading the comment
+immediately above the line it cited, which is the same not-reading-the-neighbourhood error the entry
+itself is about.
+
+The real fix keeps the path **digit-free and** makes it unique, since `$SELF` is only `bash`/`zsh`
+(`:42`) and so separates the two CI jobs but not two runs of the same shell:
+
+```bash
+WORK="/tmp/fence-isolation-gate-$SELF-$(printf '%s' "$$" | tr '0-9' 'abcdefghij')"   # 91553 -> jbffd
+```
 
 **Reopens if:** CI ever runs the shells in parallel, or the fixed path is given to any check that
 fails soft instead of loud.
