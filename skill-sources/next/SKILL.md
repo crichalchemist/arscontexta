@@ -258,7 +258,11 @@ SESSION_COUNT=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null | wc -l | 
 # or inlined link-extraction. The reason to source the library is the naive
 # `grep -rl "[[$NAME]]"` spelling: it counts links inside fenced blocks, does not
 # case-fold, and matches the wrong direction for orphans.
-LINK_LIB="ops/lib/link-extraction.sh"
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
 if [ -r "$LINK_LIB" ]; then
   . "$LINK_LIB"
 
