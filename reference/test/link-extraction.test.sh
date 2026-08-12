@@ -136,6 +136,12 @@ printf -- 'target linking itself\n[[target]]\n' > "$EDGE_DIR/notes/target.md"
 printf -- '---\ntitle: Lonely\n---\nno links here\n' > "$EDGE_DIR/notes/lonely.md"
 printf -- '---\ntitle: Fenced\n---\n```\n[[in-code-fence]]\n```\n' > "$EDGE_DIR/notes/fenced.md"
 printf -- '---\ntitle: SelfOnly\n---\n[[selfonly]]\n' > "$EDGE_DIR/notes/selfonly.md"
+# F5: capitalized SOURCE filename, only link is its own lowercase form. Every
+# other note here already has a lowercase basename, so the source-side
+# _fold_lower call (link_edge_map / link_edge_map_recursive) is unasserted
+# without this: under a mutant that drops it, src="Myself" != tgt="myself"
+# and the self-edge check ($1 != $2) no longer excludes it, rescuing the note.
+printf -- '[[myself]]\n' > "$EDGE_DIR/notes/Myself.md"
 
 edges=$(link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
 
@@ -164,7 +170,8 @@ eq "link_edge_map: empty directory output empty" "" "$out"
 
 # 7. recursive variant tests
 edges_recursive=$(link_edge_map_recursive "$EDGE_DIR/notes" 2>/dev/null)
-eq "link_edge_map_recursive: basic functionality" "9" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
+# 10 = prior 9 raw edges + 1 (Myself.md's self-edge, myself -> myself)
+eq "link_edge_map_recursive: basic functionality" "10" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
 
 # 8. recursive empty directory
 out=$(link_edge_map_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -297,6 +304,9 @@ eq "orphan_notes: fenced is orphan (link only in fence)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'fenced')"
 eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'selfonly')"
+# F5: capitalized source (Myself.md) still folds before the self-edge check
+eq "orphan_notes: myself is orphan (capitalized source folds to match)" "1" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'myself')"
 
 # 18b. LC_ALL=C pinning is STRUCTURAL (not behaviorally testable on BSD sort)
 # Both sides of comm must be sorted under the same collation; pinning ensures it.
@@ -346,6 +356,9 @@ eq "orphan_notes_recursive: fenced is orphan" "1" \
   "$(printf '%s\n' "$orphans_r" | grep -Fxc 'fenced')"
 eq "orphan_notes_recursive: selfonly is orphan (self-link doesn't rescue)" "1" \
   "$(printf '%s\n' "$orphans_r" | grep -Fxc 'selfonly')"
+# F5: capitalized source (Myself.md) still folds before the self-edge check
+eq "orphan_notes_recursive: myself is orphan (capitalized source folds to match)" "1" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'myself')"
 
 # 22. orphan_notes_recursive empty directory
 out=$(orphan_notes_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
