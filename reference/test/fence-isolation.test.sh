@@ -47,7 +47,12 @@ if [ -n "${ZSH_VERSION:-}" ]; then SELF=zsh; else SELF=bash; fi
 # under that root trips the digit test and reports a defect against correct
 # code. This was measured as a near-miss false Critical before the path was
 # pinned. The shell name keeps the two CI jobs from colliding.
-WORK="/tmp/fence-isolation-gate-$SELF"
+# The shell name alone is NOT unique: SELF is only bash|zsh, so two runs under the
+# same shell shared one directory and clobbered each other (deferrals 14). The PID
+# supplies uniqueness, but `$$` is digits and would re-break the rule this comment
+# states, so it is mapped through tr '0-9' 'abcdefghij'. Do NOT "simplify" this to
+# mktemp -d: that reintroduces digits and the false Critical above.
+WORK="/tmp/fence-isolation-gate-$SELF-$(printf '%s' "$$" | tr '0-9' 'abcdefghij')"
 rm -rf "$WORK"
 # Says WHY it died. An `|| exit 1` here exits 1 with an empty stdout and a
 # silent stderr — the exact shape this gate exists to eliminate, and it cost a
