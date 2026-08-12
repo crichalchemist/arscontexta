@@ -192,6 +192,8 @@ if [ -d "$NOTES_DIR" ]; then
   else
     echo "warning: link-extraction library unavailable; orphan signal omitted" >&2
   fi
+else
+  echo "warning: notes directory $NOTES_DIR not found; orphan signal omitted" >&2
 fi
 
 # Tutorial resume check
