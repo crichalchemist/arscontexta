@@ -590,9 +590,16 @@ grep -n 'ops/queue/queue\.json' skill-sources/next/SKILL.md   # :50 prose format
 ```
 
 - [ ] **Step 4: Add the precondition**
-  In `queue_edit`, before staging: if the file does not exist → exit 1 naming it. If it ends
-  `.json` and a sibling `queue.yaml` exists → exit 1 naming both. Do **not** create, migrate, or
-  fall back — a fallback is a write to a file the caller did not name.
+  In `queue_edit`, before staging: if the file does not exist → exit 1 naming it. If its **basename
+  is `queue.json`** and a sibling `queue.yaml` exists → exit 1 naming both. Do **not** create,
+  migrate, or fall back — a fallback is a write to a file the caller did not name.
+
+  **Corrected 2026-08-12.** This step first read *"if it ends `.json`"*, which is broader than the
+  spec it derives from: `§2e` says *"the `queue.json` it is about to write"* and criterion 9b says
+  *"handed `…/queue.json`"*. Implemented literally, the suffix form refuses **any** JSON file beside
+  a `queue.yaml` — an unrelated `ops/queue/tasks.json` is rejected with a message asserting it is
+  "the stale JSON copy", which is a claim the guard cannot support. Key on the basename. The spec
+  governs the plan; this was a drafting error here, not a decision taken there.
 
 - [ ] **Step 5: Run — see both pass**
 
