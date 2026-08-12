@@ -95,7 +95,7 @@ reference/test/hook-config.test.sh        Task 11
 reference/test/threshold-namespace.test.sh Task 12
 reference/test/guard-failure.test.sh      Task 13
 reference/check-portability.sh            Task 13         (check 6 internals)
-reference/check-prose-paths.sh            Task 14         (SCOPE 8 -> 10)
+reference/check-prose-paths.sh            Task 14         (SCOPE 9 -> 11, see Task 14)
 hooks/scripts/session-orient.sh           Task 11
 hooks/scripts/read_config.sh              Task 12
 .github/workflows/checks.yml              Task 7          (+2 steps, bash and zsh)
@@ -560,6 +560,53 @@ grep -rn 'queue_edit ' skill-sources/ skills/ | grep -v '^.*#'   # expect 7
 A caller marking a task `done` must not proceed believing a failed write landed.
 
 - [ ] **Step 5: Suite green, both shells, then commit**
+
+---
+
+## Task 8a: Guard the `queue-edit` *target*, not just the rename (spec §2e)
+
+**Added 2026-08-11.** Task 8 guards the rename. On a YAML-queue vault the rename is not the
+problem — the target is. Every call site writes to a `queue.json` that is not the live queue,
+silently, at rc 0, because it is valid JSON and jq succeeds on it.
+
+**Interfaces**
+- **Consumes:** Task 7's suite (`reference/test/queue-edit.test.sh`) and Task 8's guarded commit.
+- **Produces:** a precondition in `reference/lib/queue-edit.sh`. **No `skill-sources/` edits** — that
+  boundary is what keeps this inside the plan's "without changing what generation emits" constraint.
+
+- [ ] **Step 1: Write the two failing assertions first**
+  Add to `queue-edit.test.sh`: (a) `queue_edit` handed a nonexistent path exits 1 and names it;
+  (b) handed `…/queue.json` with a sibling `…/queue.yaml` present, exits 1 and names **both**.
+  Use a digit-free fixture dir — `mktemp` paths carry digits and void any "no digits" assertion.
+
+- [ ] **Step 2: Run them — see them fail for the right reason**
+  Both must fail because the function *succeeds*, not because the fixture is malformed. Print the
+  observed rc; a fixture error and a missing guard both look like "not green".
+
+- [ ] **Step 3: Reproduce the field condition, so the guard is not written against a guess**
+```bash
+ls -la ~/second-brain/ops/queue/    # queue.yaml 440999B live; queue.json 636B, Jul 7 — the tombstone
+grep -n 'ops/queue/queue\.json' skill-sources/next/SKILL.md   # :50 prose format-aware; :98,:130,:154 not
+```
+
+- [ ] **Step 4: Add the precondition**
+  In `queue_edit`, before staging: if the file does not exist → exit 1 naming it. If it ends
+  `.json` and a sibling `queue.yaml` exists → exit 1 naming both. Do **not** create, migrate, or
+  fall back — a fallback is a write to a file the caller did not name.
+
+- [ ] **Step 5: Run — see both pass**
+
+- [ ] **Step 6: Mutation-prove each assertion separately**
+  Delete the sibling check → assertion (b) red and **only** (b). Delete the existence check →
+  (a) red and only (a). Assert each mutation applied (`cmp -s`) before reading the result: a
+  `sed`/`perl` that matches nothing reports the same all-green as a robust assertion.
+
+- [ ] **Step 7: Prove the emission boundary held**
+```bash
+git diff --stat -- skill-sources/    # must be EMPTY for this task
+```
+
+- [ ] **Step 8: Suite green in both shells, then commit**
 
 ---
 
@@ -1145,7 +1192,7 @@ check 6 into a no-op that reports PASS."
 - Consumes: Task 10's edits to `platforms/claude-code/hooks/session-orient.sh.template`. **Run
   this task after Task 10**, because Task 10 adds the warning text that motivates the widening,
   and a path it introduces must be caught by this gate rather than by the next reader.
-- Produces: a ten-file SCOPE. No interface for later tasks.
+- Produces: an eleven-file SCOPE (baseline was 9 as of 2026-08-11, not 8). No interface for later tasks.
 
 `hooks/scripts/session-orient.sh` and `platforms/claude-code/hooks/session-orient.sh.template`
 both name repo paths — in comments and in warning text a user reads at SessionStart — and
@@ -1182,6 +1229,7 @@ nothing — report that instead of widening.
 ```bash
 SCOPE="
 CLAUDE.md
+docs/closed-divergences.md
 CONTRIBUTING.md
 README.md
 reference/skill-authoring.md
@@ -1192,6 +1240,15 @@ platforms/shared/skill-blocks/README.md
 hooks/scripts/session-orient.sh
 platforms/claude-code/hooks/session-orient.sh.template
 "
+```
+
+**`docs/closed-divergences.md` is already in SCOPE — do not add it, and do not be surprised by
+it.** It arrived on 2026-08-11 with the `CLAUDE.md` archive split, which moved the four "Closed
+on …" sections out of the always-loaded file. **This task therefore takes SCOPE from 9 to 11, not
+8 to 10.** Re-derive the baseline before editing rather than trusting either number:
+
+```bash
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | /usr/bin/grep -c .
 ```
 
 **Add them by name. No glob, no discovery** — a discovered scope cannot distinguish "shrank
@@ -1238,7 +1295,7 @@ Repeat with `F=platforms/claude-code/hooks/session-orient.sh.template`. Both mus
 
 ```bash
 git add reference/check-prose-paths.sh
-git commit -m "check-prose-paths: add the two session-orient files to SCOPE (8 -> 10)
+git commit -m "check-prose-paths: add the two session-orient files to SCOPE (9 -> 11)
 
 hooks/scripts/session-orient.sh and its platforms/ template both name repo
 paths, in comments and in warning text a user reads at SessionStart, and
@@ -1427,6 +1484,55 @@ share, and the honest form is that `allowed-tools:` is common to both while `con
 
 ---
 
+## Task 19: Divergence 16's "structural" claim (spec §15)
+
+**Added 2026-08-11.** Prose only — two sentences in `CLAUDE.md` and one annotation in
+`skills/upgrade/SKILL.md`. Nothing executable changes, and option (b) stays withheld.
+
+**Interfaces**
+- **Consumes:** nothing. Independent of every other task; may land in any order.
+- **Produces:** corrected prose. No interface for later tasks.
+
+- [ ] **Step 1: Re-derive all three measurements yourself — do not inherit the spec's numbers**
+```bash
+grep -rho 'generated_from:.*' ~/second-brain/.claude/skills/*/SKILL.md | sort | uniq -c
+ls -1 ~/second-brain/ops/skills-archive/ | grep -c '2026-08-09'
+git tag | wc -l
+ls -1 ~/.claude/plugins/cache/agenticnotetaking/arscontexta/
+```
+Expected: 13×`0.9.7` + 3×`0.8.0`; 8 archived; **0** tags; five cached baselines. The cache is
+**version-partitioned** — a `find -maxdepth 4` for `plugin.json` returns nothing and reads as
+"cache is empty", which is wrong. Descend into a version directory.
+
+- [ ] **Step 2: Locate the sentence by text, not by line number**
+```bash
+/usr/bin/grep -n 'never been invoked as a slash command' CLAUDE.md
+```
+Line numbers in this repo drift; the `CLAUDE.md` archive split moved several hundred on
+2026-08-11 alone.
+
+- [ ] **Step 3: Rewrite the claim — and stay inside the evidence**
+  Replace "structurally, since a slash command runs in the session's working directory and cannot
+  be pointed at another tree" with the accurate reason: a session whose cwd **is** the vault
+  invokes it natively, so the gap is **undone, not structural**. **Do not write that the slash
+  command has been invoked** — the stamps and archives establish that an upgrade *operation* ran,
+  not its vehicle. Over-claiming here reproduces the exact defect being corrected.
+
+- [ ] **Step 4: Annotate `skills/upgrade/SKILL.md:592`**
+  Its "no release tags to recover it" is **true**; its conclusion that no baseline exists is not.
+  Record the cached-baseline path beside it. **Leave option (b) withheld** — restoring it is
+  deferred (see Deferrals), because a wrong merge corrupts a user's customized skills.
+
+- [ ] **Step 5: Verify the emission boundary and the divergence numbering**
+```bash
+git diff --stat -- skill-sources/ generators/     # must be EMPTY
+bash reference/check-doc-claims.sh | tail -3      # divergence numbers still unique
+```
+
+- [ ] **Step 6: `check-prose-paths.sh` and `check-doc-claims.sh` green, then commit**
+
+---
+
 ## Deferrals
 
 *(One line per deferral, naming the tracked file it landed in, or the literal word `none`.
@@ -1474,3 +1580,53 @@ divergence 10.)*
   new spec sections, and that reason stands unaffected.**
 - Any deferral arising during execution lands in `docs/superpowers/deferrals.md` with a
   stated, observable reopening trigger, and is named here.
+
+**Added 2026-08-11**, from a cross-check of the field vault's `ops/` record against this repo's
+specs and plans. The first two are measured and re-verified against this checkout; the last two
+rest on that review's own evidence and are **not independently verified** — stated per entry
+rather than left for a reader to assume, because the same review's `/upgrade` headline was found
+overstated when checked.
+
+- **Dual-format queue support — teaching `queue-edit.sh` to read YAML and converting the 23
+  files (spec §2e).** Deferred because it **changes what generation emits**, which this plan's
+  Goal excludes; Task 8a takes the in-scope half (fail loud) instead. Not a design problem —
+  `skill-sources/seed/SKILL.md:66,307,318,401` already carries the dual-format pattern to copy.
+  Measured 2026-08-11: 23 files / 43 lines carry the literal path, and all seven `queue_edit`
+  sites pass it as a **literal, not a variable**, so no configuration reaches them. Field
+  evidence is the open vault observation
+  `ops/observations/pipeline-skills-hardcode-queue-json-….md`. Lands in
+  `docs/superpowers/deferrals.md`. **Reopening trigger:** Task 8a's guard firing against a real
+  vault — at that point the loud refusal is the entire behavior, and a user with a YAML queue has
+  no working `queue_edit` at all.
+
+- **Restoring `/upgrade` option (b), the customization-preserving merge (spec §15).** Deferred
+  because it is a behavior change to a plugin skill where a wrong merge **corrupts a user's
+  customized skills** — a worse failure than the withholding it repairs. Task 19 corrects the
+  prose only. The blocker is now gone rather than merely restated: five complete baselines sit in
+  `~/.claude/plugins/cache/agenticnotetaking/arscontexta/` (`0.8.0 0.9.0 0.9.5 0.9.6 0.9.7`, 16
+  `skill-sources/` each), including **both** versions the field vault is stamped with, so a merge
+  baseline is recoverable and a merge would be fact rather than guess. Needs its own spec. Lands
+  in `docs/superpowers/deferrals.md`. **Reopening trigger:** any vault reporting a customization
+  lost to an `/upgrade` replace — the cost of withholding then exceeds the risk of merging.
+
+- **`/next`'s `context: fork` (`skill-sources/next:7`) — 0-for-4 in the field.**
+  `ops/observations/next-subagent-forks-die-to-growing-context-reinjection-….md` (open) records
+  four fork deaths, zero successes, and three rounds of verified skill fixes changing nothing;
+  the posited remedy is dropping the exact frontmatter key the template ships. Deferred because
+  removing it **changes what generation emits**, and because `## Deliberately not in scope`
+  already parks the fork/inline rule pending a third skill moving. **Not independently
+  verified** — the count comes from the vault's record, not from a run reproduced here. The cheap
+  half is *not* deferred: cite this observation where that section states its trigger, so the
+  evidence stops sitting uncited one tree over. Lands in `docs/superpowers/deferrals.md`.
+  **Reopening trigger:** the third skill moving in either direction, which the spec already
+  names — this observation is the evidence that trigger was waiting for.
+
+- **Four vault-behavior findings with no home in this plan** — `/reweave` performing a second
+  forward pass rather than a backward one; the systematic verbing of sibling relations as
+  hierarchies (with its open tension on edge direction); `/rethink` exempting its own `drift-*`
+  output from the provenance fields it enforces; and every extraction stub carrying
+  `semantic_neighbor: null`. All four are generation-surface or vault-content questions, none is
+  reachable by a task in this plan, and **none was independently verified here**. Grouped rather
+  than split because they share one destination and one verification debt. Land in
+  `docs/superpowers/deferrals.md`. **Reopening trigger:** each becomes actionable only once
+  re-derived against this checkout — treat the vault's record as a lead, not a finding.

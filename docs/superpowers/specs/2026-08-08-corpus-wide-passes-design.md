@@ -71,7 +71,21 @@ for f in ~/second-brain/nodes/*.md; do
 done
 echo "$have with status + $none without = $((have+none))"   # 2005 + 681 = 2686
 for f in ~/second-brain/nodes/*.md; do frontmatter_field "$f" status 2>/dev/null; done \
-  | sort | uniq -c | sort -rn   # 1182 active, 808 draft, 11 closed, 3 superseded, 1 investigating
+  | sort | uniq -c | sort -rn   # 2026-08-08: 1182 active, 808 draft, 11 closed, 3 superseded, 1 investigating
+                                # 2026-08-11: 1238 active,  752 draft, 11 closed, 3 superseded, 1 investigating
+
+**Re-measured 2026-08-11, and the drift is evidence rather than rot.** `2005 + 681 = 2686` is
+**unchanged**, and so is `1990` (`active + draft`) — but the split inside it moved by exactly
+**56 notes, draft → active**, with `closed`/`superseded`/`investigating` all static. That is the
+`draft → active` promotion this spec designs, already happening in the field vault by hand. Every
+`808` below is a 2026-08-08 measurement and now reads **752**; the argument each one carries is
+unaffected, because none of them turns on the exact value. Re-derive before quoting:
+
+```bash
+. reference/lib/frontmatter.sh
+for f in ~/second-brain/nodes/*.md; do frontmatter_field "$f" status 2>/dev/null; done \
+  | sort | uniq -c | sort -rn
+```
 
 # ITEM 2 — the two shapes, timed.
 #   per-note scan:  58ms/note  (57.5ms at n=100, 58.4ms at n=300 -- stable)

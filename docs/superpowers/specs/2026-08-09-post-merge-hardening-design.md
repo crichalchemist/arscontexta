@@ -225,6 +225,48 @@ instead of leaving the user to discover it the next time they run a command."*
 grep -n 'check_lib ' skills/health/SKILL.md    # 2 lines; queue-edit absent
 ```
 
+**2e. Fail loud when the handed queue file is not the vault's live queue (added 2026-08-11).**
+2a guards the rename. It does not guard the *target*, and on a YAML-queue vault every one of
+the seven call sites writes to a file that is not the queue — silently, at rc 0, because the
+path is a valid JSON file and jq succeeds on it.
+
+Measured on the field vault:
+
+```bash
+ls -la ~/second-brain/ops/queue/          # queue.yaml 440999B (live) + queue.json 636B (Jul 7)
+grep -rl 'ops/queue/queue\.json' --include='*.md' --include='*.sh' . --exclude-dir=.git | wc -l   # 23 FILES
+grep -rn 'ops/queue/queue\.json' --include='*.md' --include='*.sh' . --exclude-dir=.git | wc -l   # 43 LINES
+grep -c 'jq ' reference/lib/queue-edit.sh; grep -ci 'yaml\|yml' reference/lib/queue-edit.sh       # 6 / 0
+```
+
+**Read that as files and lines, not one number** — 23 is the file count, 43 the line count. This
+spec states both because divergence 15 records this repo mistaking one for the other once already.
+
+All seven sites pass the path as a **literal**, not a variable, so no configuration reaches them:
+
+```bash
+grep -n 'ops/queue/queue\.json' skill-sources/*/SKILL.md | grep -c 'queue_edit\|^\s*ops/'
+```
+
+`skill-sources/next:50` states the format-awareness in prose — *"`ops/queue/queue.json` or
+`ops/queue.yaml`"* — while its fences at `:98`, `:130`, `:154` hardcode JSON. That prose/executable
+split is the whole defect, and it is recorded open in the field vault as
+`ops/observations/pipeline-skills-hardcode-queue-json-….md`.
+
+**The remedy here is a guard, not format support.** `queue_edit` gains a precondition: if the file
+it was handed does not exist, or a sibling `queue.yaml` sits beside the `queue.json` it is about to
+write, it exits 1 and names both paths. That is a change to `reference/lib/queue-edit.sh` only —
+**no template changes, so what generation emits is unchanged**, which is this plan's binding
+constraint. Teaching the library to read YAML, and converting the 23 files, is deferred: it changes
+emitted content, and `skill-sources/seed/SKILL.md:66,307,318,401` already carries the dual-format
+pattern to copy from.
+
+**Scope statement for F1, stated because the criteria below would otherwise overstate it.** With
+2a+2e, the rc-0 lost-update class is closed for **JSON-queue vaults**, and made *loud* rather than
+closed for YAML-queue vaults. It is not closed everywhere. The field vault is a YAML-queue vault,
+so on the one instance we can observe, this work converts a silent wrong-target write into a
+refusal — which is the honest claim, and less than "the class is closed."
+
 ### 3. Suite blind spots (F5, F8)
 
 **3a. Add a capitalized source fixture.** Every source filename in `EDGE_DIR` is already
@@ -426,6 +468,60 @@ text by regex, so **inserting a line above it is safe and rewording that line is
 `allowed-tools:`)"*. After section 6 that parenthetical is false for 4 of 10 `skills/`.
 It is ungated prose of exactly the class the divergence list is about, and it rots on **this
 commit** rather than on merge — so it is fixed in the same commit, not filed.
+
+## Out-of-band scope additions (2026-08-11)
+
+One item, from a cross-check of the field vault's `ops/` record against this repo's specs and
+plans. It is prose-only and lands here rather than in a spec of its own because §8 already
+establishes that a `CLAUDE.md` claim falsified by measurement is corrected in the commit that
+measures it.
+
+### 15. Divergence 16's "structural" claim does not survive measurement (§15)
+
+`CLAUDE.md:1206-1208` reads:
+
+> **`/arscontexta:upgrade` is the nearest thing to a mechanism, and divergence 5 records that it has
+> never been invoked as a slash command against a real vault** — structurally, since a slash command
+> runs in the session's working directory and cannot be pointed at another tree.
+
+**The justification does not support the claim.** A slash command running in the session's working
+directory is only a barrier to pointing at *another* tree; a session whose cwd **is** the vault
+invokes it natively. Nothing structural prevents that, so the gap is **undone, not structural** —
+and "structural rather than merely undone" is the phrase divergence 16's FORWARD-ONLY ceiling rests
+on.
+
+**Two things were measured, and they license different amounts.** An upgrade *operation*
+demonstrably ran against the real vault:
+
+```bash
+grep -rho 'generated_from:.*' ~/second-brain/.claude/skills/*/SKILL.md | sort | uniq -c   # 13×0.9.7, 3×0.8.0
+ls -1 ~/second-brain/ops/skills-archive/ | grep -c '2026-08-09'                            # 8 archived
+grep -c '2026-08-09' ~/second-brain/ops/changelog.md                                       # 0 — unrecorded
+```
+
+**What this does NOT establish is the vehicle.** Version stamps and archives are silent on whether
+a slash command or a hand-executed sequence produced them. So the correction states that the gap is
+undone rather than structural — it does **not** claim the slash command has been invoked, and any
+wording that does is over-claiming past the evidence.
+
+**The recoverable-baseline half is separate and fully measured.** `skills/upgrade/SKILL.md:592`
+withholds option (b), the customization-preserving merge, because *"this repo carries no release
+tags to recover it."* The tag half is true; the conclusion is not, because the baseline is not in
+tags:
+
+```bash
+git tag | wc -l                                                    # 0 — the premise, true as written
+ls -1 ~/.claude/plugins/cache/agenticnotetaking/arscontexta/        # 0.8.0 0.9.0 0.9.5 0.9.6 0.9.7
+for v in 0.8.0 0.9.7; do ls -1d ~/.claude/plugins/cache/agenticnotetaking/arscontexta/$v/skill-sources/*/ | wc -l; done   # 16, 16
+```
+
+Five complete baselines, 16 `skill-sources/` each, **including both versions the field vault is
+stamped with**. The premise checks the wrong location.
+
+**Scope here is the prose only.** Restoring option (b) is a behavior change to a plugin skill where
+a wrong merge corrupts a user's customized skills; it is deferred with the premise now verified,
+which is what unblocks writing that spec. This section changes two sentences in `CLAUDE.md` and
+nothing executable.
 
 ## Salvaged deferrals (2026-08-09)
 
@@ -722,6 +818,10 @@ the whole set pass with them undone. That is the same defect as a test that cann
 | 7 | A new `queue-edit.test.sh` wired into CI in both shells, every assertion mutation-proved; the `mv`-failure path documented as hand-run, **not rounded up to covered** | F1c |
 | 8 | A forced rename failure returns rc 1, discards the temp, and names the path — verified by stub | F1a |
 | 9 | A jq-rejected filter surfaces jq's own diagnostic, not the generic message | F1b |
+| 9a | `queue_edit` handed a path that does not exist exits **1** and names it — it does not create the file and does not return 0 | §2e |
+| 9b | `queue_edit` handed `…/queue.json` while a sibling `…/queue.yaml` exists exits **1** and names **both** paths. Mutation-proved: removing the sibling check turns this red and only this | §2e |
+| 9c | The guard is library-only — `git diff --stat` for the F1 work touches `reference/lib/queue-edit.sh` and its suite, and **no file under `skill-sources/`**, so what generation emits is unchanged | §2e |
+| 9d | No criterion, commit message, or `CLAUDE.md` line claims the rc-0 lost-update class is *closed*; the claim is "closed for JSON-queue vaults, made loud for YAML-queue vaults" | §2e |
 | 10 | Running the suite from `reference/test/` gives the same result as from the repo root | F8 |
 | 11 | `/health` Category 9 reports on all three libraries | F6 |
 | 12 | With `NOTES_DIR` pointing at a directory that does not exist, the template's orphan block **warns on stderr** and emits no signal — and `ORPHAN_COUNT=0` at `:162` is still present, untouched | F10 |
@@ -740,9 +840,15 @@ the whole set pass with them undone. That is the same defect as a test that cann
 | 25 | Two concurrent runs of `fence-isolation.test.sh` under the same shell both complete; no run reports `extracted no fences`. Criterion is contributor ergonomics — it must **not** be written as closing a correctness hole, because the pre-fix failure was already loud | §11 (D14) |
 | 25a | **The new `$WORK` contains no digit** — `printf '%s' "$WORK" \| tr -cd '0-9'` is empty — and the comment block above `:50` still states why `mktemp -d` is forbidden. A fix that makes the suite concurrency-safe by reintroducing digits into the path has traded a loud collision for the silent false Critical that comment records | §11 (D14) |
 | 26 | `interp_hits_in` is anchored, and an allowlist entry whose path contains a space parses as one entry — both mutation-proved. The scanned-tree space count is re-derived **with `core.quotePath=false`**, since without it the check reports a spurious survivor | §12 (D19) |
-| 26a | **Reconciles with criterion 1, which is otherwise read as "no gate changes".** Two gates' *internals* move here while the gate *count and composition* do not: §12 rewrites check 6 inside `check-portability.sh`, and §14 takes `check-prose-paths.sh`'s SCOPE from 8 files to 10. Both must go **red under their own mutation and green after** — criterion 1's "unchanged" governs the sixteen-gate inventory and the fence-gate `files=/run=/skipped=` counts, never the contents of an individual check | §12, §14 |
+| 26a | **Reconciles with criterion 1, which is otherwise read as "no gate changes".** Two gates' *internals* move here while the gate *count and composition* do not: §12 rewrites check 6 inside `check-portability.sh`, and §14 takes `check-prose-paths.sh`'s SCOPE from 9 files to 11 (**the baseline moved from 8 to 9 on
+2026-08-11** when `docs/closed-divergences.md` was added to SCOPE alongside the `CLAUDE.md` archive
+split — re-derive with `awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | wc -l`
+rather than trusting either number here). Both must go **red under their own mutation and green after** — criterion 1's "unchanged" governs the sixteen-gate inventory and the fence-gate `files=/run=/skipped=` counts, never the contents of an individual check | §12, §14 |
 | 27 | `/usr/bin/grep -rn 'LINK_LIB=' skill-sources/` returns **9 prefixed, 0 bare**, and `/next`'s reported numbers are unchanged before and after — the fix is behaviour-neutral or it is not this fix | §13 (D3) |
-| 28 | `check-prose-paths.sh`'s SCOPE names **10** files including both `session-orient` paths, the gate is green, and the list is still a literal stated list — no glob, no discovery | §14 (D9) |
+| 28 | `check-prose-paths.sh`'s SCOPE names **11** files including both `session-orient` paths, the gate is green, and the list is still a literal stated list — no glob, no discovery. **Was 10 until 2026-08-11**; the baseline gained `docs/closed-divergences.md`, so a step asserting 10 fails on arrival | §14 (D9) |
+| 30 | `CLAUDE.md:1206-1208` no longer calls the `/upgrade` gap **structural**, and no longer offers "cannot be pointed at another tree" as the reason a real-vault invocation has not happened | §15 |
+| 30a | The replacement wording claims the gap is **undone**, and does **not** claim the slash command has been invoked — version stamps and archives do not establish the vehicle, and the correction must not out-run them | §15 |
+| 30b | `skills/upgrade/SKILL.md:592`'s "no release tags to recover it" is annotated with the cached-baseline measurement, and option (b) is **still withheld** — this spec changes prose only | §15 |
 | 29 | Decision 2 is **recorded as ruled, not silently implemented**: `hooks/hooks.json:17` still reads `"Write"` unless the user picks option B, and `deferrals.md` entry 15 reflects whichever way it went | Decision 2 (D15) |
 
 Criterion 12's second clause is deliberate: it fails both the missing fix *and* the
