@@ -155,8 +155,8 @@ count_open_items() { # count_open_items <dir>
 # recursive open count printed "N pending (of M total)" with N > M whenever an
 # open note lived in a subdirectory (deferrals 17). `find` is already required
 # by this repo; -type f keeps a stray directory named *.md out of the count.
-OBS_TOTAL=$(find ops/observations -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-TENS_TOTAL=$(find ops/tensions -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+OBS_TOTAL=$(find -H ops/observations -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+TENS_TOTAL=$(find -H ops/tensions -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
 OBS_COUNT=""
 TENS_COUNT=""
 if [ "$FM_OK" -eq 1 ]; then

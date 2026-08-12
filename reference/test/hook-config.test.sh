@@ -249,6 +249,23 @@ eq "D17: OBS_TOTAL counts notes under ops/observations/archive/, not just the to
 eq "D17: TENS_TOTAL counts notes under ops/tensions/archive/, not just the top level" "yes" \
    "$(orient "$V4" | grep -q 'CONDITION: 6 unresolved tensions (of 6 total)' && echo yes || echo no)"
 
+# D17b: OBS_TOTAL's find must carry -H, matching _fm_find_md (reference/lib/frontmatter.sh),
+# so count_open_items (which goes through that library and does use -H) and OBS_TOTAL agree
+# even when ops/observations is itself a symlink. Without -H, find does not follow a symlink
+# named on the command line, so OBS_TOTAL silently reports 0 through a symlinked directory
+# while OBS_COUNT still finds the real files -- "N pending (of 0 total)", the same invariant
+# violation this task exists to eliminate, reappearing through a different vector.
+V5=$(mktemp -d); TMPDIRS+=("$V5")
+mkdir -p "$V5/hooks/scripts" "$V5/ops/lib" "$V5/ops/tensions" "$V5/real-observations"
+cp "$SRC/read_config.sh" "$SRC/vaultguard.sh" "$SRC/session-orient.sh" "$V5/hooks/scripts/"
+cp "$FM_SRC" "$V5/ops/lib/frontmatter.sh"
+printf '# marker\ngit: true\nsession_capture: false\n' > "$V5/.arscontexta"
+for i in 1 2; do printf -- '---\nstatus: open\n---\nobservation %s\n' "$i" > "$V5/real-observations/o$i.md"; done
+ln -s "$V5/real-observations" "$V5/ops/observations"
+cfg "$V5" 1 5
+eq "D17b: OBS_TOTAL follows a symlinked ops/observations (find -H), matching OBS_COUNT" "yes" \
+   "$(orient "$V5" | grep -q 'CONDITION: 2 pending observations (of 2 total)' && echo yes || echo no)"
+
 # === vaultguard.sh — the inertness every other hook depends on ================
 # CONTRACT-PINNING, NOT DEFECT-DERIVED: no defect is known here. These exist
 # because this script decides whether EVERY plugin hook runs at all, and it had
