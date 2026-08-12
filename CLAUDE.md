@@ -69,11 +69,11 @@ for s in bash zsh; do
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 57/57
   $s reference/test/vocabulary-schema.test.sh            # 12/12
-  $s reference/test/queue-edit.test.sh                   # 36/36
+  $s reference/test/queue-edit.test.sh                   # 37/37
 done
 ```
 
-**`queue-edit.test.sh` is green: 36/36, both shells.** It was RED ON PURPOSE for one branch — three
+**`queue-edit.test.sh` is green: 37/37, both shells.** It was RED ON PURPOSE for one branch — three
 of its assertions pinned an open defect before the fix landed, the only order in which a test can be
 shown to fail for the stated reason. `reference/lib/queue-edit.sh` used to end `mv "$tmp" "$file"`
 with no `||`, so a rename that failed left the temp on disk, printed nothing, and returned the exit

@@ -118,6 +118,13 @@ eq "missing: returns 1"                       "1"   "$rc"
 eq "missing: names the path it could not read" "yes" "$(has "absent.json" "$err")"
 eq "missing: creates no lock directory"       "no"  \
    "$([ -d "$F/ops/queue/.locks" ] && echo yes || echo no)"
+# The guard's own message and jq's own failure message are textually distinct —
+# "not a readable file" is printed only by the guard, never by jq. Without the
+# guard, execution reaches jq, which fails with its own "Could not open file"
+# text instead. This is the discriminator; rc and the bare presence of the path
+# in the message are not, since jq's failure also yields rc 1 and also names the
+# path.
+eq "missing: guard's own message, not jq's"   "yes" "$(has "not a readable file" "$err")"
 
 # An empty first-argument path is a distinct caller error — an unset shell variable
 # rather than a wrong one — and the library spells it `<empty>` so the message does
