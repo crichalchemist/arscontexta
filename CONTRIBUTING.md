@@ -104,7 +104,7 @@ bash reference/check-vocabulary-schema.sh ;      echo "expect rc=0, got rc=$?"  
 bash reference/test/check-doc-claims.test.sh | tail -1  # bash-only (see the suite's own header); expect: passed=13 failed=0
 
 for s in bash zsh; do
-  $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=91 failed=0
+  $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=97 failed=0
   $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=60 failed=0
   $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
   $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0

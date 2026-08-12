@@ -173,8 +173,8 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 4 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 4" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
@@ -276,7 +276,12 @@ MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $3 in moc {print $2}' "$MOC_
 rm -f "$EDGE_MAP" "$MOC_SRC"
 
 # Denominator set is non-MOC notes, matching NOTE_COUNT, which also subtracts
-# MOCs. Both operands reach comm already folded and sorted.
+# MOCs. NOT proven valid by "sorted" alone: comm requires the SAME collation on
+# both sides, not merely that each side is independently sorted. NOTE_INDEX and
+# MOC_TARGETS are library-exported and pinned LC_ALL=C, but MOC_INDEX above (line
+# 220-221) is built with a bare `sort -u` (ambient locale) -- under a non-C
+# locale this inner comm can silently return a wrong set. comm gives no warning
+# on mismatched collation; it just returns the wrong answer.
 COVERED=$(comm -12 \
   <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
   <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)

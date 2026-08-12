@@ -60,7 +60,7 @@ bash reference/check-placeholder-count.sh main           # exit 0 (1 = a templat
 bash reference/check-vocabulary-schema.sh                # exit 0 (1 = an undeclared key; also runs under zsh in CI)
 bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
-  $s reference/test/link-extraction.test.sh              # 91/91
+  $s reference/test/link-extraction.test.sh              # 97/97
   $s reference/test/guard-failure.test.sh                # 60/60
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
@@ -967,7 +967,8 @@ the subject, not the sum.
 Each was converted to `reference/lib/link-extraction.sh`'s functions, one commit at a time, and the
 library gained three callers built for exactly this: `link_edge_map` (and its `_recursive` variant)
 builds the full edge set once; `backlink_counts` derives per-note incoming counts from it;
-`orphan_notes` derives the zero-incoming set. `LINK_EXTRACTION_VERSION` is now 3, and a third column,
+`orphan_notes` derives the zero-incoming set. `LINK_EXTRACTION_VERSION` is now 4 (was 3 when this
+paragraph was written; bumped by the F3 `LC_ALL=C` pin task), and a third column,
 `source_path`, was added to the edge map's output specifically to disambiguate two notes that fold to
 the same lowercased basename in different directories — a real collision hit during this conversion,
 not a hypothetical one.
@@ -1035,7 +1036,8 @@ this SET of files link to" re-inlined the same three-stage pipeline: `_strip_fen
 
 **Closure was the library gaining functions, not the callers being rewritten around the old
 pipeline.** `link_edge_map` (and `_recursive`), `backlink_counts` (and `_recursive`), and
-`orphan_notes` (and `_recursive`) now exist — `LINK_EXTRACTION_VERSION` moved to 3, and a third
+`orphan_notes` (and `_recursive`) now exist — `LINK_EXTRACTION_VERSION` moved to 3 on that branch
+(now 4, bumped again by the F3 `LC_ALL=C` pin task), and a third
 output column, `source_path`, was added to the edge map specifically to disambiguate two notes whose
 lowercased basenames collide across directories, a real collision hit during the conversion, not a
 hypothetical one. Every site that inlined the pipeline for a per-file or per-target question inside

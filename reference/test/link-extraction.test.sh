@@ -332,6 +332,20 @@ eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
 eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
   "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C comm -23')"
 
+# F3: the four exported sorts (extract_link_targets{,_recursive}, existing_note_index{,_recursive})
+# must pin LC_ALL=C, or consumers receive ambient-locale-collated streams and silently
+# mis-join them against LC_ALL=C-sorted ones via comm. STRUCTURAL, not behavioral: BSD sort
+# on macOS ignores LC_ALL for collation, so a locale mismatch cannot be demonstrated by
+# observed output order in this fixture -- these assert the literal source text instead.
+eq "extract_link_targets: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body extract_link_targets | grep -c '_fold_lower | LC_ALL=C sort -u')"
+eq "existing_note_index: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body existing_note_index | grep -c '_fold_lower | LC_ALL=C sort -u')"
+eq "extract_link_targets_recursive: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body extract_link_targets_recursive | grep -c '_fold_lower | LC_ALL=C sort -u')"
+eq "existing_note_index_recursive: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body existing_note_index_recursive | grep -c '_fold_lower | LC_ALL=C sort -u')"
+
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
 eq "orphan_notes: empty directory rc 0" "0" "$rc"

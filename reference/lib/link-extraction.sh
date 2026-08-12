@@ -50,7 +50,7 @@
 #      filesystem) violates this and produces false positives.
 
 # Contract version. Bump on any BEHAVIOR change (fold rules, termination, recursion semantics).
-LINK_EXTRACTION_VERSION=3
+LINK_EXTRACTION_VERSION=4
 
 # Case folding must fold NON-ASCII, and neither a locale name nor a tool name is
 # enough to know that it will:
@@ -192,7 +192,7 @@ extract_link_targets() {
 
   cat "$tmpf" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | _fold_lower | sort -u
+    | _fold_lower | LC_ALL=C sort -u
 
   rm -f "$tmpf" "$tmpdata" "$errf"
 }
@@ -204,7 +204,7 @@ existing_note_index() {
   for p in "$dir"/*.md; do
     [ -e "$p" ] || continue
     basename "$p" .md
-  done | _fold_lower | sort -u
+  done | _fold_lower | LC_ALL=C sort -u
 }
 
 # count_links_recursive <dir> -> integer (scans directory tree)
@@ -269,7 +269,7 @@ extract_link_targets_recursive() {
 
   cat "$tmpf" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | _fold_lower | sort -u
+    | _fold_lower | LC_ALL=C sort -u
 
   rm -f "$tmpf" "$tmpdata" "$errf"
 }
@@ -280,7 +280,7 @@ existing_note_index_recursive() {
   local dir="$1" p
   find "$dir" -type f -name '*.md' | while IFS= read -r p; do
     basename "$p" .md
-  done | _fold_lower | sort -u
+  done | _fold_lower | LC_ALL=C sort -u
 }
 
 # link_edge_map <dir> -> source<TAB>target<TAB>source_path edges (flat, no recursion)
