@@ -113,21 +113,18 @@ for s in bash zsh; do
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0
   $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
-  $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=28 failed=3 — RED ON PURPOSE
+  $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=31 failed=0
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
 ```
 
-**`queue-edit.test.sh` is the one entry above whose expected result is a failure, and its two CI
-steps are red with it.** Three of its 31 assertions pin an open defect: `reference/lib/queue-edit.sh`
-ends `mv "$tmp" "$file"` unguarded, so a failed rename leaves the temp on disk, prints nothing, and
-returns the exit status of the following `rm -rf` — 0. The suite was written and committed red on
-purpose, because a test shown to fail for the stated reason before the fix is the only kind that
-proves it. Guarding the commit step turns exactly those three green and nothing else; that fix is a
-separate change. **Until it lands, "all thirty CI steps pass" is not attainable and the two steps
-named `Queue edit library tests` are the expected exception** — do not disable them, and do not edit
-the library to silence them.
+**`queue-edit.test.sh` is green: 31/31, both shells — all CI steps pass.** It was RED ON PURPOSE for
+one branch: three of its assertions pinned an open defect before the fix, the only order in which a
+test can be shown to fail for the stated reason. `reference/lib/queue-edit.sh` used to end
+`mv "$tmp" "$file"` unguarded, so a failed rename left the temp on disk, printed nothing, and
+returned the exit status of the following `rm -rf` — 0. The commit step is now guarded: a failed
+rename returns 1, discards its temp, and names the path that could not move.
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
 disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message first,

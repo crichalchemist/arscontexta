@@ -69,21 +69,19 @@ for s in bash zsh; do
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 57/57
   $s reference/test/vocabulary-schema.test.sh            # 12/12
-  $s reference/test/queue-edit.test.sh                   # 28/3 — RED ON PURPOSE, see below
+  $s reference/test/queue-edit.test.sh                   # 31/31
 done
 ```
 
-**`queue-edit.test.sh` is RED ON PURPOSE and its two CI steps are red with it.** Three of its 31
-assertions pin a defect that is still open: `reference/lib/queue-edit.sh` ends `mv "$tmp" "$file"`
-with no `||`, so a rename that fails leaves the temp on disk, prints nothing, and returns the exit
-status of the following `rm -rf` — 0. The suite exists to prove that before the fix rather than
-after, which is the only order in which a test can be shown to fail for the stated reason. Guarding
-the commit step turns all three green; a candidate guard was applied to the library and reverted,
-and it took the suite to 31/0. Do not disable the steps and do not edit the library to make the
-suite green — that is a separate change with its own review. The rename failure is forced with a
-shell-function stub, because a genuine same-directory `mv` failure needs `chflags uchg` or
-`chattr +i` and is not portable to CI; the mechanism is covered, the organic trigger is hand-run
-only, and that is not the same claim.
+**`queue-edit.test.sh` is green: 31/31, both shells.** It was RED ON PURPOSE for one branch — three
+of its assertions pinned an open defect before the fix landed, the only order in which a test can be
+shown to fail for the stated reason. `reference/lib/queue-edit.sh` used to end `mv "$tmp" "$file"`
+with no `||`, so a rename that failed left the temp on disk, printed nothing, and returned the exit
+status of the following `rm -rf` — 0. The commit step is now guarded: a failed rename returns 1,
+discards its temp, and names the path that could not move — the `bump-version.sh` remedy verbatim.
+The rename failure is forced with a shell-function stub, because a genuine same-directory `mv`
+failure needs `chflags uchg` or `chattr +i` and is not portable to CI; the mechanism is covered, the
+organic trigger is hand-run only, and that is not the same claim.
 
 | Gate | What only it can catch |
 |---|---|
@@ -98,7 +96,7 @@ only, and that is not the same claim.
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
 | `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
 | `check-doc-claims.sh` | a number a document DECLARES going stale — including on MERGE, where nothing in a working tree changes and there is no diff to notice. Also the only gate reading `generators/`: the note `status` enum is declared **four times across three files** (`schema.md` declares it twice, once in a table and once in `_schema`), and a file-to-file comparison cannot see those two disagree — the blind spot `bump-version.test.sh` exists for, one tree over. It compares the VALUE SET, never the text, because the same enum is legitimately spelled three ways. It also checks the tension enum against its three consumers, which is the half that is checkable for an enum declared only once: a recipe matching a value the enum dropped returns 0 forever. **What it cannot cover:** the observation enum, declared once with no consumer inside `generators/` — its consumer is the SessionStart hook, in another tree. Declaration counts are PINNED, because discovery keys on an anchor value and a declaration that drops the anchor stops being discovered; three survivors agreeing would otherwise read PASS |
-| `queue-edit.test.sh` | the only gate that executes `reference/lib/queue-edit.sh` — a shared library with seven consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing. Three of its assertions are **expected red**; see the paragraph above the table |
+| `queue-edit.test.sh` | the only gate that executes `reference/lib/queue-edit.sh` — a shared library with seven consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing; and that a failed commit-step rename returns 1, discards its temp, and names the path — see the paragraph above the table |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether

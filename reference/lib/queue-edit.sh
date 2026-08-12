@@ -58,12 +58,23 @@ queue_edit() {
     waited=$((waited + 2))
   done
   tmp="${file}.tmp.$$"
-  if ! jq "$@" "$filter" "$file" > "$tmp" 2>/dev/null; then
+  local jqerr
+  if ! jqerr=$(jq "$@" "$filter" "$file" 2>&1 1>"$tmp"); then
     rm -f "$tmp"
     rm -rf "$lockdir"
     echo "error: queue-edit: jq rejected the filter or its arguments against '$file'" >&2
+    [ -n "$jqerr" ] && printf '%s\n' "$jqerr" >&2
     return 1
   fi
-  mv "$tmp" "$file"
+  # Guard the rename, discard the temp, name the path — the bump-version.sh remedy
+  # verbatim. Leaving the temp on a failed mv is an undeclared second copy of the
+  # queue; discarding it is safe because it is redundant with the file it failed to
+  # replace, and the failed rename never touched that file.
+  if ! mv "$tmp" "$file"; then
+    echo "error: queue-edit: $file could not be moved into place" >&2
+    rm -f "$tmp"
+    rm -rf "$lockdir"
+    return 1
+  fi
   rm -rf "$lockdir"
 }
