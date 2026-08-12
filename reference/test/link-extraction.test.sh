@@ -300,19 +300,27 @@ eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
 
 # 18b. LC_ALL=C pinning is STRUCTURAL (not behaviorally testable on BSD sort)
 # Both sides of comm must be sorted under the same collation; pinning ensures it.
-# Grep the library to verify the pins are present, then mutation-prove by removing one.
+# Anchored on $LIB (not a CWD-relative path) and scoped to the right function's
+# BODY, not a bare file grep — orphan_notes and orphan_notes_recursive share
+# byte-identical LC_ALL=C lines, so a match against the whole file cannot tell
+# them apart, and a hardcoded line number rots on any edit above it. The
+# redirect target (`> "$idx"` / `> "$tgts"`) is part of the anchor, not just
+# "idx"/"tgts" anywhere on the line — every LC_ALL=C sort line's own inline
+# `|| { rm -f "$idx" "$tgts" ... }` cleanup clause mentions BOTH names, so a
+# looser anchor matches two lines instead of one and fails on a healthy library.
+_orphan_fn_body() { awk -v fn="$1() {" '$0==fn{f=1} f{print} f&&/^}/{exit}' "$LIB"; }
 eq "orphan_notes: LC_ALL=C sort for index" "1" \
-  "$(sed -n '414p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(_orphan_fn_body orphan_notes | grep -c 'LC_ALL=C sort -u.*> "$idx"')"
 eq "orphan_notes: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '419p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(_orphan_fn_body orphan_notes | grep -c 'LC_ALL=C sort -u.*> "$tgts"')"
 eq "orphan_notes: LC_ALL=C comm call" "1" \
-  "$(sed -n '422p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(_orphan_fn_body orphan_notes | grep -c 'LC_ALL=C comm -23')"
 eq "orphan_notes_recursive: LC_ALL=C sort for index" "1" \
-  "$(sed -n '435p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C sort -u.*> "$idx"')"
 eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '440p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C sort -u.*> "$tgts"')"
 eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
-  "$(sed -n '443p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C comm -23')"
 
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
