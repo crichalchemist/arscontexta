@@ -134,6 +134,19 @@ chmod 644 "$Q"
 eq "unreadable: returns 1"                    "1"   "$rc"
 eq "unreadable: names the file"               "yes" "$(has "queue.json" "$err")"
 
+# --- a readable directory ----------------------------------------------------
+# A directory passes -r (directories are commonly readable) but is not a queue
+# file. Without a regular-file check it would create a .locks/ directory as a
+# side effect and only fail once jq is invoked against it. mkfix() already
+# creates ops/queue/queue.json as a regular file, so a *different* path is used
+# here — mkdir -p on mkfix's own queue.json path would fail (file exists) and
+# leave $D as that pre-existing readable file, silently testing the wrong thing.
+F=$(mkfix); D="$F/ops/queue/adir"; mkdir -p "$D"
+err=$( queue_edit '.' "$D" 2>&1 >/dev/null ); rc=$?
+eq "directory: returns 1"                     "1"   "$rc"
+eq "directory: creates no lock directory"     "no"  \
+   "$([ -d "$F/ops/queue/.locks" ] && echo yes || echo no)"
+
 # --- a JSON queue file with a YAML sibling (the field tombstone shape) ------
 # ops/queue/queue.json (636B, Jul 7) beside a live ops/queue/queue.yaml (440999B,
 # modified today) is not hypothetical — it is the measured field-vault state.
@@ -148,6 +161,14 @@ err=$( queue_edit '.' "$Q" 2>&1 >/dev/null ); rc=$?
 eq "json+yaml sibling: returns 1" "1" "$rc"
 eq "json+yaml sibling: names both paths" "yes" \
    "$([ "$(has "$Q" "$err")" = "yes" ] && [ "$(has "$Y" "$err")" = "yes" ] && echo yes || echo no)"
+
+# The guard is keyed on the basename queue.json specifically, not any *.json —
+# an unrelated tasks.json beside a queue.yaml is not the tombstone shape and
+# must be accepted, not refused.
+T="$D/tasks.json"
+printf '%s\n' '{"tasks":[]}' > "$T"
+out=$( queue_edit '.' "$T" 2>&1 ); rc=$?
+eq "unrelated json: tasks.json beside queue.yaml is accepted" "0" "$rc"
 
 # --- a filter jq rejects ----------------------------------------------------
 F=$(mkfix); Q="$F/ops/queue/queue.json"; L="$F/ops/queue/.locks/queue.lock"

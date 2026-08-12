@@ -38,16 +38,18 @@ QUEUE_EDIT_VERSION=1
 queue_edit() {
   local filter="$1" file="$2"
   shift 2
-  if [ -z "$file" ] || [ ! -r "$file" ]; then
+  if [ -z "$file" ] || [ ! -f "$file" ] || [ ! -r "$file" ]; then
     echo "error: queue-edit: not a readable file: '${file:-<empty>}'" >&2
     return 1
   fi
-  # A JSON queue file with a YAML sibling in the same directory is the
+  # queue.json with a queue.yaml sibling in the same directory is the
   # tombstone shape: valid JSON, jq succeeds on it, and every write lands
   # on a file the live queue moved away from — silently, at rc 0. Refuse
-  # rather than guess which one the caller meant.
-  case "$file" in
-    *.json)
+  # rather than guess which one the caller meant. Keyed on the basename
+  # queue.json specifically, not any *.json — an unrelated tasks.json
+  # beside a queue.yaml is not this shape and must not be refused.
+  case "$(basename "$file")" in
+    queue.json)
       local sib="$(dirname "$file")/queue.yaml"
       if [ -e "$sib" ]; then
         echo "error: queue-edit: '$file' is JSON but a sibling queue exists at '$sib' — refusing to write to the stale JSON copy" >&2
