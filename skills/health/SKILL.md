@@ -688,14 +688,14 @@ Bare links without context phrases are address book entries, not navigation. Eve
 
 ### Category 9: Shared Library Integrity (quick, full)
 
-**What it checks:** The vault's own copies of **both** shared libraries exist and are new enough for the skills that source them.
+**What it checks:** The vault's own copies of **all three** shared libraries exist and are new enough for the skills that source them.
 
-**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh`, and `/next`, `/rethink` and `/stats` source `ops/lib/frontmatter.sh`; each exits 1 when its library is missing or too old. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. These are the *vault* copies — the same files those skills load — not the plugin's.
+**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh`; `/next`, `/rethink` and `/stats` source `ops/lib/frontmatter.sh`; and `/next`, `/verify`, `/reduce`, `/reflect` and `/reweave` source `ops/lib/queue-edit.sh` for every queue write. Each exits 1 when its library is missing or too old. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. These are the *vault* copies — the same files those skills load — not the plugin's.
 
-**Both are checked because this category's own numbers depend on one of them.** `/health` sources
-`frontmatter.sh` to produce its observation and tension counts. A check that covered only the link
-library would report the shared library healthy in exactly the vault where /health's own condition
-counts could not be taken — a report vouching for the thing it was unable to use.
+**All three are checked, and `frontmatter.sh` in particular because this category's own numbers
+depend on it.** `/health` sources `frontmatter.sh` to produce its observation and tension counts. A
+check that skipped it would report the shared library healthy in exactly the vault where /health's
+own condition counts could not be taken — a report vouching for the thing it was unable to use.
 
 **How to check:**
 
@@ -742,11 +742,12 @@ check_lib() {                # check_lib <path> <version-var-name> <label>
 
 check_lib "$VAULT_ROOT/ops/lib/link-extraction.sh" LINK_EXTRACTION_VERSION link-extraction
 check_lib "$VAULT_ROOT/ops/lib/frontmatter.sh"     FRONTMATTER_VERSION     frontmatter
+check_lib "$VAULT_ROOT/ops/lib/queue-edit.sh"      QUEUE_EDIT_VERSION      queue-edit
 ```
 
 **Thresholds:**
 
-Applied to **each** library independently; the category FAILs if either row FAILs.
+Applied to **each** library independently; the category FAILs if any row FAILs.
 
 | Condition | Result |
 |-----------|--------|
@@ -756,7 +757,7 @@ Applied to **each** library independently; the category FAILs if either row FAIL
 
 There is no WARN band. A library is a precondition, not a quality measure: the skills that source it either run or do not.
 
-**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — and `frontmatter.sh` is newer than `link-extraction.sh`, so on most existing vaults it is the frontmatter row that fires. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
+**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — `queue-edit.sh` is the newest of the three, so on most existing vaults it is the queue-edit row that fires, missing rather than merely outdated. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
 
 **Example output:**
 
@@ -764,6 +765,7 @@ There is no WARN band. A library is a precondition, not a quality measure: the s
 [9] Shared Libraries ............. FAIL
     ops/lib/link-extraction.sh v2
     ops/lib/frontmatter.sh missing
+    ops/lib/queue-edit.sh v1
     /next, /rethink and /stats will exit 1 until restored
     Recommendation: run /arscontexta:upgrade
 ```
@@ -893,7 +895,7 @@ PASS:
     [details — note count per topic map, coverage gaps, bare links]
 
 [9] Shared Libraries ............. PASS | FAIL
-    [ops/lib/link-extraction.sh and ops/lib/frontmatter.sh — presence and version, one line each]
+    [ops/lib/link-extraction.sh, ops/lib/frontmatter.sh and ops/lib/queue-edit.sh — presence and version, one line each]
 
 ---
 
