@@ -137,6 +137,7 @@ count_links() {
   tmpf=$(mktemp) || return 1
   tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" > "$tmpf" 2>/dev/null; then
@@ -170,6 +171,7 @@ extract_link_targets() {
   tmpf=$(mktemp) || return 1
   tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" >> "$tmpdata" 2>/dev/null; then
@@ -214,6 +216,7 @@ count_links_recursive() {
   tmpf=$(mktemp) || return 1
   tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$1" -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" > "$tmpf" 2>/dev/null; then
@@ -247,6 +250,7 @@ extract_link_targets_recursive() {
   tmpf=$(mktemp) || return 1
   tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" >> "$tmpdata" 2>/dev/null; then
@@ -294,6 +298,7 @@ link_edge_map() {
   tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
   rgtmp=$(mktemp) || { rm -f "$stripped" "$tmpdata"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
     src=$(basename "$f" .md | _fold_lower)
@@ -332,6 +337,7 @@ link_edge_map_recursive() {
   tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
   rgtmp=$(mktemp) || { rm -f "$stripped" "$tmpdata"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -type f -name '*.md' -not -path '*/.git/*' | while IFS= read -r f; do
     src=$(basename "$f" .md | _fold_lower)
@@ -375,7 +381,7 @@ backlink_counts() {
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
     | LC_ALL=C sort \
     | uniq -c \
-    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+    | LC_ALL=C awk '{ match($0, /^[ \t]*[0-9]+[ \t]+/); c = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", c); rest = substr($0, RSTART + RLENGTH); printf "%s\t%s\n", rest, c }'
 
   rm -f "$edges"
 }
@@ -392,7 +398,7 @@ backlink_counts_recursive() {
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
     | LC_ALL=C sort \
     | uniq -c \
-    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+    | LC_ALL=C awk '{ match($0, /^[ \t]*[0-9]+[ \t]+/); c = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", c); rest = substr($0, RSTART + RLENGTH); printf "%s\t%s\n", rest, c }'
 
   rm -f "$edges"
 }

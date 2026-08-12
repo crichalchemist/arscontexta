@@ -464,6 +464,43 @@ rm -rf "$STUB_DIR" "$STUB_AWK"
 
 rm -rf "$EDGE_DIR"
 
+# --- whitespace preservation (multi-space filenames must round-trip) --------
+# Default awk FS splits on any run of whitespace; reassembling $0 after
+# clearing $1 rebuilds the line via OFS (a single space), collapsing internal
+# runs. skills/health Categories 7/8 key on $1==n against this table, so a
+# corrupted key silently defaults incoming to 0 and falsely reports a note stale.
+WS_DIR=$(mktemp -d); mkdir -p "$WS_DIR/n"
+printf -- '[[double  space]]\n' > "$WS_DIR/n/linker.md"
+printf -- 'x\n' > "$WS_DIR/n/double  space.md"
+
+ws_edges=$(link_edge_map "$WS_DIR/n" 2>/dev/null)
+ws_expected_edge=$'linker\tdouble  space'
+eq "link_edge_map: multi-space target preserved intact" "$ws_expected_edge" \
+   "$(printf '%s\n' "$ws_edges" | LC_ALL=C awk -F'\t' '{print $1"\t"$2}')"
+
+ws_expected_counts=$'double  space\t1'
+eq "backlink_counts: multi-space target key not collapsed" "$ws_expected_counts" \
+   "$(backlink_counts "$WS_DIR/n" 2>/dev/null)"
+eq "backlink_counts_recursive: multi-space target key not collapsed" "$ws_expected_counts" \
+   "$(backlink_counts_recursive "$WS_DIR/n" 2>/dev/null)"
+
+rm -rf "$WS_DIR"
+
+# --- stale error-flag debris from a killed same-PID run ---------------------
+# $$ is recyclable: debris left by a run killed between touch and cleanup of
+# link-extraction-err-$$ must not make a healthy call in the same PID return 1.
+CLEAN_DIR=$(mktemp -d); mkdir -p "$CLEAN_DIR/n"
+printf -- '[[nowhere]]\n' > "$CLEAN_DIR/n/note.md"
+errf_result=$("$SELF" -c '
+touch "/tmp/link-extraction-err-$$"
+. "'"$LIB"'"
+out=$(count_links "'"$CLEAN_DIR"'/n" 2>/dev/null); rc=$?
+rm -f "/tmp/link-extraction-err-$$"
+printf "%s:%s" "$rc" "$out"
+' 2>/dev/null)
+eq "count_links: stale errf debris from same PID does not spuriously fail" "0:1" "$errf_result"
+rm -rf "$CLEAN_DIR"
+
 # --- empty vault (legitimate state, not a failure) ----------------------------
 EMPTY=$(mktemp -d); mkdir -p "$EMPTY/notes"
 eq "empty dir: count_links yields 0"          "zero" \
