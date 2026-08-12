@@ -81,9 +81,9 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all sixteen, expect exactly these results
+## Verification — run all seventeen, expect exactly these results
 
-Fourteen run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
+Fifteen run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
@@ -113,10 +113,21 @@ for s in bash zsh; do
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0
   $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
+  $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=28 failed=3 — RED ON PURPOSE
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
 ```
+
+**`queue-edit.test.sh` is the one entry above whose expected result is a failure, and its two CI
+steps are red with it.** Three of its 31 assertions pin an open defect: `reference/lib/queue-edit.sh`
+ends `mv "$tmp" "$file"` unguarded, so a failed rename leaves the temp on disk, prints nothing, and
+returns the exit status of the following `rm -rf` — 0. The suite was written and committed red on
+purpose, because a test shown to fail for the stated reason before the fix is the only kind that
+proves it. Guarding the commit step turns exactly those three green and nothing else; that fix is a
+separate change. **Until it lands, "all thirty CI steps pass" is not attainable and the two steps
+named `Queue edit library tests` are the expected exception** — do not disable them, and do not edit
+the library to silence them.
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
 disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message first,
@@ -145,7 +156,7 @@ primitive 2 for the opposite reason: it has no wiki links yet, and the check rep
 notes directory containing none. Neither is this repo failing; both are the validator describing
 the vault it was handed.
 
-**"Green" means all twenty-eight CI steps ran and passed** — not that the previously-red step turned.
+**"Green" means all thirty CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
 
 ```bash
@@ -347,5 +358,5 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All twenty-eight CI steps must pass. State in the PR what is **not** claimed —
+Branch from `main`. All thirty CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.

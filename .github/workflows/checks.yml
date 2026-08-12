@@ -206,3 +206,14 @@ jobs:
         run: bash reference/test/bump-version.test.sh
       - name: Version tool failure-path tests (zsh)
         run: zsh reference/test/bump-version.test.sh
+
+      # queue-edit.sh had seven consumers and no tests, which is how its commit
+      # step shipped unguarded: `mv "$tmp" "$file"` with no `||`, so a failed
+      # rename leaves the temp on disk, prints nothing, and returns the exit
+      # status of the following `rm -rf` — 0. THESE TWO STEPS ARE RED ON PURPOSE
+      # until that step is guarded: three assertions pin the defect and fail
+      # today by design. Do not disable them; the fix turns them green.
+      - name: Queue edit library tests (bash)
+        run: bash reference/test/queue-edit.test.sh
+      - name: Queue edit library tests (zsh)
+        run: zsh reference/test/queue-edit.test.sh
