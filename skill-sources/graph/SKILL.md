@@ -146,9 +146,14 @@ MOC_FILES=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {}
 
 # Folded MOC basenames, so MOCs can be removed from the denominator set the same
 # way NOTE_COUNT already subtracts them from the total.
+# LC_ALL=C is not decoration: this set is a comm operand below, joined against
+# NOTE_INDEX and MOC_TARGETS, both of which are pinned to C collation (the
+# library pins its exports; MOC_SRC/MOC_TARGETS are pinned in this fence). comm
+# requires the SAME collation on both sides, not merely that each side is sorted,
+# and it does not warn on a mismatch -- it returns the wrong set at exit 0.
 MOC_INDEX=$(printf '%s\n' "$MOC_FILES" | while IFS= read -r m; do
   [ -n "$m" ] && basename "$m" .md
-done | _fold_lower | sort -u)
+done | _fold_lower | LC_ALL=C sort -u)
 
 # Targets linked FROM MOCs. link_edge_map_recursive emits
 # source_basename<TAB>target<TAB>source_path (columns 1-2 folded). Basenames
@@ -168,12 +173,11 @@ printf '%s\n' "$MOC_FILES" | grep -v '^$' | LC_ALL=C sort -u > "$MOC_SRC"
 MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $3 in moc {print $2}' "$MOC_SRC" "$EDGE_MAP" | LC_ALL=C sort -u)
 rm -f "$EDGE_MAP" "$MOC_SRC"
 
-# NOT proven valid by "sorted" alone: comm requires the SAME collation on both
-# sides, not merely that each side is independently sorted. NOTE_INDEX and
-# MOC_TARGETS are library-exported and pinned LC_ALL=C, but MOC_INDEX above is
-# built with a bare `sort -u` (ambient locale) -- under a non-C locale this inner
-# comm can silently return a wrong set. comm gives no warning on mismatched
-# collation; it just returns the wrong answer.
+# "Sorted" alone would NOT make this valid: comm requires the SAME collation on
+# both sides, not merely that each side is independently sorted, and it does not
+# warn on a mismatch -- it returns the wrong set at exit 0. All three operands
+# are pinned to C: NOTE_INDEX by the library (>= v4), MOC_TARGETS above, and
+# MOC_INDEX where it is built. Do not unpin any of them in isolation.
 COVERED=$(comm -12 \
   <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
   <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
