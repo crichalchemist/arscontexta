@@ -134,6 +134,21 @@ chmod 644 "$Q"
 eq "unreadable: returns 1"                    "1"   "$rc"
 eq "unreadable: names the file"               "yes" "$(has "queue.json" "$err")"
 
+# --- a JSON queue file with a YAML sibling (the field tombstone shape) ------
+# ops/queue/queue.json (636B, Jul 7) beside a live ops/queue/queue.yaml (440999B,
+# modified today) is not hypothetical — it is the measured field-vault state.
+# Every call site writes to the .json tombstone silently, at rc 0, because it is
+# valid JSON and jq succeeds on it. Digit-free subdirectory name, per this repo's
+# own "mktemp paths void no-digits assertions" lesson.
+F=$(mkfix); D="$F/ops/queue-sibling-fixture"; mkdir -p "$D"
+Q="$D/queue.json"; Y="$D/queue.yaml"
+printf '%s\n' '{"tasks":[]}' > "$Q"
+printf '%s\n' 'tasks: []' > "$Y"
+err=$( queue_edit '.' "$Q" 2>&1 >/dev/null ); rc=$?
+eq "json+yaml sibling: returns 1" "1" "$rc"
+eq "json+yaml sibling: names both paths" "yes" \
+   "$([ "$(has "$Q" "$err")" = "yes" ] && [ "$(has "$Y" "$err")" = "yes" ] && echo yes || echo no)"
+
 # --- a filter jq rejects ----------------------------------------------------
 F=$(mkfix); Q="$F/ops/queue/queue.json"; L="$F/ops/queue/.locks/queue.lock"
 before=$(cat "$Q")

@@ -113,13 +113,13 @@ for s in bash zsh; do
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0
   $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
-  $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=31 failed=0
+  $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=33 failed=0
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
 ```
 
-**`queue-edit.test.sh` is green: 31/31, both shells — all CI steps pass.** It was RED ON PURPOSE for
+**`queue-edit.test.sh` is green: 33/33, both shells — all CI steps pass.** It was RED ON PURPOSE for
 one branch: three of its assertions pinned an open defect before the fix, the only order in which a
 test can be shown to fail for the stated reason. `reference/lib/queue-edit.sh` used to end
 `mv "$tmp" "$file"` unguarded, so a failed rename left the temp on disk, printed nothing, and

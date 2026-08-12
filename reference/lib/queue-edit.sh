@@ -42,6 +42,19 @@ queue_edit() {
     echo "error: queue-edit: not a readable file: '${file:-<empty>}'" >&2
     return 1
   fi
+  # A JSON queue file with a YAML sibling in the same directory is the
+  # tombstone shape: valid JSON, jq succeeds on it, and every write lands
+  # on a file the live queue moved away from — silently, at rc 0. Refuse
+  # rather than guess which one the caller meant.
+  case "$file" in
+    *.json)
+      local sib="$(dirname "$file")/queue.yaml"
+      if [ -e "$sib" ]; then
+        echo "error: queue-edit: '$file' is JSON but a sibling queue exists at '$sib' — refusing to write to the stale JSON copy" >&2
+        return 1
+      fi
+      ;;
+  esac
   local lockdir tmp waited=0
   lockdir="$(dirname "$file")/.locks/queue.lock"
   # mkdir WITHOUT -p is the mutex, same reasoning as the qmd lock in reflect/reweave: `-p`
