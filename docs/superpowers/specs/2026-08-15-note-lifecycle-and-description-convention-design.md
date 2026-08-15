@@ -224,7 +224,7 @@ result is read:
 **The strongest assertion is idempotency:** run twice, the second run's diff is byte-empty. It
 catches a class the per-fixture tests cannot, including partial-run recovery.
 
-**Gates this work moves** — re-derive each, do not assume: `check-vocabulary-schema.sh` (the four
+**Gates this work moves** — re-derive each, do not assume: `check-vocabulary-schema.sh` (the five
 new `status_*` keys must be *declared*, or it exits 1) · `check-placeholder-count.sh` (new
 placeholders must survive into templates) · `fence-isolation.test.sh` (changed fences in `reduce`
 and `verify` must still run standalone; both files also carry queue fences from the
