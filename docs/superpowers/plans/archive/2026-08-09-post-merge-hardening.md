@@ -15,7 +15,7 @@ change is repo-internal: no task alters a `generators/` block or what a generate
 
 **Tech Stack:** POSIX-portable bash/zsh, `awk`/`sed`/`grep`/`git`, no new dependencies.
 
-Implements `docs/superpowers/specs/2026-08-09-post-merge-hardening-design.md` — groups A, B, C
+Implements `docs/superpowers/specs/archive/2026-08-09-post-merge-hardening-design.md` — groups A, B, C
 and E, its Design sections 9-14, and its out-of-band sections 6-8.
 
 Source findings: adversarial review of `main` at `a98352c`. Six Important, four Minor.
@@ -1708,7 +1708,7 @@ divergence 10.)*
   the spec's Decision 1 was put to the user and answered. Measured as latent: all three
   computable semantics return 0 on the field vault, whose `nodes/` has zero subdirectories, so
   nothing forces the ruling today. Recorded in
-  `docs/superpowers/specs/2026-08-09-post-merge-hardening-design.md` under "The open decisions".
+  `docs/superpowers/specs/archive/2026-08-09-post-merge-hardening-design.md` under "The open decisions".
   **Reopening trigger:** the first vault whose notes directory gains a subdirectory, at which
   point the three semantics stop agreeing and the counts in five shipped commands diverge.
 - **The PostToolUse matcher stays `Write` (spec Decision 2, `deferrals.md` entry 15).** **RULED

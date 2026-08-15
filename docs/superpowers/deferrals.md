@@ -575,7 +575,7 @@ This is pre-existing and independent of Task 14's SCOPE widening — it reproduc
 9-file SCOPE just as it does on the current 11-file one.
 
 This exact bug class is pre-named as a risk by this task's own governing plan — Global Constraint #2
-(`docs/superpowers/plans/2026-08-09-post-merge-hardening.md:54`), verbatim: *"zsh also does **not**
+(`docs/superpowers/plans/archive/2026-08-09-post-merge-hardening.md:54`), verbatim: *"zsh also does **not**
 word-split an unquoted `$var` in a `for` list; use `while IFS= read -r`."* `check-prose-paths.sh` is
 an unconverted instance of exactly that named pattern, in a file this same task edited without
 noticing the fork.
@@ -614,7 +614,7 @@ which shell(s) it is invoked under, so the posture stops being accidental either
 grep -n 'for f in \$SCOPE' reference/check-prose-paths.sh   # :74, the unquoted for-list
 bash reference/check-prose-paths.sh; echo "bash rc=$?"      # rc=0, PASS, 11 files scanned
 zsh  reference/check-prose-paths.sh; echo "zsh rc=$?"       # rc=2, "scope is empty", loud FAIL
-grep -n 'word-split' docs/superpowers/plans/2026-08-09-post-merge-hardening.md   # :54, the named risk class
+grep -n 'word-split' docs/superpowers/plans/archive/2026-08-09-post-merge-hardening.md   # :54, the named risk class
 ```
 
 ---
@@ -642,8 +642,8 @@ shared `check_lib` helper now covers all three
 libraries), and CLAUDE.md's `QUEUE_EDIT_VERSION` paragraph (added by task 15) already documents the
 fixed state. What this entry closes is a different gap: the provenance fact itself — a PR silently
 carrying undescribed backport work past the review its own findings are numbered against — already
-exists as tracked, committed, non-gitignored prose (`docs/superpowers/specs/2026-08-09-post-merge-hardening-design.md`'s
-"Provenance matters here" paragraph, duplicated in `docs/superpowers/plans/2026-08-09-post-merge-hardening.md:1469`),
+exists as tracked, committed, non-gitignored prose (`docs/superpowers/specs/archive/2026-08-09-post-merge-hardening-design.md`'s
+"Provenance matters here" paragraph, duplicated in `docs/superpowers/plans/archive/2026-08-09-post-merge-hardening.md:1469`),
 but only inside this branch's own task-scoped spec and plan documents. Those are exactly the kind
 of file this branch's own history shows going stale or getting archived once the branch that
 produced them lands (see `docs/closed-divergences.md`'s absorption of earlier per-branch sections).
@@ -658,7 +658,7 @@ diff under review, and re-check whether any review finding traces to the undescr
 
 **From:** Task 15 (`.superpowers/sdd/2026-08-09-post-merge-hardening/task-15-brief.md`),
 `fix/post-merge-hardening` — cross-referencing
-`docs/superpowers/specs/2026-08-09-post-merge-hardening-design.md`'s "Provenance matters here"
+`docs/superpowers/specs/archive/2026-08-09-post-merge-hardening-design.md`'s "Provenance matters here"
 paragraph and its grouping-B finding pair (F1, F6)
 
 ```bash
