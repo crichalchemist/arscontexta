@@ -517,8 +517,14 @@ phrasing does not protect a synonym, and prose is where the synonyms live. Re-de
 ```bash
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 17
 grep -c '^      - ' .github/workflows/checks.yml                                        # 30
-git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 28
+git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 30
 ```
+
+That third line read `# 28` until the PR #8 merge on 2026-08-15 equalised the two. It was
+missed by the same merge-day edit that corrected its twin twenty lines below — **two sites,
+one pattern, and only the gate saw the second.** That is the finding, not the numeral: this
+paragraph exists to warn that a gate reading one phrasing does not protect a synonym, and the
+two spellings here are not even synonyms — they are the same command, wrapped differently.
 
 **A claim about `main` rots on MERGE, not on edit, which is why it needs a gate rather than care.**
 Nothing in a working tree changes when a branch lands, so `# 14` sat here correct-when-written and
@@ -533,16 +539,28 @@ count, because `actions/checkout` carries no `name:`. Count step *items* (`^    
 
 ```bash
 grep -c '^      - ' .github/workflows/checks.yml                      # 30, this tree
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 28, main — the two
-                                                                      # numbers were equal
-                                                                      # (PR #6 having merged
-                                                                      # this branch's earlier
-                                                                      # vocabulary-schema
-                                                                      # steps into main) and
-                                                                      # this branch is now 2
-                                                                      # ahead again, having
-                                                                      # added the queue-edit
-                                                                      # suite in both shells
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 30, main — equal
+                                                                      # again as of the PR #8
+                                                                      # merge on 2026-08-15,
+                                                                      # which carried the
+                                                                      # queue-edit suite's two
+                                                                      # steps into main.
+                                                                      #
+                                                                      # This read "# 28, main
+                                                                      # ... this branch is now
+                                                                      # 2 ahead again" until
+                                                                      # that merge: correct
+                                                                      # when written, wrong by
+                                                                      # merge, with no diff to
+                                                                      # notice. That is the
+                                                                      # exact rot the sentence
+                                                                      # above describes, and
+                                                                      # this line is the third
+                                                                      # time it has been
+                                                                      # corrected — which is
+                                                                      # why the gate reads it
+                                                                      # rather than trusting
+                                                                      # anyone to remember
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 17
 ```
 
