@@ -86,7 +86,7 @@ on an off-enum status, which is how seven values accumulated.
 | surface | owns | lifetime |
 |---|---|---|
 | **templates** — `skill-sources/reduce/`, `skill-sources/verify/` | prevention: stamp at creation, promote on a gate | permanent, ships to every vault |
-| **vocabulary keys** — `generators/` | four flat `status_*` keys, so lifecycle states are derivable when a vault renames them | permanent, generation surface |
+| **vocabulary keys** — `generators/` | five flat `status_*` keys, one per enum value, so lifecycle states are derivable when a vault renames them | permanent, generation surface |
 | **migration script** — `reference/`, unshipped | clearing this vault's backlog | **one-time; deleted after it runs** |
 
 The load-bearing claim: **the backlog is a migration artifact of one vault, not a recurring
