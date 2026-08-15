@@ -351,29 +351,16 @@ the only remaining thing keeping the guard from running.
 
 ---
 
-### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths
+### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths — CLOSED
 
-**What:** One reader, two code paths, differing in ways a caller cannot see. (a) A **present but
-empty** value fails LOUD on the dotted path (`exit 1`) and SILENTLY returns the default on the bare
-path — and returning the default is exactly how divergence 3's hardcoded `10` stayed invisible.
-(b) Key names are interpolated into an awk ERE, so a dot in the key matches any character:
-`self_evolution.obs.ervation` would match a line spelling `obsXervation`.
-
-**Why not now:** Neither is reachable from any key this repo ships — every dotted key in use is a
-clean identifier, and no shipped bare key is written-but-empty in a real `.arscontexta`. Fixing (b)
-means escaping the key before interpolation, which is the same class as `check-portability.sh` check
-6 and belongs with it rather than as a one-off.
-
-**Reopens if:** any consumer starts passing a user-supplied or vocabulary-derived string as a config
-key, which makes (b) reachable; or a bare key is added whose empty value is meaningful.
-
-**From:** `2026-08-04-ci-hardening.md` Task 4
-
-```bash
-/usr/bin/grep -n 'exit 1' hooks/scripts/read_config.sh          # the dotted path's loud arm
-/usr/bin/grep -n 'awk' hooks/scripts/read_config.sh             # the interpolation sites
-bash reference/test/threshold-namespace.test.sh | tail -1       # 52/52 — covers neither asymmetry
-```
+Closed by `d9662fd` (Task 12, `fix/post-merge-hardening`): the bare path now fails loud on a
+present-but-empty value exactly as the dotted path does, and both paths match keys fixed-string
+rather than through an interpolated ERE — pinned by the D16a/D16b assertions in
+`reference/test/threshold-namespace.test.sh`. The full entry moved to [Closed](#closed) per this
+file's own convention — **with a drift record**, because the commit that closed both asymmetries
+never touched this ledger: the entry kept asserting `52/52 — covers neither asymmetry` while the
+suite measured 56 and covered both. A status file lying about status, inside the ledger that
+exists to prevent exactly that. Kept numbered so references by number stay valid.
 
 ---
 
@@ -479,7 +466,9 @@ would land unseen by the fence gate), or the CI-hardening spec picks up harness 
 `2026-08-09-post-merge-hardening.md` ## Deferrals)
 
 ```bash
-/usr/bin/grep -n 'queue.yaml' reference/test/fence-isolation.test.sh | head -3   # fixture creates it
+# The fixture WRITE itself, not merely lines mentioning the name — a `| head -3` over
+# 'queue.yaml' returns a KNOWN_OPEN entry and two comments and proves nothing:
+/usr/bin/grep -n '> "\$v/ops/queue/queue\.yaml"' reference/test/fence-isolation.test.sh   # :204, the healthy fixture writing it
 ```
 
 ---
@@ -647,8 +636,9 @@ fail-loud contract — and **F6** — `/health` Category 9 audited `link-extract
 `frontmatter.sh` but not `queue-edit.sh`, the very library that had ridden along undescribed.
 
 **Why not now:** there is nothing left to implement — both findings this provenance gap produced
-are already fixed on this branch (Task 12a: `queue_edit`'s commit step is now guarded,
-`QUEUE_EDIT_VERSION` moved 1→2; `/health`'s shared `check_lib` helper now covers all three
+are already fixed on this branch (Task 8, `694e880`: `queue_edit`'s commit step is now guarded —
+the F1a/F1b assertions; Task 12a: `QUEUE_EDIT_VERSION` moved 1→2; Task 9, `69003a1`: `/health`'s
+shared `check_lib` helper now covers all three
 libraries), and CLAUDE.md's `QUEUE_EDIT_VERSION` paragraph (added by task 15) already documents the
 fixed state. What this entry closes is a different gap: the provenance fact itself — a PR silently
 carrying undescribed backport work past the review its own findings are numbered against — already
@@ -675,8 +665,8 @@ paragraph and its grouping-B finding pair (F1, F6)
 git rev-list --count 542fed8..d2c5054   # 11 — pre-existing backport work, incl. queue-edit.sh v1
 git rev-list --count d2c5054..77928ee   # 35 — the link-edge-map plan's own described scope
 git rev-list --count 542fed8..77928ee   # 46 — actually merged by PR #7 (merge commit a98352c)
-/usr/bin/grep -n 'QUEUE_EDIT_VERSION=' reference/lib/queue-edit.sh   # 2 — F1 fixed, task 12a
-/usr/bin/grep -n 'queue-edit' skills/health/SKILL.md | /usr/bin/grep -c .   # F6 fixed, task 12a
+/usr/bin/grep -n 'QUEUE_EDIT_VERSION=' reference/lib/queue-edit.sh   # 2 — the task-12a bump; the F1 guard itself shipped in task 8 (694e880)
+/usr/bin/grep -n 'queue-edit' skills/health/SKILL.md | /usr/bin/grep -c .   # F6 fixed, task 9
 ```
 
 ---
@@ -794,4 +784,47 @@ git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
 git ls-files | /usr/bin/grep -c '^"'                                      # 1 — the quoted path
 git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
   | /usr/bin/grep -c '^\(skill-sources\|skills\|platforms\|reference\|generators\)/'   # 0 — scanned trees
+```
+
+### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths
+
+**CLOSED 2026-08-15, and the closure was recorded by a later fix round rather than by the commit
+that did the work — that gap is itself the finding.** Task 12 (`d9662fd`,
+`fix/post-merge-hardening`) closed BOTH asymmetries this entry filed: (a) the bare path now exits 1
+on a present-but-empty value instead of silently returning the default — pinned by the D16a pair in
+`reference/test/threshold-namespace.test.sh` — and (b) both paths now match keys fixed-string, so
+an ERE metacharacter in a key matches nothing — pinned by the D16b pair. But `d9662fd` touched
+`CLAUDE.md`, `CONTRIBUTING.md`, the hook and the suite, and never this ledger, so from that commit
+until 2026-08-15 this entry's own closing command still asserted `52/52 — covers neither
+asymmetry`. Measured at closure: the suite printed `56 passed, 0 failed` and covered both. The
+numeral was false and the claim beside it was false — a status file lying about status, in the
+ledger whose header warns about exactly that. The entry below is preserved as filed, including the
+refuted command, because the drift is the evidence. Re-derive rather than quote — the same fix
+round that recorded this closure adds a field-arm assertion and moves the total again:
+
+```bash
+/usr/bin/grep -n 'D16' reference/test/threshold-namespace.test.sh   # the assertions covering both
+bash reference/test/threshold-namespace.test.sh | tail -1           # N passed, 0 failed
+```
+
+**What:** One reader, two code paths, differing in ways a caller cannot see. (a) A **present but
+empty** value fails LOUD on the dotted path (`exit 1`) and SILENTLY returns the default on the bare
+path — and returning the default is exactly how divergence 3's hardcoded `10` stayed invisible.
+(b) Key names are interpolated into an awk ERE, so a dot in the key matches any character:
+`self_evolution.obs.ervation` would match a line spelling `obsXervation`.
+
+**Why not now:** Neither is reachable from any key this repo ships — every dotted key in use is a
+clean identifier, and no shipped bare key is written-but-empty in a real `.arscontexta`. Fixing (b)
+means escaping the key before interpolation, which is the same class as `check-portability.sh` check
+6 and belongs with it rather than as a one-off.
+
+**Reopens if:** any consumer starts passing a user-supplied or vocabulary-derived string as a config
+key, which makes (b) reachable; or a bare key is added whose empty value is meaningful.
+
+**From:** `2026-08-04-ci-hardening.md` Task 4
+
+```bash
+/usr/bin/grep -n 'exit 1' hooks/scripts/read_config.sh          # the dotted path's loud arm
+/usr/bin/grep -n 'awk' hooks/scripts/read_config.sh             # the interpolation sites
+bash reference/test/threshold-namespace.test.sh | tail -1       # 52/52 — covers neither asymmetry
 ```
