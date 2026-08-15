@@ -3,8 +3,6 @@ name: health
 description: Run condition-based vault health diagnostics. 9 categories — schema compliance, orphan detection, link health, description quality, three-space boundaries, processing throughput, stale notes, MOC coherence, shared library integrity. 3 modes — quick (schema+orphans+links+library), full (all 9), three-space (boundary violations only). Returns actionable FAIL/WARN/PASS report with specific fixes ranked by impact. Triggers on "/health", "check vault health", "maintenance report", "what needs fixing".
 version: "1.0"
 generated_from: "arscontexta-v1.6"
-context: fork
-model: opus
 allowed-tools: Read, Grep, Glob, Bash, mcp__qmd__query
 argument-hint: "[optional: 'quick', 'full', or 'three-space']"
 ---

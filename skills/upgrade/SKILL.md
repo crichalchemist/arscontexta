@@ -4,8 +4,6 @@ description: Apply plugin knowledge base updates to an existing generated system
 version: "1.0"
 generated_from: "arscontexta-v1.6"
 user-invocable: true
-context: fork
-model: opus
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
