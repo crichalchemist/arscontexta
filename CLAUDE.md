@@ -83,6 +83,23 @@ The rename failure is forced with a shell-function stub, because a genuine same-
 failure needs `chflags uchg` or `chattr +i` and is not portable to CI; the mechanism is covered, the
 organic trigger is hand-run only, and that is not the same claim.
 
+**`QUEUE_EDIT_VERSION` is 2 — bumped from 1 by task 12a on this branch — and until now this file
+never named it.** `LINK_EXTRACTION_VERSION` (4) and `FRONTMATTER_VERSION` (3) are the library
+versions this file already tracks; this is the third, added for the ported YAML write path the
+paragraph above describes. Seven fences across five `skill-sources/` templates (`next` ×3, `reduce`,
+`reflect`, `reweave`, `verify`) guard `[ "$QUEUE_EDIT_VERSION" -lt 2 ]` before calling `queue_yaml`.
+`skills/health` checks all three libraries through one shared `check_lib` helper and deliberately
+floors queue-edit at `-lt 1`, not `-lt 2` — "THE FLOOR IS 1 AND STAYS 1" (`skills/health/SKILL.md:723`)
+is an in-file recorded reviewer ruling from task 12a, not an oversight: raising the floor to the
+current version would FAIL every vault that has not run `/upgrade`, for a defect (v1's unguarded
+rename) that is narrow rather than universal.
+
+```bash
+/usr/bin/grep -n 'QUEUE_EDIT_VERSION=' reference/lib/queue-edit.sh                       # 2
+/usr/bin/grep -rc '\-lt 2 \]' skill-sources/ | /usr/bin/grep -v ':0'                      # 3,1,1,1,1 = 7
+/usr/bin/grep -n 'FLOOR IS 1' skills/health/SKILL.md                                      # :723
+```
+
 | Gate | What only it can catch |
 |---|---|
 | `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 71 sites across 25 files** — 71 matching lines carrying 71 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 71 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |

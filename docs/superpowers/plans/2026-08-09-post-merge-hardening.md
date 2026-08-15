@@ -1696,6 +1696,13 @@ divergence 10.)*
   widening, and named as a risk class by this plan's own Global Constraint #2. Fixing the loop is a
   shell-portability change to the script, out of Task 14's stated scope.
 
+- **Task 15 — none of its own.** Task 15 is the records task itself (deferral 13's amendment,
+  `CLAUDE.md`'s `QUEUE_EDIT_VERSION` numeral, and the 46-vs-35 provenance record), not a task that
+  found new work to scope out. It landed `docs/superpowers/deferrals.md` entry 26 (the 46-vs-35
+  provenance finding, cross-referencing this plan's own "Provenance matters here" paragraph and
+  grouping-B findings F1/F6) and amended entry 13 in place — both are its Step 1 and Step 3
+  deliverables, not out-of-scope work pushed off. Nothing was scoped out during its execution.
+
 - **Group D — orphan-semantics unification across five surfaces (F4).** **RULED by the user on
   2026-08-09: keep deferred as latent.** Not deferred by omission and no longer merely blocked —
   the spec's Decision 1 was put to the user and answered. Measured as latent: all three

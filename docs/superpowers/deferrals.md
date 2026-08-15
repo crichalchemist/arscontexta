@@ -251,7 +251,31 @@ blind spot divergence 15's amendment documents and `bump-version.test.sh` exists
 
 **Why not now:** The `|| true` was added because the earlier false-positive "scan failed" warning fired on every healthy SessionStart (when `grep -c .` exits 1 on empty input), training users to ignore the signal. A query-breaking `comm` failure is unreachable under normal conditions — sort, awk, grep, mktemp, and the library all work correctly in healthy cases. The trade moved from "false positive on 100% of healthy starts" to "silent 0 on rare failure". It is not a clean win; it is a trade, which is why it is recorded rather than left to rot in memory.
 
-**Reopens if:** A second failure mode surfaces that can empty `$tgts` or `$idx` without tripping an earlier guard (the `[ -n "$idx" ]` and `[ -d "$NOTES_DIR" ]` checks at :165, :162). Such a mode would make the conflation reachable and remedy 1 required.
+**Reopens if:** A second failure mode surfaces that can empty `$tgts` or `$idx` without tripping an earlier guard (the `[ -n "$idx" ]` and `[ -d "$NOTES_DIR" ]` checks, now at :177 and :163 — corrected 2026-08-15; the entry originally cited :165 and :162, both off by one, which is a deferral whose own line references had drifted). Such a mode would make the conflation reachable and remedy 1 required.
+
+**AMENDED 2026-08-15 — task 15, post-merge-hardening.** Task 10 (already complete) touched the
+`[ -d "$NOTES_DIR" ]` guard this entry's own "Reopens if" clause names, and the trigger above is
+**not** tripped: task 10 added an `else` warning to that guard's existing `if`, so a missing
+`NOTES_DIR` is now loud on stderr rather than silent — the guard was not bypassed, and no new route
+into the `comm -23 | grep -c . || true` conflation was opened. This entry stays open, not reopened.
+
+What task 10 does change is this entry's own framing. "Why not now" characterizes the silent-0 path
+as reachable only through a *rare* internal failure — sort, awk, grep, mktemp all working. That
+framing was already incomplete before task 10 and remains so after it: the outer `[ -d "$NOTES_DIR" ]`
+guard means the entire block this entry is about — including the conflation it diagnoses — never
+executes at all for any vault whose notes directory does not resolve to the literal path `notes/`
+(an unsubstituted `{{NOTES_DIR:-notes}}` placeholder, or a vault that legitimately named its notes
+directory something else). That is not rare in the way "sort/awk/grep/mktemp fail" is rare — it is
+the default outcome for any vault that customized `{{NOTES_DIR}}`. Before task 10 this route was
+silent, same outcome as the conflation this entry names, reached a different way. After task 10 it
+warns, so the common route is no longer silent; the entry's remaining scope is the narrower one it
+was always about — the inner conflation, still real, still requiring an actual sort/awk/grep/mktemp
+failure to reach.
+
+```bash
+/usr/bin/grep -n 'ORPHAN_COUNT=0\|if \[ -d "\$NOTES_DIR" \]' platforms/claude-code/hooks/session-orient.sh.template   # :162, :163
+/usr/bin/grep -n 'notes directory .* not found; orphan signal omitted' platforms/claude-code/hooks/session-orient.sh.template   # task 10's else warning
+```
 
 **From:** `2026-08-08-link-edge-map.md` final whole-branch review
 
@@ -602,6 +626,57 @@ grep -n 'for f in \$SCOPE' reference/check-prose-paths.sh   # :74, the unquoted 
 bash reference/check-prose-paths.sh; echo "bash rc=$?"      # rc=0, PASS, 11 files scanned
 zsh  reference/check-prose-paths.sh; echo "zsh rc=$?"       # rc=2, "scope is empty", loud FAIL
 grep -n 'word-split' docs/superpowers/plans/2026-08-09-post-merge-hardening.md   # :54, the named risk class
+```
+
+---
+
+### 26. PR #7 merged 46 commits; the plan that drove its review describes only 35
+
+**What:** The merge commit for PR #7 (`a98352c`, `crichalchemist/arscontexta`) landed 46 commits
+on `main`, not the 35 that `2026-08-08-link-edge-map.md` — the plan whose review this branch's own
+adversarial pass was scoped against — set out to produce. Eleven earlier backport commits, already
+sitting on the branch before that plan's work began, rode along inside the same PR, described by
+neither the PR body nor the plan. That undescribed eleven-commit range is not incidental: it
+includes the entire initial `reference/lib/queue-edit.sh` — a third shared library, with seven
+consumers, that consequently never passed through the plan's own review process the way
+`link-extraction.sh` and `frontmatter.sh` did. Two of the ten findings the subsequent adversarial
+review raised against `a98352c` live in that undescribed half: **F1** — `queue_edit`'s commit step
+(`mv "$tmp" "$file"`) was unguarded, so a failed rename returned rc 0, left the queue file
+unchanged, and left a staged temp beside it, silently defeating the library's own stated
+fail-loud contract — and **F6** — `/health` Category 9 audited `link-extraction.sh` and
+`frontmatter.sh` but not `queue-edit.sh`, the very library that had ridden along undescribed.
+
+**Why not now:** there is nothing left to implement — both findings this provenance gap produced
+are already fixed on this branch (Task 12a: `queue_edit`'s commit step is now guarded,
+`QUEUE_EDIT_VERSION` moved 1→2; `/health`'s shared `check_lib` helper now covers all three
+libraries), and CLAUDE.md's `QUEUE_EDIT_VERSION` paragraph (added by task 15) already documents the
+fixed state. What this entry closes is a different gap: the provenance fact itself — a PR silently
+carrying undescribed backport work past the review its own findings are numbered against — already
+exists as tracked, committed, non-gitignored prose (`docs/superpowers/specs/2026-08-09-post-merge-hardening-design.md`'s
+"Provenance matters here" paragraph, duplicated in `docs/superpowers/plans/2026-08-09-post-merge-hardening.md:1469`),
+but only inside this branch's own task-scoped spec and plan documents. Those are exactly the kind
+of file this branch's own history shows going stale or getting archived once the branch that
+produced them lands (see `docs/closed-divergences.md`'s absorption of earlier per-branch sections).
+`deferrals.md` is this repo's durable ledger; the process lesson here — that a PR's stated scope and
+its actual commit range can silently diverge, hiding findings inside the gap — outlives this one
+branch and belongs in the file that does.
+
+**Reopens if:** a future PR's merged commit range again exceeds what its driving plan or PR body
+describes, by any margin — the remedy each time is the same: run the three `git rev-list --count`
+comparisons below against the new range before treating a plan's stated commit count as the actual
+diff under review, and re-check whether any review finding traces to the undescribed portion.
+
+**From:** Task 15 (`.superpowers/sdd/2026-08-09-post-merge-hardening/task-15-brief.md`),
+`fix/post-merge-hardening` — cross-referencing
+`docs/superpowers/specs/2026-08-09-post-merge-hardening-design.md`'s "Provenance matters here"
+paragraph and its grouping-B finding pair (F1, F6)
+
+```bash
+git rev-list --count 542fed8..d2c5054   # 11 — pre-existing backport work, incl. queue-edit.sh v1
+git rev-list --count d2c5054..77928ee   # 35 — the link-edge-map plan's own described scope
+git rev-list --count 542fed8..77928ee   # 46 — actually merged by PR #7 (merge commit a98352c)
+/usr/bin/grep -n 'QUEUE_EDIT_VERSION=' reference/lib/queue-edit.sh   # 2 — F1 fixed, task 12a
+/usr/bin/grep -n 'queue-edit' skills/health/SKILL.md | /usr/bin/grep -c .   # F6 fixed, task 12a
 ```
 
 ---
