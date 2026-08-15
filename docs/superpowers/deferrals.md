@@ -681,6 +681,47 @@ git rev-list --count 542fed8..77928ee   # 46 — actually merged by PR #7 (merge
 
 ---
 
+### 27. `/upgrade` option (b) — the customization-preserving merge — stays withheld
+
+**What:** `skills/upgrade/SKILL.md` offers (a) keep and (c) replace-with-archive; option (b), a
+merge preserving a user's customizations, is deliberately not offered. Its stated blocker — "this
+repo carries no release tags to recover it" (`git tag` returns 0, still true) — is no longer the
+whole story: five complete cached baselines sit under
+`~/.claude/plugins/cache/agenticnotetaking/arscontexta/` (`0.8.0 0.9.0 0.9.5 0.9.6 0.9.7`, 16
+`skill-sources/` directories each), so the canonical side of a merge baseline is recoverable from
+cache. Task 19 annotated the skill with that path beside the release-tags sentence; it did not
+restore the option.
+
+**Why not now:** restoring (b) is a behavior change to a plugin skill where a wrong merge
+**corrupts a user's customized skills** — a worse failure than the withholding it repairs. And the
+cached baseline is usually-present, not guaranteed: a cache can be pruned, and mapping an installed
+skill back to its cached original is a derivation rather than a lookup — measured 2026-08-15, the
+field vault's stamps no longer name a plugin version at all (10 of its 16 skills carry
+`generated_from: "arscontexta-v1.6"` and the other 6 carry no stamp), so the earlier claim that the
+cache holds "both versions the field vault is stamped with" no longer holds as stated. Needs its
+own spec.
+
+**Reopens if:** any vault reports a customization lost to `/upgrade`'s replace path — at that point
+the cost of withholding exceeds the risk of merging — or a baseline-retention mechanism (release
+tags, or a pinned per-vault baseline copy) lands, making the baseline guaranteed rather than
+usually-present.
+
+**From:** Task 19 (`.superpowers/sdd/2026-08-09-post-merge-hardening/task-19-brief.md`),
+`fix/post-merge-hardening`, spec §15.
+
+```bash
+git tag | wc -l                                                    # 0 — no release tags
+ls -1 ~/.claude/plugins/cache/agenticnotetaking/arscontexta/       # 0.8.0 0.9.0 0.9.5 0.9.6 0.9.7
+for v in ~/.claude/plugins/cache/agenticnotetaking/arscontexta/*/; do
+  ls -1 "$v/skill-sources" | wc -l
+done                                                               # 16, five times — each complete
+/usr/bin/grep -rho 'generated_from:.*' ~/second-brain/.claude/skills/*/SKILL.md \
+  | sort | uniq -c        # 10 x arscontexta-v1.6, of 16 skills; the other 6 carry no stamp line
+/usr/bin/grep -c 'plugins/cache/agenticnotetaking' skills/upgrade/SKILL.md   # >=1 — the annotation
+```
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.

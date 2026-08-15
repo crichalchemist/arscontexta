@@ -590,7 +590,15 @@ Options:
 **Option (b), a merge preserving customizations, is not offered — not as a corner case, but as
 the real behavior every invocation of `/upgrade` gets today: there is no OLD-rendering
 available.** A merge needs the *original* canonical template this skill was generated from, and
-this repo carries no release tags to recover it. Without that baseline a merge is a guess, not a
+this repo carries no release tags to recover it. That much is true, but it is not the same as "no
+baseline exists": the plugin cache retains complete prior versions under
+`~/.claude/plugins/cache/agenticnotetaking/arscontexta/<version>/`, each carrying a full
+`skill-sources/` tree (five versions, 16 skill directories each, measured 2026-08-15 — `ls` that
+directory to re-derive, and note the cache is version-partitioned: descend into a version
+directory before concluding it is empty). Restoring option (b) on that basis stays deliberately
+withheld — a wrong merge corrupts a user's customized skills — and is tracked in
+`docs/superpowers/deferrals.md`. Until a baseline is actually recovered and compared, a merge is
+a guess, not a
 fact — exactly the render-noise problem the mechanical-comparison step above was built to avoid,
 not something to reintroduce here by another route. State this plainly to the human rather than
 presenting a third option that would fail silently or produce a guessed merge.

@@ -671,9 +671,13 @@ comment`, the comment being the line that records what the old name claimed. Rea
 as a surviving defect is the error; deleting the comment to make one command suffice would delete
 the only in-file account of why the rename happened.
 
-**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` **has still never been invoked as
-a slash command against a real vault** — a slash command runs in the session's working directory and
-cannot be pointed at another tree, so that gap is structural rather than merely undone. Its three
+**5. Verification gaps in the loop itself.** `/arscontexta:upgrade` **has no recorded slash-command
+invocation against a real vault, and that gap is undone, not structural.** This entry used to give a
+structural reason — a slash command runs in the session's working directory and cannot be pointed at
+another tree — which is true of a session sitting in this repo and false where it matters: a session
+whose cwd *is* the vault invokes the command natively. The field vault's `ops/skills-archive/`
+carries dated archive events, the footprint of upgrade *operations* — but an archive proves an
+operation ran, not that this command was its vehicle, so neither direction is established. Its three
 repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`) remain prose contracts CI cannot
 exercise.
 
@@ -1285,8 +1289,8 @@ three-tier gap in miniature, built by someone who had just written this entry.
 ```
 
 **`/arscontexta:upgrade` is the nearest thing to a mechanism, and divergence 5 records that it has
-never been invoked as a slash command against a real vault** — structurally, since a slash command
-runs in the session's working directory and cannot be pointed at another tree. Its repairs were
+no recorded slash-command invocation against a real vault** — a gap that is undone, not structural,
+since a session whose cwd is the vault invokes it natively. Its repairs were
 hand-executed against an `rsync` copy once, which found six defects. A design for real re-sync is its
 own spec and is explicitly out of scope for Spec H.
 

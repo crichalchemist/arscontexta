@@ -1776,8 +1776,11 @@ overstated when checked.
   prose only. The blocker is now gone rather than merely restated: five complete baselines sit in
   `~/.claude/plugins/cache/agenticnotetaking/arscontexta/` (`0.8.0 0.9.0 0.9.5 0.9.6 0.9.7`, 16
   `skill-sources/` each), including **both** versions the field vault is stamped with, so a merge
-  baseline is recoverable and a merge would be fact rather than guess. Needs its own spec. Lands
-  in `docs/superpowers/deferrals.md`. **Reopening trigger:** any vault reporting a customization
+  baseline is recoverable and a merge would be fact rather than guess. Needs its own spec. Landed
+  as `docs/superpowers/deferrals.md` entry 27 — which also records that this bullet's "both
+  versions the field vault is stamped with" no longer held when re-measured on 2026-08-15: the
+  vault's stamp scheme changed to `arscontexta-v1.6`, with six skills unstamped. **Reopening
+  trigger:** any vault reporting a customization
   lost to an `/upgrade` replace — the cost of withholding then exceeds the risk of merging.
 
 - **`/next`'s `context: fork` (`skill-sources/next:7`) — 0-for-4 in the field.**
