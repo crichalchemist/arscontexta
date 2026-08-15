@@ -350,9 +350,19 @@ independent and have different contracts.
 **1. Commands → vault skills.** `skill-sources/<name>/SKILL.md` is a template copied into a
 generated vault at `.claude/skills/<name>/SKILL.md`, where it becomes a bare `/<name>` command.
 Distinct from `skills/<name>/SKILL.md`, which are the *plugin's own* always-available
-`/arscontexta:<name>` commands and are never copied. Both use SKILL.md frontmatter
-(`context: fork`, `model:`, `allowed-tools:`), but only `skill-sources/` templates carry
-`{vocabulary.*}` placeholders.
+`/arscontexta:<name>` commands and are never copied. Both use SKILL.md frontmatter, but the two
+keys inside it diverge: `allowed-tools:` is universal in both trees (10/10 `skills/`, 16/16
+`skill-sources/`), while `context:`/`model:` are universal only in `skill-sources/` (16/16) —
+`skills/` now carries them on just 5 of 10 (`architect`, `health`, `help`, `setup`, `upgrade` lack
+both keys; `help` always did, the other four dropped them on `fix/post-merge-hardening`, so the
+sentence was already imprecise for one skill before that commit widened it to five). Only
+`skill-sources/` templates carry `{vocabulary.*}` placeholders.
+
+```bash
+c=0; for f in skills/*/SKILL.md; do /usr/bin/grep -q '^context:' "$f" && c=$((c+1)); done; echo "$c"          # 5 of 10
+c=0; for f in skill-sources/*/SKILL.md; do /usr/bin/grep -q '^context:' "$f" && c=$((c+1)); done; echo "$c"   # 16 of 16
+c=0; for f in skills/*/SKILL.md; do /usr/bin/grep -q '^allowed-tools:' "$f" && c=$((c+1)); done; echo "$c"    # 10 of 10
+```
 
 **2. Feature blocks → vault CLAUDE.md.** `generators/claude-md.md` is the composition spec;
 `generators/features/*.md` are 17 blocks it selects among based on the derived configuration. The

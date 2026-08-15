@@ -1598,7 +1598,7 @@ slipped.
 
 ## Task 18: `CLAUDE.md:307` — a claim Task 16 makes false (spec §8)
 
-- [ ] **Step 1: Fix the parenthetical in the same commit as Task 16, or immediately after**
+- [x] **Step 1: Fix the parenthetical in the same commit as Task 16, or immediately after**
 
 `CLAUDE.md:307` says *"Both use SKILL.md frontmatter (`context: fork`, `model:`,
 `allowed-tools:`)"*. After Task 16 that is false for 4 of 10 `skills/`. **This rots on
@@ -1615,7 +1615,7 @@ State the split rather than a bare number: the sentence's subject is what the tw
 share, and the honest form is that `allowed-tools:` is common to both while `context:`/
 `model:` now appear on a subset. Give it a re-derivation command, per house convention.
 
-- [ ] **Step 2: `check-doc-claims.sh` green, then commit**
+- [x] **Step 2: `check-doc-claims.sh` green, then commit**
 
 ---
 
