@@ -34,6 +34,7 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 LINK_LIB_SRC="$ROOT/reference/lib/link-extraction.sh"
 FM_LIB_SRC="$ROOT/reference/lib/frontmatter.sh"
 QUEUE_LIB_SRC="$ROOT/reference/lib/queue-edit.sh"
+QUEUE_PY_SRC="$ROOT/reference/lib/queue_edit.py"
 
 # Every spawned shell must be THIS harness's shell, not `sh`. On macOS `sh` is
 # bash 3.2 regardless of what launched the harness, so an `sh` site silently
@@ -131,14 +132,11 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f09~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01. Was f08 until 2026-08-08, when the Category 1 enum-value check added a fence ahead of it; the defect did not move, its INDEX did. This is the (letter, label) keying CLAUDE.md flags -- a renumber makes the entry read STALE and its unchanged subject read as a new failure, and only the message tells them apart
 skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
-skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer
-skill-sources/next f01~H~2026-08-11: queue_edit targets ops/queue/queue.json while the healthy fixture also creates ops/queue/queue.yaml; the guard added on this branch correctly refuses that write, since queue.json is a stale tombstone once queue.yaml exists; the real defect is this template hardcoding the JSON queue path instead of detecting the actual queue format in use; fixing that is deferred because it changes what generation emits; the entry drains once the template stops hardcoding the JSON path
-skill-sources/next f02~H~2026-08-11: same fence pattern and same reason as skill-sources/next f01 above -- queue_edit on ops/queue/queue.json, correctly refused by the queue.yaml-present guard; hardcoded JSON path is the deferred defect
-skill-sources/next f03~H~2026-08-11: same fence pattern and same reason as skill-sources/next f01 above -- queue_edit on ops/queue/queue.json, correctly refused by the queue.yaml-present guard; hardcoded JSON path is the deferred defect
-skill-sources/reduce f03~H~2026-08-11: same fence pattern and same reason as skill-sources/next f01 above -- queue_edit on ops/queue/queue.json, correctly refused by the queue.yaml-present guard; hardcoded JSON path is the deferred defect
-skill-sources/reflect f06~H~2026-08-11: same fence pattern and same reason as skill-sources/next f01 above -- queue_edit on ops/queue/queue.json, correctly refused by the queue.yaml-present guard; hardcoded JSON path is the deferred defect
-skill-sources/reweave f04~H~2026-08-11: same fence pattern and same reason as skill-sources/next f01 above -- queue_edit on ops/queue/queue.json, correctly refused by the queue.yaml-present guard; hardcoded JSON path is the deferred defect
-skill-sources/verify f01~H~2026-08-11: same fence pattern and same reason as skill-sources/next f01 above -- queue_edit on ops/queue/queue.json, correctly refused by the queue.yaml-present guard; hardcoded JSON path is the deferred defect'
+skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer'
+# 2026-08-15: the seven 2026-08-11 assertion-H queue entries (next f01-f03, reduce f03,
+# reflect f06, reweave f04, verify f01) drained here, in the same commit that
+# repointed those fences to detect the queue format and write YAML via
+# queue_yaml — the bidirectional check requires exactly that pairing.
 
 table_reason() {                    # table_reason <table> <label> [letter]
   printf '%s\n' "$1" | while IFS='~' read -r l a r; do
@@ -178,6 +176,13 @@ build_fixture() {
     printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_LIB_SRC" >&2
     return 1
   }
+  # queue-edit.sh v2 resolves queue_edit.py beside itself; a fixture carrying the
+  # .sh without the .py would fail every YAML queue write on harness shape rather
+  # than on anything the fence is being judged for.
+  cp "$QUEUE_PY_SRC" "$v/ops/lib/queue_edit.py" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_PY_SRC" >&2
+    return 1
+  }
 
   # THE `---` DELIMITERS ARE LOAD-BEARING, not decoration. These two files had none,
   # which was fine while the counting fences matched `^status:` line-anchored anywhere
@@ -191,7 +196,12 @@ build_fixture() {
   printf -- '---\nstatus: open\ntitle: a tension\n---\nBody.\n'  > "$v/ops/tensions/tension-one.md"
   printf 'description: a learned rule\ntitle: a learned rule\n' > "$v/ops/methodology/method-one.md"
   printf 'title: a session\n'                            > "$v/ops/sessions/session-one.md"
-  printf -- '- id: one\n  status: pending\n- id: two\n  status: done\n' > "$v/ops/queue/queue.yaml"
+  # Task `one` carries the condition_key the map gives `{condition_key}` and a
+  # pending status, so the repointed queue fences' `--where` clauses MATCH here:
+  # queue_yaml fails loud on a zero-match write (that silence was the defect the
+  # seven fences shipped), so a fixture task nothing matches would fail every
+  # queue fence on fixture shape rather than on anything it is judged for.
+  printf -- '- id: one\n  status: pending\n  condition_key: orphans\n- id: two\n  status: done\n' > "$v/ops/queue/queue.yaml"
   printf 'title: identity\n'                             > "$v/self/identity.md"
   # Level 5/6/7 markers and one non-identity pair (reduce -> extract) added for
   # assertion M (Spec I Task 5) -- resolve_canonical_name's own guard needs
@@ -532,11 +542,18 @@ assert_modification_detection "$VAULT_FULL" "$PLUGIN_STUB" || m_fail=1
 # used by fences but are NOT in the README prerequisite table; that gap is a
 # finding in its own right, recorded in the report.
 missing=""
-for t in rg awk jq bc git sed; do
+for t in rg awk jq bc git sed python3; do
   command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
 done
 if [ -n "$missing" ]; then
   printf 'harness: required tool(s) missing:%s — cannot conclude anything\n' "$missing" >&2
+  exit 1
+fi
+# python3 alone is not enough: queue_edit.py imports PyYAML, and without it every
+# YAML queue write exits on an ImportError traceback — a false Critical against
+# seven fences that a reader cannot tell from a real one.
+if ! python3 -c 'import yaml' >/dev/null 2>&1; then
+  printf 'harness: python3 lacks PyYAML (queue_edit.py needs it) — cannot conclude anything\n' >&2
   exit 1
 fi
 
@@ -577,6 +594,9 @@ map_value() {
     '{value}')                       printf 'note' ;;
     '{target}')                      printf 'alpha' ;;
     '{condition_key}')               printf 'orphans' ;;
+    # The fixture queue task the queue fences' --where clauses match; see the
+    # fixture's own comment above its queue.yaml.
+    '{task_id}')                     printf 'one' ;;
     '{description}')                 printf 'a sample description' ;;
     '{priority}')                    printf 'high' ;;
     '{SOURCE_NAME}')                 printf 'sample-source' ;;

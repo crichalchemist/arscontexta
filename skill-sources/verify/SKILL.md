@@ -522,15 +522,36 @@ else
   exit 1
 fi
 : "${QUEUE_EDIT_VERSION:=0}"
-if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
-  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+if [ "$QUEUE_EDIT_VERSION" -lt 2 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 2" >&2
   echo "       run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
+# The queue is YAML or JSON — the same search order seed and /ralph document.
+# A vault that migrated to YAML leaves queue.json behind as a tombstone; a
+# write landing there is the silent no-op this dispatch replaced. No queue at
+# all fails loud rather than writing nowhere.
+QUEUE_FILE=""
+for q in ops/queue.yaml ops/queue/queue.yaml ops/queue/queue.json; do
+  if [ -f "$q" ]; then QUEUE_FILE="$q"; break; fi
+done
+if [ -z "$QUEUE_FILE" ]; then
+  echo "error: no queue file found (looked for ops/queue.yaml, ops/queue/queue.yaml, ops/queue/queue.json)" >&2
+  exit 1
+fi
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-queue_edit '(.tasks[] | select(.id==$id)).status = "done" | (.tasks[] | select(.id==$id)).completed = $ts' \
-  ops/queue/queue.json --arg id "TASK_ID" --arg ts "$TIMESTAMP"
+# {task_id} is the task id from the handoff block
+case "$QUEUE_FILE" in
+  *.yaml)
+    queue_yaml "$QUEUE_FILE" --where 'id={task_id}' --set status=done --set "completed=$TIMESTAMP"
+    ;;
+  *)
+    queue_edit '(.tasks[] | select(.id==$id)).status = "done" | (.tasks[] | select(.id==$id)).completed = $ts' \
+      "$QUEUE_FILE" --arg id "{task_id}" --arg ts "$TIMESTAMP"
+    ;;
+esac
 ```
 
 The queue path uses the domain-native operations folder. Check `ops/` or equivalent.

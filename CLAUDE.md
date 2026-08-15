@@ -69,11 +69,11 @@ for s in bash zsh; do
   $s reference/test/placeholder-count.test.sh            # 40/40
   $s reference/test/hook-config.test.sh                  # 60/60
   $s reference/test/vocabulary-schema.test.sh            # 12/12
-  $s reference/test/queue-edit.test.sh                   # 37/37
+  $s reference/test/queue-edit.test.sh                   # 77/77
 done
 ```
 
-**`queue-edit.test.sh` is green: 37/37, both shells.** It was RED ON PURPOSE for one branch — three
+**`queue-edit.test.sh` is green: 77/77, both shells.** It was RED ON PURPOSE for one branch — three
 of its assertions pinned an open defect before the fix landed, the only order in which a test can be
 shown to fail for the stated reason. `reference/lib/queue-edit.sh` used to end `mv "$tmp" "$file"`
 with no `||`, so a rename that failed left the temp on disk, printed nothing, and returned the exit
@@ -96,7 +96,7 @@ organic trigger is hand-run only, and that is not the same claim.
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
 | `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
 | `check-doc-claims.sh` | a number a document DECLARES going stale — including on MERGE, where nothing in a working tree changes and there is no diff to notice. Also the only gate reading `generators/`: the note `status` enum is declared **four times across three files** (`schema.md` declares it twice, once in a table and once in `_schema`), and a file-to-file comparison cannot see those two disagree — the blind spot `bump-version.test.sh` exists for, one tree over. It compares the VALUE SET, never the text, because the same enum is legitimately spelled three ways. It also checks the tension enum against its three consumers, which is the half that is checkable for an enum declared only once: a recipe matching a value the enum dropped returns 0 forever. **What it cannot cover:** the observation enum, declared once with no consumer inside `generators/` — its consumer is the SessionStart hook, in another tree. Declaration counts are PINNED, because discovery keys on an anchor value and a declaration that drops the anchor stops being discovered; three survivors agreeing would otherwise read PASS |
-| `queue-edit.test.sh` | the only gate that executes `reference/lib/queue-edit.sh` — a shared library with seven consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing; and that a failed commit-step rename returns 1, discards its temp, and names the path — see the paragraph above the table |
+| `queue-edit.test.sh` | the only gate that executes `reference/lib/queue-edit.sh` — a shared library with seven consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing; and that a failed commit-step rename returns 1, discards its temp, and names the path — see the paragraph above the table. Since v2 (task 12a) it also pins the ported YAML write path: `queue_edit` refuses a `.yaml` target naming `queue_yaml` as the remedy, and `queue_yaml` edits surgically (one changed line, folded scalars untouched), fails loud on a zero-match `--where` — the silence that left seven fences dead for a month — and shares the same lock and guarded-rename contract |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
@@ -154,18 +154,18 @@ silently skipped fence is the same defect class the gate exists to catch. Read t
 extracted count as two numbers: this sentence said "extracts all 75", which is the run count wearing
 the extraction label, and a skip rule that quietly began matching a fourth fence would not have
 moved it. It supplies `ARGUMENTS` so the healthy fixture models a healthy *invocation*
-and not merely a healthy vault. It carries an allowlist of known-open defects — now 11, and the
+and not merely a healthy vault. It carries an allowlist of known-open defects — now 4, and the
 composition carries the meaning rather than the total: two `ZSH ONLY:` entries against assertion H
-(the non-matching-glob fork, down from 8 such at its peak), two shell-agnostic entries against
-assertion N, and seven shell-agnostic entries against assertion H
-(`skill-sources/next` f01-f03, `reduce` f03, `reflect` f06, `reweave` f04, `verify` f01) — each calls
-`queue_edit` on `ops/queue/queue.json` while the healthy fixture also creates `ops/queue/queue.yaml`;
-the `queue_edit` guard added on `fix/post-merge-hardening` correctly refuses that write, since
-`queue.json` is a stale tombstone once `queue.yaml` exists; the underlying defect is these seven
-templates hardcoding the JSON queue path rather than detecting which format a vault actually uses,
-and fixing that changes what generation emits, so it is deferred — **checked in both directions**: a
-listed entry that starts passing, or whose fence no longer exists, fails the gate, so the list drains
-rather than rots, and each of these seven drains once its template stops hardcoding the JSON path.
+(the non-matching-glob fork, down from 8 such at its peak) and two shell-agnostic entries against
+assertion N — **checked in both directions**: a listed entry that starts passing, or whose fence no
+longer exists, fails the gate, so the list drains rather than rots. The seven shell-agnostic
+assertion-H queue entries the list carried from 2026-08-11 (`skill-sources/next` f01-f03, `reduce`
+f03, `reflect` f06, `reweave` f04, `verify` f01 — each calling `queue_edit` on the
+`ops/queue/queue.json` tombstone) drained on 2026-08-15, in the same commit that repointed those
+seven fences: they now detect the queue via the `ops/queue.yaml` → `ops/queue/queue.yaml` →
+`ops/queue/queue.json` search order and write YAML through `queue_yaml`, the field-proven write path
+ported into `reference/lib/queue-edit.sh` v2 (task 12a's ruling). That port is also why `python3`
+joined the gate's asserted tool set and the README prerequisite table below.
 
 **That sentence read "now 2, both zsh-only" from 2026-08-02 until 2026-08-08**, while the
 vocabulary-schema work added the two N entries and merged. It is an ungated prose numeral of exactly
@@ -176,23 +176,26 @@ did not follow.
 **It then read "now 4" from 2026-08-08 until 2026-08-11**, when `fix/post-merge-hardening` added the
 `queue_edit` precondition described above and the healthy fixture's legitimate coexistence of
 `queue.json` and `queue.yaml` turned seven fences red against assertion H. Same class of drift as the
-line above, recorded rather than silently corrected.
+line above, recorded rather than silently corrected. **It read "now 11" from 2026-08-11 until
+2026-08-15**, when task 12a's port drained those seven — that move is a fix landing with its own
+count, not drift, and it returns the total to a coincidental 4 whose composition differs from the
+2026-08-08 "now 4": read the composition, not the number.
 
 **Re-derive it, and do not read the gate's own `known-open=` as the table size — it is SHELL-SCOPED.**
 The header counts entries in scope for the shell running it, so the same unchanged table reports
-`known-open=9` under bash and `known-open=11` under zsh: the two `ZSH ONLY:` entries are correctly out
+`known-open=2` under bash and `known-open=4` under zsh: the two `ZSH ONLY:` entries are correctly out
 of scope under bash. A reader taking either number as "how many known-open defects are there" gets a
 different answer depending on which shell they happened to run, and both look authoritative. Count
 the table for the total; run both shells for the split:
 
 ```bash
-# 12 = 11 table entries + 1 comment line, the one documenting the fabricated
+# 5 = 4 table entries + 1 comment line, the one documenting the fabricated
 # `.probe-skill f01~H~` absorption probe. Stated as a sum rather than filtered with
 # an exclusion, per the idiom divergence 12 uses: an exclusion rots silently and can
 # quietly match nothing, whereas a sum fails loudly the moment it stops adding up.
-/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 12 = 11 + 1
-bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 9 — in scope for bash
-zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 11 — in scope for zsh
+/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 5 = 4 + 1
+bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 2 — in scope for bash
+zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 4 — in scope for zsh
 ```
 
 It also carries one assertion that is **not** about fences: **F**, which runs once against a
@@ -302,21 +305,24 @@ rewriting history. *qmd absent* stays WARN; *qmd present but declaring names tha
 is FAIL.
 
 `tree` and `ripgrep` are required (per the README's prerequisite table) — by generated systems at
-runtime and by `validate-kernel.sh` here. Fences additionally invoke `awk`, `sed`, `jq`, `bc` and
-`git`; the fence gate asserts their presence and halts loudly rather than letting a missing tool's
-127 read as a defect.
+runtime and by `validate-kernel.sh` here. Fences additionally invoke `awk`, `sed`, `jq`, `bc`,
+`git` and — since queue-edit v2's `queue_edit.py` (task 12a) — `python3` with PyYAML; the fence
+gate asserts their presence (including a PyYAML import probe) and halts loudly rather than letting
+a missing tool's 127 read as a defect.
 
-**Those six and the README's prerequisite table are now deliberately the same set** — that sentence
+**Those seven and the README's prerequisite table are now deliberately the same set** — that sentence
 used to read "which are **not** in that table", and the table has since been widened to cover every
 tool the gate asserts. The relationship, not either list alone, is what to check when one side moves.
-The table carries **7** shell-tool rows rather than 6: the decomposition is `7 = 6 gate-asserted +
+The table carries **8** shell-tool rows rather than 7: the decomposition is `8 = 7 gate-asserted +
 tree`, `tree` being a SessionStart-hook dependency that no fence invokes. Stated as a sum rather than
 as a `grep -v tree` exclusion, per the idiom divergence 12 already uses — an exclusion rots silently
-and can quietly match nothing, which this repo has shipped twice.
+and can quietly match nothing, which this repo has shipped twice. (The first command's character
+class carries a `3` because `python3` does; the old `[a-z ]*` would silently truncate the very
+token this port added.)
 
 ```bash
-grep -o 'for t in [a-z ]*' reference/test/fence-isolation.test.sh   # rg awk jq bc git sed
-grep -cE '^\| `(ripgrep|awk|sed|jq|bc|git|tree)' README.md          # 7 = 6 + tree
+grep -o 'for t in [a-z3 ]*' reference/test/fence-isolation.test.sh   # rg awk jq bc git sed python3
+grep -cE '^\| `(ripgrep|awk|sed|jq|bc|git|tree|python3)' README.md   # 8 = 7 + tree
 ```
 
 ## Architecture: three generation paths

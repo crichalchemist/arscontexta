@@ -1008,6 +1008,134 @@ what shows this did not alter meaning for real keys."
 
 ---
 
+## Task 12a: the queue write path is dead in seven template fences (field, 2026-08-15)
+
+**Source:** field observation `~/second-brain/ops/observations/the-documented-queue-write-path-is-dead-in-five-skills-and-its-deadness-emits-no-signal.md`,
+corroborated independently by this repo's own fence-gate allowlist, which has carried these same
+seven as known-open since 2026-08-11. `docs/field-intel-2026-08-15.md` A1.
+
+**This task carries a DESIGN FORK at Step 2. Do not implement past Step 1 without a ruling.**
+
+- [x] **Step 1: Re-derive both sides — the two libraries are NOT the same version**
+
+```bash
+grep -nE '^[a-z_]+\(\)|^QUEUE_EDIT_VERSION' reference/lib/queue-edit.sh        # v1, queue_edit() only
+grep -nE '^[a-z_]+\(\)|^QUEUE_EDIT_VERSION' ~/second-brain/ops/lib/queue-edit.sh  # v2, +_queue_lock +queue_yaml
+find . -name 'queue_edit*.py' -not -path './.git/*'                            # absent here
+ls ~/second-brain/ops/lib/queue_edit.py                                        # present there
+grep -rn 'queue_edit' skill-sources/ | grep -c .                               # 7 sites
+```
+
+The vault's library is AHEAD of the generator. The working write path (`queue_yaml()` →
+`queue_edit.py`, `--where` required, blocks iterated back-to-front) was written in the vault and
+has never existed here. Any plan that assumes a mechanical repoint is wrong — there is nothing to
+repoint *to* until something is ported.
+
+Why the seven fail: `jq` cannot parse YAML, and every filter says `.tasks[]`, which the bare-list
+queue has never had. Both failures are silent — the fences exit 0 having changed nothing, which is
+why a month passed with no error, no wrong number and no failed run.
+
+- [x] **Step 2: DESIGN FORK — RULED 2026-08-15: shape (i), port `queue_edit.py` upstream**
+
+**The ruling is recorded here because it is an architecture decision, not a preference.** It makes
+`python3` a runtime dependency of a repo that has until now declared six shell tools plus `tree`,
+and of every system this repo generates. The alternatives and their costs are kept below rather
+than deleted, per Rule 9 — a ruling whose rejected branches are erased cannot be re-audited.
+
+**Consequences the implementer MUST carry, all of them gated numbers:**
+
+```bash
+grep -o 'for t in [a-z ]*' reference/test/fence-isolation.test.sh   # the asserted tool set — grows
+grep -cE '^\| `(ripgrep|awk|sed|jq|bc|git|tree)' README.md          # prerequisite table — 7 today
+grep -n 'QUEUE_EDIT_VERSION' reference/lib/queue-edit.sh skills/health/SKILL.md   # 1 -> 2, and its reader
+```
+
+`CLAUDE.md` states that the gate-asserted tool set and the README prerequisite table *"are now
+deliberately the same set"*, and publishes the decomposition `7 = 6 gate-asserted + tree`. Adding
+`python3` moves both sides and that sum. Move them together or the relationship silently breaks —
+`CLAUDE.md` says explicitly that the relationship, not either list alone, is what to check.
+
+Everything below is the pre-ruling analysis, retained:
+
+
+
+Two shapes, and they differ in what generation emits:
+
+**(i) Port upstream.** Bring `_queue_lock()`, `queue_yaml()` and `queue_edit.py` into
+`reference/lib/`, bump `QUEUE_EDIT_VERSION` 1→2, repoint the seven fences to `queue_yaml`.
+Matches the field-proven code. Costs: a Python file is new to this repo's runtime surface
+(`CLAUDE.md` currently declares six shell tools plus `tree`; `python3` would be an eighth
+dependency and the README prerequisite table is gated), and `queue-edit.test.sh` must grow
+coverage for two new functions.
+
+**(ii) Teach `queue_edit()` format detection.** Keep one function; have it detect whether the
+vault's queue is `.json` or `.yaml` and dispatch. No new language dependency. Costs: re-implements
+work the vault already proved, and YAML editing in shell is what `queue_edit.py` exists to avoid.
+
+The repo's standing deferral reason (`CLAUDE.md`, fence-gate paragraph) is *"these seven templates
+hardcoding the JSON queue path rather than detecting which format a vault actually uses"* — which
+names (ii). The field evidence names (i). **Rule 9 applies: surface the conflict, do not blend
+them.** Do not invent a hybrid.
+
+**Measured 2026-08-15, and it splits the fork in half rather than settling it.** The DETECTION half
+of (ii) is not work to be designed — it already exists in this repo, in placeholder form, and the
+templates simply do not use it:
+
+```bash
+sed -n '78p;245,256p' platforms/shared/skill-blocks/seed.md   # 3-location, 2-format search order
+sed -n '85,87p'       platforms/shared/skill-blocks/ralph.md   # the identical order
+sed -n '92p'          skills/architect/SKILL.md                # "queue.yaml or queue.json"
+sed -n '40p'          skills/help/SKILL.md                     # same
+sed -n '225,228p'     reference/test/fence-isolation.test.sh   # fixture creates BOTH, on purpose
+```
+
+`skill-blocks/` is frozen and generates nothing — consult it, never port a behaviour change into
+it (`CLAUDE.md`, and `platforms/shared/skill-blocks/README.md`). But under Rule 12 it is this
+repo's own convention for this exact question, expressed in `{config.ops_dir}` placeholders, which
+is the form Step 3 requires anyway.
+
+What detection does NOT give you is the WRITE. Establishing that a vault's queue is YAML tells you
+only that `jq` cannot perform the edit; something must still edit YAML safely. That is precisely
+what `queue_edit.py` exists for, and it is the half that does not exist here in any form. So the
+real question is narrower than (i) vs (ii): **detection is settled and already conventional; the
+open decision is what performs a YAML write in a repo whose product is markdown, YAML and bash.**
+
+Confirm before ruling that the vault's format is not incidental: `ops/queue/queue.yaml` is ~876 KB
+and current, `ops/queue/queue.json` is a 637-byte `tasks: []` tombstone last touched 2026-08-13.
+The vault migrated; the templates never learned.
+
+- [x] **Step 3: Both reverse-transforms, whichever shape wins**
+
+The vault's call sites say `ops/queue/queue.yaml` and speak the vault's dialect. Templates must
+carry placeholders, not one vault's paths. Verify against `reference/vocabulary-transforms.md`
+line 14 — note the vault's `/extract` is this repo's `skill-sources/reduce/`, which is why the
+observation says "five skills" and the allowlist says seven fences across those same five.
+
+- [x] **Step 4: Extend `reference/test/queue-edit.test.sh`**
+
+37/37 today, both shells. It is the only gate that executes this library. New functions with no
+assertions repeat exactly how the commit step shipped unguarded (Task 8).
+
+- [x] **Step 5: Repoint the seven, and let the allowlist drain**
+
+```bash
+for s in bash zsh; do $s reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'; done
+```
+
+The allowlist is checked BIDIRECTIONALLY: an entry that starts passing FAILS the gate. So the seven
+must be removed from `KNOWN_OPEN` in the same commit that fixes them — expect `9→2` under bash and
+`11→4` under zsh. A green run with the entries still listed means the fix did not take.
+
+- [x] **Step 6: Update every declared count this moves**
+
+`check-doc-claims.sh` gates some and not others; the fence-gate paragraph in `CLAUDE.md` states
+its allowlist size in prose, and the `12 = 11 + 1` sum command beside it must still add up. Do not
+trust a single grep to find them all — Task 12 measured three doc sites where five existed.
+
+- [x] **Step 7: Commit**
+
+---
+
 ## Task 13: check 6's substring match and whitespace-split allowlist (spec §12, D19)
 
 **Files:**

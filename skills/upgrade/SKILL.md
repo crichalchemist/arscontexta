@@ -716,6 +716,14 @@ Generated vaults carry their own copies of **three** versioned libraries under `
 | `ops/lib/frontmatter.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
 | `ops/lib/queue-edit.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/queue-edit.sh` | `QUEUE_EDIT_VERSION` |
 
+**`queue-edit.sh` v2 has a companion file, `queue_edit.py`, that rides the same version constant.**
+`queue_yaml` resolves the helper beside the library it was sourced from, so whenever the queue-edit
+row copies (restore, or refresh to v2 or later), copy
+`${CLAUDE_PLUGIN_ROOT}/reference/lib/queue_edit.py` to `ops/lib/queue_edit.py` in the same action and
+confirm both files landed. A v2 `.sh` without its `.py` fails every YAML queue write loudly at run
+time — better than silence, but a state this step must not create. The helper needs `python3` with
+PyYAML (the README prerequisite table row added with v2).
+
 **Scope, stated rather than implied: this step reconciles those three files, not the whole of
 `ops/lib/`.** A vault's `ops/lib/` may also hold graph parsers and their tests. Those carry no version
 marker to compare against, so this step cannot reconcile them and must not claim to. Report the files;
@@ -762,8 +770,9 @@ link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
 frontmatter.sh:     v0 (absent) → v3 [restored]
 frontmatter.sh:     v1 → v3 [refreshed]
 frontmatter.sh:     v3 [current]
-queue-edit.sh:      v0 (absent) → v1 [restored]
-queue-edit.sh:      v1 [current]
+queue-edit.sh:      v0 (absent) → v2 [restored, with queue_edit.py]
+queue-edit.sh:      v1 → v2 [refreshed, with queue_edit.py]
+queue-edit.sh:      v2 [current]
 ```
 
 `frontmatter.sh` is absent from **every vault generated before it existed**, so `v0 (absent) → v3

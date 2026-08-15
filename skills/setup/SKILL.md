@@ -431,7 +431,7 @@ All generated systems ship with full automation from day one. There are no tiers
 | Context file | Always | Comprehensive, all sections |
 | 16 processing skills + 10 plugin commands | Always | Processing skills vocabulary-transformed with full quality gates |
 | All hooks | Always | Orient, capture, validate, commit |
-| Shared libraries | Always | ops/lib/link-extraction.sh + ops/lib/frontmatter.sh + ops/lib/queue-edit.sh |
+| Shared libraries | Always | ops/lib/link-extraction.sh + ops/lib/frontmatter.sh + ops/lib/queue-edit.sh + ops/lib/queue_edit.py |
 | Queue system | Always | ops/tasks.md + ops/queue/ + ops/queue/.locks/ |
 | Templates | Always | With _schema blocks |
 | Self space | If opted in | self/ or ops/ fallback |
@@ -1450,6 +1450,7 @@ Create the directory `ops/lib/` in the vault, then copy **all three** of these i
 | `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh` | `ops/lib/link-extraction.sh` | `LINK_EXTRACTION_VERSION` |
 | `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `ops/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
 | `${CLAUDE_PLUGIN_ROOT}/reference/lib/queue-edit.sh` | `ops/lib/queue-edit.sh` | `QUEUE_EDIT_VERSION` |
+| `${CLAUDE_PLUGIN_ROOT}/reference/lib/queue_edit.py` | `ops/lib/queue_edit.py` | — rides `QUEUE_EDIT_VERSION`; `queue_yaml` resolves it beside `queue-edit.sh`, so the pair must copy together |
 
 **Perform these copies yourself — do not emit them as shell commands.** `${CLAUDE_PLUGIN_ROOT}` resolves for you, who knows where the plugin is installed; it is *unset* inside a bash block, so a shell copy would silently read from `/reference/lib/…`, fail, and leave `ops/lib/` empty. The generated vault would then look like it needs an upgrade rather than a repaired copy. This applies identically to all three files.
 
