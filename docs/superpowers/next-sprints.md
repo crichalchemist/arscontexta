@@ -84,30 +84,77 @@ field vault. A staleness audit against `main` @ `d146069` returned: T1 hold · T
 **T3 step 3 broke** · T4 hold · **T5 broke** · T6 hold · T7 shifted · T8 shifted/partly broke,
 with 12 stale citations.
 
-**T5 is the reason this stopped.** The plan's normalizer targets bare `description:` scalars,
-assuming **1621 bare / 12 quoted**. The corpus has since inverted. Measured 2026-08-15 across
-all 2874 notes under `nodes/`:
-
-```bash
-# 2776 quoted · 98 bare · 473 of the quoted carry a colon inside the value
-```
-
-`frontmatter_field` strips balanced quotes *before* the plan's strip logic runs, and the rewrite
-emits the value unquoted — so `--apply` would rewrite ~1776 files without their quotes and
-produce **invalid YAML on the colon-bearing subset**, while its "expect 1633" progress check
-read as plausible forward motion throughout. Verified by executing the plan's own fixture.
+**T5 is the reason this stopped — but not for the reason first recorded here.** Its
+read-modify-write reads through `frontmatter_field`, which strips balanced quotes, and emits the
+value back **unquoted**. Against the live corpus that rewrites **1776** files without their
+quotes and produces **invalid YAML on the 473 carrying a colon inside the value**, while its
+"expect 1633" progress check reads as plausible forward motion throughout. Verified by executing
+the plan's own fixture: it returns `A quoted one.` and the rewrite emits it unquoted.
 
 **T3 step 3** gates promotion on `$VERIFY_FAIL_COUNT`, which exists nowhere in `verify`. Fences
 are separate shell invocations, so it expands empty and promotion silently never fires.
 
-**Decision: re-spec Item 3 from scratch** rather than revise the plan. The corpus changed shape
-underneath the *design*, not merely the plan — T5's stated purpose (clear a 1621-note backlog)
-has largely evaporated on its own, with ~8 bare-with-period notes remaining. A revised plan
-would inherit a framing that may no longer describe the problem.
+### CORRECTION, 2026-08-15 — what this section claimed, and what refuted it
 
-**Blocked first on forensics.** Roughly 1776 descriptions were normalized between 2026-08-08 and
-2026-08-15 with no record of what did it. That is being run down before the re-spec, because a
-spec written against a corpus that something is still actively rewriting would race it.
+This section first read: *"The plan's normalizer targets bare `description:` scalars, assuming
+1621 bare / 12 quoted. **The corpus has since inverted**"*, and concluded *"T5's stated purpose
+(clear a 1621-note backlog) **has largely evaporated on its own**, with ~8 bare-with-period notes
+remaining."*
+
+**Both claims were false**, and the decision to re-spec was taken on them. Refuted by a forensic
+pass over the vault's git history plus a direct census:
+
+```bash
+# quoted with trailing period 1776 · bare with trailing period 8 · TOTAL 1784
+# quoted without 1000 · bare without 90
+```
+
+- **The corpus never inverted.** Descriptions have been written quoted at note creation since the
+  April 2026 ingestion — 2588 of 2686 were already quoted before 2026-08-07.
+- **The plan's `1621 bare / 12 quoted` was never a bare-vs-quoted census.** It was a
+  *trailing-period* census taken through the quote-stripping `frontmatter_field` accessor, so
+  every quoted value looked bare to it. The arithmetic matches exactly:
+  `1621 = 1613 quoted-with-period + 8 bare-with-period`.
+- **T5's purpose is intact and has grown**, from 1621 to 1784 targets — the increase is 187 new
+  notes born quoted on 2026-08-14, not a rewrite. The constant `8` across both censuses is the
+  tell: it was read as the residue of a finished job when it is a subset that was always tiny.
+
+**What survives the correction:** T5's mechanism defect and T3's dead gate, both established
+empirically and neither dependent on the misreading.
+
+**Kept rather than rewritten**, per this repo's convention — a claim that went wrong is evidence
+about how it went wrong, and this one shows a measurement artifact being mistaken for a change in
+the world.
+
+### Forensics result — no unattended rewriter exists
+
+Run before the re-spec, on the premise that a spec written against a corpus something was
+actively rewriting would race it. There is no such thing:
+
+- **crontab empty**; the one loaded launchd agent (`com.second-brain.vault-embed-serve`) has zero
+  write-opens and zero description references; the vault's other plists point at scripts that no
+  longer exist and are not installed.
+- **The plan's normalizer never ran** — bare counts are frozen at 98/8 across every August snapshot.
+- **What IS live:** the note-creation pipeline, still writing quoted descriptions; the PostToolUse
+  auto-commit hook; and agents stripping trailing periods opportunistically per the
+  `/validate`–`/verify` convention.
+- `3eabdea3` "Auto: 520 files" (2026-08-14) was a **link-enrichment sweep**, not a description
+  normalization: 492 wiki-link additions against only 25 description edits, 23 of them plain
+  period strips.
+- **It was recorded** — `ops/health/2026-08-14-report-2.md:267` names the SHA and the sweep's
+  origin — and evidently never read. `ops/changelog.md` has no 2026-08 entries at all.
+
+**Method caveat carried from that investigation:** the rtk hook filtered at least one counting
+pipeline mid-run (a `git show | grep -c` returned 0 against a diff containing 25 matches). Every
+published count was re-derived inside a bash script file using `/usr/bin/grep`.
+
+### Standing decision
+
+**Re-measure Item 3's design premises first, then revise the plan** — not a full re-spec. The
+design's conclusion holds, but the `1621` figure proved to be an artifact of *how* it was
+measured rather than what was there, so the premises get re-derived before the plan is edited. If
+re-measurement shows the design itself is unsound, escalate to a re-spec then; that path stays
+open and this choice is the reversible one.
 
 ### Decisions taken 2026-08-15, for the re-spec to carry
 
