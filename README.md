@@ -326,6 +326,7 @@ arscontexta/
 |   |-- check-prose-paths.sh     # Prose-path gate
 |   |-- check-doc-claims.sh      # Documented numbers vs measured reality
 |   |-- check-placeholder-count.sh  # Templates must not lose placeholders
+|   |-- check-vocabulary-schema.sh  # Vocabulary placeholders must resolve to schema
 |   |-- lib/                     # Shared shell libraries
 |   +-- test/                    # Gate test suites
 |-- platforms/                   # Platform-specific adapters
