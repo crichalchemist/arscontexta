@@ -78,8 +78,62 @@ and is simply not pointed at this file. Belongs to the CI-hardening spec.
 
 ## In flight
 
-**Sprint C — schema coherence over status and description.** Not queued here: its core already
-has an active spec and plan.
+**Sprint C — schema coherence over status and description. BLOCKED on a re-spec, decided
+2026-08-15.** The plan below cannot be executed as written and its central task would damage the
+field vault. A staleness audit against `main` @ `d146069` returned: T1 hold · T2 shifted ·
+**T3 step 3 broke** · T4 hold · **T5 broke** · T6 hold · T7 shifted · T8 shifted/partly broke,
+with 12 stale citations.
+
+**T5 is the reason this stopped.** The plan's normalizer targets bare `description:` scalars,
+assuming **1621 bare / 12 quoted**. The corpus has since inverted. Measured 2026-08-15 across
+all 2874 notes under `nodes/`:
+
+```bash
+# 2776 quoted · 98 bare · 473 of the quoted carry a colon inside the value
+```
+
+`frontmatter_field` strips balanced quotes *before* the plan's strip logic runs, and the rewrite
+emits the value unquoted — so `--apply` would rewrite ~1776 files without their quotes and
+produce **invalid YAML on the colon-bearing subset**, while its "expect 1633" progress check
+read as plausible forward motion throughout. Verified by executing the plan's own fixture.
+
+**T3 step 3** gates promotion on `$VERIFY_FAIL_COUNT`, which exists nowhere in `verify`. Fences
+are separate shell invocations, so it expands empty and promotion silently never fires.
+
+**Decision: re-spec Item 3 from scratch** rather than revise the plan. The corpus changed shape
+underneath the *design*, not merely the plan — T5's stated purpose (clear a 1621-note backlog)
+has largely evaporated on its own, with ~8 bare-with-period notes remaining. A revised plan
+would inherit a framing that may no longer describe the problem.
+
+**Blocked first on forensics.** Roughly 1776 descriptions were normalized between 2026-08-08 and
+2026-08-15 with no record of what did it. That is being run down before the re-spec, because a
+spec written against a corpus that something is still actively rewriting would race it.
+
+### Decisions taken 2026-08-15, for the re-spec to carry
+
+These settle the three entries the source spec deferred out of itself. All three fire by their
+own `Reopens if` conditions the moment Item 3 is revisited.
+
+- **Entry 5 — the statusless notes: derive status from a checkable property.** MOC-referenced
+  notes become `active`; orphans become `preliminary`. **This overrides the entry's own stated
+  reasoning** — it argues that inferring status "from age or link count would assert a quality
+  claim nothing checked." The distinction relied on: MOC membership is a structural fact a human
+  actively created, not a proxy like age or raw link count. Record both sides when closing it,
+  in the shape entry 19's closure uses. **The count is 698, not the entry's 681** — re-derive
+  before acting. The rule for notes in neither category is still open.
+- **Entry 6 — description length: `200` is canonical.** The majority spelling (three sites
+  against two), and `~150` reads as a soft target rather than a constraint. The entry warns its
+  own count is "at least" — a term-keyed survey cannot enumerate sites that omit the term — so
+  the true site count must be re-derived, not inherited.
+- **Entry 7 — off-enum statuses: adopt `superseded`, correct the other two.** `superseded` is a
+  real lifecycle state the vault's own template declares and canonical lacks — the same dialect
+  gap as `draft`, and the divergences 7–9 precedent says a value the vault's template declares is
+  a gap rather than an error. `closed` (11) and `investigating` (1) are in neither enum: 12 vault
+  notes to correct, not a generator change.
+
+### The superseded plan and spec
+
+Retained for reference; **do not execute the plan.**
 
 - Spec: `docs/superpowers/specs/2026-08-08-corpus-wide-passes-design.md`, "Item 3 — the note lifecycle"
 - Plan: `docs/superpowers/plans/2026-08-08-note-convention-and-lifecycle.md` — 8 tasks
