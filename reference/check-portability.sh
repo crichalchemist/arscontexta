@@ -409,19 +409,20 @@ echo "6. Wiki-link matchers do not interpolate a note name into the pattern"
 # carries a reason and is reviewed, a marker carries nothing. Two exemption
 # mechanisms for one check is how they drift, so this one has exactly one.
 #
-# ALLOWLIST — "<path> <count> <reason>". Bidirectional, on check 4's model: an
+# ALLOWLIST — "<path>|<count>|<reason>", `|`-delimited: the old whitespace split
+# ("${e%% *}") mis-parsed a path containing a space, silently. Bidirectional, on check 4's model: an
 # unlisted hit FAILS, and an entry whose file is gone or whose count no longer
 # matches is STALE and also fails. The list drains rather than rots.
 #
-# WHY <path> <count> AND NOT <path>:<line>:
+# WHY <path>|<count> AND NOT <path>:<line>:
 # Line numbers drift on every edit — CLAUDE.md's divergence 12 table still says
 # session-orient.sh.template:149 for a site now at :160, and the comment this
 # replaces gave "no line numbers here" as a deliberate choice for the same reason.
 # A bare path without a count would let skills/health quietly grow a fourth site
 # behind its three.
 INTERP_ALLOW="
-reference/testing-milestones.md 1 a test SPEC's own example; teaching the pattern is not shipping it
-generators/features/maintenance.md 1 a recipe emitted into a generated vault's docs; a recipe cannot source a library the way a fence can, so converting it changes what generation emits
+reference/testing-milestones.md|1|a test SPEC's own example; teaching the pattern is not shipping it
+generators/features/maintenance.md|1|a recipe emitted into a generated vault's docs; a recipe cannot source a library the way a fence can, so converting it changes what generation emits
 "
 # ONE PREDICATE, CALLED BY BOTH HALVES.
 # The fence gate shipped exactly this defect and CLAUDE.md records it: absorption
@@ -430,11 +431,18 @@ generators/features/maintenance.md 1 a recipe emitted into a generated vault's d
 # printed PASS. Re-deriving the condition at the second site is how they came apart.
 # Both halves below ask this one question and neither computes its own answer.
 #
-# -F is load-bearing: the paths contain `.`, which as a regex matches any character,
-# so `SKILL.md` would also count a hit in `SKILLxmd`. Divergence 13 records the same
-# flag being load-bearing for the same reason.
+# Fixed-string matching is load-bearing: the paths contain `.`, which as a regex
+# matches any character, so `SKILL.md` would also count a hit in `SKILLxmd`.
+# Divergence 13 records grep's -F flag being load-bearing for the same reason.
+# And the match is ANCHORED at column 1: `grep -cF` counted the path ANYWHERE
+# in the line, so a hit line whose CONTENT mentioned another allowlisted path
+# (with its trailing colon) was also counted against that path — a substring
+# match wearing a per-file count's label. awk index($0,p)==1 keeps the
+# fixed-string semantics while requiring the match to START the line; awk
+# prints 0 itself, so grep -c's `|| true` (grep -c exits 1 at count 0) is
+# gone rather than left behind as dead armour.
 interp_hits_in() {         # interp_hits_in <relative-path> -> hit count in that file
-  printf '%s\n' "$INTERP_RAW" | "$GREP" -cF "$ROOT/$1:" || true
+  printf '%s\n' "$INTERP_RAW" | awk -v p="$ROOT/$1:" 'index($0, p) == 1 { c++ } END { print c+0 }'
 }
 # The rel-path parse, extracted rather than written a third time. Two identical
 # copies is where the fence gate's absorption/staleness split began, and this
@@ -450,8 +458,8 @@ interp_files_hit() {       # interp_files_hit -> sorted unique relative paths wi
 interp_allowed_for() {     # interp_allowed_for <relative-path> -> declared count, or empty
   printf '%s\n' "$INTERP_ALLOW" | while IFS= read -r e; do
     [ -n "$e" ] || continue
-    [ "${e%% *}" = "$1" ] || continue
-    e=${e#* }; printf '%s' "${e%% *}"
+    [ "${e%%|*}" = "$1" ] || continue
+    e=${e#*|}; printf '%s' "${e%%|*}"
   done
 }
 if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
@@ -459,7 +467,7 @@ if INTERP_RAW=$(scan_or_die "interpolated wiki-link matcher scan" -rn \
                 -E '\\\[\\\[\$' "${SCAN[@]}"); then
   INTERP_RAW=$(printf '%s\n' "$INTERP_RAW" | "$GREP" -Ev "$EXEMPT_PATHS")
   interp_paths=$(printf '%s\n' "$INTERP_ALLOW" | while IFS= read -r e; do
-                   [ -n "$e" ] || continue; printf '%s\n' "${e%% *}"; done)
+                   [ -n "$e" ] || continue; printf '%s\n' "${e%%|*}"; done)
   # WHY `printf | while` AND NOT `for p in $interp_paths`:
   # An unquoted parameter expansion in a `for` list word-splits under bash and does
   # NOT under zsh, where it stays one string — the fork class this guard exists to

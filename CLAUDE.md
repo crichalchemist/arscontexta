@@ -61,7 +61,7 @@ bash reference/check-vocabulary-schema.sh                # exit 0 (1 = an undecl
 bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 101/101
-  $s reference/test/guard-failure.test.sh                # 60/60
+  $s reference/test/guard-failure.test.sh                # 66/66
   $s reference/test/fence-isolation.test.sh              # PASS
   $s reference/test/bump-version.test.sh                 # 41/41
   $s reference/test/kernel-note-dirs.test.sh             # 76/76
