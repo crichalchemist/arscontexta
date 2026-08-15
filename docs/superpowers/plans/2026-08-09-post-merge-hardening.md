@@ -1680,6 +1680,13 @@ divergence 10.)*
   gitignored task report. The same round closed deferrals entry 19 with a drift record — its
   "false FAIL, never a false PASS" direction claim was measured false during Task 13.
 
+- **Task 14 — `check-prose-paths.sh`'s own SCOPE count is an ungated prose numeral.** Landed as
+  `docs/superpowers/deferrals.md` entry 24. Widening SCOPE 9 → 11 required hand-correcting three
+  prose sites in `CLAUDE.md`; `check-doc-claims.sh` never mentions `check-prose-paths.sh` at all,
+  so nothing catches the next widening if the count drifts. Wiring it in is a change to
+  `check-doc-claims.sh`'s own claim-registration mechanism, out of Task 14's stated scope
+  (widen SCOPE by two named files) and belongs to the CI-hardening spec.
+
 - **Group D — orphan-semantics unification across five surfaces (F4).** **RULED by the user on
   2026-08-09: keep deferred as latent.** Not deferred by omission and no longer merely blocked —
   the spec's Decision 1 was put to the user and answered. Measured as latent: all three

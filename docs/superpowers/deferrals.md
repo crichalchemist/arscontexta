@@ -516,6 +516,39 @@ sed -n '/^FM_ALLOW="/,/^"$/p' reference/check-portability.sh | /usr/bin/grep -c 
 
 ---
 
+### 24. `check-prose-paths.sh`'s SCOPE count is itself an ungated prose numeral
+
+**What:** CLAUDE.md states the gate's SCOPE count in prose (`:782`, "across 11 documents") and
+republishes it inside its own bash re-derive block (`:805-806`). Neither numeral is checked by any
+gate — `check-doc-claims.sh` reads other sentences in this file for other quantities (the
+executable-checks count, the CI-step count) and never mentions `check-prose-paths.sh` at all, so a
+gate that reads one phrasing does not protect a synonym, per this file's own opening paragraph on
+that exact subject. Task 14 (`fix/post-merge-hardening`) widened SCOPE from 9 to 11 and had to
+hand-correct the prose at three sites in one paragraph to keep up; the next widening faces the
+identical risk with nothing to catch it.
+
+**Why not now:** wiring this count into `check-doc-claims.sh` is a change to that gate's own
+claim-registration mechanism, not to `check-prose-paths.sh`, and is out of Task 14's stated scope
+(widen SCOPE by two named files). `check-doc-claims.sh`'s design is itself a CI-hardening-spec
+question, per the gate-table row near the top of CLAUDE.md ("Building the missing check is a
+gate-design question and belongs to the CI-hardening spec").
+
+**Reopens if:** `check-prose-paths.sh`'s SCOPE list changes size again without CLAUDE.md's stated
+count moving with it, found by drift rather than by a gate. Or: `check-doc-claims.sh` gains a
+mechanism generic enough to register an arbitrary computed-count-vs-prose-numeral pair without a
+bespoke assertion, at which point this pair should be its first user.
+
+**From:** Task 14 (`.superpowers/sdd/2026-08-09-post-merge-hardening/task-14-report.md`),
+`fix/post-merge-hardening`
+
+```bash
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | /usr/bin/grep -c .   # 11, the live count
+/usr/bin/grep -c 'across 11 documents' CLAUDE.md                                                 # 1, the prose claim
+/usr/bin/grep -c 'check-prose-paths' reference/check-doc-claims.sh                                # 0: gate never reads this file's name
+```
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.

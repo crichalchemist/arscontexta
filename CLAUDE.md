@@ -779,7 +779,7 @@ file spends most of its length warning about, added to the gate set that warns a
 
 Asked a narrower question, though, a real answer exists: *does every repo path named in prose resolve
 in this checkout?* That is a strictly weaker property and it is honestly checkable, so
-`reference/check-prose-paths.sh` now checks it, across 8 documents, in CI. **Its name, its
+`reference/check-prose-paths.sh` now checks it, across 11 documents, in CI. **Its name, its
 header and its every-run banner all say `checkout only — packaging unverified`**, because a gate whose
 green is read as the stronger claim is worse than no gate.
 
@@ -793,19 +793,23 @@ scope must not read as clean. And extracting **zero** paths exits `2` with "the 
 not that prose is clean", distinct from `1` for a genuine miss: this repo has twice shipped a scan
 that matched nothing and reported green.
 
-**The stated list is eight documents, and two files that carry cross-references are not among
-them** — `hooks/scripts/session-orient.sh` and `platforms/claude-code/hooks/session-orient.sh.template`.
-Both name repo paths in comments and in warning messages a user reads at SessionStart, and both were
-edited on `fix/spec-f-divergence-drain`; a path that rots in either is checked by nothing. This is a
-gap in coverage, not a bug in the design — widening a *stated* list is a deliberate edit, which is
-the property that makes a shrinking scope impossible to mistake for a clean one. Left open on
-purpose; recorded here rather than in a plan, because a deferral in a git-ignored ledger is not a
-record. Re-derive the list and the gap:
+**The stated list was eight documents until `fix/post-merge-hardening` widened it to eleven —
+`hooks/scripts/session-orient.sh` and `platforms/claude-code/hooks/session-orient.sh.template` are
+now in it.** Both name repo paths in comments and in warning messages a user reads at SessionStart,
+which is why they were added on this branch: a path that rots in either is now checked by this gate
+rather than by the next reader. Widening a *stated* list is a deliberate edit, which is the property
+that makes a shrinking scope impossible to mistake for a clean one — re-derive it rather than trust
+either number:
 
 ```bash
-awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 8 in scope
-grep -c 'session-orient' reference/check-prose-paths.sh                    # 0: neither is listed
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 11 in scope
+grep -c 'session-orient' reference/check-prose-paths.sh                    # 2: both now listed
 ```
+
+The scope count itself is not gated — `check-doc-claims.sh` reads a different sentence in this file
+for a different quantity, and a gate that reads one phrasing does not protect a synonym, per this
+file's own opening paragraph on that subject. Filed as a deferral rather than fixed here, since
+wiring it in is a change to that gate, not to this one.
 
 The human diff of the two trees at release remains the only check on the full §4 rule.
 
