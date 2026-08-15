@@ -224,6 +224,129 @@ eq "EXPECTED RED — failed rename names the path"     "yes" "$(has "queue.json"
 # writing the queue file some other way.
 eq "failed rename: leaves the queue file byte-identical" "$before" "$(cat "$Q")"
 
+# --- v2: _queue_lock and queue_yaml (ported from the field vault) ------------
+# The port is Task 12a's ruling (i): the YAML write path was proven in the field
+# vault and never existed here. Each assertion below was run against the v1
+# library first and confirmed RED — a function that does not exist exits 127 and
+# prints none of the messages asserted on — so a green run is evidence the port
+# landed, not evidence the assertions cannot fail.
+
+# A YAML fixture shaped like the live queue: a BARE LIST (no tasks: key), one
+# folded scalar so "surgical" is a checkable property rather than a label.
+mkyfix() { # mkyfix -> fixture root
+  local d
+  d=$(mktemp -d)
+  TMPDIRS+=("$d")
+  mkdir -p "$d/ops/queue"
+  printf -- '- id: alpha\n  status: pending\n  note: >-\n    a folded scalar that\n    spans two lines\n- id: beta\n  status: done\n  completed_phases:\n  - reduce\n' \
+    > "$d/ops/queue/queue.yaml"
+  printf '%s' "$d"
+}
+YTMP_GLOB='queue.yaml.tmp.*'
+ytemps_in() { find "$1" -name "$YTMP_GLOB" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//'; }
+
+# --- v2: version and surface -------------------------------------------------
+eq "v2: QUEUE_EDIT_VERSION is 2"          "2"   "${QUEUE_EDIT_VERSION:-0}"
+eq "v2: queue_yaml is defined"            "yes" "$(command -v queue_yaml >/dev/null 2>&1 && echo yes || echo no)"
+eq "v2: _queue_lock is defined"           "yes" "$(command -v _queue_lock >/dev/null 2>&1 && echo yes || echo no)"
+eq "v2: queue_edit.py ships beside the library" "yes" \
+   "$([ -r "$ROOT/reference/lib/queue_edit.py" ] && echo yes || echo no)"
+
+# --- _queue_lock directly ----------------------------------------------------
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"; L="$F/ops/queue/.locks/queue.lock"
+out=$(_queue_lock "$Y" 2>/dev/null); rc=$?
+eq "_queue_lock: returns 0 and echoes the lockdir" "$L" "$out"
+eq "_queue_lock: the lock exists after acquisition" "yes" "$([ -d "$L" ] && echo yes || echo no)"
+rm -rf "$L"
+mkdir -p "$L"
+err=$( sleep() { :; }; _queue_lock "$Y" 2>&1 >/dev/null ); rc=$?
+eq "_queue_lock contended: returns 1"     "1"   "$rc"
+eq "_queue_lock contended: does NOT break the held lock" "yes" \
+   "$([ -d "$L" ] && echo yes || echo no)"
+rm -rf "$L"
+
+# --- queue_edit refuses a YAML target ----------------------------------------
+# v1 also returned 1 here — jq cannot parse YAML — so rc alone is not the
+# discriminator; the remedy message naming queue_yaml is (red on v1).
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"; before=$(cat "$Y")
+err=$( queue_edit '.' "$Y" 2>&1 >/dev/null ); rc=$?
+eq "yaml refusal: returns 1"              "1"   "$rc"
+eq "yaml refusal: names queue_yaml as the remedy" "yes" "$(has "queue_yaml" "$err")"
+eq "yaml refusal: leaves the file byte-identical" "$before" "$(cat "$Y")"
+
+# --- queue_yaml: a successful --where/--set ----------------------------------
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"; L="$F/ops/queue/.locks/queue.lock"
+before=$(cat "$Y")
+err=$( queue_yaml "$Y" --where id=alpha --set status=done 2>&1 >/dev/null ); rc=$?
+eq "queue_yaml set: returns 0"            "0"   "$rc"
+eq "queue_yaml set: the edit is on disk"  "  status: done" "$(sed -n '2p' "$Y")"
+eq "queue_yaml set: reports the match count on stderr" "yes" "$(has "1 task(s) updated" "$err")"
+# Surgical means exactly one line replaced: one removal, one addition in a diff.
+diffcount=$( { printf '%s\n' "$before" | diff - "$Y" || true; } | /usr/bin/grep -c '^[<>]' )
+eq "queue_yaml set: exactly one line changed (surgical)" "2" "$diffcount"
+eq "queue_yaml set: the folded scalar is untouched" "yes" "$(has "spans two lines" "$(cat "$Y")")"
+eq "queue_yaml set: releases the lock"    "no"  "$([ -d "$L" ] && echo yes || echo no)"
+eq "queue_yaml set: leaves no temp behind" ""   "$(ytemps_in "$F")"
+
+# --- queue_yaml: --where matching nothing is a loud failure ------------------
+# The silent zero-match write is the failure this whole port exists to end.
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"; L="$F/ops/queue/.locks/queue.lock"
+before=$(cat "$Y")
+err=$( queue_yaml "$Y" --where id=nonesuch --set status=done 2>&1 >/dev/null ); rc=$?
+eq "no match: returns 1"                  "1"   "$rc"
+eq "no match: says nothing was written"   "yes" "$(has "nothing written" "$err")"
+eq "no match: leaves the queue byte-identical" "$before" "$(cat "$Y")"
+eq "no match: releases the lock"          "no"  "$([ -d "$L" ] && echo yes || echo no)"
+eq "no match: leaves no temp behind"      ""    "$(ytemps_in "$F")"
+
+# --- queue_yaml: --where is required -----------------------------------------
+err=$( queue_yaml "$Y" --set status=done 2>&1 >/dev/null ); rc=$?
+eq "missing --where: returns 1"           "1"   "$rc"
+eq "missing --where: refuses to edit every task" "yes" "$(has "refusing" "$err")"
+eq "missing --where: leaves the queue byte-identical" "$before" "$(cat "$Y")"
+
+# --- queue_yaml: --add-task and --append -------------------------------------
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"
+queue_yaml "$Y" --add-task id=gamma type=maintenance status=pending >/dev/null 2>&1; rc=$?
+eq "add-task: returns 0"                  "0"   "$rc"
+eq "add-task: the block is appended"      "yes" "$(has "- id: gamma" "$(cat "$Y")")"
+eq "add-task: fields ride at indent 2"    "yes" "$(has "  type: maintenance" "$(cat "$Y")")"
+queue_yaml "$Y" --where id=beta --append completed_phases=reflect >/dev/null 2>&1; rc=$?
+eq "append: returns 0"                    "0"   "$rc"
+eq "append: the item lands in the list"   "yes" "$(has "  - reflect" "$(cat "$Y")")"
+
+# --- queue_yaml: a held lock -------------------------------------------------
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"; L="$F/ops/queue/.locks/queue.lock"
+before=$(cat "$Y")
+mkdir -p "$L"
+err=$( sleep() { :; }; queue_yaml "$Y" --where id=alpha --set status=done 2>&1 >/dev/null ); rc=$?
+eq "queue_yaml locked: returns 1"         "1"   "$rc"
+eq "queue_yaml locked: does NOT break the lock it failed to take" "yes" \
+   "$([ -d "$L" ] && echo yes || echo no)"
+eq "queue_yaml locked: leaves the queue byte-identical" "$before" "$(cat "$Y")"
+rm -rf "$L"
+
+# --- queue_yaml: a failed rename ---------------------------------------------
+# Same mechanism-stub as queue_edit's EXPECTED-RED block above, same claim
+# limits: the organic trigger is hand-run only.
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"; before=$(cat "$Y")
+err=$( mv() { return 1; }; queue_yaml "$Y" --where id=alpha --set status=done 2>&1 >/dev/null ); rc=$?
+eq "queue_yaml failed rename: returns 1"  "1"   "$rc"
+eq "queue_yaml failed rename: discards its temp" "" "$(ytemps_in "$F")"
+eq "queue_yaml failed rename: names the path" "yes" "$(has "queue.yaml" "$err")"
+eq "queue_yaml failed rename: leaves the queue byte-identical" "$before" "$(cat "$Y")"
+
+# --- queue_yaml: a missing helper --------------------------------------------
+# The library resolves queue_edit.py beside its own sourced path — captured at
+# source time, which is also what makes the resolution work under zsh. A copy of
+# the .sh with no .py beside it must fail loud, not fall through to python3
+# erroring on a path that does not exist.
+F=$(mkyfix); Y="$F/ops/queue/queue.yaml"
+cp "$LIB" "$F/qe.sh"
+err=$( . "$F/qe.sh"; queue_yaml "$Y" --where id=alpha --set status=done 2>&1 >/dev/null ); rc=$?
+eq "missing helper: returns 1"            "1"   "$rc"
+eq "missing helper: names the helper it could not find" "yes" "$(has "queue_edit.py" "$err")"
+
 # --- controls on the temp search --------------------------------------------
 # A "leaves no temp behind" assertion is satisfied by a search that can never find
 # anything. Both controls below exist to make that impossible, and the second is the
