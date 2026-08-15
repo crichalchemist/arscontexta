@@ -88,16 +88,24 @@ never named it.** `LINK_EXTRACTION_VERSION` (4) and `FRONTMATTER_VERSION` (3) ar
 versions this file already tracks; this is the third, added for the ported YAML write path the
 paragraph above describes. Seven fences across five `skill-sources/` templates (`next` ×3, `reduce`,
 `reflect`, `reweave`, `verify`) guard `[ "$QUEUE_EDIT_VERSION" -lt 2 ]` before calling `queue_yaml`.
-`skills/health` checks all three libraries through one shared `check_lib` helper and deliberately
-floors queue-edit at `-lt 1`, not `-lt 2` — "THE FLOOR IS 1 AND STAYS 1" (`skills/health/SKILL.md:723`)
-is an in-file recorded reviewer ruling from task 12a, not an oversight: raising the floor to the
-current version would FAIL every vault that has not run `/upgrade`, for a defect (v1's unguarded
-rename) that is narrow rather than universal.
+`skills/health` checks all three libraries through one shared `check_lib` helper whose floors are
+per-library and derived from the consumers' own guards — queue-edit 2, link-extraction 4,
+frontmatter 1. That REVERSES the ruling this paragraph used to record ("THE FLOOR IS 1 AND STAYS
+1", a task-12a reviewer ruling): the final whole-branch review measured that ruling against the
+floors this same branch raised and found `/health` vouching at 1 for libraries the skills refuse
+to run below 2 and 4 — a vault on queue-edit v1 had every queue write exiting 1 while Category 9
+printed `PASS … queue-edit v1` beside them. The half of the old ruling that survives: a floor is
+a consumer guard, never the library's current version, so a stale-but-working copy above its
+floor still PASSes (frontmatter has no versioned consumer guard, so its floor stays 1). The same
+fix added the check the version constant cannot carry: a v2 `queue-edit.sh` without its
+`queue_edit.py` companion FAILs, because the split reads version-healthy while every YAML queue
+write fails at run time.
 
 ```bash
 /usr/bin/grep -n 'QUEUE_EDIT_VERSION=' reference/lib/queue-edit.sh                       # 2
 /usr/bin/grep -rc '\-lt 2 \]' skill-sources/ | /usr/bin/grep -v ':0'                      # 3,1,1,1,1 = 7
-/usr/bin/grep -n 'FLOOR IS 1' skills/health/SKILL.md                                      # :723
+/usr/bin/grep -n 'FLOOR IS PER-LIBRARY' skills/health/SKILL.md                            # the superseding comment
+/usr/bin/grep -c 'queue_edit\.py' skills/health/SKILL.md                                  # non-zero: the companion check
 ```
 
 | Gate | What only it can catch |
