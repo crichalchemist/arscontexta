@@ -294,6 +294,18 @@ printf 'seection:\n  field: 7\n' > "$d/ops/config.yaml"
 out=$(CLAUDE_PROJECT_DIR="$d" "$READER" 'se+ction.field' 42 2>/dev/null)
 eq "D16b: dotted section 'se+ction' does not regex-match 'seection'" "42" "$out"
 
+# (b) dotted path, FIELD arm — the assertion the two above cannot substitute
+# for: the section can be matched fixed-string while the field is still
+# spliced into an ERE, and reverting only the field comparison
+# (read_config.sh's `index(bare, fld ":") == 1`) to `bare ~ "^" fld ":"` left
+# every assertion above green, because no other swept field name carries an
+# ERE metacharacter. Under that ERE, field 'fi+eld' finds the line
+# 'fiield: 7'. A fixed-string match must miss it and return the default.
+d="$TMP/d16b_fld"; mkdir -p "$d/ops"
+printf 'sect:\n  fiield: 7\n' > "$d/ops/config.yaml"
+out=$(CLAUDE_PROJECT_DIR="$d" "$READER" 'sect.fi+eld' 42 2>/dev/null)
+eq "D16b: dotted field 'fi+eld' does not regex-match 'fiield'" "42" "$out"
+
 echo
 printf 'threshold-namespace: %d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ] || exit 1
