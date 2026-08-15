@@ -712,6 +712,110 @@ done                                                               # 16, five ti
 
 ---
 
+### 28. `TENS_TOTAL`'s `find -H` has no symlink fixture of its own
+
+**What:** `hooks/scripts/session-orient.sh:159` computes `TENS_TOTAL` with `find -H`, added by
+Task 11 alongside `OBS_TOTAL`'s (`:158`). D17b in `reference/test/hook-config.test.sh` pins the
+`-H` behavior through a symlinked `ops/observations` only — the suite's single `ln -s` fixture
+points at observations — so deleting `-H` from `:159` alone leaves every gate green. The visible
+symptom of that mutation is the invariant Task 11 exists to hold: `count_open_items` goes through
+the library's `_fm_find_md`, which carries its own `-H`, and still finds open tensions, while
+`TENS_TOTAL` reads 0 through a symlinked `ops/tensions` — "N pending (of 0 total)", the
+observations defect reappearing one directory over, seen by a user and by no gate.
+
+**Why not now:** promoted from the gitignored task-11 report at final review (divergence 10: a
+record that does not ship is not a record). The fix is mechanical — a D17c mirroring D17b with
+`tensions` substituted, born red against a `-H`-less `:159` — but it was outside the consolidated
+fix round's stated scope, which shipped that round's own born-red assertion (the D16b field arm)
+instead of a second one.
+
+**Reopens if:** anyone edits `session-orient.sh:158`-`:159` or the D17 block — write D17c first,
+verify it red against a `-H`-less `:159`, then touch the hook.
+
+**From:** Task 11 (`.superpowers/sdd/2026-08-09-post-merge-hardening/task-11-report.md`),
+`fix/post-merge-hardening`; promoted by the final fix round.
+
+```bash
+/usr/bin/grep -n 'find -H ops/' hooks/scripts/session-orient.sh      # :158 observations, :159 tensions
+/usr/bin/grep -n 'ln -s' reference/test/hook-config.test.sh          # one fixture — observations only
+```
+
+---
+
+### 29. `comm`-collation residue: two stale rationales inside the governed trees, two unpinned sites outside them
+
+**What:** Two survivors of Task 4's collation work, both the "conclusion true, reasoning false"
+class it fixed. (a) `skill-sources/graph/SKILL.md` (~`:127`) and `skill-sources/next/SKILL.md`
+(~`:352`) still gloss their orphan/dangling comparisons with "Both sides are already folded and
+sorted by the library, which is what makes comm valid" — but sortedness never makes `comm` valid,
+identical COLLATION does, which graph's own later comment states in full. The invocations
+themselves are now pinned `LC_ALL=C comm` (final fix round), so the conclusion stays true for a
+new reason; the prose survives to teach the fallacy to the next reader. Anchor on the phrase, not
+the line numbers — they drift. (b) The same sweep found the unpinned-`comm` class survives
+outside the trees the review named: `reference/validate-kernel.sh:520`'s dangling-count `comm`
+(both operands C-sorted, the collation requirement argued in its own comment a few lines up) and
+`scripts/sync-thinking.sh`'s three `comm`s (unsorted `echo` operands — a different and worse
+state).
+
+**Why not now:** (a) the pinning commit deliberately did not reword two rationale blocks — a
+behavior-neutral locale pin should not smuggle prose rewrites past review (Rule 5). (b) is out of
+the review's flagged scope (`skill-sources/` templates), and pinning `validate-kernel.sh` should
+land with a field-vault re-run of the validator, which is its own verification cost.
+
+**Reopens if:** anyone edits either rationale, either outside site, or lands a new `comm`
+anywhere — the property is "every `comm` carries `LC_ALL=C` and its rationale names collation,
+not sortedness".
+
+**From:** Task 4 (`.superpowers/sdd/2026-08-09-post-merge-hardening/final-triage.md`, deferred
+minors), promoted and extended by the final fix round.
+
+```bash
+# 'makes comm valid', not the fuller phrase: next/SKILL.md hard-wraps 'which is
+# what' onto the previous line, and the longer pattern finds only graph — this
+# command's first spelling did exactly that, a pattern narrower than its class.
+/usr/bin/grep -rn 'makes comm valid' skill-sources/                        # 2 — the two stale rationales
+/usr/bin/grep -rn '\bcomm -[0-9]' reference/validate-kernel.sh scripts/sync-thinking.sh \
+  | /usr/bin/grep -v 'LC_ALL=C comm'                                       # the unpinned survivors (one hit is validate-kernel's :508 comment)
+```
+
+---
+
+### 30. Six controller errors on this branch — condensed record
+
+**What:** The controller running this branch's task dispatch disclosed its own errors in the
+gitignored session ledger as they happened; divergence 10 makes that no record, so the condensed
+list lands here. Six, in task order: (1) Task 12 — told the implementer THREE doc sites carried
+the suite total when there were FIVE, because the controller's grep required an `N/M` slash form
+and missed a `(52/0)` and a bare prose numeral. (2) Task 12a — the brief instructed
+`{config.ops_dir}` placeholders for queue paths, a marker that appears nowhere in
+`skill-sources/` (it is the frozen `skill-blocks/` dialect); followed literally it would have
+shipped an unsubstituted marker into every generated vault. (3) Task 16 — repeated the
+implementer's "six deleted lines" claim to the ledger and the user as established fact without
+re-checking a brief already read in full. (4) Task 16 — the "six" then traced back to the
+controller's OWN dispatch message, which undercounted 8 as six; the root of the chain, not a
+relay of it. (5) Task 18 — verified a paragraph's numbers through the bundling frame the
+paragraph itself supplied, so the unmeasured half (`model:`) inherited the assumption that made
+the claim false. (6) Task 19 — a pre-derivation ending in `| tail -5` presented as a complete
+date list; the true list had six entries, and the truncation was invisible because a truncated
+list looks exactly like a short one. Separately, three implementer REPORTS contradicted their own
+source documents — Task 16's misattributed "six", Task 17's summary-vs-table mismatch, Task 19's
+non-verbatim quotation — report-vs-source incidents, each caught in review.
+
+**Why not now:** nothing to implement — every error was caught and its work product corrected on
+the branch. The record ships because the shapes recur: recollection-vs-file,
+verification-through-the-document's-own-frame, and display-truncation-read-as-completeness are
+the same narrower-than-the-class failures this repo's gates catch in code, appearing in the
+process that builds the gates.
+
+**Reopens if:** never, as such — it is a record, not work. Cite it when a dispatch, review or
+report repeats one of the three shapes.
+
+**From:** `.superpowers/sdd/2026-08-09-post-merge-hardening/final-triage.md` ("Controller errors
+made during this branch"), promoted per divergence 10. No re-derive command: this is a process
+record, not a claim about the tree.
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.

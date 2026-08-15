@@ -1804,3 +1804,20 @@ overstated when checked.
   than split because they share one destination and one verification debt. Land in
   `docs/superpowers/deferrals.md`. **Reopening trigger:** each becomes actionable only once
   re-derived against this checkout — treat the vault's record as a lead, not a finding.
+
+**Added 2026-08-15**, by the consolidated final fix round — the surviving deferred findings both
+final reviewers flagged as living only in the gitignored ledger (divergence 10: not a record),
+now landed tracked:
+
+- **Task 11 — `TENS_TOTAL`'s `find -H` has no symlink fixture of its own.** D17b covers only the
+  observations path; removing `-H` from `session-orient.sh:159` alone leaves every gate green.
+  Lands in `docs/superpowers/deferrals.md` entry 28.
+- **Task 4 — `comm`-collation residue.** The stale "sorted by the library, which is what makes
+  comm valid" rationales in `graph` and `next` (conclusion true, reasoning the fallacy Task 4
+  fixed), plus the two unpinned `comm` sites the fix round's sweep found outside the flagged
+  trees (`reference/validate-kernel.sh:520`, `scripts/sync-thinking.sh`). The nine unpinned
+  `comm` commands inside `skill-sources/` were fixed, not deferred. Lands in
+  `docs/superpowers/deferrals.md` entry 29.
+- **The six controller errors made during this branch**, three implementer report-vs-source
+  incidents alongside them — condensed process record, promoted from the ledger. Lands in
+  `docs/superpowers/deferrals.md` entry 30.
