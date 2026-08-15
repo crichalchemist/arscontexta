@@ -171,6 +171,9 @@ case "$QUEUE_FILE" in
       --set status=done --set "completed=$TIMESTAMP"
     ;;
   *)
+    # KNOWN: the second clause re-selects status == "pending" AFTER the first set it
+    # "done", so .completed lands on nothing — preserved pre-existing behavior, not
+    # introduced by the format dispatch. See docs/superpowers/deferrals.md entry 22.
     queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).status = "done" |
         (.tasks[] | select(.condition_key == $key and .status == "pending")).completed = $ts' \
         "$QUEUE_FILE" --arg key "{condition_key}" --arg ts "$TIMESTAMP"

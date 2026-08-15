@@ -1690,6 +1690,13 @@ divergence 10.)*
   a hook invocation on every edit everywhere and close nothing. **Reopening trigger:** that path
   filter becoming vocabulary-aware, at which point the matcher is the only thing left stopping
   the guard from firing. Lands in `docs/superpowers/deferrals.md` entry 15.
+- **Task 12a — the fence gate never exercises the queue fences' JSON dispatch arm.** The healthy
+  fixture always creates `queue.yaml`, so the repointed fences' jq branch runs only under
+  `queue-edit.test.sh`, never under the fence gate. Lands in `docs/superpowers/deferrals.md`
+  entry 21.
+- **Task 12a — `next` f02's JSON arm never writes `completed` (pre-existing, preserved).** The
+  second jq clause re-selects `pending` after the first set it `done`; the site carries a
+  `# KNOWN:` comment. Lands in `docs/superpowers/deferrals.md` entry 22.
 - **The thirteen deferrals that did not fold into the spec.** Enumerated by number with their
   individual blocking reasons in the spec's `## Deliberately not in scope`. They remain in
   `docs/superpowers/deferrals.md`; this plan does not restate them, because a second copy of a

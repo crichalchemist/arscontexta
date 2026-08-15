@@ -464,6 +464,58 @@ more" suffix is dropped, at which point the output stops disclosing its own trun
 
 ---
 
+### 21. The fence gate never exercises the queue fences' JSON dispatch arm
+
+**What:** Task 12a's seven repointed fences dispatch on queue format: `*.yaml` → `queue_yaml`, else
+`queue_edit` with the original jq filter. The fence gate's healthy fixture always creates
+`ops/queue/queue.yaml` (deliberately, beside the `queue.json` tombstone — that coexistence is what
+turned the seven red in the first place), so YAML always wins the search order and the fences' jq
+arm is never executed by that gate, in either shell.
+
+**Why not now:** The jq arm's mechanics are covered where they live — `queue-edit.test.sh` asserts
+`queue_edit`'s argument pass-through, tombstone refusal, lock and guarded rename — and a
+JSON-only fixture variant is a harness design change (a second `build_fixture` mode or a
+per-fence fixture override), not a one-line addition. A fixture rigged so JSON wins would also
+stop modeling the field-measured tombstone shape the gate exists to pin.
+
+**Reopens if:** a queue fence's JSON branch changes (the un-exercised arm is where a regression
+would land unseen by the fence gate), or the CI-hardening spec picks up harness variants.
+
+**From:** task 12a (`.superpowers` report, promoted here per divergence 10; plan
+`2026-08-09-post-merge-hardening.md` ## Deferrals)
+
+```bash
+/usr/bin/grep -n 'queue.yaml' reference/test/fence-isolation.test.sh | head -3   # fixture creates it
+```
+
+---
+
+### 22. `next` f02's JSON arm never writes `completed` — pre-existing, preserved, marked
+
+**What:** In `skill-sources/next/SKILL.md` fence f02 (auto-close a satisfied maintenance task),
+the JSON arm's jq filter sets `.status = "done"` in its first clause, then the second clause
+re-selects `.status == "pending"` — which no longer matches the task just closed — so
+`.completed = $ts` lands on nothing. Tasks auto-close without a completion timestamp on JSON
+queues. The YAML arm added by task 12a sets both fields correctly.
+
+**Why not now:** Pre-existing (it shipped with the original fence, before task 12a), and task
+12a's scope was the dead write path, not the filters' semantics — fixing it inside that commit
+would have hidden a behavior change in a port commit (Rule 5). The fix is one line: select once
+into a variable binding or repeat the selection on `condition_key` alone. It wants its own
+commit and a suite assertion pinning "close writes both fields."
+
+**Reopens if:** anyone touches f02, or a JSON-queue vault's `/next` auto-close is debugged for
+missing `completed` timestamps — the site carries a `# KNOWN:` comment pointing here.
+
+**From:** task 12a (`.superpowers` report, promoted here per divergence 10; plan
+`2026-08-09-post-merge-hardening.md` ## Deferrals)
+
+```bash
+/usr/bin/grep -n 'and .status == "pending")).completed' skill-sources/next/SKILL.md   # the dead clause
+```
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.
