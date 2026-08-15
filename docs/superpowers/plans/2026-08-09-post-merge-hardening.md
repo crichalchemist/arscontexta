@@ -1674,6 +1674,12 @@ bash reference/check-doc-claims.sh | tail -3      # divergence numbers still uni
 Required for every plan from `fix/spec-e-fourteen-items` forward — see `CLAUDE.md`
 divergence 10.)*
 
+- **Task 13 — check 7's allowlist keeps the whitespace-split parse check 6 dropped.** Landed as
+  `docs/superpowers/deferrals.md` entry 23. Same class one check over, out of Task 13's stated
+  scope; filed in review round 1 after the round found the promotion had not shipped from the
+  gitignored task report. The same round closed deferrals entry 19 with a drift record — its
+  "false FAIL, never a false PASS" direction claim was measured false during Task 13.
+
 - **Group D — orphan-semantics unification across five surfaces (F4).** **RULED by the user on
   2026-08-09: keep deferred as latent.** Not deferred by omission and no longer merely blocked —
   the spec's Decision 1 was put to the user and answered. Measured as latent: all three

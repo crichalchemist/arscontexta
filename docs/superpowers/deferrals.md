@@ -401,45 +401,15 @@ bash reference/check-placeholder-count.sh main; echo "rc=$?"    # 0 clean, 1 fin
 
 ---
 
-### 19. `check-portability.sh` check 6 — substring matching and a whitespace-split allowlist
+### 19. `check-portability.sh` check 6 — substring matching and a whitespace-split allowlist — CLOSED
 
-**What:** (a) `interp_hits_in` (`:436`, used at `:484` and `:497`) is an unanchored `-F` substring
-match, while the half it is compared against parses paths differently; any divergence produces a
-false FAIL, never a false PASS. (b) The allowlist is whitespace-delimited, so a path containing a
-space mis-parses silently.
-
-**Why not now:** (a) fails in the safe direction by construction — a gate that cries wolf gets
-investigated, and this one has, twice. (b) has no instance **in the trees check 6 scans**. Read that
-qualifier as load-bearing: **234 tracked paths do contain a space**, and the first version of this
-entry claimed "no path in the tree contains a space" on the strength of a command it had not run.
-All 234 are in `methodology/`, whose filenames are whole sentences and which the check's declared
-scope excludes; the scanned trees hold **zero**. State it as `234 = 234 methodology + 0 scanned`
-rather than filtering down to a bare `0`, which is the same one-number-hides-the-class error the
-guard itself exists to catch. Both findings sit inside the guard that divergence 12 warns is the one
-place where writing *about* matchers inflates the matcher count, so edits here are conservative.
-
-**Reopens if:** a path containing a space appears under any tree check 6 scans (`skill-sources/`,
-`skills/`, `platforms/`, `reference/`, `generators/`) — not merely anywhere in the repo — or check 6's
-allowlist grows an entry whose file is matched by another entry as a substring.
-
-**From:** `2026-08-04-ci-hardening.md` Task 2 (findings M-2 and M-5)
-
-**`core.quotePath=false` is required and its absence is silent.** `git ls-files` quotes any path
-holding a non-ASCII byte, so that line arrives as `"methodology/notes are skills \342\200\224 …"` —
-starting with `"`, not `m`. A `grep -v '^methodology/'` therefore reports **1** path outside
-`methodology/` when the true answer is **0**, and the survivor looks like a real finding rather than
-a quoting artifact. Exactly one tracked path is affected today, which is the worst case: enough to
-make the filter wrong, too few to look broken.
-
-```bash
-/usr/bin/grep -n 'interp_hits_in' reference/check-portability.sh          # 436, 484, 497
-git -c core.quotePath=false ls-files | /usr/bin/grep -c ' '               # 234, all methodology/
-git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
-  | /usr/bin/grep -cv '^methodology/'                                     # 0 — none outside it
-git ls-files | /usr/bin/grep -c '^"'                                      # 1 — the quoted path
-git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
-  | /usr/bin/grep -c '^\(skill-sources\|skills\|platforms\|reference\|generators\)/'   # 0 — scanned trees
-```
+Closed by `cbcd48f` (Task 13, `fix/post-merge-hardening`): the hit count is now anchored and the
+allowlist `|`-delimited, born-red and mutation-proved in `guard-failure.test.sh` (60/60 → 66/66,
+both shells). The full entry moved to [Closed](#closed) per this file's own convention — **with a
+drift record**, because the closure measured the entry's central claim false: it asserted the
+substring match "fails in the safe direction by construction — a false FAIL, never a false PASS",
+and the measured failure is a false PASS (a hit line naming a deleted allowlisted path masked the
+GONE arm). Kept numbered here so references by number stay valid.
 
 ---
 
@@ -516,6 +486,36 @@ missing `completed` timestamps — the site carries a `# KNOWN:` comment pointin
 
 ---
 
+### 23. `check-portability.sh` check 7's allowlist keeps the whitespace-split parse check 6 dropped
+
+**What:** `FM_ALLOW` is `<path> <count> <reason>`, space-delimited, parsed at three sites via
+`cut -d' ' -f1` / `-f2` and a `case "$rel "*` glob — the same silent-mis-parse class Task 13
+closed for check 6's `INTERP_ALLOW`: a path containing a space parses as a shorter path plus
+garbage, and nothing says so. Check 4's manifest parse (`${line%% *}` / `${line#* }`) is the same
+shape one check over. Anchor on the variable names, not on line numbers — this file's own rule.
+
+**Why not now:** Out of Task 13's stated scope — its brief bound the change to check 6 and
+"allowlist's contents unchanged" — and the exposure is what entry 19(b)'s was before its closure:
+zero space-bearing paths in the scanned trees today, `234 = 234 methodology/ + 0 scanned`
+(re-derive with the commands preserved in entry 19 under [Closed](#closed); `core.quotePath=false`
+is load-bearing there). Unlike 19(a), no false-PASS route is currently measured here; that
+asymmetry is why 19 closed first and this one waits.
+
+**Reopens if:** a space-bearing path lands in any tree the guard scans, or anyone edits check 7's
+allowlist or its parses — a conversion should reuse check 6's now-tested `|` idiom and a
+D19b-style entry-count assertion (measure ENTRIES, not pipe-lines in a fixed window) rather than
+invent a third format.
+
+**From:** Task 13 of `2026-08-09-post-merge-hardening.md` (finding promoted from the
+`.superpowers` report per divergence 10 — review round 1 found the promotion had not shipped)
+
+```bash
+/usr/bin/grep -n "cut -d' ' -f" reference/check-portability.sh                        # check 7's parse sites
+sed -n '/^FM_ALLOW="/,/^"$/p' reference/check-portability.sh | /usr/bin/grep -c '|'   # 0 — still space-delimited
+```
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.
@@ -532,6 +532,60 @@ These are decisions awaiting a **design pass**, not decisions already made.
 
 ## Closed
 
-*(none yet — entries move here when acted on, with the commit that did it. They are
-never deleted: a ledger that quietly drops items is the status-file-that-lies defect
-this repo documents about itself.)*
+*(Entries move here when acted on, with the commit that did it. They are never
+deleted: a ledger that quietly drops items is the status-file-that-lies defect this repo
+documents about itself.)*
+
+### 19. `check-portability.sh` check 6 — substring matching and a whitespace-split allowlist
+
+**CLOSED 2026-08-15 by `cbcd48f` (Task 13, `fix/post-merge-hardening`) — and the closure
+measured this entry's central claim FALSE. Recorded rather than silently corrected, the way
+CLAUDE.md keeps its own drifted lines.** From filing until 2026-08-15 the entry asserted that the
+unanchored match could produce "a false FAIL, never a false PASS" and so "fails in the safe
+direction by construction". Measured otherwise: a hit line whose CONTENT names another allowlisted
+path with its trailing colon inflates that path's `interp_hits_in` count, and the stale loop's
+`!= 0` skip then swallows the GONE arm for a deleted allowlisted file — check 6 reports green over
+a masked STALE. A false PASS, in the gate the entry called safe by construction, established three
+ways: a born-red fixture (`guard-failure.test.sh`, the D19a pair), the Task 13 reviewer's
+independent measurement, and a mutation restoring the substring count that reddens exactly those
+two assertions. The fix: `interp_hits_in` anchors with `awk 'index($0,p)==1'`, still fixed-string;
+`INTERP_ALLOW` is `|`-delimited with all three parse sites updated; contents unchanged. The entry
+below is preserved as filed — including the false claim — because the drift is the evidence.
+
+**What:** (a) `interp_hits_in` (`:436`, used at `:484` and `:497`) is an unanchored `-F` substring
+match, while the half it is compared against parses paths differently; any divergence produces a
+false FAIL, never a false PASS. (b) The allowlist is whitespace-delimited, so a path containing a
+space mis-parses silently.
+
+**Why not now:** (a) fails in the safe direction by construction — a gate that cries wolf gets
+investigated, and this one has, twice. (b) has no instance **in the trees check 6 scans**. Read that
+qualifier as load-bearing: **234 tracked paths do contain a space**, and the first version of this
+entry claimed "no path in the tree contains a space" on the strength of a command it had not run.
+All 234 are in `methodology/`, whose filenames are whole sentences and which the check's declared
+scope excludes; the scanned trees hold **zero**. State it as `234 = 234 methodology + 0 scanned`
+rather than filtering down to a bare `0`, which is the same one-number-hides-the-class error the
+guard itself exists to catch. Both findings sit inside the guard that divergence 12 warns is the one
+place where writing *about* matchers inflates the matcher count, so edits here are conservative.
+
+**Reopens if:** a path containing a space appears under any tree check 6 scans (`skill-sources/`,
+`skills/`, `platforms/`, `reference/`, `generators/`) — not merely anywhere in the repo — or check 6's
+allowlist grows an entry whose file is matched by another entry as a substring.
+
+**From:** `2026-08-04-ci-hardening.md` Task 2 (findings M-2 and M-5)
+
+**`core.quotePath=false` is required and its absence is silent.** `git ls-files` quotes any path
+holding a non-ASCII byte, so that line arrives as `"methodology/notes are skills \342\200\224 …"` —
+starting with `"`, not `m`. A `grep -v '^methodology/'` therefore reports **1** path outside
+`methodology/` when the true answer is **0**, and the survivor looks like a real finding rather than
+a quoting artifact. Exactly one tracked path is affected today, which is the worst case: enough to
+make the filter wrong, too few to look broken.
+
+```bash
+/usr/bin/grep -n 'interp_hits_in' reference/check-portability.sh          # 436, 484, 497
+git -c core.quotePath=false ls-files | /usr/bin/grep -c ' '               # 234, all methodology/
+git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
+  | /usr/bin/grep -cv '^methodology/'                                     # 0 — none outside it
+git ls-files | /usr/bin/grep -c '^"'                                      # 1 — the quoted path
+git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
+  | /usr/bin/grep -c '^\(skill-sources\|skills\|platforms\|reference\|generators\)/'   # 0 — scanned trees
+```
