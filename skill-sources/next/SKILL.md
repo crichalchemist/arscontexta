@@ -351,8 +351,8 @@ if [ -r "$LINK_LIB" ]; then
   # Orphans: indexed notes that nothing links TO. Dangling: targets that resolve to
   # no note. Both sides are already folded and sorted by the library, which is what
   # makes comm valid here.
-  ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
-  DANGLING_COUNT=$(comm -13 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
+  ORPHAN_COUNT=$(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
+  DANGLING_COUNT=$(LC_ALL=C comm -13 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
 else
   echo "error: link-extraction library not found at '$LINK_LIB'" >&2
   echo "       run /arscontexta:upgrade to restore it" >&2

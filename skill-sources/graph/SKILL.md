@@ -126,7 +126,7 @@ done
 # known blind spot: it counted links inside fenced code blocks, did not case-fold,
 # and matched the wrong direction. Both sides are already folded and sorted by the
 # library, which is what makes comm valid.
-comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") \
+LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") \
   | while read -r NAME; do [ -n "$NAME" ] && echo "ORPHAN: $NAME"; done
 
 # MOC coverage: % of notes appearing in at least one MOC's Core Ideas.
@@ -178,8 +178,8 @@ rm -f "$EDGE_MAP" "$MOC_SRC"
 # warn on a mismatch -- it returns the wrong set at exit 0. All three operands
 # are pinned to C: NOTE_INDEX by the library (>= v4), MOC_TARGETS above, and
 # MOC_INDEX where it is built. Do not unpin any of them in isolation.
-COVERED=$(comm -12 \
-  <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
+COVERED=$(LC_ALL=C comm -12 \
+  <(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
   <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
 echo "Coverage: $COVERED / $NOTE_COUNT"
 ```

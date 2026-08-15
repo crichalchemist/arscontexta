@@ -226,8 +226,8 @@ MOC_INDEX=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {}
 # pinned to C: NOTE_INDEX and LINK_TARGETS by the library (>= v4), MOC_INDEX
 # above, and ORPHAN_ALL inherits C order from the comm that produced it. Folded
 # and sorted is not sufficient — comm needs one collation across both sides.
-ORPHAN_ALL=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS"))
-ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$ORPHAN_ALL") <(printf '%s\n' "$MOC_INDEX") \
+ORPHAN_ALL=$(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS"))
+ORPHAN_COUNT=$(LC_ALL=C comm -23 <(printf '%s\n' "$ORPHAN_ALL") <(printf '%s\n' "$MOC_INDEX") \
   | grep -c . || true)
 
 # Dangling: targets that resolve to no note. Left as a membership loop rather
@@ -287,8 +287,8 @@ rm -f "$EDGE_MAP" "$MOC_SRC"
 # it does not warn on a mismatch — it returns the wrong set at exit 0. All three
 # operands are pinned to C: NOTE_INDEX by the library (>= v4), MOC_TARGETS above,
 # and MOC_INDEX where it is built. Do not unpin any of them in isolation.
-COVERED=$(comm -12 \
-  <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
+COVERED=$(LC_ALL=C comm -12 \
+  <(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
   <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
   COVERAGE=$(echo "scale=0; $COVERED * 100 / $NOTE_COUNT" | bc)
