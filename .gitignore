@@ -4,3 +4,5 @@
 *.local.md
 .claude/settings.local.json
 .superpowers/
+__pycache__/
+*.pyc
