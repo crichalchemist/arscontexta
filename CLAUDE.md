@@ -793,9 +793,15 @@ scope must not read as clean. And extracting **zero** paths exits `2` with "the 
 not that prose is clean", distinct from `1` for a genuine miss: this repo has twice shipped a scan
 that matched nothing and reported green.
 
-**The stated list was eight documents until `fix/post-merge-hardening` widened it to eleven —
-`hooks/scripts/session-orient.sh` and `platforms/claude-code/hooks/session-orient.sh.template` are
-now in it.** Both name repo paths in comments and in warning messages a user reads at SessionStart,
+**The stated list was nine documents until `fix/post-merge-hardening` widened it to eleven — not
+eight to eleven, though this very paragraph claimed "eight" from 2026-08-11 (when
+`docs/closed-divergences.md` joined SCOPE and the prose was never updated to follow) until this
+branch corrected it. That stale "eight" is what this task inherited, not the tree's true count; the
+commit trailer (`9 -> 11`) is the correct record. Keeping both numbers here — nine true, eight
+claimed — is deliberate, per this file's own convention of recording drift rather than silently
+overwriting it. `hooks/scripts/session-orient.sh` and
+`platforms/claude-code/hooks/session-orient.sh.template` are now in it.** Both name repo paths in
+comments and in warning messages a user reads at SessionStart,
 which is why they were added on this branch: a path that rots in either is now checked by this gate
 rather than by the next reader. Widening a *stated* list is a deliberate edit, which is the property
 that makes a shrinking scope impossible to mistake for a clean one — re-derive it rather than trust

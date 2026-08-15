@@ -1687,6 +1687,15 @@ divergence 10.)*
   `check-doc-claims.sh`'s own claim-registration mechanism, out of Task 14's stated scope
   (widen SCOPE by two named files) and belongs to the CI-hardening spec.
 
+- **Task 14 — `check-prose-paths.sh` is zsh-broken by an unquoted `for f in $SCOPE`.** Landed as
+  `docs/superpowers/deferrals.md` entry 25 (review round 1, Important 2). Under zsh the unquoted
+  multi-line `$SCOPE` does not word-split, collapsing the whole heredoc into one non-path argument;
+  the guard's own zero-paths exit-2 design catches this loud (`FAIL: scope is empty`, not a false
+  PASS), but the bash-only invocation posture that avoids it is accidental, not pinned the way
+  `guard-failure.test.sh` pins `check-portability.sh` to bash. Pre-existing, independent of the SCOPE
+  widening, and named as a risk class by this plan's own Global Constraint #2. Fixing the loop is a
+  shell-portability change to the script, out of Task 14's stated scope.
+
 - **Group D — orphan-semantics unification across five surfaces (F4).** **RULED by the user on
   2026-08-09: keep deferred as latent.** Not deferred by omission and no longer merely blocked —
   the spec's Decision 1 was put to the user and answered. Measured as latent: all three

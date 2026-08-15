@@ -549,6 +549,63 @@ awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | /usr
 
 ---
 
+### 25. `check-prose-paths.sh` is zsh-broken by an unquoted `for f in $SCOPE`
+
+**What:** `reference/check-prose-paths.sh:74` reads `for f in $SCOPE; do`, where `SCOPE` is a
+multi-line heredoc variable. Under zsh, an unquoted `$SCOPE` in a `for` list is not word-split
+(`SH_WORD_SPLIT` is off by default), so the entire 11-line SCOPE blob collapses into a single
+"filename" argument — the loop body runs once against a string that is not a real path, fails the
+existence/readability test, and the script reports `ERROR <blob> is in scope but missing or
+unreadable` followed by `FAIL: scope is empty -- no files scanned`. Under bash the same script scans
+all 11 files correctly (`scanned 11 files, checked 267 repo paths, 0 missing`, `PROSE PATHS: PASS`).
+This is pre-existing and independent of Task 14's SCOPE widening — it reproduces on the unwidened
+9-file SCOPE just as it does on the current 11-file one.
+
+This exact bug class is pre-named as a risk by this task's own governing plan — Global Constraint #2
+(`docs/superpowers/plans/2026-08-09-post-merge-hardening.md:54`), verbatim: *"zsh also does **not**
+word-split an unquoted `$var` in a `for` list; use `while IFS= read -r`."* `check-prose-paths.sh` is
+an unconverted instance of exactly that named pattern, in a file this same task edited without
+noticing the fork.
+
+**The mitigation, and why it matters:** this is not a silent failure. The guard's own
+zero-paths-extracted design (`found -eq 0` → exit 2, distinct from exit 1 for a genuine missing-path
+finding — the property Task 14 preserved and re-verified) is what catches it: the collapsed blob
+fails to resolve as a path, `found` stays 0, and the script exits loud with `FAIL: scope is empty --
+no files scanned. This is a broken check, not a clean repo.` A reader who runs this under zsh gets an
+unambiguous failure, not a false PASS. What is missing is not loudness but a *documented* invocation
+contract: unlike `check-portability.sh`, which `guard-failure.test.sh` pins to `bash "$GUARD"` because
+nothing anywhere invokes it any other way, nothing pins `check-prose-paths.sh` to bash-only. Its
+bash-only-safe posture is accidental, not a decision this repo has recorded — which is the distinction
+that matters here, not bash-vs-zsh in the abstract.
+
+**Why not now:** fixing the fork (rewriting the loop as `while IFS= read -r f; do … done <<<"$SCOPE"`,
+per the plan's own prescribed remedy) is a change to `check-prose-paths.sh`'s shell-portability
+posture, not to its SCOPE list — out of Task 14's stated scope (widen SCOPE by two named files).
+Every documented invocation of this script in this repo (`CLAUDE.md`, CI, `.pre-commit-config.yaml`)
+already spells `bash reference/check-prose-paths.sh`, so the fork has no organic trigger today; but
+that same sentence was true of `check-portability.sh` until a human typed `zsh` in front of a
+different script (`bump-version.sh`) and shipped a live zsh fork anyway.
+
+**Reopens if:** anyone invokes this script under zsh (by habit, by a new CI matrix leg, or by
+following this file's own "Run every suite under BOTH bash and zsh" constraint literally onto a
+script that is not a suite), or if a future task hardens `check-prose-paths.sh`'s shell portability
+and this entry should close alongside it. The fix, when taken, should also add a
+`guard-failure.test.sh`-style pin (or an explicit `check-prose-paths.sh` header comment) recording
+which shell(s) it is invoked under, so the posture stops being accidental either way.
+
+**From:** Task 14 (`.superpowers/sdd/2026-08-09-post-merge-hardening/task-14-report.md`),
+`fix/post-merge-hardening` — found during Task 14's guard-invariant verification, review round 1
+(coordinator finding, Important 2)
+
+```bash
+grep -n 'for f in \$SCOPE' reference/check-prose-paths.sh   # :74, the unquoted for-list
+bash reference/check-prose-paths.sh; echo "bash rc=$?"      # rc=0, PASS, 11 files scanned
+zsh  reference/check-prose-paths.sh; echo "zsh rc=$?"       # rc=2, "scope is empty", loud FAIL
+grep -n 'word-split' docs/superpowers/plans/2026-08-09-post-merge-hardening.md   # :54, the named risk class
+```
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.
