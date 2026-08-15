@@ -206,3 +206,14 @@ jobs:
         run: bash reference/test/bump-version.test.sh
       - name: Version tool failure-path tests (zsh)
         run: zsh reference/test/bump-version.test.sh
+
+      # queue-edit.sh had seven consumers and no tests, which is how its commit
+      # step shipped unguarded: `mv "$tmp" "$file"` with no `||`, so a failed
+      # rename left the temp on disk, printed nothing, and returned the exit
+      # status of the following `rm -rf` — 0. The commit step is now guarded:
+      # a failed rename returns 1, discards its temp, and names the path that
+      # could not move — the bump-version.sh remedy verbatim.
+      - name: Queue edit library tests (bash)
+        run: bash reference/test/queue-edit.test.sh
+      - name: Queue edit library tests (zsh)
+        run: zsh reference/test/queue-edit.test.sh

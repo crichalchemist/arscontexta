@@ -34,6 +34,7 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 LINK_LIB_SRC="$ROOT/reference/lib/link-extraction.sh"
 FM_LIB_SRC="$ROOT/reference/lib/frontmatter.sh"
 QUEUE_LIB_SRC="$ROOT/reference/lib/queue-edit.sh"
+QUEUE_PY_SRC="$ROOT/reference/lib/queue_edit.py"
 
 # Every spawned shell must be THIS harness's shell, not `sh`. On macOS `sh` is
 # bash 3.2 regardless of what launched the harness, so an `sh` site silently
@@ -47,7 +48,12 @@ if [ -n "${ZSH_VERSION:-}" ]; then SELF=zsh; else SELF=bash; fi
 # under that root trips the digit test and reports a defect against correct
 # code. This was measured as a near-miss false Critical before the path was
 # pinned. The shell name keeps the two CI jobs from colliding.
-WORK="/tmp/fence-isolation-gate-$SELF"
+# The shell name alone is NOT unique: SELF is only bash|zsh, so two runs under the
+# same shell shared one directory and clobbered each other (deferrals 14). The PID
+# supplies uniqueness, but `$$` is digits and would re-break the rule this comment
+# states, so it is mapped through tr '0-9' 'abcdefghij'. Do NOT "simplify" this to
+# mktemp -d: that reintroduces digits and the false Critical above.
+WORK="/tmp/fence-isolation-gate-$SELF-$(printf '%s' "$$" | tr '0-9' 'abcdefghij')"
 rm -rf "$WORK"
 # Says WHY it died. An `|| exit 1` here exits 1 with an empty stdout and a
 # silent stderr — the exact shape this gate exists to eliminate, and it cost a
@@ -91,7 +97,7 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 #
 # THE reflect f01 / reweave f02 ENTRIES BELOW ARE A DIFFERENT KIND: not a
 # defect in the fence, a scope artifact in assertion N's own selector. Task 3
-# of docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md renamed
+# of docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md renamed
 # {vocabulary.notes_collection} to {vocabulary.notes}, which newly matches
 # N's `grep -q -e 'NOTES_DIR' -e '{vocabulary.notes}'` selector even though the
 # match here is a qmd COLLECTION name, not the notes-directory reference the
@@ -125,8 +131,12 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 # scope marker but is not one of the two canonical spellings.
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f09~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01. Was f08 until 2026-08-08, when the Category 1 enum-value check added a fence ahead of it; the defect did not move, its INDEX did. This is the (letter, label) keying CLAUDE.md flags -- a renumber makes the entry read STALE and its unchanged subject read as a new failure, and only the message tells them apart
-skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
+skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
 skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer'
+# 2026-08-15: the seven 2026-08-11 assertion-H queue entries (next f01-f03, reduce f03,
+# reflect f06, reweave f04, verify f01) drained here, in the same commit that
+# repointed those fences to detect the queue format and write YAML via
+# queue_yaml — the bidirectional check requires exactly that pairing.
 
 table_reason() {                    # table_reason <table> <label> [letter]
   printf '%s\n' "$1" | while IFS='~' read -r l a r; do
@@ -166,6 +176,13 @@ build_fixture() {
     printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_LIB_SRC" >&2
     return 1
   }
+  # queue-edit.sh v2 resolves queue_edit.py beside itself; a fixture carrying the
+  # .sh without the .py would fail every YAML queue write on harness shape rather
+  # than on anything the fence is being judged for.
+  cp "$QUEUE_PY_SRC" "$v/ops/lib/queue_edit.py" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_PY_SRC" >&2
+    return 1
+  }
 
   # THE `---` DELIMITERS ARE LOAD-BEARING, not decoration. These two files had none,
   # which was fine while the counting fences matched `^status:` line-anchored anywhere
@@ -179,7 +196,12 @@ build_fixture() {
   printf -- '---\nstatus: open\ntitle: a tension\n---\nBody.\n'  > "$v/ops/tensions/tension-one.md"
   printf 'description: a learned rule\ntitle: a learned rule\n' > "$v/ops/methodology/method-one.md"
   printf 'title: a session\n'                            > "$v/ops/sessions/session-one.md"
-  printf -- '- id: one\n  status: pending\n- id: two\n  status: done\n' > "$v/ops/queue/queue.yaml"
+  # Task `one` carries the condition_key the map gives `{condition_key}` and a
+  # pending status, so the repointed queue fences' `--where` clauses MATCH here:
+  # queue_yaml fails loud on a zero-match write (that silence was the defect the
+  # seven fences shipped), so a fixture task nothing matches would fail every
+  # queue fence on fixture shape rather than on anything it is judged for.
+  printf -- '- id: one\n  status: pending\n  condition_key: orphans\n- id: two\n  status: done\n' > "$v/ops/queue/queue.yaml"
   printf 'title: identity\n'                             > "$v/self/identity.md"
   # Level 5/6/7 markers and one non-identity pair (reduce -> extract) added for
   # assertion M (Spec I Task 5) -- resolve_canonical_name's own guard needs
@@ -404,7 +426,7 @@ assert_modification_detection() {   # assert_modification_detection <vault> <plu
   # (a) genuine divergence -> MODIFIED (non-empty diff, rc != 0 from diff itself)
   #
   # mechanically_compare now calls frontmatter_field (domain_summary: extraction,
-  # see docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) and
+  # see docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md) and
   # HALTs if it's undefined -- source ops/lib/frontmatter.sh (already copied into
   # the fixture by build_fixture, for assertion F) before mechanically_compare, the
   # same ordering skills/upgrade/SKILL.md's own item 0 documents for real callers.
@@ -520,11 +542,18 @@ assert_modification_detection "$VAULT_FULL" "$PLUGIN_STUB" || m_fail=1
 # used by fences but are NOT in the README prerequisite table; that gap is a
 # finding in its own right, recorded in the report.
 missing=""
-for t in rg awk jq bc git sed; do
+for t in rg awk jq bc git sed python3; do
   command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
 done
 if [ -n "$missing" ]; then
   printf 'harness: required tool(s) missing:%s — cannot conclude anything\n' "$missing" >&2
+  exit 1
+fi
+# python3 alone is not enough: queue_edit.py imports PyYAML, and without it every
+# YAML queue write exits on an ImportError traceback — a false Critical against
+# seven fences that a reader cannot tell from a real one.
+if ! python3 -c 'import yaml' >/dev/null 2>&1; then
+  printf 'harness: python3 lacks PyYAML (queue_edit.py needs it) — cannot conclude anything\n' >&2
   exit 1
 fi
 
@@ -565,6 +594,9 @@ map_value() {
     '{value}')                       printf 'note' ;;
     '{target}')                      printf 'alpha' ;;
     '{condition_key}')               printf 'orphans' ;;
+    # The fixture queue task the queue fences' --where clauses match; see the
+    # fixture's own comment above its queue.yaml.
+    '{task_id}')                     printf 'one' ;;
     '{description}')                 printf 'a sample description' ;;
     '{priority}')                    printf 'high' ;;
     '{SOURCE_NAME}')                 printf 'sample-source' ;;

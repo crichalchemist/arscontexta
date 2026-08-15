@@ -259,6 +259,53 @@ eq "setup emits a self_evolution: block" "yes" "$(says skills/setup/SKILL.md '^s
 eq "no generator emits the legacy pair" "0" \
    "$(grep -rlE 'pending_observations_threshold' "$REPO/skills/setup/SKILL.md" "$REPO/generators" 2>/dev/null | wc -l | tr -d ' ')"
 
+# ---------------------------------------------------------------------------
+# D16: the reader's two bare-vs-dotted asymmetries (Task 12).
+#
+# (a) present-but-empty. The bare path used to collapse "absent" and "present
+#     but unparseable" into `$DEFAULT` at rc 0 — returning the default for a
+#     key the user wrote verbatim is how divergence 3's hardcoded 10 stayed
+#     invisible. It must fail loud, exactly as the dotted path already does.
+# (b) fixed-string key match. Both paths interpolated the key into a regex
+#     (grep -E on the bare path, two awk EREs on the dotted path), so an ERE
+#     metacharacter in the key matched arbitrary text. A `.` never reaches the
+#     bare path (the *.* case routes away), but `+`, `*`, `[` did on both.
+# ---------------------------------------------------------------------------
+echo "== D16: bare-vs-dotted asymmetries in the reader =="
+
+# (a) bare key PRESENT but EMPTY: loud rc 1, nothing on stdout. The rc-1
+# assertion is the positive control for the empty-stdout assertion beside it —
+# an empty stdout alone is also what a silent crash looks like.
+d="$TMP/d16a"; mkdir -p "$d"; printf 'observation_threshold:\n' > "$d/.arscontexta"
+out=$(CLAUDE_PROJECT_DIR="$d" "$READER" observation_threshold 99 2>/dev/null); rc=$?
+eq "D16a: bare present-but-empty exits 1, not the default" "1" "$rc"
+eq "D16a: bare present-but-empty prints no value" "" "$out"
+
+# (b) bare path: under the old grep -E, key 'se+sion' found the line
+# 'seesion: 7'. A fixed-string match must miss it and return the default.
+d="$TMP/d16b_bare"; mkdir -p "$d"; printf 'seesion: 7\n' > "$d/.arscontexta"
+out=$(CLAUDE_PROJECT_DIR="$d" "$READER" 'se+sion' 42 2>/dev/null)
+eq "D16b: bare key 'se+sion' does not regex-match 'seesion'" "42" "$out"
+
+# (b) dotted path: under the old awk ERE, section 'se+ction' found the header
+# 'seection:'. A fixed-string match must miss it and return the default.
+d="$TMP/d16b_sec"; mkdir -p "$d/ops"
+printf 'seection:\n  field: 7\n' > "$d/ops/config.yaml"
+out=$(CLAUDE_PROJECT_DIR="$d" "$READER" 'se+ction.field' 42 2>/dev/null)
+eq "D16b: dotted section 'se+ction' does not regex-match 'seection'" "42" "$out"
+
+# (b) dotted path, FIELD arm — the assertion the two above cannot substitute
+# for: the section can be matched fixed-string while the field is still
+# spliced into an ERE, and reverting only the field comparison
+# (read_config.sh's `index(bare, fld ":") == 1`) to `bare ~ "^" fld ":"` left
+# every assertion above green, because no other swept field name carries an
+# ERE metacharacter. Under that ERE, field 'fi+eld' finds the line
+# 'fiield: 7'. A fixed-string match must miss it and return the default.
+d="$TMP/d16b_fld"; mkdir -p "$d/ops"
+printf 'sect:\n  fiield: 7\n' > "$d/ops/config.yaml"
+out=$(CLAUDE_PROJECT_DIR="$d" "$READER" 'sect.fi+eld' 42 2>/dev/null)
+eq "D16b: dotted field 'fi+eld' does not regex-match 'fiield'" "42" "$out"
+
 echo
 printf 'threshold-namespace: %d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ] || exit 1

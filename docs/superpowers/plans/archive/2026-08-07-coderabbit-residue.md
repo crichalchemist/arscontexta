@@ -1,6 +1,6 @@
 # Plan — the CodeRabbit PR #3 residue
 
-Spec: `docs/superpowers/specs/2026-08-07-coderabbit-residue-design.md`
+Spec: `docs/superpowers/specs/archive/2026-08-07-coderabbit-residue-design.md`
 
 ## Global Constraints
 
@@ -21,7 +21,7 @@ Spec: `docs/superpowers/specs/2026-08-07-coderabbit-residue-design.md`
 - **Both bash and zsh, everywhere a suite runs under both today.** Do not add coverage that only
   one shell exercises without a stated reason (see `CLAUDE.md`'s own account of why
   `check-portability.sh` is the one gate that legitimately runs bash-only).
-- **This plan does not touch `docs/superpowers/plans/2026-08-04-ci-hardening.md` or its design
+- **This plan does not touch `docs/superpowers/plans/archive/2026-08-04-ci-hardening.md` or its design
   spec, anywhere, for any reason.** Both are closed records. If a task below tempts you to update a
   number in either file, stop — that number belongs to a different, completed plan.
 - **Any fix that changes a gated count (assertion total, allowlist size, fence total) must update
@@ -260,7 +260,7 @@ for s in bash zsh; do $s reference/test/fence-isolation.test.sh | tail -1; done
 
 ---
 
-## Task 10 — fix `docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md`'s own acceptance-script mechanics
+## Task 10 — fix `docs/superpowers/plans/archive/2026-08-05-generator-vault-enforcement-gap.md`'s own acceptance-script mechanics
 
 - [ ] **Step 1 — confirm this is in scope**, per the design spec's explicit reasoning: this task
       touches the plan's embedded *verification script*, not its recorded decisions or Deferrals
@@ -288,7 +288,7 @@ for s in bash zsh; do $s reference/test/fence-isolation.test.sh | tail -1; done
 
 **Done when:**
 ```bash
-/usr/bin/grep -n '<suite>' docs/superpowers/plans/2026-08-05-generator-vault-enforcement-gap.md
+/usr/bin/grep -n '<suite>' docs/superpowers/plans/archive/2026-08-05-generator-vault-enforcement-gap.md
 # expect 0 — placeholder resolved
 # run the Deferrals validation block against the plan's own real Deferrals table and confirm
 # zero false-positive flags on legitimate prose/table rows
@@ -311,7 +311,7 @@ workflow.)
   of any task here.
 - **Whether/how `platforms/claude-code`'s `{{NOTES_DIR:-notes}}`-style placeholders get substituted
   at `/init` time.** Task 8 explicitly stops short of this — tracked in
-  `docs/superpowers/specs/2026-08-07-coderabbit-residue-design.md`, Task 8's own Step 4 note.
+  `docs/superpowers/specs/archive/2026-08-07-coderabbit-residue-design.md`, Task 8's own Step 4 note.
   Related to this repo's own `CLAUDE.md` divergence 3's discussion of the same placeholder family
   never being substituted anywhere in this repo — not re-filed here, since fixing the doc and the
   guard is a smaller, independent step from building the substitution mechanism itself.

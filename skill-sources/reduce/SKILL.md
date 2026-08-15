@@ -30,7 +30,7 @@ Read these files to configure domain-specific behavior:
    - `processing.chaining`: manual | suggested | automatic
    - `processing.extraction.selectivity`: strict | moderate | permissive
 
-3. **`ops/queue/queue.json`** — current task queue (for handoff mode)
+3. **the queue file** (`ops/queue.yaml`, `ops/queue/queue.yaml`, or `ops/queue/queue.json` — whichever exists) — current task queue (for handoff mode)
 
 If these files don't exist (pre-init invocation or standalone use), use universal defaults:
 - depth: standard
@@ -1009,7 +1009,7 @@ Rationale: [why this enriches rather than duplicates]
 
 ### Queue Updates (REQUIRED in handoff mode)
 
-After creating task files, update `ops/queue/queue.json`:
+After creating task files, update the queue file (`ops/queue.yaml`, `ops/queue/queue.yaml`, or `ops/queue/queue.json` — whichever exists):
 
 1. Mark the extract task as `"status": "done"` with completion timestamp
 2. For EACH claim, add ONE queue entry:
@@ -1083,7 +1083,7 @@ Work Done:
 Files Modified:
 - ops/queue/{source}-NNN.md (claim files)
 - ops/queue/{source}-EEE.md (enrichment files, if any)
-- ops/queue/queue.json (N claim tasks + M enrichment tasks, 1 entry each)
+- the queue file (N claim tasks + M enrichment tasks, 1 entry each)
 
 Learnings:
 - [Friction]: [description] | NONE
@@ -1117,18 +1117,38 @@ else
   exit 1
 fi
 : "${QUEUE_EDIT_VERSION:=0}"
-if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
-  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+if [ "$QUEUE_EDIT_VERSION" -lt 2 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 2" >&2
   echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# The queue is YAML or JSON — the same search order seed and /ralph document.
+# A vault that migrated to YAML leaves queue.json behind as a tombstone; a
+# write landing there is the silent no-op this dispatch replaced. No queue at
+# all fails loud rather than writing nowhere.
+QUEUE_FILE=""
+for q in ops/queue.yaml ops/queue/queue.yaml ops/queue/queue.json; do
+  if [ -f "$q" ]; then QUEUE_FILE="$q"; break; fi
+done
+if [ -z "$QUEUE_FILE" ]; then
+  echo "error: no queue file found (looked for ops/queue.yaml, ops/queue/queue.yaml, ops/queue/queue.json)" >&2
   exit 1
 fi
 
 # Get timestamp
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Mark extract task done (replace TASK_ID with actual task ID)
-queue_edit '(.tasks[] | select(.id==$id)).status = "done" | (.tasks[] | select(.id==$id)).completed = $ts' \
-  ops/queue/queue.json --arg id "TASK_ID" --arg ts "$TIMESTAMP"
+# Mark the completed task done — {task_id} is the task id from the handoff block
+case "$QUEUE_FILE" in
+  *.yaml)
+    queue_yaml "$QUEUE_FILE" --where 'id={task_id}' --set status=done --set "completed=$TIMESTAMP"
+    ;;
+  *)
+    queue_edit '(.tasks[] | select(.id==$id)).status = "done" | (.tasks[] | select(.id==$id)).completed = $ts' \
+      "$QUEUE_FILE" --arg id "{task_id}" --arg ts "$TIMESTAMP"
+    ;;
+esac
 ```
 
 The handoff block's "Queue Updates" section is not just output — it is your own todo list when running interactively.
@@ -1152,7 +1172,7 @@ When processing content, route to the correct skill:
 After extraction completes, output the next step based on `ops/config.yaml` pipeline chaining mode:
 
 - **manual:** Output "Next: {vocabulary.cmd_reflect} [created notes]" — user decides when to proceed
-- **suggested:** Output next step AND add each created {vocabulary.note} to `ops/queue/queue.json` with `current_phase: "create"` and `completed_phases: []`
+- **suggested:** Output next step AND add each created {vocabulary.note} to the queue file with `current_phase: "create"` and `completed_phases: []`
 - **automatic:** Queue entries created and processing continues immediately via orchestration
 
 The chaining output uses domain-native command names from the derivation manifest.

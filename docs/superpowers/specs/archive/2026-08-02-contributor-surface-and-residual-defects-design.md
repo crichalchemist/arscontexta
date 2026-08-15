@@ -72,7 +72,7 @@ Must cover, because each has already cost someone real time:
 
 ### 3. Make the plan artifacts tell the truth
 
-`docs/superpowers/plans/2026-08-01-portability-link-correctness.md` and
+`docs/superpowers/plans/archive/2026-08-01-portability-link-correctness.md` and
 `…/2026-08-02-silent-failure-hardening.md` show **0 of 93 steps complete** while both are fully
 executed and merged. The SDD ledgers under `.superpowers/sdd/` are accurate; the plans are not.
 
@@ -97,7 +97,7 @@ Three states must stay distinct — collapsing the last two into "not PASS" is w
 | qmd present, names do NOT resolve | **FAIL** |
 
 Full step-by-step implementation, including the non-vacuity mutation, is already written as Task 5
-of `docs/superpowers/plans/2026-08-02-stale-contracts-and-dead-configuration.md`. This spec adopts
+of `docs/superpowers/plans/archive/2026-08-02-stale-contracts-and-dead-configuration.md`. This spec adopts
 it rather than restating it.
 
 ### 5. Residual defects — decide, then either fix or record with a reason

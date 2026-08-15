@@ -60,10 +60,24 @@ case "$KEY" in
     # The field's raw line, if the section exists and contains it. Section ends at
     # the next column-0 line, so a same-named field in a different section cannot
     # be picked up.
+    # FIXED-STRING matching via index(), not an interpolated ERE. The key used
+    # to be spliced into two awk regexes, so an ERE metacharacter in it matched
+    # arbitrary text — section `se+ction` found the header `seection:`. Same
+    # fixed-string idiom frontmatter.sh uses.
     LINE=$(awk -v sec="$SECTION" -v fld="$FIELD" '
-      $0 ~ "^"sec":[[:space:]]*(#.*)?$" { insec=1; next }
-      /^[^[:space:]#]/                  { insec=0 }
-      insec && $0 ~ "^[[:space:]]+"fld":" { print; exit }
+      # Section header: `sec:` at column 0, rest blank or a comment.
+      (index($0, sec ":") == 1) {
+        rest = substr($0, length(sec) + 2)
+        sub(/^[[:space:]]*/, "", rest)
+        if (rest == "" || substr(rest, 1, 1) == "#") { insec = 1; next }
+      }
+      ($0 ~ /^[^[:space:]#]/) { insec = 0 }
+      (insec) {
+        bare = $0; sub(/^[[:space:]]+/, "", bare)
+        # bare != $0 keeps the original requirement that a field line be
+        # indented, so a column-0 key of the same name is not picked up.
+        if (bare != $0 && index(bare, fld ":") == 1) { print; exit }
+      }
     ' "$NESTED" 2>/dev/null)
 
     # NOT CONFIGURED and CONFIGURED-BUT-UNREADABLE ARE DIFFERENT ANSWERS. Absent is
@@ -104,10 +118,29 @@ fi
 
 # Simple YAML key-value reader (top-level scalar keys only)
 # Handles: key: value, key: "value", key: 'value'
-VALUE=$(grep -E "^${KEY}:" "$CONFIG_FILE" 2>/dev/null | head -1 | sed 's/^[^:]*:[[:space:]]*//' | sed 's/^["'"'"']//;s/["'"'"']$//' | sed 's/[[:space:]]*$//')
+#
+# FIXED-STRING key match, and ABSENT kept apart from PRESENT-BUT-EMPTY — the
+# dotted path above already draws both distinctions and this path did not:
+# `grep -E "^${KEY}:"` made the key a regex, and an empty VALUE collapsed
+# "the user wrote this key with no readable value" into the default at rc 0.
+# Returning the default for a key the user wrote verbatim is how divergence
+# 3's hardcoded 10 stayed invisible.
+LINE=$(awk -v k="$KEY" 'index($0, k ":") == 1 { print; exit }' "$CONFIG_FILE" 2>/dev/null)
+
+# Absent is ordinary: return the default and say nothing.
+if [ -z "$LINE" ]; then
+  echo "$DEFAULT"
+  exit 0
+fi
+
+VALUE=$(printf '%s\n' "$LINE" \
+  | sed 's/[[:space:]]*#.*$//' \
+  | sed 's/^[^:]*:[[:space:]]*//' \
+  | sed 's/^["'"'"']//;s/["'"'"']$//' \
+  | sed 's/[[:space:]]*$//')
 
 if [ -z "$VALUE" ]; then
-  echo "$DEFAULT"
-else
-  echo "$VALUE"
+  printf 'read_config: %s is set in %s but its value could not be read: %s\n' "$KEY" "$CONFIG_FILE" "$LINE" >&2
+  exit 1
 fi
+echo "$VALUE"

@@ -1,6 +1,6 @@
 # Plan — Spec E: the fourteen open items
 
-**Spec:** `docs/superpowers/specs/2026-08-03-fourteen-open-items-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-03-fourteen-open-items-design.md`
 **Branch:** cut fresh from `main` after `docs/skill-authoring-reference` merges.
 **Ledger:** `.superpowers/sdd/2026-08-03-fourteen-open-items/progress.md` — authoritative over the
 checkboxes below. Tick as you go, or this plan becomes E11.
@@ -77,7 +77,7 @@ absorbing a timestamped filename — demonstrated on the fixture, pasted into th
       marker in the templates, so it was dropped. `741b2b7` describes this as "recorded in the
       ledger"; the ledger is `.superpowers/`, which is **gitignored**, so no record shipped and the
       tick above stood for nothing a reader could check. Carried as divergence 10 in `CLAUDE.md`;
-      the marker convention is deferred to `docs/superpowers/plans/2026-08-04-ci-hardening.md`
+      the marker convention is deferred to `docs/superpowers/plans/archive/2026-08-04-ci-hardening.md`
       (item 18). The `[x]` is deliberately **not** untucked — Steps 1–3 shipped, and retro-ticking
       or retro-unticking is how this plan's status stopped matching its ledger in the first place.
 

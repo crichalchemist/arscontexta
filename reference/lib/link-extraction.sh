@@ -50,7 +50,7 @@
 #      filesystem) violates this and produces false positives.
 
 # Contract version. Bump on any BEHAVIOR change (fold rules, termination, recursion semantics).
-LINK_EXTRACTION_VERSION=3
+LINK_EXTRACTION_VERSION=4
 
 # Case folding must fold NON-ASCII, and neither a locale name nor a tool name is
 # enough to know that it will:
@@ -137,6 +137,7 @@ count_links() {
   tmpf=$(mktemp) || return 1
   tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" > "$tmpf" 2>/dev/null; then
@@ -170,6 +171,7 @@ extract_link_targets() {
   tmpf=$(mktemp) || return 1
   tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" >> "$tmpdata" 2>/dev/null; then
@@ -192,7 +194,7 @@ extract_link_targets() {
 
   cat "$tmpf" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | _fold_lower | sort -u
+    | _fold_lower | LC_ALL=C sort -u
 
   rm -f "$tmpf" "$tmpdata" "$errf"
 }
@@ -204,7 +206,7 @@ existing_note_index() {
   for p in "$dir"/*.md; do
     [ -e "$p" ] || continue
     basename "$p" .md
-  done | _fold_lower | sort -u
+  done | _fold_lower | LC_ALL=C sort -u
 }
 
 # count_links_recursive <dir> -> integer (scans directory tree)
@@ -214,6 +216,7 @@ count_links_recursive() {
   tmpf=$(mktemp) || return 1
   tmpcount=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$1" -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" > "$tmpf" 2>/dev/null; then
@@ -247,6 +250,7 @@ extract_link_targets_recursive() {
   tmpf=$(mktemp) || return 1
   tmpdata=$(mktemp) || { rm -f "$tmpf"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -type f -name '*.md' | while IFS= read -r f; do
     if ! _strip_fences "$f" >> "$tmpdata" 2>/dev/null; then
@@ -269,7 +273,7 @@ extract_link_targets_recursive() {
 
   cat "$tmpf" \
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-    | _fold_lower | sort -u
+    | _fold_lower | LC_ALL=C sort -u
 
   rm -f "$tmpf" "$tmpdata" "$errf"
 }
@@ -280,7 +284,7 @@ existing_note_index_recursive() {
   local dir="$1" p
   find "$dir" -type f -name '*.md' | while IFS= read -r p; do
     basename "$p" .md
-  done | _fold_lower | sort -u
+  done | _fold_lower | LC_ALL=C sort -u
 }
 
 # link_edge_map <dir> -> source<TAB>target<TAB>source_path edges (flat, no recursion)
@@ -294,6 +298,7 @@ link_edge_map() {
   tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
   rgtmp=$(mktemp) || { rm -f "$stripped" "$tmpdata"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -maxdepth 1 -type f -name '*.md' | while IFS= read -r f; do
     src=$(basename "$f" .md | _fold_lower)
@@ -332,6 +337,7 @@ link_edge_map_recursive() {
   tmpdata=$(mktemp) || { rm -f "$stripped"; return 1; }
   rgtmp=$(mktemp) || { rm -f "$stripped" "$tmpdata"; return 1; }
   errf="/tmp/link-extraction-err-$$"
+  rm -f "$errf"
 
   find "$dir" -type f -name '*.md' -not -path '*/.git/*' | while IFS= read -r f; do
     src=$(basename "$f" .md | _fold_lower)
@@ -375,7 +381,7 @@ backlink_counts() {
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
     | LC_ALL=C sort \
     | uniq -c \
-    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+    | LC_ALL=C awk '{ match($0, /^[ \t]*[0-9]+[ \t]+/); c = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", c); rest = substr($0, RSTART + RLENGTH); printf "%s\t%s\n", rest, c }'
 
   rm -f "$edges"
 }
@@ -392,7 +398,7 @@ backlink_counts_recursive() {
   LC_ALL=C awk -F'\t' '$1 != $2 { print $2 }' "$edges" \
     | LC_ALL=C sort \
     | uniq -c \
-    | LC_ALL=C awk '{ c=$1; $1=""; sub(/^ /,""); printf "%s\t%s\n", $0, c }'
+    | LC_ALL=C awk '{ match($0, /^[ \t]*[0-9]+[ \t]+/); c = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", c); rest = substr($0, RSTART + RLENGTH); printf "%s\t%s\n", rest, c }'
 
   rm -f "$edges"
 }

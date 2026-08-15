@@ -43,6 +43,7 @@ cd "$ROOT" || { echo "check-prose-paths: cannot cd to repo root" >&2; exit 2; }
 # missing is an ERROR, never a skip — a shrinking scope must not read as clean.
 SCOPE="
 CLAUDE.md
+docs/closed-divergences.md
 CONTRIBUTING.md
 README.md
 reference/skill-authoring.md
@@ -50,6 +51,8 @@ reference/testing-milestones.md
 reference/vocabulary-transforms.md
 reference/use-case-presets.md
 platforms/shared/skill-blocks/README.md
+hooks/scripts/session-orient.sh
+platforms/claude-code/hooks/session-orient.sh.template
 "
 
 # Repo top-level directories. A path must start with one of these to be treated

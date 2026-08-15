@@ -81,9 +81,9 @@ behind exactly this. **Always pass `--repo <you>/arscontexta`.**
 
 ---
 
-## Verification — run all sixteen, expect exactly these results
+## Verification — run all seventeen, expect exactly these results
 
-Fourteen run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
+Fifteen run in CI on every push, **most under both bash and zsh**. Three shipped defects were bash/zsh
 forks (unquoted word-splitting; `PIPESTATUS` reads empty under zsh); a single-shell run cannot see
 either.
 
@@ -104,19 +104,27 @@ bash reference/check-vocabulary-schema.sh ;      echo "expect rc=0, got rc=$?"  
 bash reference/test/check-doc-claims.test.sh | tail -1  # bash-only (see the suite's own header); expect: passed=13 failed=0
 
 for s in bash zsh; do
-  $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=91 failed=0
-  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=60 failed=0
+  $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=101 failed=0
+  $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=66 failed=0
   $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
   $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0
   $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=76 failed=0
-  $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 52 passed, 0 failed
+  $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 57 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
-  $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=57 failed=0
+  $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=60 failed=0
   $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
+  $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=77 failed=0
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
 ```
+
+**`queue-edit.test.sh` is green: 77/77, both shells — all CI steps pass.** It was RED ON PURPOSE for
+one branch: three of its assertions pinned an open defect before the fix, the only order in which a
+test can be shown to fail for the stated reason. `reference/lib/queue-edit.sh` used to end
+`mv "$tmp" "$file"` unguarded, so a failed rename left the temp on disk, printed nothing, and
+returned the exit status of the following `rm -rf` — 0. The commit step is now guarded: a failed
+rename returns 1, discards its temp, and names the path that could not move.
 
 `validate-kernel.sh` may WARN **only** on primitive 10 (qmd absent) and primitive 8 (self space
 disabled). Any other WARN or FAIL is a regression **in this repo** — but read the message first,
@@ -145,7 +153,7 @@ primitive 2 for the opposite reason: it has no wiki links yet, and the check rep
 notes directory containing none. Neither is this repo failing; both are the validator describing
 the vault it was handed.
 
-**"Green" means all twenty-eight CI steps ran and passed** — not that the previously-red step turned.
+**"Green" means all thirty CI steps ran and passed** — not that the previously-red step turned.
 Verify per-step; a skipped step is not a passing step:
 
 ```bash
@@ -278,7 +286,7 @@ done
 ```
 
 Nothing enforces this. A gate keyed on plan structure is the one viable candidate and is deferred to
-`docs/superpowers/plans/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
+`docs/superpowers/plans/archive/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
 next author copies the last plan.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
@@ -347,5 +355,5 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All twenty-eight CI steps must pass. State in the PR what is **not** claimed —
+Branch from `main`. All thirty CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.

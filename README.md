@@ -271,10 +271,12 @@ Keep qmd MCP configuration and tool preapproval in `.mcp.json`.
 | `jq` | Yes | JSON parsing in generated skills |
 | `bc` | Yes | Arithmetic in `/stats` metrics -- **not preinstalled on Fedora or minimal Debian images** |
 | `git` | Yes | Auto-commit hook, vault history |
+| `python3` (with PyYAML) | Yes | Surgical YAML queue writes (`queue_edit.py`, shipped to `ops/lib/`) |
 | [qmd](https://github.com/tobi/qmd) | Optional | Semantic search |
 
-The six shell tools above (`rg`, `awk`, `sed`, `jq`, `bc`, `git`) are exactly what
-`reference/test/fence-isolation.test.sh` asserts before it runs, so this table and that
+The seven shell tools above (`rg`, `awk`, `sed`, `jq`, `bc`, `git`, `python3`) are exactly what
+`reference/test/fence-isolation.test.sh` asserts before it runs (for `python3` it also probes the
+PyYAML import that `queue_edit.py` needs), so this table and that
 gate can be checked against each other. A missing tool makes a generated skill's shell
 block exit 127, which reads as a plausible-looking failure rather than an absent
 dependency -- `bc` is the one that actually bites in practice.
@@ -324,6 +326,7 @@ arscontexta/
 |   |-- check-prose-paths.sh     # Prose-path gate
 |   |-- check-doc-claims.sh      # Documented numbers vs measured reality
 |   |-- check-placeholder-count.sh  # Templates must not lose placeholders
+|   |-- check-vocabulary-schema.sh  # Vocabulary placeholders must resolve to schema
 |   |-- lib/                     # Shared shell libraries
 |   +-- test/                    # Gate test suites
 |-- platforms/                   # Platform-specific adapters

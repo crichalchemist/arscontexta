@@ -499,5 +499,55 @@ eq "check 7: converted allowlist does NOT misdiagnose the scan itself" "yes" \
    "$(printf '%s' "$FM_STALE_OUT" | grep -q 'does not match the allowlist' || { echo no; exit; }; \
       printf '%s' "$FM_STALE_OUT" | grep -q 'the scan did not run' && echo no || echo yes)"
 
+# --- check 6: D19 — anchored hit count, pipe-delimited allowlist --------------
+#
+# D19a: `interp_hits_in` used `grep -cF "$ROOT/<path>:"` — a SUBSTRING match,
+# so a hit line whose CONTENT mentions another allowlisted path (with its
+# trailing colon) was counted against that other path too. The damage runs in
+# the silent direction this repo documents: maintenance.md is DELETED here, so
+# the GONE arm must fire — but the unanchored count read the mention inside
+# testing-milestones.md's hit line as a live maintenance.md hit, the stale
+# loop's `!= 0` skip swallowed the deletion, and the guard reported check 6
+# green. Both assertions were born red against that guard. (Why not the
+# false-FAIL direction — a healthy two-file tree wrongly COUNT CHANGED:
+# creating generators/features/maintenance.md wakes check 7's OWN allowlist,
+# whose other entries then go STALE, and recreating that list here is the
+# brittleness the fixtures above already refuse.)
+D=$(mkroot)
+printf '%s %s/generators/features/maintenance.md: named in content\n' "$INTERP" "$D" \
+  > "$D/reference/testing-milestones.md"
+D_OUT=$(out_of "$D")
+eq "interp: D19a deleted allowlisted file is STALE even when another hit's content names its path" \
+   "1" "$(rc_of "$D")"
+eq "interp: D19a the GONE arm names it — the substring count masked exactly this" "yes" \
+   "$(printf '%s' "$D_OUT" | grep -q 'STALE generators/features/maintenance.md — allowlisted but the file is gone' && echo yes || echo no)"
+
+# D19b: the allowlist itself. `${e%% *}` split on WHITESPACE, so a path
+# containing a space mis-parsed silently. The delimiter is now `|`, and this
+# measures ENTRIES — every non-empty line between INTERP_ALLOW=" and its
+# closing quote — not lines-matching-a-substring inside a fixed grep window,
+# which stops being the same quantity the moment two entries share a line or
+# the list outgrows the window. Born red: the space-delimited rows carried
+# zero `|` field separators, so both counted as malformed. The entry-count
+# assertion is the positive control — an awk anchor that stopped matching
+# would print 0 there, not pass quietly.
+allow_entries=$(awk '/^INTERP_ALLOW="$/{f=1;next} f&&/^"$/{f=0} f&&NF{c++} END{print c+0}' "$GUARD")
+allow_malformed=$(awk '/^INTERP_ALLOW="$/{f=1;next} f&&/^"$/{f=0} f&&NF && gsub(/\|/,"|")!=2 {c++} END{print c+0}' "$GUARD")
+eq "interp: D19b allowlist still declares 2 entries (counted as entries)" "2" "$allow_entries"
+eq "interp: D19b every entry is path|count|reason — exactly two field separators" \
+   "0" "$allow_malformed"
+
+# D19 end-to-end: the guard run against THIS repo must still resolve both
+# entries through the new delimiter. A parse that silently yields nothing does
+# not no-op here — the repo's two real sites would surface as UNLISTED and
+# redden the rc assertion — and the second assertion pins that both files
+# resolved at their declared counts. Not born red (the old parse also passed
+# on the repo); these are the assertions the space-delimiter mutation and the
+# unanchored-count mutation must each redden.
+REPO_OUT=$(bash "$GUARD" 2>&1); REPO_RC=$?
+eq "interp: D19 guard green on the real repo through the new delimiter" "0" "$REPO_RC"
+eq "interp: D19 real repo — both allowlisted files accounted for" "yes" \
+   "$(printf '%s' "$REPO_OUT" | grep -q 'across 2 allowlisted file(s), all accounted for' && echo yes || echo no)"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -93,7 +93,7 @@ rc_of(){ ( cd "$1" && bash reference/check-placeholder-count.sh "${2:-base}" >/d
 allow(){ # allow <repo> <entries>  — substitute the allowlist in the repo's copy
     # Matches the WHOLE current assignment (PLACEHOLDER_ALLOW="...") via regex,
     # not a literal '""' — the shipped default is no longer empty (see
-    # docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md's
+    # docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md's
     # one real allowlisted entry), and a literal-empty-string match would only
     # ever have worked for that one specific starting value. No entry, shipped
     # or test-supplied, contains an embedded double quote, so a non-greedy

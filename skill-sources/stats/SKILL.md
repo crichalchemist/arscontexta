@@ -173,8 +173,8 @@ else
 fi
 
 : "${LINK_EXTRACTION_VERSION:=0}"
-if [ "$LINK_EXTRACTION_VERSION" -lt 3 ]; then
-  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 3" >&2
+if [ "$LINK_EXTRACTION_VERSION" -lt 4 ]; then
+  echo "error: link-extraction library is version $LINK_EXTRACTION_VERSION; this skill needs >= 4" >&2
   echo " run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
@@ -214,14 +214,20 @@ LINK_TARGETS=$(extract_link_targets_recursive "$NOTES_DIR") || {
 # SAME total (6) over DIFFERENT sets, the errors cancelling in the sum.
 #
 # MOCs are excluded, as before: a map that nothing links TO is not an orphan.
-# The MOC index is folded through _fold_lower and sorted the same way the
-# library sorts NOTE_INDEX — comm does not warn usefully on inputs collated
-# differently, it just returns a wrong set.
+# The MOC index is folded through _fold_lower and pinned to C collation, which is
+# how the library sorts its exports (>= v4). Sorting each side is NOT enough on
+# its own: comm requires the SAME collation on both, and it does not warn on a
+# mismatch — it returns a wrong set at exit 0. Under glibc with a non-C LANG,
+# `my-note` and `mynote` collate in a different order than under C, so an
+# unpinned MOC_INDEX would silently corrupt ORPHAN_COUNT below.
 MOC_INDEX=$(find "$NOTES_DIR" -type f -name '*.md' -exec grep -l '^type: moc' {} + 2>/dev/null \
-  | while IFS= read -r f; do basename "$f" .md; done | _fold_lower | sort -u)
-# Both sides are already folded and sorted, which is what makes comm valid here.
-ORPHAN_ALL=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS"))
-ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$ORPHAN_ALL") <(printf '%s\n' "$MOC_INDEX") \
+  | while IFS= read -r f; do basename "$f" .md; done | _fold_lower | LC_ALL=C sort -u)
+# BOTH of the comms below, not just the first. Each operand is folded, sorted AND
+# pinned to C: NOTE_INDEX and LINK_TARGETS by the library (>= v4), MOC_INDEX
+# above, and ORPHAN_ALL inherits C order from the comm that produced it. Folded
+# and sorted is not sufficient — comm needs one collation across both sides.
+ORPHAN_ALL=$(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS"))
+ORPHAN_COUNT=$(LC_ALL=C comm -23 <(printf '%s\n' "$ORPHAN_ALL") <(printf '%s\n' "$MOC_INDEX") \
   | grep -c . || true)
 
 # Dangling: targets that resolve to no note. Left as a membership loop rather
@@ -276,9 +282,13 @@ MOC_TARGETS=$(awk -F'\t' 'FNR==NR {moc[$1]=1; next} $3 in moc {print $2}' "$MOC_
 rm -f "$EDGE_MAP" "$MOC_SRC"
 
 # Denominator set is non-MOC notes, matching NOTE_COUNT, which also subtracts
-# MOCs. Both operands reach comm already folded and sorted.
-COVERED=$(comm -12 \
-  <(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
+# MOCs. "Sorted" alone would NOT make this valid: comm requires the SAME
+# collation on both sides, not merely that each side is independently sorted, and
+# it does not warn on a mismatch — it returns the wrong set at exit 0. All three
+# operands are pinned to C: NOTE_INDEX by the library (>= v4), MOC_TARGETS above,
+# and MOC_INDEX where it is built. Do not unpin any of them in isolation.
+COVERED=$(LC_ALL=C comm -12 \
+  <(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$MOC_INDEX")) \
   <(printf '%s\n' "$MOC_TARGETS") | grep -c . || true)
 if [[ "$NOTE_COUNT" -gt 0 ]]; then
   COVERAGE=$(echo "scale=0; $COVERED * 100 / $NOTE_COUNT" | bc)

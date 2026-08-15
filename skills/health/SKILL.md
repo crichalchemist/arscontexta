@@ -3,8 +3,6 @@ name: health
 description: Run condition-based vault health diagnostics. 9 categories — schema compliance, orphan detection, link health, description quality, three-space boundaries, processing throughput, stale notes, MOC coherence, shared library integrity. 3 modes — quick (schema+orphans+links+library), full (all 9), three-space (boundary violations only). Returns actionable FAIL/WARN/PASS report with specific fixes ranked by impact. Triggers on "/health", "check vault health", "maintenance report", "what needs fixing".
 version: "1.0"
 generated_from: "arscontexta-v1.6"
-context: fork
-model: opus
 allowed-tools: Read, Grep, Glob, Bash, mcp__qmd__query
 argument-hint: "[optional: 'quick', 'full', or 'three-space']"
 ---
@@ -688,14 +686,14 @@ Bare links without context phrases are address book entries, not navigation. Eve
 
 ### Category 9: Shared Library Integrity (quick, full)
 
-**What it checks:** The vault's own copies of **both** shared libraries exist and are new enough for the skills that source them.
+**What it checks:** The vault's own copies of **all three** shared libraries exist and are new enough for the skills that source them.
 
-**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh`, and `/next`, `/rethink` and `/stats` source `ops/lib/frontmatter.sh`; each exits 1 when its library is missing or too old. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. These are the *vault* copies — the same files those skills load — not the plugin's.
+**Why it runs in quick mode:** `/stats` and `/graph` source `ops/lib/link-extraction.sh`; `/next`, `/rethink` and `/stats` source `ops/lib/frontmatter.sh`; and `/next`, `/verify`, `/reduce`, `/reflect` and `/reweave` source `ops/lib/queue-edit.sh` for every queue write. Each exits 1 when its library is missing or too old. This check reports that condition directly instead of leaving the user to discover it the next time they run a command. These are the *vault* copies — the same files those skills load — not the plugin's.
 
-**Both are checked because this category's own numbers depend on one of them.** `/health` sources
-`frontmatter.sh` to produce its observation and tension counts. A check that covered only the link
-library would report the shared library healthy in exactly the vault where /health's own condition
-counts could not be taken — a report vouching for the thing it was unable to use.
+**All three are checked, and `frontmatter.sh` in particular because this category's own numbers
+depend on it.** `/health` sources `frontmatter.sh` to produce its observation and tension counts. A
+check that skipped it would report the shared library healthy in exactly the vault where /health's
+own condition counts could not be taken — a report vouching for the thing it was unable to use.
 
 **How to check:**
 
@@ -707,7 +705,9 @@ VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 # Report, never exit: health is a report generator, and exiting here would
 # suppress every category that follows. Each library is reported on its own line;
 # one missing file must not mask the state of the other.
-check_lib() {                # check_lib <path> <version-var-name> <label>
+check_lib() {                # check_lib <path> <version-var-name> <label> <min-version>
+  v=0   # reset: on the missing-file return below, a stale $v from the previous
+        # call must not leak into the companion check that reads $v after us.
   if [ ! -r "$1" ]; then
     echo "FAIL: $3 library missing or unreadable at '$1'"
     echo "      run /arscontexta:upgrade to restore it"
@@ -720,43 +720,63 @@ check_lib() {                # check_lib <path> <version-var-name> <label>
   # reports a problem rather than hiding one.
   eval "v=\${$2:-0}"
   case "$v" in ''|*[!0-9]*) v=0 ;; esac
-  # THE FLOOR IS 1 AND STAYS 1 — a decision, recorded because a review asked for
-  # one rather than for a particular answer. The floor exists to catch ABSENT or
-  # unparseable, which is a broken vault. It is deliberately NOT raised to track
-  # the current version: doing so would FAIL every vault that has not run
-  # /upgrade, for libraries whose later versions fix real but narrow defects
-  # (frontmatter v2 added a directory-readability guard, v3 symlink traversal and
-  # a find-rc check — a v1 copy is wrong only on trees it cannot fully scan).
-  # Turning a whole fleet red for that is a worse trade than a stale-but-working
-  # copy. What was NOT acceptable is the previous silence: `PASS: library v1`
-  # said nothing about being behind, so a vault carrying a version this repo had
-  # just documented as defective read as healthy. The PASS line now names the
-  # remedy without asserting a failure.
-  if [ "$v" -lt 1 ]; then
-    echo "FAIL: $3 library is version $v; skills need >= 1"
+  # THE FLOOR IS PER-LIBRARY AND DERIVED FROM THE CONSUMERS' OWN GUARDS. This
+  # supersedes the earlier in-file ruling "THE FLOOR IS 1 AND STAYS 1", which
+  # predated the consumers raising their own floors: the seven queue fences
+  # (/next x3, /reduce, /reflect, /reweave, /verify) exit 1 below
+  # QUEUE_EDIT_VERSION 2, and /graph and /stats exit 1 below
+  # LINK_EXTRACTION_VERSION 4. Vouching at 1 meant a vault on queue-edit v1 had
+  # every one of those queue writes refusing to run while this category printed
+  # PASS beside them — a report vouching for the thing the skills were unable
+  # to use, the exact failure this category's rationale paragraph names. Each
+  # floor is the HIGHEST version any consuming skill demands — not the
+  # library's current version, so a stale-but-working copy above its floor
+  # still PASSes and the fleet does not turn red for narrow fixes (frontmatter
+  # has no versioned consumer guard at all, so its floor stays 1:
+  # absent/unparseable detection only). Re-derive the floors from the guards,
+  # never from this comment:
+  #   /usr/bin/grep -rn '_VERSION" -lt [0-9]' skill-sources/ skills/
+  if [ "$v" -lt "$4" ]; then
+    echo "FAIL: $3 library is version $v; the skills that source it need >= $4"
     echo "      run /arscontexta:upgrade to refresh it"
   else
     echo "PASS: $3 library v$v (run /arscontexta:upgrade to check for a newer one)"
   fi
 }
 
-check_lib "$VAULT_ROOT/ops/lib/link-extraction.sh" LINK_EXTRACTION_VERSION link-extraction
-check_lib "$VAULT_ROOT/ops/lib/frontmatter.sh"     FRONTMATTER_VERSION     frontmatter
+check_lib "$VAULT_ROOT/ops/lib/link-extraction.sh" LINK_EXTRACTION_VERSION link-extraction 4
+check_lib "$VAULT_ROOT/ops/lib/frontmatter.sh"     FRONTMATTER_VERSION     frontmatter     1
+check_lib "$VAULT_ROOT/ops/lib/queue-edit.sh"      QUEUE_EDIT_VERSION      queue-edit      2
+
+# queue-edit v2 is TWO files: the .sh dispatches every YAML queue write to its
+# Python companion. A v2 .sh without its .py is the split state /upgrade's
+# library step says an upgrade must not create — the version constant reads
+# healthy while every YAML queue write fails at run time. $v still holds
+# queue-edit's parsed version from the call above (same fence; check_lib resets
+# it to 0 on its missing-file path, so a missing .sh cannot leak the previous
+# library's version into this test).
+if [ "$v" -ge 2 ] && [ ! -r "$VAULT_ROOT/ops/lib/queue_edit.py" ]; then
+  echo "FAIL: queue-edit companion queue_edit.py missing or unreadable at '$VAULT_ROOT/ops/lib/queue_edit.py'"
+  echo "      every YAML queue write will fail until it is restored; run /arscontexta:upgrade"
+fi
 ```
 
 **Thresholds:**
 
-Applied to **each** library independently; the category FAILs if either row FAILs.
+Applied to **each** library independently; the category FAILs if any row FAILs. The floor is
+per-library, derived from the consuming skills' own guards (link-extraction 4, frontmatter 1,
+queue-edit 2 — re-derive from the guards, per the comment in the fence).
 
 | Condition | Result |
 |-----------|--------|
-| File present, readable, version >= 1 | PASS |
-| File present, version < 1 or unset | FAIL |
+| File present, readable, version >= its consumer floor | PASS |
+| File present, version below its consumer floor or unset | FAIL |
 | File missing or unreadable | FAIL |
+| queue-edit v2+ present but `queue_edit.py` missing | FAIL |
 
 There is no WARN band. A library is a precondition, not a quality measure: the skills that source it either run or do not.
 
-**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — and `frontmatter.sh` is newer than `link-extraction.sh`, so on most existing vaults it is the frontmatter row that fires. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
+**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — `queue-edit.sh` is the newest of the three, so on most existing vaults it is the queue-edit row that fires, missing rather than merely outdated. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
 
 **Example output:**
 
@@ -764,6 +784,7 @@ There is no WARN band. A library is a precondition, not a quality measure: the s
 [9] Shared Libraries ............. FAIL
     ops/lib/link-extraction.sh v2
     ops/lib/frontmatter.sh missing
+    ops/lib/queue-edit.sh v1
     /next, /rethink and /stats will exit 1 until restored
     Recommendation: run /arscontexta:upgrade
 ```
@@ -893,7 +914,7 @@ PASS:
     [details — note count per topic map, coverage gaps, bare links]
 
 [9] Shared Libraries ............. PASS | FAIL
-    [ops/lib/link-extraction.sh and ops/lib/frontmatter.sh — presence and version, one line each]
+    [ops/lib/link-extraction.sh, ops/lib/frontmatter.sh and ops/lib/queue-edit.sh — presence and version, one line each]
 
 ---
 

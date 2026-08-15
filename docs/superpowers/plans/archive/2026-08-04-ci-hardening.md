@@ -1,6 +1,6 @@
 # Plan — Spec G: CI hardening
 
-**Spec:** `docs/superpowers/specs/2026-08-04-ci-hardening-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md`
 **Branch:** cut fresh from `main` **after** `fix/spec-f-divergence-drain` merges. Two of Spec G's
 subjects (the divergence list's numbering, the six matcher sites) are files that branch is actively
 editing; racing it manufactures conflicts in the exact documents G2 exists to keep honest. If
@@ -258,7 +258,7 @@ and the Step-3 mutation produced red in both shells before being reverted.
 - [x] **Step 1 — Name the expected gates in Spec F's carry-forward.** Spec G items 22 and 23 expect
       gates from Spec F Task 3's commits (the enum consistency assertion; the check-portability ban
       on inlining the frontmatter library once it exists). Add one line to the *Review* section of
-      `docs/superpowers/plans/2026-08-03-ten-open-divergences.md` carrying that expectation into
+      `docs/superpowers/plans/archive/2026-08-03-ten-open-divergences.md` carrying that expectation into
       its final review — a tracked file that work already reads. If that branch has merged with
       Task 3 done and no such gates, file the gap as a new divergence entry instead; do not let the
       expectation live only here.
@@ -269,7 +269,7 @@ and the Step-3 mutation produced red in both shells before being reverted.
       the ones the branch itself changed. Spec G documents that this discipline has a half-life of
       one branch; Task 1's gate now covers the declared claims, and this step covers the rest.
 
-**Done when:** `awk '/^## Deferrals/{f=1;next} /^## /{f=0} f&&NF' docs/superpowers/plans/2026-08-04-ci-hardening.md | grep -c .`
+**Done when:** `awk '/^## Deferrals/{f=1;next} /^## /{f=0} f&&NF' docs/superpowers/plans/archive/2026-08-04-ci-hardening.md | grep -c .`
 returns ≥ 1, and the line it counts is not the word `none` unless the ledger shows zero deferrals.
 
 ---
@@ -299,7 +299,7 @@ where it landed and what would reopen it.
 
 ```text
 Item 18 (output-contract marker convention) — deferred to whoever next changes the template
-  format. Tracked: docs/superpowers/specs/2026-08-04-ci-hardening-design.md, "Deliberately not
+  format. Tracked: docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md, "Deliberately not
   gated", item 18. Needs an explicit contract marker in the templates before it is checkable.
 
 From Task 2 (check-portability check 6):

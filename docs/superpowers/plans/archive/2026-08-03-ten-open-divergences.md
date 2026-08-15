@@ -1,6 +1,6 @@
 # Plan — Spec F: the ten open divergences
 
-**Spec:** `docs/superpowers/specs/2026-08-03-ten-open-divergences-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-03-ten-open-divergences-design.md`
 **Branch:** cut fresh from `main` at `769c221`.
 **Ledger:** `.superpowers/sdd/2026-08-03-ten-open-divergences/progress.md` — authoritative over the
 checkboxes below. **The ledger is gitignored.** It is a working log, never a record. Anything that
@@ -246,7 +246,7 @@ states in a comment that it is deliberately fixed and why — and `CLAUDE.md` di
 ```bash
 # 1. The Deferrals slot exists and is non-empty in this plan.
 awk '/^## Deferrals/{f=1;next} /^## /{f=0} f&&NF' \
-    docs/superpowers/plans/2026-08-03-ten-open-divergences.md | grep -c .   # >= 1
+    docs/superpowers/plans/archive/2026-08-03-ten-open-divergences.md | grep -c .   # >= 1
 
 # 2. No divergence entry lacks a re-derivation command. Each numbered entry must
 #    contain a backticked command or a ```bash block before the next entry.
@@ -259,7 +259,7 @@ awk '/^## Known open divergences/,/^### Closed on/' CLAUDE.md \
 
 # 4. Spec E's Task 2 Step 4 no longer reads as a shipped check.
 grep -A2 'Step 4 — Add the assertion' \
-    docs/superpowers/plans/2026-08-03-fourteen-open-items.md | grep -ci 'not shipped\|superseded'
+    docs/superpowers/plans/archive/2026-08-03-fourteen-open-items.md | grep -ci 'not shipped\|superseded'
 ```
 
 A gate, if Step 2.2 concludes one is viable, must additionally fail on a fabricated commit message
@@ -383,7 +383,7 @@ One gate **is** viable and is deferred rather than dropped: *every file in
 `docs/superpowers/plans/*.md` must contain a `## Deferrals` section with at least one non-blank
 line.* It keys on document structure rather than on a word's sense, so it has no false-positive
 surface. It is not built here for two reasons. Gate design is assigned to
-`docs/superpowers/plans/2026-08-04-ci-hardening.md` and `CLAUDE.md` says not to bolt one on
+`docs/superpowers/plans/archive/2026-08-04-ci-hardening.md` and `CLAUDE.md` says not to bolt one on
 elsewhere. And it would fail today on the six older plans, whose only fix would be retrofitting
 `none` into plans nobody has audited for deferrals — manufacturing records to satisfy a check,
 which is the defect this task exists to close.

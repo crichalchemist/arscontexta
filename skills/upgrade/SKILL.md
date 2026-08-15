@@ -4,8 +4,6 @@ description: Apply plugin knowledge base updates to an existing generated system
 version: "1.0"
 generated_from: "arscontexta-v1.6"
 user-invocable: true
-context: fork
-model: opus
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
@@ -315,7 +313,7 @@ EOF_VOCAB
 
   # domain_summary: is a standalone top-level manifest field, deliberately outside
   # the vocabulary: block above (see
-  # docs/superpowers/specs/2026-08-08-vocabulary-schema-coverage-design.md) -- extracted
+  # docs/superpowers/specs/archive/2026-08-08-vocabulary-schema-coverage-design.md) -- extracted
   # separately, same fold-and-append shape as the topic_map/topic_maps aliasing just
   # above, applied to a second source. Reads it via frontmatter_field, not a hand-rolled
   # grep -- reference/check-portability.sh check 7 bans a line-anchored '^field:' grep
@@ -592,7 +590,15 @@ Options:
 **Option (b), a merge preserving customizations, is not offered — not as a corner case, but as
 the real behavior every invocation of `/upgrade` gets today: there is no OLD-rendering
 available.** A merge needs the *original* canonical template this skill was generated from, and
-this repo carries no release tags to recover it. Without that baseline a merge is a guess, not a
+this repo carries no release tags to recover it. That much is true, but it is not the same as "no
+baseline exists": the plugin cache retains complete prior versions under
+`~/.claude/plugins/cache/agenticnotetaking/arscontexta/<version>/`, each carrying a full
+`skill-sources/` tree (five versions, 16 skill directories each, measured 2026-08-15 — `ls` that
+directory to re-derive, and note the cache is version-partitioned: descend into a version
+directory before concluding it is empty). Restoring option (b) on that basis stays deliberately
+withheld — a wrong merge corrupts a user's customized skills — and is tracked in
+`docs/superpowers/deferrals.md`. Until a baseline is actually recovered and compared, a merge is
+a guess, not a
 fact — exactly the render-noise problem the mechanical-comparison step above was built to avoid,
 not something to reintroduce here by another route. State this plainly to the human rather than
 presenting a third option that would fail silently or produce a guessed merge.
@@ -716,6 +722,14 @@ Generated vaults carry their own copies of **three** versioned libraries under `
 | `ops/lib/frontmatter.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/frontmatter.sh` | `FRONTMATTER_VERSION` |
 | `ops/lib/queue-edit.sh` | `${CLAUDE_PLUGIN_ROOT}/reference/lib/queue-edit.sh` | `QUEUE_EDIT_VERSION` |
 
+**`queue-edit.sh` v2 has a companion file, `queue_edit.py`, that rides the same version constant.**
+`queue_yaml` resolves the helper beside the library it was sourced from, so whenever the queue-edit
+row copies (restore, or refresh to v2 or later), copy
+`${CLAUDE_PLUGIN_ROOT}/reference/lib/queue_edit.py` to `ops/lib/queue_edit.py` in the same action and
+confirm both files landed. A v2 `.sh` without its `.py` fails every YAML queue write loudly at run
+time — better than silence, but a state this step must not create. The helper needs `python3` with
+PyYAML (the README prerequisite table row added with v2).
+
 **Scope, stated rather than implied: this step reconciles those three files, not the whole of
 `ops/lib/`.** A vault's `ops/lib/` may also hold graph parsers and their tests. Those carry no version
 marker to compare against, so this step cannot reconcile them and must not claim to. Report the files;
@@ -762,8 +776,9 @@ link-extraction.sh: plugin copy absent [skipped — plugin older than this step]
 frontmatter.sh:     v0 (absent) → v3 [restored]
 frontmatter.sh:     v1 → v3 [refreshed]
 frontmatter.sh:     v3 [current]
-queue-edit.sh:      v0 (absent) → v1 [restored]
-queue-edit.sh:      v1 [current]
+queue-edit.sh:      v0 (absent) → v2 [restored, with queue_edit.py]
+queue-edit.sh:      v1 → v2 [refreshed, with queue_edit.py]
+queue-edit.sh:      v2 [current]
 ```
 
 `frontmatter.sh` is absent from **every vault generated before it existed**, so `v0 (absent) → v3

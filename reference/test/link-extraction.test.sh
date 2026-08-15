@@ -136,6 +136,12 @@ printf -- 'target linking itself\n[[target]]\n' > "$EDGE_DIR/notes/target.md"
 printf -- '---\ntitle: Lonely\n---\nno links here\n' > "$EDGE_DIR/notes/lonely.md"
 printf -- '---\ntitle: Fenced\n---\n```\n[[in-code-fence]]\n```\n' > "$EDGE_DIR/notes/fenced.md"
 printf -- '---\ntitle: SelfOnly\n---\n[[selfonly]]\n' > "$EDGE_DIR/notes/selfonly.md"
+# F5: capitalized SOURCE filename, only link is its own lowercase form. Every
+# other note here already has a lowercase basename, so the source-side
+# _fold_lower call (link_edge_map / link_edge_map_recursive) is unasserted
+# without this: under a mutant that drops it, src="Myself" != tgt="myself"
+# and the self-edge check ($1 != $2) no longer excludes it, rescuing the note.
+printf -- '[[myself]]\n' > "$EDGE_DIR/notes/Myself.md"
 
 edges=$(link_edge_map "$EDGE_DIR/notes" 2>/dev/null)
 
@@ -164,7 +170,8 @@ eq "link_edge_map: empty directory output empty" "" "$out"
 
 # 7. recursive variant tests
 edges_recursive=$(link_edge_map_recursive "$EDGE_DIR/notes" 2>/dev/null)
-eq "link_edge_map_recursive: basic functionality" "9" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
+# 10 = prior 9 raw edges + 1 (Myself.md's self-edge, myself -> myself)
+eq "link_edge_map_recursive: basic functionality" "10" "$(printf '%s\n' "$edges_recursive" | grep -c .)"
 
 # 8. recursive empty directory
 out=$(link_edge_map_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -297,22 +304,47 @@ eq "orphan_notes: fenced is orphan (link only in fence)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'fenced')"
 eq "orphan_notes: selfonly is orphan (self-link alone doesn't rescue it)" "1" \
   "$(printf '%s\n' "$orphans" | grep -Fxc 'selfonly')"
+# F5: capitalized source (Myself.md) still folds before the self-edge check
+eq "orphan_notes: myself is orphan (capitalized source folds to match)" "1" \
+  "$(printf '%s\n' "$orphans" | grep -Fxc 'myself')"
 
 # 18b. LC_ALL=C pinning is STRUCTURAL (not behaviorally testable on BSD sort)
 # Both sides of comm must be sorted under the same collation; pinning ensures it.
-# Grep the library to verify the pins are present, then mutation-prove by removing one.
+# Anchored on $LIB (not a CWD-relative path) and scoped to the right function's
+# BODY, not a bare file grep — orphan_notes and orphan_notes_recursive share
+# byte-identical LC_ALL=C lines, so a match against the whole file cannot tell
+# them apart, and a hardcoded line number rots on any edit above it. The
+# redirect target (`> "$idx"` / `> "$tgts"`) is part of the anchor, not just
+# "idx"/"tgts" anywhere on the line — every LC_ALL=C sort line's own inline
+# `|| { rm -f "$idx" "$tgts" ... }` cleanup clause mentions BOTH names, so a
+# looser anchor matches two lines instead of one and fails on a healthy library.
+_orphan_fn_body() { awk -v fn="$1() {" '$0==fn{f=1} f{print} f&&/^}/{exit}' "$LIB"; }
 eq "orphan_notes: LC_ALL=C sort for index" "1" \
-  "$(sed -n '414p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(_orphan_fn_body orphan_notes | grep -c 'LC_ALL=C sort -u.*> "$idx"')"
 eq "orphan_notes: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '419p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(_orphan_fn_body orphan_notes | grep -c 'LC_ALL=C sort -u.*> "$tgts"')"
 eq "orphan_notes: LC_ALL=C comm call" "1" \
-  "$(sed -n '422p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(_orphan_fn_body orphan_notes | grep -c 'LC_ALL=C comm -23')"
 eq "orphan_notes_recursive: LC_ALL=C sort for index" "1" \
-  "$(sed -n '435p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*idx')"
+  "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C sort -u.*> "$idx"')"
 eq "orphan_notes_recursive: LC_ALL=C sort for targets" "1" \
-  "$(sed -n '440p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C sort -u.*tgts')"
+  "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C sort -u.*> "$tgts"')"
 eq "orphan_notes_recursive: LC_ALL=C comm call" "1" \
-  "$(sed -n '443p' reference/lib/link-extraction.sh | grep -c 'LC_ALL=C comm -23')"
+  "$(_orphan_fn_body orphan_notes_recursive | grep -c 'LC_ALL=C comm -23')"
+
+# F3: the four exported sorts (extract_link_targets{,_recursive}, existing_note_index{,_recursive})
+# must pin LC_ALL=C, or consumers receive ambient-locale-collated streams and silently
+# mis-join them against LC_ALL=C-sorted ones via comm. STRUCTURAL, not behavioral: BSD sort
+# on macOS ignores LC_ALL for collation, so a locale mismatch cannot be demonstrated by
+# observed output order in this fixture -- these assert the literal source text instead.
+eq "extract_link_targets: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body extract_link_targets | grep -c '_fold_lower | LC_ALL=C sort -u')"
+eq "existing_note_index: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body existing_note_index | grep -c '_fold_lower | LC_ALL=C sort -u')"
+eq "extract_link_targets_recursive: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body extract_link_targets_recursive | grep -c '_fold_lower | LC_ALL=C sort -u')"
+eq "existing_note_index_recursive: LC_ALL=C sort on exported stream" "1" \
+  "$(_orphan_fn_body existing_note_index_recursive | grep -c '_fold_lower | LC_ALL=C sort -u')"
 
 # 19. orphan_notes empty directory (rc 0, empty output)
 out=$(orphan_notes "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -338,6 +370,9 @@ eq "orphan_notes_recursive: fenced is orphan" "1" \
   "$(printf '%s\n' "$orphans_r" | grep -Fxc 'fenced')"
 eq "orphan_notes_recursive: selfonly is orphan (self-link doesn't rescue)" "1" \
   "$(printf '%s\n' "$orphans_r" | grep -Fxc 'selfonly')"
+# F5: capitalized source (Myself.md) still folds before the self-edge check
+eq "orphan_notes_recursive: myself is orphan (capitalized source folds to match)" "1" \
+  "$(printf '%s\n' "$orphans_r" | grep -Fxc 'myself')"
 
 # 22. orphan_notes_recursive empty directory
 out=$(orphan_notes_recursive "$EDGE_DIR/empty" 2>/dev/null); rc=$?
@@ -428,6 +463,43 @@ eq "orphan_notes_recursive: transform awk failure prints NOTHING" "" "$out"
 rm -rf "$STUB_DIR" "$STUB_AWK"
 
 rm -rf "$EDGE_DIR"
+
+# --- whitespace preservation (multi-space filenames must round-trip) --------
+# Default awk FS splits on any run of whitespace; reassembling $0 after
+# clearing $1 rebuilds the line via OFS (a single space), collapsing internal
+# runs. skills/health Categories 7/8 key on $1==n against this table, so a
+# corrupted key silently defaults incoming to 0 and falsely reports a note stale.
+WS_DIR=$(mktemp -d); mkdir -p "$WS_DIR/n"
+printf -- '[[double  space]]\n' > "$WS_DIR/n/linker.md"
+printf -- 'x\n' > "$WS_DIR/n/double  space.md"
+
+ws_edges=$(link_edge_map "$WS_DIR/n" 2>/dev/null)
+ws_expected_edge=$'linker\tdouble  space'
+eq "link_edge_map: multi-space target preserved intact" "$ws_expected_edge" \
+   "$(printf '%s\n' "$ws_edges" | LC_ALL=C awk -F'\t' '{print $1"\t"$2}')"
+
+ws_expected_counts=$'double  space\t1'
+eq "backlink_counts: multi-space target key not collapsed" "$ws_expected_counts" \
+   "$(backlink_counts "$WS_DIR/n" 2>/dev/null)"
+eq "backlink_counts_recursive: multi-space target key not collapsed" "$ws_expected_counts" \
+   "$(backlink_counts_recursive "$WS_DIR/n" 2>/dev/null)"
+
+rm -rf "$WS_DIR"
+
+# --- stale error-flag debris from a killed same-PID run ---------------------
+# $$ is recyclable: debris left by a run killed between touch and cleanup of
+# link-extraction-err-$$ must not make a healthy call in the same PID return 1.
+CLEAN_DIR=$(mktemp -d); mkdir -p "$CLEAN_DIR/n"
+printf -- '[[nowhere]]\n' > "$CLEAN_DIR/n/note.md"
+errf_result=$("$SELF" -c '
+touch "/tmp/link-extraction-err-$$"
+. "'"$LIB"'"
+out=$(count_links "'"$CLEAN_DIR"'/n" 2>/dev/null); rc=$?
+rm -f "/tmp/link-extraction-err-$$"
+printf "%s:%s" "$rc" "$out"
+' 2>/dev/null)
+eq "count_links: stale errf debris from same PID does not spuriously fail" "0:1" "$errf_result"
+rm -rf "$CLEAN_DIR"
 
 # --- empty vault (legitimate state, not a failure) ----------------------------
 EMPTY=$(mktemp -d); mkdir -p "$EMPTY/notes"

@@ -51,9 +51,9 @@ Evidence, re-verified on this checkout rather than taken from the prior spec:
   directory at any depth.
 - Every surviving mention lives in prose *about* the directory — `CLAUDE.md:138`,
   `CONTRIBUTING.md:172`, and prior specs/plans.
-- `docs/superpowers/specs/2026-08-01-portability-link-correctness-design.md:73` already ruled it
+- `docs/superpowers/specs/archive/2026-08-01-portability-link-correctness-design.md:73` already ruled it
   **"Verified vestigial … Explicitly out of scope"**, and
-  `docs/superpowers/plans/2026-08-01-portability-link-correctness.md:27` carried that forward as
+  `docs/superpowers/plans/archive/2026-08-01-portability-link-correctness.md:27` carried that forward as
   **"Do not modify `platforms/shared/skill-blocks/`."**
 
 ### But it is not a superseded predecessor — check this before deciding

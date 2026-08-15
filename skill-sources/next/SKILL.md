@@ -84,24 +84,51 @@ else
   exit 1
 fi
 : "${QUEUE_EDIT_VERSION:=0}"
-if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
-  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+if [ "$QUEUE_EDIT_VERSION" -lt 2 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 2" >&2
   echo "       run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-MAINT_MAX=$(jq '[.tasks[] | select(.id | startswith("maint-")) | .id | ltrimstr("maint-") | tonumber] | max // 0' ops/queue/queue.json)
-NEXT_MAINT=$((MAINT_MAX + 1))
+# The queue is YAML or JSON — the same search order seed and /ralph document.
+# A vault that migrated to YAML leaves queue.json behind as a tombstone; a
+# write landing there is the silent no-op this dispatch replaced. No queue at
+# all fails loud rather than writing nowhere.
+QUEUE_FILE=""
+for q in ops/queue.yaml ops/queue/queue.yaml ops/queue/queue.json; do
+  if [ -f "$q" ]; then QUEUE_FILE="$q"; break; fi
+done
+if [ -z "$QUEUE_FILE" ]; then
+  echo "error: no queue file found (looked for ops/queue.yaml, ops/queue/queue.yaml, ops/queue/queue.json)" >&2
+  exit 1
+fi
 
-queue_edit '.tasks += [{"id": $id, "type": "maintenance", "priority": $priority, "status": "pending", "condition_key": $key, "target": $target, "action": $action, "auto_generated": true, "created": $ts}]' \
-   ops/queue/queue.json \
-   --arg id "maint-$(printf '%03d' $NEXT_MAINT)" \
-   --arg priority "{priority}" \
-   --arg key "{condition_key}" \
-   --arg target "{description}" \
-   --arg action "{recommended command}" \
-   --arg ts "$TIMESTAMP"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+case "$QUEUE_FILE" in
+  *.yaml)
+    # Highest existing maint- number. awk's numeric coercion reads a zero-padded
+    # 008 as decimal 8, where $(( )) would read it as bad octal.
+    MAINT_MAX=$(awk -F 'maint-' '/^[- ] id: maint-/ { n = $2 + 0; if (n > max) max = n } END { print max + 0 }' "$QUEUE_FILE")
+    NEXT_MAINT=$((MAINT_MAX + 1))
+    queue_yaml "$QUEUE_FILE" --add-task \
+      "id=maint-$(printf '%03d' "$NEXT_MAINT")" \
+      type=maintenance "priority={priority}" status=pending \
+      "condition_key={condition_key}" "target={description}" \
+      "action={recommended command}" auto_generated=true "created=$TIMESTAMP"
+    ;;
+  *)
+    MAINT_MAX=$(jq '[.tasks[] | select(.id | startswith("maint-")) | .id | ltrimstr("maint-") | tonumber] | max // 0' "$QUEUE_FILE")
+    NEXT_MAINT=$((MAINT_MAX + 1))
+    queue_edit '.tasks += [{"id": $id, "type": "maintenance", "priority": $priority, "status": "pending", "condition_key": $key, "target": $target, "action": $action, "auto_generated": true, "created": $ts}]' \
+       "$QUEUE_FILE" \
+       --arg id "maint-$(printf '%03d' $NEXT_MAINT)" \
+       --arg priority "{priority}" \
+       --arg key "{condition_key}" \
+       --arg target "{description}" \
+       --arg action "{recommended command}" \
+       --arg ts "$TIMESTAMP"
+    ;;
+esac
 ```
 
 3. **If condition is satisfied AND a pending task with this condition_key exists:**
@@ -118,16 +145,40 @@ else
   exit 1
 fi
 : "${QUEUE_EDIT_VERSION:=0}"
-if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
-  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+if [ "$QUEUE_EDIT_VERSION" -lt 2 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 2" >&2
   echo "       run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
+# The queue is YAML or JSON — the same search order seed and /ralph document.
+# A vault that migrated to YAML leaves queue.json behind as a tombstone; a
+# write landing there is the silent no-op this dispatch replaced. No queue at
+# all fails loud rather than writing nowhere.
+QUEUE_FILE=""
+for q in ops/queue.yaml ops/queue/queue.yaml ops/queue/queue.json; do
+  if [ -f "$q" ]; then QUEUE_FILE="$q"; break; fi
+done
+if [ -z "$QUEUE_FILE" ]; then
+  echo "error: no queue file found (looked for ops/queue.yaml, ops/queue/queue.yaml, ops/queue/queue.json)" >&2
+  exit 1
+fi
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).status = "done" |
-    (.tasks[] | select(.condition_key == $key and .status == "pending")).completed = $ts' \
-    ops/queue/queue.json --arg key "{condition_key}" --arg ts "$TIMESTAMP"
+case "$QUEUE_FILE" in
+  *.yaml)
+    queue_yaml "$QUEUE_FILE" --where 'condition_key={condition_key}' --where status=pending \
+      --set status=done --set "completed=$TIMESTAMP"
+    ;;
+  *)
+    # KNOWN: the second clause re-selects status == "pending" AFTER the first set it
+    # "done", so .completed lands on nothing — preserved pre-existing behavior, not
+    # introduced by the format dispatch. See docs/superpowers/deferrals.md entry 22.
+    queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).status = "done" |
+        (.tasks[] | select(.condition_key == $key and .status == "pending")).completed = $ts' \
+        "$QUEUE_FILE" --arg key "{condition_key}" --arg ts "$TIMESTAMP"
+    ;;
+esac
 ```
 
 4. **If condition fires AND a pending task already exists:**
@@ -144,14 +195,35 @@ else
   exit 1
 fi
 : "${QUEUE_EDIT_VERSION:=0}"
-if [ "$QUEUE_EDIT_VERSION" -lt 1 ]; then
-  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 1" >&2
+if [ "$QUEUE_EDIT_VERSION" -lt 2 ]; then
+  echo "error: queue-edit library is version $QUEUE_EDIT_VERSION; this skill needs >= 2" >&2
   echo "       run /arscontexta:upgrade to refresh it" >&2
   exit 1
 fi
 
-queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).target = $target' \
-   ops/queue/queue.json --arg key "{condition_key}" --arg target "{new description}"
+# The queue is YAML or JSON — the same search order seed and /ralph document.
+# A vault that migrated to YAML leaves queue.json behind as a tombstone; a
+# write landing there is the silent no-op this dispatch replaced. No queue at
+# all fails loud rather than writing nowhere.
+QUEUE_FILE=""
+for q in ops/queue.yaml ops/queue/queue.yaml ops/queue/queue.json; do
+  if [ -f "$q" ]; then QUEUE_FILE="$q"; break; fi
+done
+if [ -z "$QUEUE_FILE" ]; then
+  echo "error: no queue file found (looked for ops/queue.yaml, ops/queue/queue.yaml, ops/queue/queue.json)" >&2
+  exit 1
+fi
+
+case "$QUEUE_FILE" in
+  *.yaml)
+    queue_yaml "$QUEUE_FILE" --where 'condition_key={condition_key}' --where status=pending \
+      --set 'target={new description}'
+    ;;
+  *)
+    queue_edit '(.tasks[] | select(.condition_key == $key and .status == "pending")).target = $target' \
+       "$QUEUE_FILE" --arg key "{condition_key}" --arg target "{new description}"
+    ;;
+esac
 ```
 
 ---
@@ -258,7 +330,11 @@ SESSION_COUNT=$(grep -rL '^mined: true' ops/sessions/*.md 2>/dev/null | wc -l | 
 # or inlined link-extraction. The reason to source the library is the naive
 # `grep -rl "[[$NAME]]"` spelling: it counts links inside fenced blocks, does not
 # case-fold, and matches the wrong direction for orphans.
-LINK_LIB="ops/lib/link-extraction.sh"
+# Vault root: same mechanism as hooks/scripts/read_config.sh:20.
+# Precondition: the working directory is the vault root — already assumed by
+# vaultguard.sh ([ -f ".arscontexta" ]) and read_config.sh.
+VAULT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"
 if [ -r "$LINK_LIB" ]; then
   . "$LINK_LIB"
 
@@ -275,8 +351,8 @@ if [ -r "$LINK_LIB" ]; then
   # Orphans: indexed notes that nothing links TO. Dangling: targets that resolve to
   # no note. Both sides are already folded and sorted by the library, which is what
   # makes comm valid here.
-  ORPHAN_COUNT=$(comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
-  DANGLING_COUNT=$(comm -13 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
+  ORPHAN_COUNT=$(LC_ALL=C comm -23 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
+  DANGLING_COUNT=$(LC_ALL=C comm -13 <(printf '%s\n' "$NOTE_INDEX") <(printf '%s\n' "$LINK_TARGETS") | grep -c . || true)
 else
   echo "error: link-extraction library not found at '$LINK_LIB'" >&2
   echo "       run /arscontexta:upgrade to restore it" >&2

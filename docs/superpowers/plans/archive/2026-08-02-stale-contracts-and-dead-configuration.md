@@ -11,7 +11,7 @@
 **Goal:** Remove the class of defect where a capability is declared, documented, wired in, and
 inert — failing as *nothing happening* rather than as an error.
 
-**Spec:** `docs/superpowers/specs/2026-08-02-stale-contracts-and-dead-configuration-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-02-stale-contracts-and-dead-configuration-design.md`
 
 **Architecture:** Fixes land in generators and templates, never in the consumers that read them.
 Prose contracts move with the code they describe — in this repo Claude executes prose tables, so a
@@ -94,7 +94,7 @@ narrow table beside a widened bash line is the same defect in a different font.
 ### Task 5: Harden Kernel Primitive 10 so this cannot recur silently — MOVED
 
 **Superseded.** This task now lives as **Task 1** of
-`docs/superpowers/plans/2026-08-02-contributor-surface-and-residual-defects.md`, where Spec C owns
+`docs/superpowers/plans/archive/2026-08-02-contributor-surface-and-residual-defects.md`, where Spec C owns
 it alongside the rest of the residual-defect work.
 
 Moved rather than copied. Two plans carrying the same task would drift — the identical hazard as
