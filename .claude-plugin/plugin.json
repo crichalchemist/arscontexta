@@ -1,6 +1,6 @@
 {
   "name": "arscontexta",
-  "version": "0.9.7",
+  "version": "0.9.9",
   "description": "Conversational derivation engine — generate agent-native memory architecture from natural conversation. 15 kernel primitives, 26 commands, 17 feature blocks, 3 presets.",
   "author": {
     "name": "Heinrich",

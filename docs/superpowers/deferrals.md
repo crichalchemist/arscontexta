@@ -932,3 +932,33 @@ key, which makes (b) reachable; or a bare key is added whose empty value is mean
 /usr/bin/grep -n 'awk' hooks/scripts/read_config.sh             # the interpolation sites
 bash reference/test/threshold-namespace.test.sh | tail -1       # 52/52 — covers neither asymmetry
 ```
+
+### 31. `README.md` declares the version but `bump-version.sh` cannot manage it
+
+**What:** `README.md:12` carries `**v0.9.9** · Claude Code plugin · MIT` — a real version
+declaration outside `.version-bump.json`'s declared set. `bump-version.sh` is **JSON-only**:
+every read and write goes through `jq` (`read_json_field`, `stage_json_field`, `jq_path`), so a
+markdown badge cannot be added to `.files` at all. Its `--audit` correctly reports the site on
+every run and cannot fix it.
+
+**Why not now:** closing it needs one of three changes, each larger than a bump. Extend
+`bump-version.sh` with pattern-based sites — a real feature in a tool whose 41-assertion suite
+exists because it once shipped a partial bump, so it needs its own tests. Or drop the version
+from `README.md` as redundant with `plugin.json` — a human-facing decision, since the badge is
+the only place a reader sees the version without opening JSON. Or record it in `audit.exclude`
+and bump it by hand — which is the partial-bump failure the tool exists to prevent, merely
+documented.
+
+**Reopens if:** `bump-version.sh` gains non-JSON site support for any other reason, or a bump
+ships with `README.md` left stale — the exact outcome the audit is warning about.
+
+**From:** the 0.9.7 → 0.9.9 bump, 2026-08-15. The README was updated by hand in that commit;
+this entry exists because "by hand" is not a mechanism.
+
+```bash
+# the site the tool cannot reach, and the proof it cannot:
+sed -n '12p' README.md
+/usr/bin/grep -c 'README' .version-bump.json          # 0 — undeclared
+/usr/bin/grep -c 'jq ' scripts/bump-version.sh        # every site read/write is jq
+bash scripts/bump-version.sh --audit | tail -3        # reports README every run
+```
