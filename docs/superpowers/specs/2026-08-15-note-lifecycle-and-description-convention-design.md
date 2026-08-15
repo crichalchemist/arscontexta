@@ -129,8 +129,17 @@ of the following `rm -rf` and reported success on failure.
 ## The lifecycle
 
 **Entry.** `/reduce` stamps every note it creates with `{vocabulary.status_preliminary}` — a
-**vocabulary placeholder, not a literal.** Four flat `status_*` keys join the generator's
-vocabulary surface.
+**vocabulary placeholder, not a literal.** **Five** flat `status_*` keys join the generator's
+vocabulary surface, one per enum value: `status_preliminary`, `status_open`, `status_active`,
+`status_archived`, `status_superseded`.
+
+**Five, not four** — a correction to this spec's own first revision, which carried "four" from the
+superseded design's four-value enum and did not update it when adopting `superseded` in the same
+document. **Every enum value gets a key, including the three no skill writes today.** A vault that
+renames its lifecycle vocabulary must be able to rename all of it; keys only for the values
+`/reduce` and `/verify` happen to write would let a vault rename half its enum and leave the rest
+in the generator's dialect — the partial-vocabulary defect this placeholder family exists to
+prevent.
 
 This is what makes the vault's 760 `draft` notes legitimate rather than violations: they are this
 vault's rendering of `preliminary`, and the key mechanism is precisely what expresses that. A
