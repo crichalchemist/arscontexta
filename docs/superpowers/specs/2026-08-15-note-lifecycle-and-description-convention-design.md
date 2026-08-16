@@ -175,6 +175,25 @@ is exactly a note that had no `status` before the migration commit, and **the mi
 the marker** — one SHA, one date, answerable by `git log`, permanently. A synthetic
 `status_source:` field would be 698 writes to record what history already records.
 
+**THE MARKER COMMIT IS `6d941634f267555a22e509c444e2e29accb93830`**, in `~/second-brain`,
+2026-08-15 — `6d941634` in short form, its parent `9f9c28a2`. It changed 2090 of 2874 notes:
+1754 descriptions lost a trailing period, 698 statusless notes were backfilled to `active`,
+25 legacy statuses were remapped. So a note carrying `active` is backfilled if and only if it
+had no `status` in `9f9c28a2`, which is one `git show` away:
+
+```bash
+git -C ~/second-brain show 9f9c28a2:nodes/<note>.md | grep -c '^status:'   # 0 = backfilled
+```
+
+Eight descriptions deliberately keep a trailing period, because the value ends in an
+abbreviation rather than a sentence: `Mr.` ×4, `vol.`, and the single-letter finals `C.`,
+`d.`, `k.`. Two of those three single letters are math symbols rather than initials, so they
+are spared for a looser reason than the rule intends — fail-safe, and recorded in
+`docs/superpowers/deferrals.md` entry 32.
+
+`draft` (760 notes) was **not** remapped, per this document's own ruling above: it is this
+vault's derived dialect for `status_preliminary`, not an off-enum value.
+
 Stated plainly, because it is the design's weakest assertion: **`active` on a backfilled note
 asserts existence and reachability, nothing about quality.**
 
