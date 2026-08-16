@@ -192,6 +192,22 @@ bash "$SCRIPT" "$V10" --apply >/dev/null 2>&1
 assert "$(stat -f '%OLp' "$V10/nodes/mode.md" 2>/dev/null || stat -c '%a' "$V10/nodes/mode.md" 2>/dev/null)" \
   '644' 'file mode preserved across the rewrite'
 
+# --------------------------------- an unclassified transform exit is a refusal
+# The rc ladder shipped with no `else`: any code other than 0/1/3 fell straight
+# through, so a run whose awk was killed reported
+# `files changed: 0 ... refused: 0` and exited 0 -- verbatim the failure mode the
+# script's own header exists to prevent. `ulimit -f 0` makes the write to the
+# temp file die of SIGXFSZ, which is a real instance of the class rather than a
+# stubbed return code.
+V11=$(mkvault)
+note "$V11" killed 'description: "Kill me."
+type: insight'
+cp "$V11/nodes/killed.md" "$V11/killed.orig"
+( ulimit -f 0 2>/dev/null; bash "$SCRIPT" "$V11" --apply ) >/dev/null 2>&1
+assert "$?" '2' 'transform killed by a signal: refused with exit 2, not a clean zero'
+assert "$(cmp -s "$V11/killed.orig" "$V11/nodes/killed.md" && echo same || echo differs)" 'same' \
+  'transform killed by a signal: original left byte-identical'
+
 # ------------------------------------------------------------------- dry run
 V6=$(mkvault)
 note "$V6" d 'description: "Dry."

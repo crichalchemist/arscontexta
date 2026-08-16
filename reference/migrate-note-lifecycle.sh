@@ -30,11 +30,19 @@ has_frontmatter() { # has_frontmatter <file> -- needs BOTH delimiters
   awk 'NR==1 { if ($0!="---") exit; next } $0=="---" { found=1; exit } END { exit (found?0:1) }' "$1"
 }
 
-# stat's flag for "permission bits" is spelled differently on BSD and GNU. This
-# runs on Darwin per the plan's constraints; the fallback keeps it honest
-# anywhere else rather than silently defaulting.
-file_mode() { # file_mode <file>
-  stat -f '%OLp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null
+# stat's flag for "permission bits" differs between GNU and BSD, and the two
+# spellings COLLIDE: on GNU, `stat -f` means --file-system, so probing BSD-first
+# prints filesystem data AND exits 1, the `||` appends the GNU output, and the
+# caller gets a multi-line blob that is non-empty and not a mode. GNU's `-c` is
+# not a BSD flag at all, so it simply fails there -- probing it first has no such
+# collision. The result is then validated as octal, because "non-empty" is not
+# the same test as "is a file mode".
+file_mode() { # file_mode <file> -> 3-4 octal digits, or empty
+  m=$(stat -c '%a' "$1" 2>/dev/null) || m=$(stat -f '%OLp' "$1" 2>/dev/null) || m=""
+  case "$m" in
+    [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) printf '%s' "$m" ;;
+    *) printf '' ;;
+  esac
 }
 
 # exit 0 = changed, 1 = nothing to do, 3 = malformed, refuse the file
@@ -105,9 +113,14 @@ for f in "$VAULT"/nodes/*.md; do
     refused=$((refused+1))
   elif [ "$rc" -eq 0 ]; then
     # Two invariants before this file is replaced. `head -1` alone is not enough:
-    # a transform truncated by a full disk or a signal still begins `---`.
-    # The transform only ever ADDS a line (the status backfill) and never
-    # removes one, so the output can never be shorter than the input.
+    # an output that lost its tail still begins `---`. The transform only ever
+    # ADDS a line (the status backfill) and never removes one, so the output can
+    # never legitimately be shorter than the input.
+    #
+    # This is NOT the guard against a full disk or a signal -- those make awk
+    # exit non-zero, and a non-zero rc never reaches this branch. The `else`
+    # below is what catches those. An earlier revision of this comment claimed
+    # otherwise and was wrong.
     out_lines=$(wc -l < "$tmp"); in_lines=$(wc -l < "$f")
     if ! head -1 "$tmp" | /usr/bin/grep -q '^---$'; then
       echo "refused (bad output: no leading ---): $f" >&2; refused=$((refused+1))
@@ -126,12 +139,23 @@ for f in "$VAULT"/nodes/*.md; do
         # mktemp creates 0600 and mv carries that mode onto the target. git
         # records only the executable bit, so a mode change here is invisible in
         # review -- every migrated note would silently become owner-read-only.
+        # Fail CLOSED: an unreadable mode, or a chmod that does not take, stops
+        # the run rather than writing the file with mktemp's 0600.
         mode=$(file_mode "$f")
-        [ -n "$mode" ] && chmod "$mode" "$tmp"
+        [ -n "$mode" ] || { rm -f "$tmp" "$cls"; echo "error: cannot read the mode of $f — refusing to write it as 0600" >&2; exit 1; }
+        chmod "$mode" "$tmp" || { rm -f "$tmp" "$cls"; echo "error: chmod $mode failed for $f" >&2; exit 1; }
         mv "$tmp" "$f" || { rm -f "$tmp" "$cls"; echo "error: could not write $f" >&2; exit 1; }
         tmp=""
       fi
     fi
+  elif [ "$rc" -ne 1 ]; then
+    # rc 1 is the only remaining expected value: "this file needed no change".
+    # ANY other code -- awk killed by a signal, out of memory, SIGXFSZ from a
+    # file-size limit -- must be a refusal. Without this branch such a run
+    # reports `files changed: 0 ... refused: 0` and exits 0, which is verbatim
+    # the failure mode this script's header exists to prevent.
+    echo "refused (transform exited $rc): $f" >&2
+    refused=$((refused+1))
   fi
 
   [ -n "$tmp" ] && rm -f "$tmp"
