@@ -13,8 +13,32 @@ see [The surface this does not build](#the-surface-this-does-not-build).
 ## The template covers one surface; this repo has two
 
 `obra/superpowers` ships a skills framework: the product **is** `skills/`, and every adapter
-does one job — point a host agent at that directory. Five exist (`.claude-plugin/`,
-`.codex-plugin/`, `.opencode/`, `.pi/`, `.hermes-plugin/`), plus a `gemini-extension.json`.
+does one job — point a host agent at that directory. **Eight** exist, plus a
+`gemini-extension.json`:
+
+```bash
+# 10 = 8 adapters + .github + .agents. Stated as a sum rather than filtered with an
+# exclusion, per the idiom divergence 12 uses: an exclusion rots silently and can
+# quietly match nothing, whereas a sum fails loudly the moment it stops adding up.
+# (A lookahead — `test("^\\.(?!github|agents)")` — is NOT available: gh's jq is gojq,
+# whose Go regexp engine rejects `(?!` outright. It errors rather than under-counting,
+# which is the good failure, but it does not run.)
+gh api "repos/obra/superpowers/git/trees/main" \
+  --jq '[.tree[] | select(.type=="tree") | select(.path|startswith("."))] | length'   # 10 = 8 + 2
+```
+
+`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, `.devin-plugin/`, `.hermes-plugin/`,
+`.kimi-plugin/`, `.opencode/`, `.pi/`. (`.agents/` is excluded from that count because it is
+the Codex marketplace directory rather than an adapter of its own — see below — and `.github/`
+is not an adapter at all.)
+
+**This spec examined three of the eight**: `.codex-plugin/`, `.opencode/`, `.pi/`. An earlier
+revision said "five exist" and named a set missing `.cursor-plugin/`, `.devin-plugin/` and
+`.kimi-plugin/` — all three of which predate the 2026-08-16 read, so that was a miscount and
+not upstream drift. Recording it because the correction is load-bearing in one direction: the
+"every adapter does one job" claim below is generalised from three trees, and three unexamined
+adapters could have contradicted it. **Nobody looked**, and the claim should be read with that
+caveat rather than as a survey.
 
 `arscontexta` is a generator. Its skills derive a knowledge system and write it into a user's
 directory. So "platform support" splits, and the two halves have different costs:
@@ -47,7 +71,9 @@ ls -d skills/*/ | wc -l                                              # 10
 
 # declared version sites, and what the audit finds outside them
 jq '.files | length' .version-bump.json                              # 3
-bash scripts/bump-version.sh --audit                                 # 1 site: README.md:12
+# rc 1 — reporting a site IS the non-clean exit, so this line aborts a `set -e` fence.
+# The rc is the annotation's load-bearing half: `# 1 site` alone reads as a clean measurement.
+bash scripts/bump-version.sh --audit                                 # 1 site: README.md:12, rc 1
 ```
 
 | Quantity | Value |
@@ -83,10 +109,23 @@ pi.on("resources_discover", async () => ({
 }));
 ```
 
-Everything else in both files — the frontmatter stripper, the module-level bootstrap cache,
-the double-injection guard, the `compactionSummary` insert-index walk, the `session_start` /
-`session_compact` / `agent_end` flag dance — exists to force-load `using-superpowers` into
-every session before the agent may act. That is superpowers' central contract.
+Everything else across the two files exists to force-load `using-superpowers` into every
+session before the agent may act. That is superpowers' central contract. It is **not** the same
+machinery in each, and saying "both files" flattens a distinction a later porter would trip on:
+
+| mechanism | opencode | Pi |
+|---|---|---|
+| frontmatter stripper, bootstrap cache, double-injection guard | yes | yes |
+| `session_start` / `session_compact` / `agent_end` flag dance | **no** | yes |
+| `compactionSummary` insert-index walk | **no** | yes |
+| injection site | `experimental.chat.messages.transform` | `context` event |
+
+```bash
+for t in session_start session_compact agent_end compactionSummary; do
+  printf '%-20s opencode=%s pi=%s\n' "$t" \
+    "$(grep -c "$t" obra-opencode.js)" "$(grep -c "$t" obra-pi.ts)"
+done      # opencode=0 for all four; pi=1 for all four
+```
 
 **`arscontexta` has no equivalent contract.** Its commands are invoked explicitly
 (`/arscontexta:setup`, `/arscontexta:health`), and the measurement above confirms no skill
@@ -143,11 +182,33 @@ SessionStart: hooks/scripts/session-orient.sh
 PostToolUse:  hooks/scripts/write-validate.sh, hooks/scripts/auto-commit.sh
 ```
 
-A Codex manifest missing `"hooks": {}` re-registers all three under Codex — including
-`auto-commit.sh`, which writes git commits — plus an install-time trust prompt. `vaultguard.sh`
-gates them on the `.arscontexta` marker, so in a non-vault directory they exit 0; **in a vault
-they do not.** A plugin committing to a user's repository from a host whose hook semantics it
-was never designed against is the failure this one JSON key prevents.
+**Provenance, stated because it is weak.** The entire fallback mechanism above — the constant
+name, the exact-value requirement, the three collapsing spellings — appears in exactly one
+place: the comment block of obra's `tests/codex/test-marketplace-manifest.sh`. That test
+asserts `manifest.hooks == {}` in a JSON file; it does not and cannot exercise the runtime
+fallback. Nothing in this repo can verify it either. It is second-hand, and it is listed in
+[What is NOT claimed](#what-is-not-claimed) alongside the `skills` key rather than presented as
+measured.
+
+**Registration is not execution, and the distinction resolves an apparent contradiction with
+this spec's own "Codex has no PostToolUse equivalent."** What the source supports is that the
+fallback registers *the file* — obra's `hooks/hooks.json` happens to contain only a SessionStart
+hook, which is why their comment describes it that way. This repo's contains more. So:
+
+| | supported by the source | status |
+|---|---|---|
+| the whole file is registered, all three entries | yes | second-hand but stated |
+| an install-time trust prompt fires | yes | second-hand but stated |
+| Codex *dispatches* SessionStart | yes | second-hand but stated |
+| Codex *dispatches* PostToolUse, so `auto-commit.sh` runs | **no** | **unknown** — and this spec asserts elsewhere that Codex has no PostToolUse equivalent, which if true means it does not |
+
+An earlier revision claimed the omission would have `auto-commit.sh` writing commits under
+Codex. That over-read the source and contradicted line 289 of this same document. The honest
+floor: **omitting the key registers this repo's Claude Code hooks under Codex and fires a trust
+prompt** — enough to require the key without the escalation. The ceiling depends on whether
+Codex maps PostToolUse-class events, which is unknown; if it does, `vaultguard.sh` gates on the
+`.arscontexta` marker, so a non-vault directory exits 0 and **a vault does not.** Declare the
+key and the question never arises.
 
 Codex reads `AGENTS.md`, which in this repo already symlinks to `CLAUDE.md` — so a Codex agent
 inherits the full development context with no new context file, and with no collision with
@@ -196,6 +257,23 @@ attempt a mechanism.**
 
 `.version-bump.json` declares three sites, all under `.claude-plugin/`. `--audit` reports one
 site outside the declared set — `README.md:12` — which is deferral 31 and is not touched here.
+
+**A register defect found while citing it, reported rather than fixed.** Deferral 31 is filed
+under `## Closed` while reading as open (`**Why not now:**`, `**Reopens if:**`) and while its
+defect is measurably live — `--audit` reports the site today. It is misfiled, and the
+misfiling **predates** the 2026-08-15 audit that landed as `b47b9c3`:
+
+```bash
+awk '/^## /{s=$0} /^### 31\./{print NR": ["s"]"}' docs/superpowers/deferrals.md   # [## Closed]
+git show b47b9c3^:docs/superpowers/deferrals.md \
+  | awk '/^## /{s=$0} /^### 31\./{print NR": ["s"]"}'                             # [## Closed] — already
+```
+
+That audit checked entry *content* against HEAD and not entry *placement*, so an entry whose
+body was accurate passed while sitting in the wrong section. Fixing it is a write to
+`deferrals.md`, which is outside this spec's scope; it belongs in whichever branch next touches
+that file. Recorded here so the next reader does not conclude from the heading that the version
+tool's markdown limitation was solved.
 
 **`.codex-plugin/plugin.json` carries a version and must be registered.** Sites go 3 → 4. The
 opencode and Pi adapters carry no version string (obra's do not either), so they add none.
@@ -256,12 +334,36 @@ the first was `bump-version.sh --verify`.)
 | `check-portability.sh` check 4 | `platforms/shared/skill-blocks/` is cksum-frozen at any depth. This design writes nothing there. |
 | `check-portability.sh` check 5 | Asserts `AGENTS.md` is a symlink to `CLAUDE.md`. **Satisfied, not fought** — it is why Codex needs no context file. |
 | `check-prose-paths.sh` | SCOPE is a stated 11-file list. `README.md` is in it; `docs/superpowers/specs/` is not. |
-| `check-doc-claims.sh` | Reads declared numerals in `CLAUDE.md`. No new gate and no new CI step, so the "17 executable checks" and 30-step counts do not move. |
+| `check-portability.sh` checks 1, 2, 6, 7 | **`reference/hosts/*.md` lands inside the scanned trees** — the collection is `find skills skill-sources reference generators platforms presets hooks agents scripts \( -name '*.md' … \)`, and the exemption `case` covers only `reference/lib/*` and three named gate files. Host tool-mapping docs are prose *about tools*, so a worked example quoting `grep -P`, an interpolated wiki-link matcher, or an anchored `'^status:'` recipe turns the guard red on the day it lands. Keep executable-looking counter-examples in ` ```text ` fences, per `reference/skill-authoring.md`. |
+| `check-doc-claims.sh` | Reads declared numerals in `CLAUDE.md` **and enum declarations in `generators/`** — it is the only gate that reads that tree. Neither is touched: no new gate and no new CI step, so the "17 executable checks" and 30-step counts do not move. |
 | `bump-version.test.sh` | 41 assertions, exists because a bump once moved some sites and not others. Registering the Codex manifest is exactly its subject. |
 
-**One ordering constraint follows from the SCOPE list, and it is the only one.** `README.md`
-is in scope, so every repo path its install matrix names must exist when the gate runs. The
-README edit must land in the same commit as the adapter files, or after them — never before.
+**Two ordering constraints, not one.** An earlier revision asserted the first was "the only
+one" — two sections after creating the second.
+
+*1 — README must not lead.* `README.md` is in `check-prose-paths.sh` SCOPE, so every repo path
+its install matrix names must exist when the gate runs. The README edit lands in the same
+commit as the adapter files, or after them; never before.
+
+*2 — `.version-bump.json` and `.codex-plugin/plugin.json` must be atomic, and the two failure
+directions are asymmetric.* CI runs `--check` on every push:
+
+```bash
+grep -n 'bump-version' .github/workflows/checks.yml     # :198  bash scripts/bump-version.sh --check
+```
+
+`--check` iterates the declared (path, field) pairs and emits a `MISSING` row with a non-zero
+exit for any it cannot read. So:
+
+| order | result |
+|---|---|
+| registration lands first | **loud** — `MISSING`, red CI, fixed in minutes |
+| manifest lands first, unregistered | **silent** — nothing fails, because `--audit` is deliberately *not* in CI. The tree carries an undeclared version site until the next bump quietly moves some sites and not others |
+
+The silent direction is the exact partial-bump drift `bump-version.test.sh`'s 41 assertions
+exist to prevent, and it is the direction a normal "add the file, then wire it up" instinct
+produces. Land both in one commit, with the manifest's version string equal to the current
+version verbatim.
 
 ## Testing
 
@@ -287,9 +389,13 @@ matrix rather than silently claimed.
 
 - **Not claimed: that generated vaults work on these hosts.** Only that the plugin installs and its commands are reachable. A vault generated from a Codex session will be Claude-Code-shaped, because surface 2 is untouched — `platforms/claude-code/` is still the only generator target.
 - **Not claimed: that hook-dependent behavior survives.** `/setup` Step 10 generates `.claude/hooks/`. Codex has no PostToolUse equivalent. A Codex-run `/setup` will write hooks the host never fires. This design does not fix that; it is the first thing surface 2 must address.
-- **Not claimed: that the adapters are tested.** See above. Two of the three are unexecuted by any gate.
+- **Not claimed: that the adapters are tested.** An earlier revision said "two of the three are unexecuted by any gate," which counts *adapters* and so conceals that the one nominally covered adapter is only half covered: Codex is two files, and `--check` reads one field of one of them. Counted by **file**, three of the four artifacts are unexecuted by any gate, and the fourth is checked for a single version string.
 - **Not claimed: parity with obra's adapters.** Theirs bootstrap a skill; these register a directory. The omission is deliberate and reasoned, not incomplete porting.
 - **Not claimed: that `/setup` is equally good on every host.** It is explicitly worse where `AskUserQuestion` is absent, and the reference docs say so.
+- **Not claimed: that the `hooks` fallback semantics are verified.** The constant name, the exact-empty-object requirement, and the three collapsing spellings come from one comment block in obra's `tests/codex/test-marketplace-manifest.sh` and are grounded in nothing inspectable — a code search of `openai/codex` finds no `DEFAULT_HOOKS_CONFIG_FILE` or `load_plugin_hooks`. Declaring `"hooks": {}` is cheap and the downside of being wrong about it is nil, so the design follows the claim; that is a cost asymmetry, not evidence.
+- **Not claimed: that Codex dispatches PostToolUse-class events.** Unknown, and this spec asserts the opposite elsewhere. See the registration-vs-execution table above.
+- **Not claimed: that Pi, opencode and Codex lack an `AskUserQuestion` equivalent.** Stated flatly in the body; the evidence is absence from obra's `<host>-tools.md` files, and obra ships none for opencode at all. Absence from a mapping document is not absence from a runtime. The `reference/hosts/` content requirement rests on these three negatives, so they should be confirmed against each host's tool surface during the manual acceptance run rather than inherited from this spec.
+- **Not claimed: that the new `.agents/plugins/marketplace.json` is protected by anything.** This is the file the design exists to fix, and after the change **no gate reads it**: `bump-version.sh --check` sees only declared (path, field) pairs and this file carries no version; `check-prose-paths.sh` checks existence, not content; `check-portability.sh` collects `*.md`/`*.sh`/`*.template` and not `*.json`. It can be malformed, carry the wrong schema, or be silently reverted to a symlink — the two exact regressions this spec narrates — with CI green. Adding a `jq -e` parse plus a non-symlink and schema-discriminating assertion (`interface.displayName` present, `plugins[0].source` an object) to an existing suite would close it; that is a gate-design change and is deferred, not overlooked.
 - **Not claimed: that `"skills": "./skills/"` registers skills on a Codex runtime.** It is inferred from obra's manifest shape and is *not* asserted by their `tests/codex/test-marketplace-manifest.sh`, which checks `name`, `source`, `policy`, `category` and `hooks` — never `skills`. So the one key this adapter's whole purpose rests on is the one key obra's test does not cover, and nothing in this repo can cover it either. The manual acceptance run above is the only evidence that will ever exist for it; until that run happens the Codex adapter is **unverified**, and "one JSON file" is a statement about size, not about risk.
 
 ## The surface this does not build
