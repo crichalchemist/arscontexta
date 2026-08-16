@@ -859,6 +859,25 @@ ledger — divergence 10's rule.
    valid-but-incorrect mode is undetectable by construction, and is conceded rather than
    guarded.
 
+7. **Seven guards are unasserted and were previously undisclosed**, enumerated by the final
+   pre-apply review: `${1:?}`, `command -v awk`, `base==""` inside `ends_abbrev`,
+   `[ -r "$f" ]`, both `mktemp ||` branches, and the two output-invariant refusals (leading
+   `---` absent; output shorter than input). All are environment preconditions or
+   unreachable-by-construction, since the transform only exits 0 on success. Listed rather
+   than tested because each would require shadowing a coreutil to reach.
+
+8. **A populated but non-matching tree exits 0 with `files changed: 0`**, which the script's
+   fail-loud header does not cover. This is a deliberate tension rather than a defect: exit 0
+   on no-work is exactly what the idempotency contract requires, since a second `--apply`
+   must be a clean zero. Making "nothing to do" loud would break "running twice is safe".
+   Recorded so the next reader does not resolve it in one direction without seeing the other.
+
+9. **Two of the eight preserved abbreviations are preserved for the wrong reason.** `d.` and
+   `k.` are math symbols ending real sentences ("at fixed d.", "regardless of k."), matched
+   by the single-LETTER rule intended for initials; `vol.` matched the list in the *volume*
+   sense while the text means *volatility*. All three outcomes are fail-safe — a kept period,
+   never corruption — and the fixture label "initial" is looser than what it matches.
+
 **Not a deferral, stated so it is not mistaken for one:** the migration's three mode guards
 (octal validation, non-empty check, `chmod` status check) are mutually redundant, so **no
 single-site mutation of any one of them is observable** — removing any one leaves the outcome

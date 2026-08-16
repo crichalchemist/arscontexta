@@ -243,10 +243,17 @@ assert "$(cmp -s "$V11/killed.orig" "$V11/nodes/killed.md" && echo same || echo 
 # No real file makes stat fail, so the only way to reach this branch is to shadow
 # stat on PATH. Same technique and same caveat as the queue-edit suite's forced
 # rename failure: the MECHANISM is covered, the organic trigger is not, and those
-# are different claims. Without this fixture, single-site reverts of the mode fix
-# (dropping the `[ -n "$mode" ]` guard, or chmod's `||`) are both all-green, and
-# only a compound two-site mutation reddens anything — which cannot attribute
-# coverage to either site.
+# are different claims.
+#
+# READ THIS BEFORE TRUSTING THE FIXTURE'S SCOPE. It asserts the fail-closed
+# OUTCOME, not any individual guard. Measured, WITH this fixture in place, both
+# single-site reverts of the mode fix (dropping the `[ -n "$mode" ]` guard, or
+# dropping chmod's `||`) are STILL all-green, because the three mode guards are
+# mutually redundant — whichever one survives catches the same input. Only a
+# compound two-site mutation reddens anything, and a compound mutation cannot
+# attribute coverage to a site. An earlier version of this comment said "without
+# this fixture", which implied the fixture bought per-guard attribution. It does
+# not. The full measured matrix is in docs/superpowers/deferrals.md entry 32.
 V12=$(mkvault)
 note "$V12" failclosed 'description: "Fail closed."
 type: insight'
