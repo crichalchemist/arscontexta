@@ -242,6 +242,21 @@ assert "$?" '1' 'non-octal mode: run STOPS rather than chmod-ing garbage and wri
 assert "$(cmp -s "$V13/garbagemode.orig" "$V13/nodes/garbagemode.md" && echo same || echo differs)" 'same' \
   'non-octal mode: file left untouched'
 
+# ------------------------------------------------ a failed rename must be loud
+# The `mv ... ||` guard was unasserted: removing it leaves the whole suite green
+# while a failing rename reports `files changed: 1  refused: 0` and exits 0,
+# having written nothing. Unlike the three mode guards this one IS single-site
+# attributable, so it gets a fixture rather than a disclosure line.
+V14=$(mkvault)
+note "$V14" mvfail 'description: "Move me."
+type: insight'
+cp "$V14/nodes/mvfail.md" "$V14/mvfail.orig"
+shim3=$(mktemp -d); printf '#!/bin/sh\nexit 1\n' > "$shim3/mv"; chmod +x "$shim3/mv"
+( PATH="$shim3:$PATH"; bash "$SCRIPT" "$V14" --apply ) >/dev/null 2>&1
+assert "$?" '1' 'failed rename: run STOPS rather than reporting a change it did not make'
+assert "$(cmp -s "$V14/mvfail.orig" "$V14/nodes/mvfail.md" && echo same || echo differs)" 'same' \
+  'failed rename: original left untouched'
+
 # ------------------------------------------------------------------- dry run
 V6=$(mkvault)
 note "$V6" d 'description: "Dry."

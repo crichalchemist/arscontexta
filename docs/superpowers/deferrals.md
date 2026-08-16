@@ -848,6 +848,17 @@ ledger — divergence 10's rule.
 4. **A description with trailing whitespace after its closing quote is refused** by the
    per-line balance check. Fail-safe and named on stderr; 0 occurrences in the corpus.
 
+5. **`stat -f '%OLp'` masks the high bits on BSD.** A note at `2755`, `4755` or `1755` is
+   reported as `755`, so setgid/setuid/sticky is dropped before any guard can see it. The
+   field vault is `644` throughout (2874 of 2874), so this cannot fire there. It is a
+   property of the probe, not of the guards that consume it.
+
+6. **A symlinked note is replaced by a regular file.** `mv` writes over the link rather than
+   through it, so the link's target is never migrated and the run reports success. Measured
+   **0 symlinked notes of 2874** in the field vault. A hostile or wrong `stat` returning a
+   valid-but-incorrect mode is undetectable by construction, and is conceded rather than
+   guarded.
+
 **Not a deferral, stated so it is not mistaken for one:** the migration's three mode guards
 (octal validation, non-empty check, `chmod` status check) are mutually redundant, so **no
 single-site mutation of any one of them is observable** — removing any one leaves the outcome
