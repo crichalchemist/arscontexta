@@ -208,6 +208,40 @@ assert "$?" '2' 'transform killed by a signal: refused with exit 2, not a clean 
 assert "$(cmp -s "$V11/killed.orig" "$V11/nodes/killed.md" && echo same || echo differs)" 'same' \
   'transform killed by a signal: original left byte-identical'
 
+# ------------------------------------------ an unreadable mode must FAIL CLOSED
+# No real file makes stat fail, so the only way to reach this branch is to shadow
+# stat on PATH. Same technique and same caveat as the queue-edit suite's forced
+# rename failure: the MECHANISM is covered, the organic trigger is not, and those
+# are different claims. Without this fixture, single-site reverts of the mode fix
+# (dropping the `[ -n "$mode" ]` guard, or chmod's `||`) are both all-green, and
+# only a compound two-site mutation reddens anything — which cannot attribute
+# coverage to either site.
+V12=$(mkvault)
+note "$V12" failclosed 'description: "Fail closed."
+type: insight'
+cp "$V12/nodes/failclosed.md" "$V12/failclosed.orig"
+shim=$(mktemp -d); printf '#!/bin/sh\nexit 1\n' > "$shim/stat"; chmod +x "$shim/stat"
+( PATH="$shim:$PATH"; bash "$SCRIPT" "$V12" --apply ) >/dev/null 2>&1
+assert "$?" '1' 'unreadable mode: run STOPS rather than writing the file as 0600'
+assert "$(cmp -s "$V12/failclosed.orig" "$V12/nodes/failclosed.md" && echo same || echo differs)" 'same' \
+  'unreadable mode: file left untouched, not written with mktemp default mode'
+
+# A stat that SUCCEEDS with a non-mode is a different input class from one that
+# fails, and it is the real-world trigger: on GNU, `stat -f` means
+# --file-system, so a BSD-first probe returns a non-empty blob. Measured guard
+# matrix: with the octal validation AND chmod's status check both removed, this
+# shim writes the file 0600 while the failing shim above stays safe -- so this
+# fixture is the only one that reaches the validation at all.
+V13=$(mkvault)
+note "$V13" garbagemode 'description: "Garbage mode."
+type: insight'
+cp "$V13/nodes/garbagemode.md" "$V13/garbagemode.orig"
+shim2=$(mktemp -d); printf '#!/bin/sh\necho "not-a-mode"\n' > "$shim2/stat"; chmod +x "$shim2/stat"
+( PATH="$shim2:$PATH"; bash "$SCRIPT" "$V13" --apply ) >/dev/null 2>&1
+assert "$?" '1' 'non-octal mode: run STOPS rather than chmod-ing garbage and writing'
+assert "$(cmp -s "$V13/garbagemode.orig" "$V13/nodes/garbagemode.md" && echo same || echo differs)" 'same' \
+  'non-octal mode: file left untouched'
+
 # ------------------------------------------------------------------- dry run
 V6=$(mkvault)
 note "$V6" d 'description: "Dry."

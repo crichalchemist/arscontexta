@@ -816,6 +816,47 @@ record, not a claim about the tree.
 
 ---
 
+### 32. Note-lifecycle branch — four deferrals, and one thing that is not one
+
+**From:** `docs/superpowers/plans/2026-08-15-note-lifecycle-and-description-convention.md`,
+whose own `## Deferrals` section reads "Nothing else." That was true when written and is no
+longer, which is why these land here rather than only in commit messages and a gitignored
+ledger — divergence 10's rule.
+
+1. **`~150 chars` survives at TWO generators sites, not one.** The plan's Deferrals names
+   `generators/features/schema.md:18`; `generators/features/atomic-notes.md:75` is a second.
+   Both belong to the generators tree rather than to `/reduce`, which is why Task 3 left them.
+   A third hit, `skills/architect/SKILL.md:482`, is the phrase `"line ~150"` — a line-number
+   reference, not a description-length claim — and is correctly out of scope.
+
+   ```bash
+   /usr/bin/grep -rn '~150' skill-sources/ generators/ skills/    # 3 = 2 generators + 1 unrelated
+   ```
+
+2. **`/verify`'s promotion gate names three checks; it is a defensible subset of the
+   computable ones, not the complete one.** `REVIEW: Frontmatter: [PASS/FAIL]` and
+   `{DOMAIN:topic map} connection: [PASS/FAIL]` are equally binary and excluded with no
+   stated rationale. Inherited verbatim from the plan's own Step 2 text, so this is a design
+   question, not an execution defect. Nothing tests any of it — nothing in this repo executes
+   template prose.
+
+3. **The migration script rewrites duplicate `status:` lines individually while `mapped`
+   counts once.** A file with two frontmatter `status:` keys is already ambiguous YAML;
+   refusing it would be the consistent choice. Measured **0 of 2874** in the field vault.
+   Moot once the script is deleted, recorded because the same shape recurs.
+
+4. **A description with trailing whitespace after its closing quote is refused** by the
+   per-line balance check. Fail-safe and named on stderr; 0 occurrences in the corpus.
+
+**Not a deferral, stated so it is not mistaken for one:** the migration's three mode guards
+(octal validation, non-empty check, `chmod` status check) are mutually redundant, so **no
+single-site mutation of any one of them is observable** — removing any one leaves the outcome
+identical. That is defense in depth, not missing coverage, and the measured guard matrix is in
+the branch's ledger. Two compound mutations do reproduce the defect: `guard+chmod` under
+either stat shim, and `octal+chmod` under a shim returning a non-empty non-mode.
+
+---
+
 ## Design-track — not deferrals, listed so they are not mistaken for open work
 
 These are decisions awaiting a **design pass**, not decisions already made.
