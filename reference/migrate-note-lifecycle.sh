@@ -53,7 +53,34 @@ transform() { # transform <file> <classfile> -> stdout
       if (length(s)>=2 && a==z && (a=="\"" || a==SQ)) return substr(s,2,length(s)-2)
       return s
     }
-    BEGIN { infm=0; seen_status=0; k_strip=0; k_stamp=0; k_map=0; malformed=0 }
+    # A trailing dot is only a sentence terminator when the token carrying it is
+    # not an abbreviation. Three classes, each measured in the field vault:
+    #   - a known abbreviation      "... represented Mr."   (4 notes)
+    #   - a single-character token  "... constant C."       (1 note, an initial)
+    #   - a token with an interior dot "... in the U.S."    (0 notes, guarded anyway)
+    # Without this the migration silently rewrites `Mr.` to `Mr`.
+    function ends_abbrev(s,   n, w, base, parts) {
+      n = split(s, parts, /[[:space:]]+/)
+      w = parts[n]
+      if (w !~ /\.$/) return 0
+      base = substr(w, 1, length(w)-1)
+      if (base == "")             return 0
+      # LETTERS only, not digits. `Ch. 6.` and `Ch. 8.` end in a bare numeral
+      # whose dot IS a sentence terminator; only an initial like `constant C.`
+      # is an abbreviation.
+      if (base ~ /^[A-Za-z]$/)    return 1
+      # Purely alphabetic dotted forms only -- `U.S.`, `e.g.`. Matching any
+      # interior dot also matches decimals, so `(6.11% -> 13.39%).` was spared a
+      # period that genuinely ends its sentence.
+      if (base ~ /^[A-Za-z.]+$/ && base ~ /\./) return 1
+      return (tolower(base) in ABBREV)
+    }
+    BEGIN {
+      infm=0; seen_status=0; k_strip=0; k_stamp=0; k_map=0; malformed=0
+      split("mr mrs ms dr prof rev hon st sen gov jr sr inc corp co ltd llc " \
+            "etc vs al ave blvd rd no vol pp fig ch ed eds approx est cf ibid viz", A, " ")
+      for (i in A) ABBREV[A[i]] = 1
+    }
     NR==1 && $0=="---" { infm=1; print; next }
     infm && $0=="---" {
       # BACKFILL IS `active`, NOT `preliminary`. The statusless notes predate
@@ -84,7 +111,7 @@ transform() { # transform <file> <classfile> -> stdout
       }
       inner=unquote(body)
       q = (inner==body) ? "" : a
-      if (inner ~ /\.$/ && inner !~ /\.\.$/ && length(inner)>1) {
+      if (inner ~ /\.$/ && inner !~ /\.\.$/ && length(inner)>1 && !ends_abbrev(inner)) {
         inner=substr(inner,1,length(inner)-1); k_strip=1
       }
       print "description: " q inner q; next

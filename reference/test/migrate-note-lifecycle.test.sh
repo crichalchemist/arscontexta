@@ -75,6 +75,37 @@ assert "$(desc "$V" bare)"     'description: A bare one'          'bare: stays b
 assert "$(desc "$V" ellipsis)" 'description: "Trailing dots..."'  'ellipsis: untouched'
 assert "$(desc "$V" empty)"    'description: "."'                 'would-be-empty: refused, unchanged'
 
+# --------------------------------------------------------- abbreviation guard
+# A trailing dot on an abbreviation is not a sentence terminator. Measured in
+# the field vault before this guard existed: 4 notes ending `Mr.` and 1 ending
+# in a single-letter initial lost a semantically real dot.
+#
+# `plain` is the POSITIVE CONTROL and is the load-bearing one: an over-broad
+# guard that never strips anything satisfies every "unchanged" assertion below
+# and looks perfect. Only the pair discriminates.
+note "$V" abbrev   'description: "The more places I represented Mr."
+type: insight'
+note "$V" initial  'description: "Arithmetic using sentinel constant C."
+type: insight'
+note "$V" interior 'description: "Widely observed across the U.S."
+type: insight'
+note "$V" plain    'description: "An ordinary closing sentence."
+type: insight'
+# Two false-positive classes the first version of this guard actually shipped.
+# The `plain` control above is prose and could not catch either: a bare numeral
+# and a decimal both end sentences, and both were being spared.
+note "$V" chapnum  'description: "Diagnostic techniques - from Morini Ch. 6."
+type: insight'
+note "$V" decimal  'description: "Large gain on LUT under GAT (6.11% to 13.39%)."
+type: insight'
+bash "$SCRIPT" "$V" --apply >/dev/null 2>&1
+assert "$(desc "$V" abbrev)"   'description: "The more places I represented Mr."'   'abbreviation: Mr. keeps its period'
+assert "$(desc "$V" initial)"  'description: "Arithmetic using sentinel constant C."' 'initial: single-letter token keeps its period'
+assert "$(desc "$V" interior)" 'description: "Widely observed across the U.S."'     'interior dot: U.S. keeps its period'
+assert "$(desc "$V" plain)"    'description: "An ordinary closing sentence"'        'POSITIVE CONTROL: an ordinary sentence IS still stripped'
+assert "$(desc "$V" chapnum)"  'description: "Diagnostic techniques - from Morini Ch. 6"' 'bare numeral is NOT an abbreviation: stripped'
+assert "$(desc "$V" decimal)"  'description: "Large gain on LUT under GAT (6.11% to 13.39%)"' 'decimal is NOT an abbreviation: stripped'
+
 # --------------------------------------------------------------------- status
 assert "$(statusline "$V" nostatus)"  'status: active'            'statusless: backfilled to active'
 assert "$(statusline "$V" hasstatus)" 'status: active'            'already-stamped: untouched'
