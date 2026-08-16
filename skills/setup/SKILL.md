@@ -1318,7 +1318,7 @@ The 16 skill sources to install:
 
 For each skill:
 1. Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/[name]/SKILL.md`
-2. Apply vocabulary transformation — rename and update ALL internal references using the vocabulary mapping from `ops/derivation.md`. **For `{vocabulary.domain}` specifically, use the manifest's `domain_summary:` field rather than the `vocabulary:` block** — it is a standalone top-level field, not part of the Levels 1-6 substitution table, and `domain` has no entry there to substitute from. Without this instruction, `{vocabulary.domain}` (12 sites in `skill-sources/reduce/SKILL.md`) ships unresolved into every generated vault.
+2. Apply vocabulary transformation — rename and update ALL internal references using the vocabulary mapping from `ops/derivation.md`. **For `{vocabulary.domain}` specifically, use the manifest's `domain_summary:` field rather than the `vocabulary:` block** — it is a standalone top-level field, not part of the numbered-level substitution table at all, and `domain` has no entry there to substitute from. Without this instruction, `{vocabulary.domain}` (12 sites in `skill-sources/reduce/SKILL.md`) ships unresolved into every generated vault.
 3. Adjust skill metadata (set `context: fork` for fresh context per invocation)
 4. Write the transformed SKILL.md to the user's skills directory
 

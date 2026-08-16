@@ -191,8 +191,43 @@ abbreviation rather than a sentence: `Mr.` ×4, `vol.`, and the single-letter fi
 are spared for a looser reason than the rule intends — fail-safe, and recorded in
 `docs/superpowers/deferrals.md` entry 32.
 
+**The strip figure moved, and the decomposition is the reconciliation** — this document
+declares `1784` in three places above, measured before the abbreviation guard existed:
+
+```text
+1784  =  1754 stripped  +  8 abbreviation-preserved  +  22 ellipsis-preserved
+```
+
+The 22 were always exempt. The 8 became exempt when the abbreviation guard was added
+mid-execution at the human partner's direction. Read the decomposition rather than either
+number alone: `1784` is what was *targeted*, `1754` is what was *changed*, and neither is
+wrong.
+
 `draft` (760 notes) was **not** remapped, per this document's own ruling above: it is this
 vault's derived dialect for `status_preliminary`, not an off-enum value.
+
+**The criterion separating a dialect from an off-enum value, stated because the migration
+applied it and did not define it.** `draft` was spared and `closed` (11 notes) was remapped to
+`archived` — and `skills/setup/SKILL.md` offers `"closed"` as an example value for
+`status_archived`, so the distinction is not self-evident and a reader could reasonably call
+it inconsistent. The rule the migration actually followed:
+
+> A value is this vault's **dialect** when it is the *sole* inhabitant of its lifecycle slot —
+> nothing else in the corpus occupies that state, so the value IS the state under another
+> name. It is **off-enum** when a canonical sibling already occupies the same slot, because
+> then two names for one state coexist and the vault's own tools cannot agree which is meant.
+
+Measured against the pre-migration census, that rule is decisive rather than a judgement call:
+`draft` (760) was the only preliminary-slot value, so it is the dialect. `closed` (11)
+coexisted with nothing in the archived slot but `verified`/`valid`/`evergreen` (13) coexisted
+with `active` (1386), and `investigating` (1) with `open` (1) — those are unambiguously
+off-enum. `closed` is the one genuinely borderline case, and it was remapped on the weaker
+ground that it had no `status_*` key derived in this vault to anchor it as dialect.
+
+**Consequence, stated plainly: 11 notes now carry canonical `archived` in a vault that might
+later derive `closed` for that slot.** Blast radius is 11 notes and no `status_*` key is
+derived here yet, so nothing is broken today. Anyone reusing this mapping should settle the
+criterion first rather than inherit it from this run.
 
 Stated plainly, because it is the design's weakest assertion: **`active` on a backfilled note
 asserts existence and reachability, nothing about quality.**
@@ -205,7 +240,7 @@ Three passes, **one commit**, then deleted.
 
 | pass | targets |
 |---|---|
-| strip one trailing period from `description` | 1784 |
+| strip one trailing period from `description` | 1784 targeted → **1754 stripped**, see below |
 | stamp `status` on statusless notes | 698 |
 | map off-enum statuses per the table above | 25 |
 
@@ -229,6 +264,8 @@ gate, and a maintainer, for a job that ran once in one place.
 
 **The throwaway script gets the most tests, and that is not a contradiction.** It is disposable
 in lifetime, not in risk: it edits roughly 2507 files in a live 2874-note vault, once.
+(**Measured when it ran: 2090 files.** The 2507 estimate predates the run and is left as
+written rather than overwritten, per this repo's convention of recording drift.)
 
 Fixtures, each **born red**, both shells, every mutation asserted to have applied before its
 result is read:

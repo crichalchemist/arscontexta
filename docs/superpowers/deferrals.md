@@ -872,7 +872,7 @@ ledger — divergence 10's rule.
    must be a clean zero. Making "nothing to do" loud would break "running twice is safe".
    Recorded so the next reader does not resolve it in one direction without seeing the other.
 
-9. **Two of the eight preserved abbreviations are preserved for the wrong reason.** `d.` and
+9. **Three of the eight preserved abbreviations are preserved for the wrong reason.** `d.` and
    `k.` are math symbols ending real sentences ("at fixed d.", "regardless of k."), matched
    by the single-LETTER rule intended for initials; `vol.` matched the list in the *volume*
    sense while the text means *volatility*. All three outcomes are fail-safe — a kept period,
