@@ -1182,6 +1182,13 @@ vocabulary:
   cmd_verify: "[/domain-verb]"  # e.g., "/verify", "/check", "/audit"
   cmd_rethink: "[/domain-verb]" # e.g., "/rethink", "/reassess", "/retrospect"
 
+  # Level 6.5: Lifecycle states (one key per enum value)
+  status_preliminary: "[domain term]"  # e.g., "preliminary", "draft", "seed"
+  status_open: "[domain term]"         # e.g., "open", "question", "unresolved"
+  status_active: "[domain term]"       # e.g., "active", "verified", "live"
+  status_archived: "[domain term]"     # e.g., "archived", "retired", "closed"
+  status_superseded: "[domain term]"   # e.g., "superseded", "replaced", "obsolete"
+
   # Level 7: Extraction categories (domain-specific, from conversation)
   extraction_categories:
     - name: "[category name]"
