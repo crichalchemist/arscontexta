@@ -470,9 +470,10 @@ Bad: "context management strategies" (topic label, not a claim)
 
 ```markdown
 ---
-description: [~150 chars elaborating the claim, adds info beyond title]
+description: [max 200 chars elaborating the claim, adds info beyond title, NO trailing period]
 type: [claim | methodology | problem | learning | tension]
 created: YYYY-MM-DD
+status: {vocabulary.status_preliminary}
 [domain-specific fields from derivation-manifest]
 ---
 
@@ -722,7 +723,7 @@ The claim test: "this {vocabulary.note} argues that [title]"
 
 ### Description
 
-One field. ~150 characters. Must add NEW information beyond the title — scope, mechanism, or implication.
+One field. Max 200 characters, no trailing period. Must add NEW information beyond the title — scope, mechanism, or implication.
 
 Bad (restates title): "quality is important in knowledge work"
 Good (adds mechanism + implication): "when creation becomes trivial, maintaining signal-to-noise becomes the primary challenge — selection IS the work"

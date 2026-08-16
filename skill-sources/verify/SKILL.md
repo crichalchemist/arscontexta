@@ -321,6 +321,22 @@ Recommended Actions:
 - If any observations worth capturing: create atomic note in the observations directory per the observation capture pattern
 - If `--handoff` in target: output RALPH HANDOFF block (see below)
 
+**Promotion (mechanical gate only).**
+
+Promote a {vocabulary.note} from `{vocabulary.status_preliminary}` to
+`{vocabulary.status_active}` when **all three** of these pass — and only these:
+
+- required fields present (VALIDATE: Required fields = PASS)
+- topics format valid (VALIDATE: Topics format = PASS)
+- every wiki link resolves (REVIEW: Link resolution = PASS)
+
+RECITE's prediction score and description quality are **reported and do not
+gate**. They are judgments this skill makes, not conditions it can compute, and
+a gate that cannot be computed is a gate that cannot be checked.
+
+If any of the three fails, leave the status unchanged and say so in the report.
+Never promote silently: state the transition and which three checks carried it.
+
 **START NOW.** The reference material below explains philosophy and methodology — use to guide reasoning, not as output to repeat.
 
 ---

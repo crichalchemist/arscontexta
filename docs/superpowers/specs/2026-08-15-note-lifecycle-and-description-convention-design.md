@@ -175,6 +175,74 @@ is exactly a note that had no `status` before the migration commit, and **the mi
 the marker** — one SHA, one date, answerable by `git log`, permanently. A synthetic
 `status_source:` field would be 698 writes to record what history already records.
 
+**THE MARKER COMMIT IS `6d941634f267555a22e509c444e2e29accb93830`**, in `~/second-brain`,
+2026-08-15 — `6d941634` in short form, its parent `9f9c28a2`. It changed 2090 of 2874 notes:
+1754 descriptions lost a trailing period, 698 statusless notes were backfilled to `active`,
+25 legacy statuses were remapped. So a note carrying `active` is backfilled if and only if it
+had no `status` in `9f9c28a2`, which is one `git show` away:
+
+```bash
+git -C ~/second-brain show 9f9c28a2:nodes/<note>.md | grep -c '^status:'   # 0 = backfilled
+```
+
+Eight descriptions deliberately keep a trailing period, because the value ends in an
+abbreviation rather than a sentence: `Mr.` ×4, `vol.`, and the single-letter finals `C.`,
+`d.`, `k.`. Two of those three single letters are math symbols rather than initials, so they
+are spared for a looser reason than the rule intends — fail-safe, and recorded in
+`docs/superpowers/deferrals.md` entry 32.
+
+**The strip figure moved, and the decomposition is the reconciliation** — this document
+declares `1784` in three places above, measured before the abbreviation guard existed:
+
+```text
+1784  =  1754 stripped  +  8 abbreviation-preserved  +  22 ellipsis-preserved
+```
+
+The 22 were always exempt. The 8 became exempt when the abbreviation guard was added
+mid-execution at the human partner's direction. Read the decomposition rather than either
+number alone: `1784` is what was *targeted*, `1754` is what was *changed*, and neither is
+wrong.
+
+`draft` (760 notes) was **not** remapped, per this document's own ruling above: it is this
+vault's derived dialect for `status_preliminary`, not an off-enum value.
+
+**The criterion separating a dialect from an off-enum value, stated because the migration
+applied it and did not define it.** `draft` was spared and `closed` (11 notes) was remapped to
+`archived` — and `skills/setup/SKILL.md` offers `"closed"` as an example value for
+`status_archived`, so the distinction is not self-evident and a reader could reasonably call
+it inconsistent. The rule the migration actually followed:
+
+> A value is this vault's **dialect** when it is the *sole* inhabitant of its lifecycle slot —
+> nothing else in the corpus occupies that state, so the value IS the state under another
+> name. It is **off-enum** when a canonical sibling already occupies the same slot, because
+> then two names for one state coexist and the vault's own tools cannot agree which is meant.
+
+Applied mechanically to the pre-migration census, the rule is decisive for every value — and
+**on one value it decides against what the migration did.** Slot by slot:
+
+| slot | canonical count | other inhabitant | the rule says |
+|---|---|---|---|
+| preliminary | 0 | `draft` 760 | sole → **dialect**, do not remap |
+| open | `open` 1 | `investigating` 1 | sibling present → off-enum, remap |
+| active | `active` 1386 | `verified` 11, `valid` 1, `evergreen` 1 | sibling present → off-enum, remap |
+| archived | 0 | `closed` 11 | sole → **dialect, do not remap** |
+| superseded | `superseded` 4 | — | nothing to decide |
+
+**`closed`'s slot is structurally identical to `draft`'s** — canonical count zero, one
+non-canonical inhabitant — so the rule that spared `draft` also spares `closed`. The migration
+remapped it anyway. That is a **deviation from the stated criterion, not a borderline call**,
+and an earlier revision of this paragraph described it as borderline, which was the softer and
+less accurate word.
+
+**Consequence, stated plainly: 11 notes now carry canonical `archived` in a vault whose own
+dialect for that slot was arguably `closed`** — and `skills/setup/SKILL.md` offers exactly
+`"closed"` as an example value for `status_archived`. Nothing is broken today: 11 notes, no
+`status_*` key derived in this vault yet, and `git revert` of the marker commit restores them.
+What it costs is that a vault which later derives `status_archived: "closed"` will find 11
+notes already renamed out of its own vocabulary. Whoever reuses this mapping should either
+follow the rule (spare `closed`) or amend the rule with a stated reason — not inherit the
+deviation silently from this run.
+
 Stated plainly, because it is the design's weakest assertion: **`active` on a backfilled note
 asserts existence and reachability, nothing about quality.**
 
@@ -186,7 +254,7 @@ Three passes, **one commit**, then deleted.
 
 | pass | targets |
 |---|---|
-| strip one trailing period from `description` | 1784 |
+| strip one trailing period from `description` | 1784 targeted → **1754 stripped**, see below |
 | stamp `status` on statusless notes | 698 |
 | map off-enum statuses per the table above | 25 |
 
@@ -210,6 +278,8 @@ gate, and a maintainer, for a job that ran once in one place.
 
 **The throwaway script gets the most tests, and that is not a contradiction.** It is disposable
 in lifetime, not in risk: it edits roughly 2507 files in a live 2874-note vault, once.
+(**Measured when it ran: 2090 files.** The 2507 estimate predates the run and is left as
+written rather than overwritten, per this repo's convention of recording drift.)
 
 Fixtures, each **born red**, both shells, every mutation asserted to have applied before its
 result is read:

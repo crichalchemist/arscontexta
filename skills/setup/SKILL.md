@@ -1182,6 +1182,13 @@ vocabulary:
   cmd_verify: "[/domain-verb]"  # e.g., "/verify", "/check", "/audit"
   cmd_rethink: "[/domain-verb]" # e.g., "/rethink", "/reassess", "/retrospect"
 
+  # Level 6.5: Lifecycle states (one key per enum value)
+  status_preliminary: "[domain term]"  # e.g., "preliminary", "draft", "seed"
+  status_open: "[domain term]"         # e.g., "open", "question", "unresolved"
+  status_active: "[domain term]"       # e.g., "active", "verified", "live"
+  status_archived: "[domain term]"     # e.g., "archived", "retired", "closed"
+  status_superseded: "[domain term]"   # e.g., "superseded", "replaced", "obsolete"
+
   # Level 7: Extraction categories (domain-specific, from conversation)
   extraction_categories:
     - name: "[category name]"
@@ -1311,7 +1318,7 @@ The 16 skill sources to install:
 
 For each skill:
 1. Read `${CLAUDE_PLUGIN_ROOT}/skill-sources/[name]/SKILL.md`
-2. Apply vocabulary transformation — rename and update ALL internal references using the vocabulary mapping from `ops/derivation.md`. **For `{vocabulary.domain}` specifically, use the manifest's `domain_summary:` field rather than the `vocabulary:` block** — it is a standalone top-level field, not part of the Levels 1-6 substitution table, and `domain` has no entry there to substitute from. Without this instruction, `{vocabulary.domain}` (12 sites in `skill-sources/reduce/SKILL.md`) ships unresolved into every generated vault.
+2. Apply vocabulary transformation — rename and update ALL internal references using the vocabulary mapping from `ops/derivation.md`. **For `{vocabulary.domain}` specifically, use the manifest's `domain_summary:` field rather than the `vocabulary:` block** — it is a standalone top-level field, not part of the numbered-level substitution table at all, and `domain` has no entry there to substitute from. Without this instruction, `{vocabulary.domain}` (12 sites in `skill-sources/reduce/SKILL.md`) ships unresolved into every generated vault.
 3. Adjust skill metadata (set `context: fork` for fresh context per invocation)
 4. Write the transformed SKILL.md to the user's skills directory
 
