@@ -217,17 +217,31 @@ it inconsistent. The rule the migration actually followed:
 > name. It is **off-enum** when a canonical sibling already occupies the same slot, because
 > then two names for one state coexist and the vault's own tools cannot agree which is meant.
 
-Measured against the pre-migration census, that rule is decisive rather than a judgement call:
-`draft` (760) was the only preliminary-slot value, so it is the dialect. `closed` (11)
-coexisted with nothing in the archived slot but `verified`/`valid`/`evergreen` (13) coexisted
-with `active` (1386), and `investigating` (1) with `open` (1) — those are unambiguously
-off-enum. `closed` is the one genuinely borderline case, and it was remapped on the weaker
-ground that it had no `status_*` key derived in this vault to anchor it as dialect.
+Applied mechanically to the pre-migration census, the rule is decisive for every value — and
+**on one value it decides against what the migration did.** Slot by slot:
 
-**Consequence, stated plainly: 11 notes now carry canonical `archived` in a vault that might
-later derive `closed` for that slot.** Blast radius is 11 notes and no `status_*` key is
-derived here yet, so nothing is broken today. Anyone reusing this mapping should settle the
-criterion first rather than inherit it from this run.
+| slot | canonical count | other inhabitant | the rule says |
+|---|---|---|---|
+| preliminary | 0 | `draft` 760 | sole → **dialect**, do not remap |
+| open | `open` 1 | `investigating` 1 | sibling present → off-enum, remap |
+| active | `active` 1386 | `verified` 11, `valid` 1, `evergreen` 1 | sibling present → off-enum, remap |
+| archived | 0 | `closed` 11 | sole → **dialect, do not remap** |
+| superseded | `superseded` 4 | — | nothing to decide |
+
+**`closed`'s slot is structurally identical to `draft`'s** — canonical count zero, one
+non-canonical inhabitant — so the rule that spared `draft` also spares `closed`. The migration
+remapped it anyway. That is a **deviation from the stated criterion, not a borderline call**,
+and an earlier revision of this paragraph described it as borderline, which was the softer and
+less accurate word.
+
+**Consequence, stated plainly: 11 notes now carry canonical `archived` in a vault whose own
+dialect for that slot was arguably `closed`** — and `skills/setup/SKILL.md` offers exactly
+`"closed"` as an example value for `status_archived`. Nothing is broken today: 11 notes, no
+`status_*` key derived in this vault yet, and `git revert` of the marker commit restores them.
+What it costs is that a vault which later derives `status_archived: "closed"` will find 11
+notes already renamed out of its own vocabulary. Whoever reuses this mapping should either
+follow the rule (spare `closed`) or amend the rule with a stated reason — not inherit the
+deviation silently from this run.
 
 Stated plainly, because it is the design's weakest assertion: **`active` on a backfilled note
 asserts existence and reachability, nothing about quality.**
