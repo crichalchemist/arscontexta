@@ -103,17 +103,55 @@ typecheck. Ship unbuilt `.ts`, exactly as obra does.
 ## Architecture: three adapters
 
 ```
-.codex-plugin/plugin.json           manifest only        ~40 lines JSON
+.codex-plugin/plugin.json           manifest             ~40 lines JSON
+.agents/plugins/marketplace.json    Codex marketplace    symlink -> REAL FILE
 .opencode/plugins/arscontexta.js    config hook          ~25 lines
 .opencode/INSTALL.md                install + mapping
 .pi/extensions/arscontexta.ts       resources_discover   ~15 lines
 ```
 
-**Codex** is a manifest and nothing else: `"skills": "./skills/"` plus the `interface` block
-(displayName, category, capabilities, defaultPrompt, brandColor). Codex reads `AGENTS.md`,
-which in this repo already symlinks to `CLAUDE.md` — so a Codex agent inherits the full
-development context with no new file and no collision with `check-portability.sh` check 5,
-which pins that symlink.
+**Codex is two files, not one.** An earlier draft of this spec called it "a manifest and
+nothing else"; obra's own `tests/codex/test-marketplace-manifest.sh` refutes that in two ways,
+both of which cost more here than they do there.
+
+*First, the marketplace entry.* Codex reads `.agents/plugins/marketplace.json`, and its schema
+is **not** Claude's:
+
+| field | Codex (obra) | Claude (this repo) |
+|---|---|---|
+| `$schema` | absent | `anthropic.com/claude-code/marketplace.schema.json` |
+| `interface.displayName` | required, asserted | absent |
+| `plugins[].source` | object `{"source":"url","url":"./"}` | string `"./"` |
+| `plugins[].policy` | `{installation, authentication}` | absent |
+| `plugins[].category` | `Developer Tools` | `productivity` |
+
+This repo's `.agents/plugins/marketplace.json` is a symlink to the Claude manifest, so it
+currently serves **Claude's schema to a Codex reader**. It must become a real file. See
+[Version sites](#version-sites-and-the-convention-already-in-the-tree) — the symlink rule
+survives this; its earlier application did not.
+
+*Second, `"hooks": {}` is mandatory and its value is exact.* Codex auto-discovers a plugin's
+`hooks/hooks.json` whenever the manifest declares no `hooks` field, falling back to a
+hardcoded `DEFAULT_HOOKS_CONFIG_FILE`. An absent field, an empty array `[]`, and an empty
+inline list all collapse to that fallback; **only an empty object suppresses it.**
+
+That matters more here than in obra's tree, because of what this repo's `hooks/hooks.json`
+registers:
+
+```
+SessionStart: hooks/scripts/session-orient.sh
+PostToolUse:  hooks/scripts/write-validate.sh, hooks/scripts/auto-commit.sh
+```
+
+A Codex manifest missing `"hooks": {}` re-registers all three under Codex — including
+`auto-commit.sh`, which writes git commits — plus an install-time trust prompt. `vaultguard.sh`
+gates them on the `.arscontexta` marker, so in a non-vault directory they exit 0; **in a vault
+they do not.** A plugin committing to a user's repository from a host whose hook semantics it
+was never designed against is the failure this one JSON key prevents.
+
+Codex reads `AGENTS.md`, which in this repo already symlinks to `CLAUDE.md` — so a Codex agent
+inherits the full development context with no new context file, and with no collision with
+`check-portability.sh` check 5, which pins that symlink.
 
 **opencode** registers `skills/` on the `config` hook. No message transform.
 
@@ -176,11 +214,40 @@ byte-identity is not file-identity. `grep -r` does **not** follow symlinked file
 `--audit` correctly stays silent about it — the bytes it would report are already declared. The
 audit was right and the reading was wrong.
 
-That symlink is the convention this repo already uses for multi-host manifests, alongside
-`AGENTS.md → CLAUDE.md`. **The rule it implies:** symlink where the schema is identical,
-write a separate file where it is not. Codex's manifest carries an `interface` block that
-Claude's schema has no slot for, so it is a real file. Had the schemas matched, it should have
-been a symlink.
+**The rule that symlink implies is right; the symlink itself fails it.** State the rule first:
+*symlink where the target schema is identical, write a separate file where it is not.*
+`AGENTS.md → CLAUDE.md` satisfies it — both sides are the same prose, and check 5 pins it.
+`.agents/plugins/marketplace.json` does not: the schema table above shows five fields where
+Codex and Claude disagree, so the symlink serves the wrong schema and must be replaced with a
+real file.
+
+Two corrections in one place, and they point opposite ways — worth separating, because
+collapsing them is how the second gets lost:
+
+1. It is **not** an unregistered duplicate version site. The audit is right to ignore it.
+2. It **is** wrong for its actual consumer, which is Codex, not Claude.
+
+The first correction was the visible one and it made the second look settled. Nothing about
+"it's a symlink, so the audit is correct" says anything about whether the bytes on the other
+end are the right bytes.
+
+**Replacing it does NOT add a version site, and the reason is measured rather than assumed.**
+The Claude manifest it currently points at carries `metadata.version` and `plugins.0.version`,
+so the obvious inference is that a real file inherits both and sites go 3 → 5. Measured
+against obra's Codex marketplace: it declares **no version field anywhere**, while its
+`.codex-plugin/plugin.json` does.
+
+```bash
+gh api "repos/obra/superpowers/contents/.agents/plugins/marketplace.json" --jq '.content' \
+  | base64 -d | jq -r '[paths(scalars)|join(".")] | map(select(test("version";"i")))'   # []
+```
+
+This design mirrors that shape: version lives in the plugin manifest, the marketplace entry
+points at it. So **sites go 3 → 4** — `.codex-plugin/plugin.json` only. (An earlier revision
+of this paragraph asserted 5, inferring the version fields from the Claude schema it was
+replacing rather than checking the Codex one. Recorded rather than quietly fixed, because it
+is the second instance in this document of a claim invented from an adjacent schema's shape;
+the first was `bump-version.sh --verify`.)
 
 ## Gates
 
@@ -198,7 +265,7 @@ README edit must land in the same commit as the adapter files, or after them —
 
 ## Testing
 
-No new CI gate. The honest reason: the three artifacts are a JSON manifest and two
+No new CI gate. The honest reason: the four artifacts are two JSON manifests and two
 registration hooks, and a bash gate can assert only that they parse and that their paths
 resolve — neither of which is the property that matters. **The property that matters is "a
 Codex/Pi/opencode session can install this plugin and run `/arscontexta:health`", and nothing
@@ -223,6 +290,7 @@ matrix rather than silently claimed.
 - **Not claimed: that the adapters are tested.** See above. Two of the three are unexecuted by any gate.
 - **Not claimed: parity with obra's adapters.** Theirs bootstrap a skill; these register a directory. The omission is deliberate and reasoned, not incomplete porting.
 - **Not claimed: that `/setup` is equally good on every host.** It is explicitly worse where `AskUserQuestion` is absent, and the reference docs say so.
+- **Not claimed: that `"skills": "./skills/"` registers skills on a Codex runtime.** It is inferred from obra's manifest shape and is *not* asserted by their `tests/codex/test-marketplace-manifest.sh`, which checks `name`, `source`, `policy`, `category` and `hooks` — never `skills`. So the one key this adapter's whole purpose rests on is the one key obra's test does not cover, and nothing in this repo can cover it either. The manual acceptance run above is the only evidence that will ever exist for it; until that run happens the Codex adapter is **unverified**, and "one JSON file" is a statement about size, not about risk.
 
 ## The surface this does not build
 
@@ -251,4 +319,7 @@ is a table that lies.
 | No sync script | obra's 467-line `sync-to-codex-plugin.sh` publishes into `prime-radiant-inc/openai-codex-plugins`, an external marketplace. This repo has no such listing. |
 | No new CI gate | Nothing checkable is the property that matters; a green gate asserting "the JSON parses" would read as coverage it does not provide. |
 | Fork-question escalation deferred | Named as a gap here, specced separately. |
-| `.agents/` symlink left alone | It is correct as-is. The earlier "defect" was a misreading of `cmp`. |
+| `.agents/plugins/marketplace.json` becomes a real file | It is Codex's marketplace entry and Codex's schema differs from Claude's in five fields. It is *not* an unregistered version site — that earlier reading was a misuse of `cmp`, which follows symlinks — but it is serving the wrong schema. |
+| Codex marketplace carries no version | Mirrors obra's shape, measured. Version lives in `.codex-plugin/plugin.json`; sites go 3 → 4. |
+| `"hooks": {}` declared explicitly | Only an empty object suppresses Codex's `hooks/hooks.json` auto-discovery. Absent, `[]`, and an empty inline list all fall back — which would register `auto-commit.sh` under Codex. |
+| Host reference docs live in `reference/hosts/` | obra puts theirs under the skill that consumes them (`skills/using-superpowers/references/`); this repo has no single consuming skill, since all ten are affected. `reference/` already holds cross-cutting contracts and four subdirectories (`lib/`, `templates/`, `test/`, `test-fixtures/`), so a fifth is the conforming choice rather than a new pattern. |
