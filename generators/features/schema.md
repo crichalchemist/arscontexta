@@ -27,7 +27,7 @@ created: YYYY-MM-DD
 | `type` | No | enum | Default omitted for standard {DOMAIN:notes}; add when querying by type matters |
 | `created` | No | date | ISO format YYYY-MM-DD |
 | `modified` | No | date | Updated when content meaningfully changes (not minor formatting) |
-| `status` | No | enum | `preliminary`, `open`, `active`, `archived` |
+| `status` | No | enum | `preliminary`, `open`, `active`, `archived`, `superseded` |
 
 **`description` is the most important field.** It enables progressive disclosure: an agent reads the title and description to decide whether to load the full {DOMAIN:note}. If the description just restates the title, it wastes that decision point. The description must add scope, mechanism, or implication that the title does not cover.
 
@@ -139,7 +139,7 @@ _schema:
   optional: [type, status, created, modified]
   enums:
     type: [insight, pattern, preference, fact, decision, question]
-    status: [preliminary, open, active, archived]
+    status: [preliminary, open, active, archived, superseded]
   constraints:
     description: "max 200 chars, no trailing period, must add info beyond title"
 ```
