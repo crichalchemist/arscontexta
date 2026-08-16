@@ -83,6 +83,12 @@ assert "$(statusline "$V" hasstatus)" 'status: active'            'already-stamp
 # ignores existing status and always writes `active` passes both above and
 # fails here.
 assert "$(statusline "$V" wasopen)"   'status: open'              'existing non-active status: untouched'
+# statusline() reads the FIRST status: line, so an unconditional backfill that
+# appends a second one below it leaves the assertion above green. Count them.
+statuscount() { # statuscount <vault> <name>
+  awk 'NR==1&&$0=="---"{f=1;next} f&&/^---$/{exit} f&&/^status:/{n++} END{print n+0}' "$1/nodes/$2.md"
+}
+assert "$(statuscount "$V" wasopen)"  '1'                         'existing status: exactly one status line, none appended below'
 
 # ------------------------------------------------------------- legacy mapping
 assert "$(statusline "$V" legacyclosed)"        'status: archived' 'legacy closed -> archived'
@@ -145,6 +151,46 @@ printf 'no frontmatter here\n' > "$V7/nodes/bad.md"
 bash "$SCRIPT" "$V7" --apply >/dev/null 2>&1
 assert "$?" '2' 'refused file: exits 2, distinct from the exit 1 for a wrong tree'
 assert "$(desc "$V7" ok)" 'description: "Fine"' 'a refusal does not abort the files that were fine'
+
+# ------------------------------------- unclosed frontmatter must be refused
+# The closing-delimiter half of has_frontmatter had NO fixture: a reviewer
+# replaced the whole guard with a leading-`---`-only check and the suite stayed
+# green. Without a closing delimiter every body line is still inside the
+# frontmatter state, so a BODY line beginning `status:` or `description:` gets
+# rewritten. This fixture carries both.
+V8=$(mkvault)
+printf -- '---\ndescription: "Opens but never closes."\ntype: insight\n\nstatus: closed\ndescription: "Body line with a period."\n' > "$V8/nodes/unclosed.md"
+cp "$V8/nodes/unclosed.md" "$V8/unclosed.orig"
+bash "$SCRIPT" "$V8" --apply >/dev/null 2>&1
+assert "$?" '2' 'unclosed frontmatter: refused with exit 2'
+assert "$(cmp -s "$V8/unclosed.orig" "$V8/nodes/unclosed.md" && echo same || echo differs)" 'same' \
+  'unclosed frontmatter: file left byte-identical, body lines NOT rewritten'
+
+# ----------------------------- a multi-line scalar must not be edited mid-value
+# `description: "A ratio of two.` continued on the next line is a value whose
+# period is INTERIOR. Stripping it edits the middle of the value and exits 0.
+V9=$(mkvault)
+note "$V9" fine 'description: "Fine."
+type: insight'
+printf -- '---\ndescription: "A ratio of two.\n  And more here."\ntype: insight\n---\n\nBody.\n' > "$V9/nodes/multiline.md"
+cp "$V9/nodes/multiline.md" "$V9/ml.orig"
+bash "$SCRIPT" "$V9" --apply >/dev/null 2>&1
+assert "$?" '2' 'multi-line quoted description: refused with exit 2'
+assert "$(cmp -s "$V9/ml.orig" "$V9/nodes/multiline.md" && echo same || echo differs)" 'same' \
+  'multi-line quoted description: interior period NOT stripped'
+assert "$(desc "$V9" fine)" 'description: "Fine"' 'one refusal does not stop the other files'
+
+# ------------------------------------------------------ file mode is preserved
+# mktemp creates 0600 and mv carries that mode onto the target. git records only
+# the executable bit, so this corruption is invisible in a diff review: it was
+# found by stat'ing the migrated copy, not by reading any diff.
+V10=$(mkvault)
+note "$V10" mode 'description: "Mode me."
+type: insight'
+chmod 644 "$V10/nodes/mode.md"
+bash "$SCRIPT" "$V10" --apply >/dev/null 2>&1
+assert "$(stat -f '%OLp' "$V10/nodes/mode.md" 2>/dev/null || stat -c '%a' "$V10/nodes/mode.md" 2>/dev/null)" \
+  '644' 'file mode preserved across the rewrite'
 
 # ------------------------------------------------------------------- dry run
 V6=$(mkvault)
