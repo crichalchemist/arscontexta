@@ -78,7 +78,7 @@ shipping it.
 **From:** same two documents. Note CLAUDE.md's divergence-12 table still cites `:410`;
 the true line is `:425`.
 
-### 3. `skill-sources/next:261` — the odd `LINK_LIB` spelling
+### 3. `skill-sources/next:261` — the odd `LINK_LIB` spelling — CLOSED
 
 **What:** 8 sites spell `LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"`; `next:261`
 spells the bare relative `LINK_LIB="ops/lib/link-extraction.sh"`, which depends on the
@@ -120,7 +120,7 @@ a sound staleness check is measurably cheaper than a rebuild. Both halves requir
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
 
-### 5. The 681 statusless field-vault notes
+### 5. The 681 statusless field-vault notes — CLOSED (rationale OVERRIDDEN, not satisfied)
 
 **What:** `/reduce` will stamp `status` on new notes; 681 existing notes predate the
 stamp and violate the vault's own `required` schema (`insight-node.md:5-11`).
@@ -133,20 +133,36 @@ link count would assert a quality claim nothing checked.
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
 
-### 6. The `~150` vs `200` description-length disagreement
+### 6. The `~150` vs `200` description-length disagreement — PARTIAL; **merged with entry 32 item 1, same residue**
 
 **What:** two sites say `~150` (`generators/features/schema.md:18`,
 `skill-sources/reduce/SKILL.md:473`), three say `200`.
 
+**AMENDED 2026-08-15 — both halves of that sentence are now stale, in opposite directions.**
+`skill-sources/reduce/SKILL.md` no longer says `~150` at all: the note-lifecycle branch moved
+**both** of its sites to "max 200 chars, no trailing period". The `~150` residue is now two
+sites, and **both are in `generators/`** — `schema.md:18` and `atomic-notes.md:75`, the latter
+never named by this entry. And "three say `200`" measured **8** at the time of the audit.
+
+**This is the same residue as entry 32 item 1. Fix them together or not at all** — they were
+filed from different branches, describe the identical two files, and a reader closing one
+would leave the other looking live.
+
 **Why not:** found while counting period declarations; reconciling a length constraint
 is a separate decision from a period. **The count is "at least" — a term-keyed survey
-cannot enumerate sites that omit the term.**
+cannot enumerate sites that omit the term.** That caveat is exactly why this entry undercounted
+its own subject by one file for a week.
+
+```bash
+/usr/bin/grep -rn '~150' skill-sources/ generators/ skills/   # 3 = 2 generators + 1 unrelated
+/usr/bin/grep -rn '200 char\|max 200\|<=200\|<= 200' generators/ skill-sources/ | wc -l   # 8
+```
 
 **Reopens if:** anyone edits the description schema for any reason.
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
 
-### 7. Off-enum vault statuses — two different questions
+### 7. Off-enum vault statuses — two different questions — CLOSED (with an inversion, see record)
 
 **What:** the field vault carries `closed` (11), `investigating` (1) — in **neither** the
 canonical enum nor its own template enum, so genuine violations. And `superseded` (3) —
@@ -170,7 +186,7 @@ anywhere defines what `open` means or what transitions into or out of it.
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
 
-### 9. `check-prose-paths.sh` scope excludes two files that name repo paths
+### 9. `check-prose-paths.sh` scope excludes two files that name repo paths — CLOSED
 
 **What:** `hooks/scripts/session-orient.sh` and
 `platforms/claude-code/hooks/session-orient.sh.template` both name repo paths in
@@ -219,7 +235,7 @@ generator" in this repo as "we fixed it for vaults not yet created."
 
 **From:** CLAUDE.md divergence 16
 
-### 12. The `generators/` status enum declarations are not placeholder-bearing
+### 12. The `generators/` status enum declarations are not placeholder-bearing — **REOPEN TRIGGER FIRED 2026-08-15, NOW DUE**
 
 **What:** once status values are vocabulary (`{vocabulary.status_preliminary}` et al.),
 the enum declarations in `generators/features/atomic-notes.md`, `schema.md` (×2) and
@@ -288,7 +304,7 @@ failure to reach.
 
 ---
 
-### 14. `fence-isolation.test.sh` uses a fixed temp path, so two concurrent runs clobber each other
+### 14. `fence-isolation.test.sh` uses a fixed temp path, so two concurrent runs clobber each other — CLOSED
 
 **What:** `reference/test/fence-isolation.test.sh:50` sets `WORK="/tmp/fence-isolation-gate-$SELF"`.
 `$SELF` is the shell name, not a per-run token, so two runs of the same suite under the same shell
@@ -364,7 +380,7 @@ exists to prevent exactly that. Kept numbered so references by number stay valid
 
 ---
 
-### 17. `session-orient.sh` counts open notes recursively but their total non-recursively
+### 17. `session-orient.sh` counts open notes recursively but their total non-recursively — CLOSED
 
 **What:** `hooks/scripts/session-orient.sh:151` counts open items with `count_notes_by_field`, which
 recurses; `:154`–`:155` compute `OBS_TOTAL`/`TENS_TOTAL` with `ls -1 ops/observations/*.md`, which
@@ -816,12 +832,35 @@ record, not a claim about the tree.
 
 ---
 
-### 32. Note-lifecycle branch — four deferrals, and one thing that is not one
+### 32. Note-lifecycle branch — nine items, of which two are live, seven are MOOT, and one is not a deferral
 
 **From:** `docs/superpowers/plans/2026-08-15-note-lifecycle-and-description-convention.md`,
 whose own `## Deferrals` section reads "Nothing else." That was true when written and is no
 longer, which is why these land here rather than only in commit messages and a gitignored
 ledger — divergence 10's rule.
+
+**STATUS AFTER THE BRANCH MERGED (`a5ccae3`, 2026-08-15) — read this before acting on any
+item below.** The heading first read "four deferrals" and the entry grew to nine while it
+said so; that is the drift this file exists to catch, caught by an audit rather than by a
+gate.
+
+| items | status | why |
+|---|---|---|
+| **1** | **LIVE — and it is the same residue as entry 6.** Merge them; do not fix one and leave the other. Both reduce to `generators/features/schema.md:18` and `generators/features/atomic-notes.md:75` | the generators tree was out of scope for `/reduce` |
+| **2** | **LIVE** — a design question, not a defect. `/verify`'s gate is a defensible subset of the computable checks, not the complete one | shipped at `skill-sources/verify/SKILL.md:326-327` |
+| **3–9** | **MOOT ×7 — nobody fixed these; the ground disappeared.** Every one is a property of `reference/migrate-note-lifecycle.sh` and its suite, which were created and deleted **inside** `94f44de..a5ccae3` and do not exist at HEAD | see the re-derive below |
+
+**MOOT is not RESOLVED, and the distinction is load-bearing here**, because the script *ran*
+before it was deleted: items 5, 6 and 9 describe decisions now baked into 2090 live vault
+notes. All three were fail-safe by their own accounts — modes measured `644` throughout, zero
+symlinked notes, and a kept period is never corruption — so there is nothing to chase. But a
+reader who takes MOOT to mean "was fixed" would draw the wrong conclusion about the corpus.
+
+```bash
+# added AND deleted inside the range, so the net branch diff shows neither
+git log --diff-filter=A --name-only --format='' 94f44de..a5ccae3 | grep migrate-note-lifecycle
+test -e reference/migrate-note-lifecycle.sh || echo "GONE at HEAD"
+```
 
 1. **`~150 chars` survives at TWO generators sites, not one.** The plan's Deferrals names
    `generators/features/schema.md:18`; `generators/features/atomic-notes.md:75` is a second.
@@ -1032,4 +1071,94 @@ sed -n '12p' README.md
 /usr/bin/grep -c 'README' .version-bump.json          # 0 — undeclared
 /usr/bin/grep -c 'jq ' scripts/bump-version.sh        # every site read/write is jq
 bash scripts/bump-version.sh --audit | tail -3        # reports README every run
+```
+
+---
+
+## Closed by the 2026-08-15 audit
+
+**Six entries, and only two were closed by the note-lifecycle branch.** The other four were
+already fixed by `fix/post-merge-hardening` and sat in `## Open` unnoticed — **this register
+was stale before the branch that audited it ever started.** That is the finding worth keeping:
+a deferrals file is itself a status file, and nothing gates it.
+
+### 3. `skill-sources/next:261` — the odd `LINK_LIB` spelling — CLOSED
+
+Closed by `fix/post-merge-hardening`, not by this branch. All nine sites are now
+`$VAULT_ROOT/`-prefixed; zero bare.
+
+**Its own re-derive command was broken and is corrected here.** The entry declared
+`# 8 prefixed, 1 bare`; measured, it is 9 and 0.
+
+```bash
+/usr/bin/grep -rn 'LINK_LIB=' skill-sources/ | grep -c 'VAULT_ROOT'   # 9
+/usr/bin/grep -rn 'LINK_LIB=' skill-sources/ | grep -vc 'VAULT_ROOT'  # 0
+```
+
+### 5. The 681 statusless field-vault notes — CLOSED, rationale OVERRIDDEN not satisfied
+
+The migration (`~/second-brain` `6d941634`) backfilled **698** notes — the count had drifted
+from 681 — to `status: active`. Statusless is now **0 of 2874**.
+
+**Read the qualifier, because the entry's own reasoning was overruled rather than met.** It
+deferred precisely because assigning a status would "assert a quality claim nothing checks",
+and the backfill asserts `active` on all 698 anyway. The spec answers this directly — `active`
+on a backfilled note asserts existence and reachability, nothing about quality, and the
+migration commit is the marker separating those from promoted notes — but that is a *decision
+taken against the entry's objection*, not a demonstration the objection was wrong.
+
+Its stated reopening trigger ("a promotion criterion that does not require reading the note")
+was independently tripped by the same branch: `/verify`'s mechanical gate is exactly that.
+
+```bash
+/usr/bin/grep -rL '^status:' ~/second-brain/nodes/ | grep -c .   # 0
+```
+
+### 7. Off-enum vault statuses — CLOSED, **with an inversion worth flagging**
+
+`closed` and `investigating` are gone from the vault; `superseded` became canonical in
+`generators/`. Post-migration census: `active 2097 · draft 760 · archived 11 · superseded 4 ·
+open 2` = 2874.
+
+**The inversion:** the `investigating` → `open` remap put **2 notes on `open`, which is
+canonical but absent from the vault's own template enum** (`~/second-brain/templates/insight-node.md`
+declares `draft | active | superseded | archived`). So the same dialect gap now exists in the
+opposite direction — the vault's template does not know a value its corpus carries. `draft`
+(760) remains the standing gap the entry named as precedent rather than subject, and
+`preliminary` has **0** notes.
+
+See also entry 32 and the plugin spec's marker section: the `closed` → `archived` half of this
+remap **deviated from the criterion the migration itself applied**, affecting 11 notes.
+
+### 9. `check-prose-paths.sh` scope excludes two files that name repo paths — CLOSED
+
+Closed by `fix/post-merge-hardening`. Both `session-orient` files are now in `SCOPE`.
+
+**Its re-derive command was not merely stale but INVERTED** — it declared
+`# 0 — neither is listed`, and the measured answer is 2.
+
+```bash
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh \
+  | grep -c session-orient    # 2
+```
+
+### 14. `fence-isolation.test.sh` uses a fixed temp path — CLOSED
+
+Closed by `fix/post-merge-hardening`, using the digit-free unique-path remedy. The entry cited
+line 50; the fix is at line 56 and the content differs, so anchor on the phrase.
+
+```bash
+/usr/bin/grep -n 'WORK=' reference/test/fence-isolation.test.sh   # unique per-process path
+```
+
+### 17. `session-orient.sh` counts open notes recursively but their total non-recursively — CLOSED
+
+Closed by `fix/post-merge-hardening`: both `OBS_TOTAL` and `TENS_TOTAL` now use
+`find -H … -type f -name '*.md'`, which recurses, so the two halves agree.
+
+**This does not close entry 28**, which is about test coverage *of* this fix and remains open —
+the two are easily conflated because they name the same variable.
+
+```bash
+/usr/bin/grep -n 'OBS_TOTAL=\|TENS_TOTAL=' hooks/scripts/session-orient.sh   # both find -H
 ```
