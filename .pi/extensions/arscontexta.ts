@@ -10,8 +10,9 @@ const packageRoot = resolve(extensionDir, "../..");
 const skillsDir = resolve(packageRoot, "skills");
 
 /**
- * Registers this plugin's skills/ directory with Pi so the /arscontexta:*
- * commands resolve.
+ * Registers this plugin's skills/ directory with Pi so the plugin's skills
+ * become available. The exact invocation syntax Pi uses to run one is
+ * host-specific and unverified.
  *
  * Deliberately absent: the session_start / session_compact / agent_end flag
  * dance, the bootstrap cache, and the compactionSummary insert-index walk that

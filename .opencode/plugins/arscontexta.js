@@ -1,8 +1,9 @@
 /**
  * arscontexta plugin for OpenCode.ai
  *
- * Registers this plugin's skills/ directory with OpenCode so the
- * /arscontexta:* commands resolve. That is the whole job.
+ * Registers this plugin's skills/ directory with OpenCode so the plugin's
+ * skills become available. That is the whole job — the exact invocation
+ * syntax OpenCode uses to run one is host-specific and unverified.
  *
  * Deliberately absent: bootstrap injection. obra/superpowers injects its
  * using-superpowers skill into every session because nothing may happen

@@ -36,4 +36,6 @@ grep -rln 'Task tool\|subagent\|Agent tool' skills/     # expect no output, rc 1
 ## Unverified
 
 The `AskUserQuestion` absence is believed rather than measured. Confirm against
-Pi's `ExtensionAPI` surface and correct this file if it is wrong.
+Pi's `ExtensionAPI` surface and correct this file if it is wrong. The
+`/skill:<name>` invocation syntax above is likewise unverified against a
+running Pi session.

@@ -28,4 +28,6 @@ are less constrained.
 This mapping is derived from OpenCode's documented tool names, and the
 `AskUserQuestion` absence is believed rather than measured — the convention this
 file mirrors ships no OpenCode tool-mapping document at all. Confirm against
-OpenCode's own tool surface and correct this file if it is wrong.
+OpenCode's own tool surface and correct this file if it is wrong. The exact
+syntax for invoking a loaded skill (bare name vs. a namespaced form) is
+likewise unverified.

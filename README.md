@@ -43,8 +43,9 @@ No templates. No configuration. Just conversation.
 ## Other hosts
 
 The plugin's commands are also installable on Codex, OpenCode and Pi. Each host
-registers this repo's `skills/` directory; the commands are then invoked the
-same way.
+registers this repo's `skills/` directory, making the same ten skills
+available; the exact invocation syntax is host-specific and unverified until
+the adapter is run.
 
 | Host | Adapter | Install | Tool mapping | Verified |
 |---|---|---|---|---|
