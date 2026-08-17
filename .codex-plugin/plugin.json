@@ -1,0 +1,41 @@
+{
+  "name": "arscontexta",
+  "version": "0.9.9",
+  "description": "Conversational derivation engine — generate an agent-native memory architecture from natural conversation.",
+  "author": {
+    "name": "Heinrich",
+    "url": "https://arscontexta.org"
+  },
+  "homepage": "https://arscontexta.org",
+  "repository": "https://github.com/agenticnotetaking/arscontexta",
+  "license": "MIT",
+  "keywords": [
+    "knowledge-management",
+    "tools-for-thought",
+    "memory-system",
+    "derivation",
+    "cognitive-architecture",
+    "agent-native",
+    "zettelkasten",
+    "knowledge-graph"
+  ],
+  "skills": "./skills/",
+  "hooks": {},
+  "interface": {
+    "displayName": "Ars Contexta",
+    "shortDescription": "Derive a knowledge system your agent operates, maintains, and grows",
+    "longDescription": "Ars Contexta derives a complete knowledge system through conversation — a structured markdown memory your agent reads, writes, and maintains across sessions. It generates the vault, its skills, its schema, and its maintenance loop, then validates the result against a kernel of research-backed primitives.",
+    "developerName": "Heinrich",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Set up my knowledge system.",
+      "What needs fixing in my vault?"
+    ],
+    "websiteURL": "https://arscontexta.org"
+  }
+}
