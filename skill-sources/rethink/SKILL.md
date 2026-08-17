@@ -326,7 +326,43 @@ After user confirmation, apply all dispositions in order:
    and re-reviewing something whose blocker has not moved is exactly the routing defect it causes.
 3. Revisit when the blocker clears: `blocked` is a live state, not an archive.
 
-**Update MOCs:** After triage execution, update `ops/observations.md` and `ops/tensions.md` to reflect status changes. Move entries between Pending/Promoted/Blocked/Archived/Resolved/Dissolved sections as appropriate.
+**Rebuild MOCs:** After triage execution, rebuild `ops/observations.md` and
+`ops/tensions.md` from frontmatter. The rebuild is idempotent and authoritative on
+membership, links and counts; existing summaries are preserved. **Do not move entries by
+hand** — they will be regenerated, and a hand-move cannot correct a status that changed
+outside this run, which is how the MOC diverged three times.
+
+```bash
+MOC_LIB="ops/lib/moc-sync.sh"
+FM_LIB="ops/lib/frontmatter.sh"
+for lib in "$MOC_LIB" "$FM_LIB"; do
+  if [ ! -r "$lib" ]; then
+    echo "error: library not found at '$lib'" >&2
+    echo "       run /arscontexta:upgrade to restore it" >&2
+    exit 1
+  fi
+done
+. "$FM_LIB"
+. "$MOC_LIB"
+
+if [ "${MOC_SYNC_VERSION:-0}" -lt 1 ]; then
+  echo "error: ops/lib/moc-sync.sh is older than this skill requires (need >= 1, have ${MOC_SYNC_VERSION:-none})" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# THE MAP IS ONE QUOTED ARGUMENT. Unquoted, zsh passes the whole string as a single
+# argument, only the first pair is honoured, and every non-open note is silently
+# dropped at rc 0 — on the user-facing path, under the shell half of real users run.
+rc=0
+rebuild_status_moc ops/observations.md ops/observations "$MOC_MAP_OBSERVATIONS" || rc=1
+rebuild_status_moc ops/tensions.md     ops/tensions     "$MOC_MAP_TENSIONS"     || rc=1
+if [ "$rc" -ne 0 ]; then
+  echo "error: MOC rebuild failed; the MOCs are unchanged and still reflect the pre-triage state" >&2
+  exit 1
+fi
+echo "MOCs rebuilt from frontmatter. Unplaceable notes, if any, are reported above."
+```
 
 ---
 
