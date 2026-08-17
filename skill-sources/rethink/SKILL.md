@@ -314,7 +314,7 @@ After user confirmation, apply all dispositions in order:
 **For PROMOTE items:**
 
 **If no approval channel is available:** do not perform this act. Append the item to
-`ops/rethink/pending.yaml` per Phase 1e and leave the source observation/tension at its
+`ops/rethink/pending.yaml` per Phase 1e with `act: promote`, and leave the source observation/tension at its
 current status — a status claiming an act that did not happen is worse than a pending one,
 because nothing downstream can tell the difference.
 
@@ -326,7 +326,7 @@ because nothing downstream can tell the difference.
 **For IMPLEMENT items:**
 
 **If no approval channel is available:** do not perform this act. Append the item to
-`ops/rethink/pending.yaml` per Phase 1e and leave the source observation/tension at its
+`ops/rethink/pending.yaml` per Phase 1e with `act: implement`, and leave the source observation/tension at its
 current status — a status claiming an act that did not happen is worse than a pending one,
 because nothing downstream can tell the difference.
 
@@ -337,7 +337,7 @@ because nothing downstream can tell the difference.
 **For METHODOLOGY items:** (see Phase 2 below)
 
 **If no approval channel is available:** do not perform this act. Append the item to
-`ops/rethink/pending.yaml` per Phase 1e and leave the source observation/tension at its
+`ops/rethink/pending.yaml` per Phase 1e with `act: methodology`, and leave the source observation/tension at its
 current status — a status claiming an act that did not happen is worse than a pending one,
 because nothing downstream can tell the difference.
 
@@ -444,12 +444,13 @@ Write **one `queue_yaml` call per item**, each carrying the fields above. A zero
 `--where` fails loud rather than silently writing nothing — that silence is what left seven
 fences dead for a month.
 
-**Then report and exit 0. Do not wait.**
+**Then CONTINUE to Phase 2. Phase 1e persists and moves on; it does NOT end the run.**
 
-```
-Pending acts and proposals: [count] written to ops/rethink/pending.yaml
-Resume with: /rethink approve
-```
+Termination belongs only at the Phase 5 proposal gate, which is the last decision the run
+makes. Ending the run here would make that gate's no-channel branch — and the `**Pending:**`
+line in the session log, which is written *after* rethink completes — unreachable in exactly
+the no-channel case this phase exists to serve. Carry the count forward; it is reported once,
+at the end, together with any proposals deferred later in the same run.
 
 ---
 
@@ -685,8 +686,16 @@ If 10+ pending or open observations or 5+ pending or open tensions remain after 
 **If an approval channel is available,** use AskUserQuestion: "Which proposals should I implement? (all / none / list numbers, e.g. '1, 3'). You can also ask me to modify a proposal before deciding."
 
 **If no approval channel is available,** write each proposal to `ops/rethink/pending.yaml` per
-Phase 1e with `act: proposal` and `status: awaiting_approval`, report the count, and exit 0 —
-do not wait. This does not weaken "Auto-implement system changes — proposals require human
+Phase 1e with `act: proposal` and `status: awaiting_approval`, then report and exit 0 — do not
+wait. **This is the only place the run terminates without a channel**, and the count it reports
+covers everything written to the artifact this run, including the acts Phase 1e deferred
+earlier:
+
+```
+Pending acts and proposals: [count] written to ops/rethink/pending.yaml
+Resume with: /rethink approve
+```
+ This does not weaken "Auto-implement system changes — proposals require human
 approval, always": a *persisted* proposal is not an implemented one. The approval still
 happens, in a separate invocation that reads the artifact instead of re-deriving it.
 
