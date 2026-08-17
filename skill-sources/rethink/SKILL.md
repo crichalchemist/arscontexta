@@ -695,7 +695,8 @@ earlier:
 Pending acts and proposals: [count] written to ops/rethink/pending.yaml
 Resume with: /rethink approve
 ```
- This does not weaken "Auto-implement system changes — proposals require human
+
+This does not weaken "Auto-implement system changes — proposals require human
 approval, always": a *persisted* proposal is not an implemented one. The approval still
 happens, in a separate invocation that reads the artifact instead of re-deriving it.
 
