@@ -46,8 +46,8 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verification
 
-There are seventeen executable checks. Fifteen run in CI (`.github/workflows/checks.yml`) on every push.
-Three defects shipped here were bash/zsh forks, so **the ten test suites each run under both
+There are eighteen executable checks. Sixteen run in CI (`.github/workflows/checks.yml`) on every push.
+Three defects shipped here were bash/zsh forks, so **the eleven test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
 harness rather than its subject.
@@ -70,6 +70,7 @@ for s in bash zsh; do
   $s reference/test/hook-config.test.sh                  # 60/60
   $s reference/test/vocabulary-schema.test.sh            # 12/12
   $s reference/test/queue-edit.test.sh                   # 77/77
+  $s reference/test/moc-sync.test.sh                     # 68/68
 done
 ```
 
@@ -88,9 +89,9 @@ never named it.** `LINK_EXTRACTION_VERSION` (4) and `FRONTMATTER_VERSION` (3) ar
 versions this file already tracks; this is the third, added for the ported YAML write path the
 paragraph above describes. Seven fences across five `skill-sources/` templates (`next` ×3, `reduce`,
 `reflect`, `reweave`, `verify`) guard `[ "$QUEUE_EDIT_VERSION" -lt 2 ]` before calling `queue_yaml`.
-`skills/health` checks all three libraries through one shared `check_lib` helper whose floors are
+`skills/health` checks all four libraries through one shared `check_lib` helper whose floors are
 per-library and derived from the consumers' own guards — queue-edit 2, link-extraction 4,
-frontmatter 1. That REVERSES the ruling this paragraph used to record ("THE FLOOR IS 1 AND STAYS
+frontmatter 1, moc-sync 1. That REVERSES the ruling this paragraph used to record ("THE FLOOR IS 1 AND STAYS
 1", a task-12a reviewer ruling): the final whole-branch review measured that ruling against the
 floors this same branch raised and found `/health` vouching at 1 for libraries the skills refuse
 to run below 2 and 4 — a vault on queue-edit v1 had every queue write exiting 1 while Category 9
@@ -110,7 +111,7 @@ write fails at run time.
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 71 sites across 25 files** — 71 matching lines carrying 71 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 71 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 72 sites across 26 files** — 72 matching lines carrying 72 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 71 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line this file already named as an open instance. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given; and (assertion M) `mechanically_compare` substituting the installed side as well as the canonical side, which silently launders a real divergence into false agreement — caught via a fixture built on the real `topic_map`/`hub` vocabulary collision, the specific pair that makes symmetric substitution wrong |
@@ -122,6 +123,7 @@ write fails at run time.
 | `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
 | `check-doc-claims.sh` | a number a document DECLARES going stale — including on MERGE, where nothing in a working tree changes and there is no diff to notice. Also the only gate reading `generators/`: the note `status` enum is declared **four times across three files** (`schema.md` declares it twice, once in a table and once in `_schema`), and a file-to-file comparison cannot see those two disagree — the blind spot `bump-version.test.sh` exists for, one tree over. It compares the VALUE SET, never the text, because the same enum is legitimately spelled three ways. It also checks the tension enum against its three consumers, which is the half that is checkable for an enum declared only once: a recipe matching a value the enum dropped returns 0 forever. **What it cannot cover:** the observation enum, declared once with no consumer inside `generators/` — its consumer is the SessionStart hook, in another tree. Declaration counts are PINNED, because discovery keys on an anchor value and a declaration that drops the anchor stops being discovered; three survivors agreeing would otherwise read PASS |
 | `queue-edit.test.sh` | the only gate that executes `reference/lib/queue-edit.sh` — a shared library with seven consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing; and that a failed commit-step rename returns 1, discards its temp, and names the path — see the paragraph above the table. Since v2 (task 12a) it also pins the ported YAML write path: `queue_edit` refuses a `.yaml` target naming `queue_yaml` as the remedy, and `queue_yaml` edits surgically (one changed line, folded scalars untouched), fails loud on a zero-match `--where` — the silence that left seven fences dead for a month — and shares the same lock and guarded-rename contract |
+| `moc-sync.test.sh` | the only gate that executes `reference/lib/moc-sync.sh` — a derivation whose failure mode is a *plausible* MOC: correct headings above silently missing notes. It pins all four unplaceable-note reports (entry whose note is gone, unreadable status, off-map status, divergent summary — the field vault holds 16 notes that any one of the three competing section maps would have dropped), that a divergent summary survives byte-identical (~40 entries would otherwise be destroyed), that a render failure leaves the target intact rather than replacing it with a header at rc 0, and idempotence in BOTH senses — byte-identical consecutive runs, and an identical body from reordered input, which a "preserve order and append" implementation passes on the first and fails on the second. It also pins the report-once guard against a map whose statuses share a section name, the case where guarding on the section NAME rather than the iteration index reports every unplaceable note once per colliding section |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
@@ -172,8 +174,8 @@ user has.
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
-it to 0, and the block exits 0 with a plausible number. It extracts 78 fences from 27 files,
-substitutes vocabulary placeholders, and runs 75 of them standalone against a healthy fixture and a
+it to 0, and the block exits 0 with a plausible number. It extracts 80 fences from 27 files,
+substitutes vocabulary placeholders, and runs 77 of them standalone against a healthy fixture and a
 missing-vault fixture — printing the 3 it skips and the stated rule each fell under, because a
 silently skipped fence is the same defect class the gate exists to catch. Read the run count and the
 extracted count as two numbers: this sentence said "extracts all 75", which is the run count wearing
@@ -484,8 +486,8 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the seventeen checks above enforce — fifteen of them
-in CI, as defined by the thirty steps in `.github/workflows/checks.yml`. The other two are
+not a claim you should take on trust: it is what the eighteen checks above enforce — sixteen of them
+in CI, as defined by the thirty-two steps in `.github/workflows/checks.yml`. The other two are
 `validate-kernel.sh`, which needs a generated vault to run against, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
 three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
@@ -515,8 +517,8 @@ executable checks", "Twelve run in CI", `# 24` — sat correct in the same file.
 phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
 
 ```bash
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 17
-grep -c '^      - ' .github/workflows/checks.yml                                        # 30
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 18
+grep -c '^      - ' .github/workflows/checks.yml                                        # 32
 git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 30
 ```
 
@@ -538,9 +540,19 @@ Counting the CI steps takes the same care: `grep -c '^      - name:'` returns on
 count, because `actions/checkout` carries no `name:`. Count step *items* (`^      - `), not names:
 
 ```bash
-grep -c '^      - ' .github/workflows/checks.yml                      # 30, this tree
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 30, main — equal
-                                                                      # again as of the PR #8
+grep -c '^      - ' .github/workflows/checks.yml                      # 32, this tree
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # 30, main — 2 BEHIND
+                                                                      # again, because this
+                                                                      # branch adds the two
+                                                                      # moc-sync.test.sh steps.
+                                                                      # The main-side numeral is
+                                                                      # deliberately NOT updated:
+                                                                      # no value is green on both
+                                                                      # sides of a merge. It takes
+                                                                      # a documented post-merge
+                                                                      # correction, which is the
+                                                                      # fourth time — see below.
+                                                                      # They were equal as of the PR #8
                                                                       # merge on 2026-08-15,
                                                                       # which carried the
                                                                       # queue-edit suite's two
@@ -561,7 +573,7 @@ git show main:.github/workflows/checks.yml | grep -c '^      - '      # 30, main
                                                                       # why the gate reads it
                                                                       # rather than trusting
                                                                       # anyone to remember
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 17
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 18
 ```
 
 What follows is what remains.
@@ -1046,10 +1058,10 @@ first draft.) That is the one-rename evasion
 `check-portability.sh`'s own header describes rejecting for `--exclude`, and it was reintroduced here in
 prose before this line was fixed.
 
-Verified against the tree, not remembered: **4 hits**, and the claim worth making is what they are
-not: zero of the four are executable code that inlines a matcher inside `skill-sources/` — the
+Verified against the tree, not remembered: **7 hits**, and the claim worth making is what they are
+not: zero of the seven are executable code that inlines a matcher inside `skill-sources/` — the
 governed property above holds, and holds more tightly than the `9 = 7 + 2` split this entry used to
-publish. The decomposition is `4 = 2 + 1 + 1`, not a bare total:
+publish. The decomposition is `7 = 2 + 1 + 1 + 3`, not a bare total:
 
 | Site | Role | Why it survives |
 |---|---|---|
@@ -1057,6 +1069,13 @@ publish. The decomposition is `4 = 2 + 1 + 1`, not a bare total:
 | `skill-sources/graph/SKILL.md:794` | documentation-table row | same table, `rg '^source:.*\[\[X\]\]'` |
 | `skills/health/SKILL.md:661` | shape matcher | `rg '^\s*- \[\[' \| grep -v ' — '` — takes no note title at all; carries `portability-exempt` |
 | `reference/testing-milestones.md:425` | test spec | `grep -rl "\[\[$TITLE\]\]"` — a test SPEC's own worked example, not shipped code |
+| `reference/test/moc-sync.test.sh` ×3 | assertion on rendered output | fixed-name greps for `[[broken-note]]`, `[[orphan-note]]` and `[[deleted-note]]`, each asserting a note is **not** placed in a MOC the suite just rendered. They match a literal slug the same file wrote, interpolate nothing, and read a `$BODY` string rather than selecting notes from a vault |
+
+**Those last three arrived with `moc-sync.test.sh` and took this count from 4 to 7 — recorded as a
+decomposition rather than a corrected total, because that is what the rest of this entry is about.**
+They do not weaken the governed property, which is scoped to *executable code in `skill-sources/`*:
+they are test assertions in `reference/test/`. The gated numeral moved, so the gate caught it; the
+property did not.
 
 Two are documentation-table rows, never executable at all. One interpolates nothing, so it was never
 a check-6 candidate — a matcher with no `$` after `\[\[` regexes nothing but its own literal text. The
@@ -1156,7 +1175,7 @@ class.** The distinguishing property is the *capture*: this class extracts a tar
 `([^\]|#]+)' -r '$1'`. A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which
 is a link **count**, a different operation with none of the per-target problem this entry describes.
 Two such sites exist (`skill-sources/graph/SKILL.md:552`, `skill-sources/stats/SKILL.md:386`), so
-`2 = 0 + 2`. **Divergence 12 now publishes `4 = 2 + 1 + 1` for a different set** — there the residue
+`2 = 0 + 2`. **Divergence 12 now publishes `7 = 2 + 1 + 1 + 3` for a different set** — there the residue
 is two documentation-table rows, a non-interpolating shape matcher and a test spec's worked example;
 here it is only the bracket counters, a different operation entirely. Same "publish the
 decomposition" idiom, different subject; do not merge them. Match the capture, not the brackets:

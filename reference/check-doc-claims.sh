@@ -271,6 +271,13 @@ word2num() {
         twenty-four) echo 24;; twenty-five) echo 25;; twenty-six) echo 26;;
         twenty-seven) echo 27;; twenty-eight) echo 28;; twenty-nine) echo 29;;
         thirty) echo 30;;
+        # The thirties, filled in one go when the CI step count crossed 30, matching
+        # how the twenties were filled rather than adding the single word in use. The
+        # decade costs nine lines once; adding them one at a time costs an rc-2 ERROR
+        # and a second commit every time a step is added.
+        thirty-one) echo 31;; thirty-two) echo 32;; thirty-three) echo 33;;
+        thirty-four) echo 34;; thirty-five) echo 35;; thirty-six) echo 36;;
+        thirty-seven) echo 37;; thirty-eight) echo 38;; thirty-nine) echo 39;;
         *) return 1;;
     esac
 }

@@ -17,7 +17,7 @@
 # an unanchored or double-quoted equivalent, or an inlined copy of
 # link-extraction.sh, which remains convention only.
 #
-# It is born red at 71 allowlisted sites, so a green run means "no NEW
+# It is born red at 72 allowlisted sites, so a green run means "no NEW
 # hand-rolled parse", not "none exists". (That phrase is on ONE line on purpose:
 # check-doc-claims gates the number, and a sed anchor cannot span a hard wrap.) The residue is owned by the CI-hardening spec. That 71 is GATED — see
 # the check-7 rows in check-doc-claims.sh, which read this file too; the number
