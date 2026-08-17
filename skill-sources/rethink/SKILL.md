@@ -289,24 +289,57 @@ Present the full triage to the user before executing any changes:
 
 Use AskUserQuestion: "Review the triage above. Approve all, or list items to reclassify (e.g., 'keep obs-003 pending, promote obs-007 instead')."
 
-**Wait for user confirmation before proceeding to 1d.** Do not execute triage without approval.
+**If an approval channel is available, wait for confirmation before proceeding to 1d.**
+
+**If no approval channel is available** (subagent execution, where `AskUserQuestion` cannot
+be used), proceed under the split below rather than stalling. A run that generates a triage
+and then stops has produced nothing a later invocation can act on, which is how 21+
+proposals accumulated across three runs.
+
+| Act | Branches | Without a channel |
+|---|---|---|
+| frontmatter status edit | ARCHIVE, KEEP PENDING, **BLOCKED** | **proceed** — reversible, recorded in the note's own history |
+| note creation | PROMOTE step 1 | **defer** to the pending artifact |
+| file/section modification | IMPLEMENT step 1 | **defer** to the pending artifact |
+| methodology elevation | METHODOLOGY | **defer** to the pending artifact |
+
+All six `1d` branches appear in this table. Deferring is not skipping: the item is persisted
+with its full disposition and reasoning, so the approval invocation need not re-derive the
+triage.
 
 ### 1d. Execute Triage
 
 After user confirmation, apply all dispositions in order:
 
 **For PROMOTE items:**
+
+**If no approval channel is available:** do not perform this act. Append the item to
+`ops/rethink/pending.yaml` per Phase 1e and leave the source observation/tension at its
+current status — a status claiming an act that did not happen is worse than a pending one,
+because nothing downstream can tell the difference.
+
 1. Create {DOMAIN:note} with prose-as-title in {vocabulary.notes}/
 2. Follow standard note schema: YAML frontmatter (description, type, created), body developing the insight, Topics footer linking to relevant {vocabulary.topic_map}(s)
 3. The observation content becomes the seed for the note body — but develop it fully, do not just copy the observation
 4. Update the observation: set `status: promoted`, add `promoted_to: [[note title]]`
 
 **For IMPLEMENT items:**
+
+**If no approval channel is available:** do not perform this act. Append the item to
+`ops/rethink/pending.yaml` per Phase 1e and leave the source observation/tension at its
+current status — a status claiming an act that did not happen is worse than a pending one,
+because nothing downstream can tell the difference.
+
 1. Make the specific change to the identified file/section
 2. Show the change to the user (before/after) and get confirmation if the change is non-trivial
 3. Update the observation/tension: set `status: implemented`, add `implemented_in: [filepath]`
 
 **For METHODOLOGY items:** (see Phase 2 below)
+
+**If no approval channel is available:** do not perform this act. Append the item to
+`ops/rethink/pending.yaml` per Phase 1e and leave the source observation/tension at its
+current status — a status claiming an act that did not happen is worse than a pending one,
+because nothing downstream can tell the difference.
 
 **For ARCHIVE items:**
 1. Update observation status: `status: archived`, and add `archived_reason: [why]` in the SAME edit.
