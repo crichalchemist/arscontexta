@@ -67,5 +67,67 @@ for s in open blocked implemented promoted archived dissolved resolved; do
   ok "tensions map places '$s'" "0" "$?"
 done
 
+# --- fixture --------------------------------------------------------------
+FIX=$(mktemp -d)
+trap 'rm -rf "$FIX"' EXIT
+mkdir -p "$FIX/observations"
+
+mknote() { # mknote <slug> <status> <description>
+  printf -- '---\ndescription: %s\ntype: observation\nstatus: %s\n---\n\nbody\n' \
+    "$3" "$2" > "$FIX/observations/$1.md"
+}
+mknote zebra-note   open        "Zebra description here"
+mknote alpha-note   open        "Alpha description here"
+mknote middle-note  implemented "Middle description here"
+
+cat > "$FIX/observations.md" <<'EOF'
+# Observations
+
+## Open (1)
+- [[alpha-note]] — Alpha description here
+- [[zebra-note]] — Zebra description that was EDITED
+EOF
+
+# --- moc_harvest_entries --------------------------------------------------
+ok "harvest finds both entries" "2" "$(moc_harvest_entries "$FIX/observations.md" | /usr/bin/grep -c .)"
+ok "harvest carries the prose" "Zebra description that was EDITED" \
+   "$(moc_harvest_entries "$FIX/observations.md" | /usr/bin/awk -F'\t' '$1=="zebra-note"{print $2}')"
+# PAIRED WITH A POSITIVE: an empty-expectation assertion passes when the function does
+# not exist, so on its own it certifies nothing.
+ok "harvest of a missing file is empty" "" "$(moc_harvest_entries "$FIX/nope.md" 2>/dev/null)"
+moc_harvest_entries "$FIX/nope.md" >/dev/null 2>&1; ok "harvest of a missing file is rc 0" "0" "$?"
+
+# --- moc_render -----------------------------------------------------------
+BODY=$(MOC_SYNC_EXISTING="$FIX/observations.md" moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>/dev/null)
+
+ok "Open heading counts 2" "## Open (2)" "$(printf '%s\n' "$BODY" | /usr/bin/grep -m1 '^## Open')"
+ok "Implemented heading counts 1" "## Implemented (1)" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/grep -m1 '^## Implemented')"
+
+# ORDER IS ASCENDING BY FILENAME (spec Decision 12).
+ok "entries sort by filename" "alpha-note zebra-note" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/awk '/^## Open/{f=1;next} /^## /{f=0} f&&/^- \[\[/' \
+      | /usr/bin/sed 's/^- \[\[//; s/\]\].*//' | /usr/bin/tr '\n' ' ' | /usr/bin/sed 's/ $//')"
+
+ok "existing prose is carried forward" "Zebra description that was EDITED" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/sed -n 's/^- \[\[zebra-note\]\] — //p')"
+ok "new entry is seeded from description" "Middle description here" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/sed -n 's/^- \[\[middle-note\]\] — //p')"
+
+# EVERY MAPPED SECTION IS EMITTED, even at zero: an absent section cannot be
+# distinguished from "no notes have that status".
+ok "empty sections are emitted at 0" "## Dissolved (0)" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/grep -m1 '^## Dissolved')"
+
+# ZSH GUARD: an uninitialised in-loop `local` prints `x=value` into stdout. Assert the
+# rendered body contains no such line — this is the only assertion that catches it, and
+# it catches it in the output rather than in a shell-version check.
+ok "render emits no stray variable lines" "0" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/grep -cE '^[a-z_]+=')"
+
+# A bad directory is rc 1 and prints an error.
+moc_render "$FIX/no-such-dir" "$MOC_MAP_OBSERVATIONS" >/dev/null 2>&1
+ok "bad notes-dir is rc 1" "1" "$?"
+
 printf '\nmoc-sync: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

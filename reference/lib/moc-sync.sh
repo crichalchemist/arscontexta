@@ -72,3 +72,82 @@ $(_moc_each_pair "$map")
 EOF
   return 2
 }
+
+# moc_harvest_entries <moc-file> -> "slug<TAB>summary" per entry, file order.
+# A missing file is not an error: a vault whose MOC does not exist yet is a legitimate
+# first-run state, and the rebuild creates it.
+moc_harvest_entries() {
+  local file="$1"
+  [ -r "$file" ] || return 0
+  /usr/bin/awk '
+    match($0, /^[[:space:]]*-[[:space:]]*\[\[[^]|#]+\]\]/) {
+      line = $0
+      slug = line
+      sub(/^[[:space:]]*-[[:space:]]*\[\[/, "", slug)
+      sub(/\]\].*$/, "", slug)
+      rest = line
+      sub(/^[^]]*\]\][[:space:]]*/, "", rest)
+      sub(/^(—|--)[[:space:]]*/, "", rest)
+      printf "%s\t%s\n", slug, rest
+    }
+  ' "$file"
+}
+
+# moc_render <notes-dir> <map-string> -> the MOC body on stdout.
+#
+# Pure with respect to files: writes nothing, so a caller can inspect a candidate render
+# before committing to it. rc 1 on a bad directory — rebuild_status_moc DEPENDS on that rc
+# and its first draft ignored it, which destroyed the MOC at rc 0.
+#
+# Every `local` below that lives inside a loop carries an initialiser. Under zsh a bare
+# re-declaration prints `name=value` on stdout, i.e. into the MOC.
+moc_render() {
+  local dir="$1" map="$2"
+  if [ ! -d "$dir" ]; then
+    echo "error: moc-sync: not a directory: '$dir'" >&2
+    return 1
+  fi
+  if [ -z "$map" ]; then
+    echo "error: moc-sync: moc_render needs <notes-dir> <map-string>" >&2
+    return 1
+  fi
+
+  local existing="${MOC_SYNC_EXISTING:-}" harvest=""
+  [ -n "$existing" ] && harvest=$(moc_harvest_entries "$existing")
+
+  local notes="" pair="" sec="" st_want="" note="" st="" slug="" desc="" summary="" lines="" count=0
+  notes=$(LC_ALL=C find -H "$dir" -type f -name '*.md' 2>/dev/null | LC_ALL=C sort)
+
+  while IFS= read -r pair; do
+    [ -n "$pair" ] || continue
+    st_want="${pair%%:*}"
+    sec="${pair#*:}"
+    lines=""
+    count=0
+
+    while IFS= read -r note; do
+      [ -n "$note" ] || continue
+      st=$(frontmatter_field "$note" status 2>/dev/null)
+      [ "$st" = "$st_want" ] || continue
+      slug=$(basename "$note" .md)
+
+      summary=$(printf '%s\n' "$harvest" | /usr/bin/awk -F'\t' -v s="$slug" '$1==s{print $2; exit}')
+      if [ -z "$summary" ]; then
+        desc=$(frontmatter_field "$note" description 2>/dev/null)
+        summary="$desc"
+      fi
+      lines="${lines}- [[${slug}]] — ${summary}
+"
+      count=$((count + 1))
+    done <<INNER
+$notes
+INNER
+
+    printf '## %s (%d)\n' "$sec" "$count"
+    [ "$count" -gt 0 ] && printf '%s' "$lines"
+    printf '\n'
+  done <<OUTER
+$(_moc_each_pair "$map")
+OUTER
+  return 0
+}
