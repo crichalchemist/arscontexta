@@ -119,14 +119,19 @@ moc_render() {
   notes=$(LC_ALL=C find -H "$dir" -type f -name '*.md' 2>/dev/null | LC_ALL=C sort)
 
   # The outer loop visits EVERY note once per section, so an unguarded report fires 4x for
-  # observations and 7x for tensions. Each report is guarded on the first section so it
+  # observations and 7x for tensions. Each report is guarded to the FIRST ITERATION so it
   # fires exactly once per note.
-  local first_sec="" placed_slugs=""
-  first_sec=$(_moc_each_pair "$map" | /usr/bin/sed -n 1p)
-  first_sec="${first_sec#*:}"
+  #
+  # GUARDED ON THE ITERATION INDEX, NOT ON THE SECTION NAME. Comparing `$sec` against the
+  # first pair's section is correct only while every status maps to a DISTINCT section — an
+  # invariant the two pinned maps happen to satisfy and nothing states or enforces. Hand
+  # this function `open:Everything implemented:Everything` and the name compare is true on
+  # two iterations, so every unplaceable note is reported twice. An index cannot collide.
+  local sec_index=0 placed_slugs=""
 
   while IFS= read -r pair; do
     [ -n "$pair" ] || continue
+    sec_index=$((sec_index + 1))
     st_want="${pair%%:*}"
     sec="${pair#*:}"
     lines=""
@@ -139,13 +144,13 @@ moc_render() {
       # Rule 3(b): the note EXISTS but its status cannot be read — frontmatter.sh treats an
       # unclosed block as no frontmatter. "The note is gone" cannot catch this case.
       if [ -z "$st" ]; then
-        [ "$sec" = "$first_sec" ] && \
+        [ "$sec_index" -eq 1 ] && \
           echo "warn: moc-sync: note has no readable status, not placed: $note" >&2
         continue
       fi
       # Rule 3(c) / rule 6: status readable but off-map. Reported rather than guessed at.
       if ! moc_section_for "$st" "$map" >/dev/null 2>&1; then
-        [ "$sec" = "$first_sec" ] && \
+        [ "$sec_index" -eq 1 ] && \
           echo "warn: moc-sync: status '$st' maps to no section, not placed: $(basename "$note" .md)" >&2
         continue
       fi
@@ -166,10 +171,18 @@ moc_render() {
         local a="" b=""
         a=$(printf '%s' "$summary" | /usr/bin/tr -d '\r' | /usr/bin/sed 's/[.… ]*$//')
         b=$(printf '%s' "$desc"    | /usr/bin/tr -d '\r' | /usr/bin/sed 's/[.… ]*$//')
-        case "$b" in
-          "$a"*) : ;;
-          *) echo "warn: moc-sync: summary not derivable from current frontmatter: $slug" >&2 ;;
-        esac
+        if [ -z "$a" ]; then
+          # A summary that normalises to NOTHING is derivable from no description at all,
+          # and must not fall through to the prefix compare: `case "$b" in ""*)` is the
+          # glob `*`, which matches every description and silently suppresses the warning.
+          # Silent suppression of a report is the failure class this library exists to end.
+          echo "warn: moc-sync: summary not derivable from current frontmatter: $slug" >&2
+        else
+          case "$b" in
+            "$a"*) : ;;
+            *) echo "warn: moc-sync: summary not derivable from current frontmatter: $slug" >&2 ;;
+          esac
+        fi
       fi
       lines="${lines}- [[${slug}]] — ${summary}
 "

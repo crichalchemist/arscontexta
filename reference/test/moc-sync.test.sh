@@ -246,5 +246,43 @@ ok "no temp survives beside the target" "0" \
 ok "no lock survives beside the target" "0" \
    "$(find "$FIX" -maxdepth 1 -name 'observations.md.lock' | /usr/bin/grep -c .)"
 
+# --- report-once must not depend on section names being distinct -----------
+# The report guard fires on the FIRST ITERATION, not on `$sec` matching the first pair's
+# section. A map whose statuses share one section name makes the name compare true on
+# several iterations, so a name-guarded implementation reports every unplaceable note once
+# PER COLLIDING SECTION. Both pinned maps happen to have distinct names, so nothing else
+# in this suite can see the difference.
+MAP_COLLIDE="open:Everything implemented:Everything archived:Everything"
+mkdir -p "$FIX/collide"
+printf -- '---\ndescription: Off map\ntype: observation\nstatus: superseded\n---\n\nbody\n' \
+  > "$FIX/collide/collide-note.md"
+printf -- '---\ndescription: No close\nstatus: open\n\nbody\n' > "$FIX/collide/collide-broken.md"
+moc_render "$FIX/collide" "$MAP_COLLIDE" >/dev/null 2>"$ERRF"
+ok "off-map reported once under a colliding map" "1" \
+   "$(/usr/bin/grep -c 'maps to no section' "$ERRF")"
+ok "unreadable reported once under a colliding map" "1" \
+   "$(/usr/bin/grep -c 'no readable status' "$ERRF")"
+# PAIRED POSITIVE: prove the colliding map really does iterate 3 times, so the two
+# assertions above are counting a de-duplicated report rather than a map that never ran.
+ok "colliding map really emits 3 sections" "3" \
+   "$(moc_render "$FIX/collide" "$MAP_COLLIDE" 2>/dev/null | /usr/bin/grep -c '^## Everything')"
+
+# --- a summary that normalises to nothing must still warn ------------------
+# `a` is the summary with trailing [.… ] stripped. When that leaves the empty string,
+# `case "$b" in ""*)` is the glob `*` and matches EVERY description, silently suppressing
+# a warning for an entry that no description can derive.
+mknote punct-note open "A real description"
+cat > "$FIX/punct.md" <<'EOF'
+## Open (1)
+- [[punct-note]] — ...
+EOF
+BODY=$(MOC_SYNC_EXISTING="$FIX/punct.md" \
+       moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+ok "punctuation-only summary still warns" "1" \
+   "$(/usr/bin/grep -c 'summary not derivable from current frontmatter: punct-note' "$ERRF")"
+ok "punctuation-only summary is still preserved" "..." \
+   "$(printf '%s\n' "$BODY" | /usr/bin/sed -n 's/^- \[\[punct-note\]\] — //p')"
+rm -f "$FIX/observations/punct-note.md"
+
 printf '\nmoc-sync: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
