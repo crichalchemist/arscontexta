@@ -519,8 +519,17 @@ phrasing does not protect a synonym, and prose is where the synonyms live. Re-de
 ```bash
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 18
 grep -c '^      - ' .github/workflows/checks.yml                                        # 32
-git show main:.github/workflows/checks.yml | grep -c '^      - '                        # 30
+git show main:.github/workflows/checks.yml | grep -c '^      - '                        # NO NUMERAL
 ```
+
+**The main-side count is deliberately undeclared, and that is a fix rather than an omission.**
+Any literal here is wrong in one of the two states a merge passes through: before it, `main`
+carries the old count; after it, the same unchanged line is false, with no diff to notice and
+no signal until `main`'s own CI run goes red. It was gated, and the gate could only ever catch
+the staleness it created — the PR ran green and `main` reddened on merge, so every branch that
+touched CI owed a follow-up commit. `check-doc-claims.sh` now asserts the RELATIONSHIP instead
+(`main`'s count ≤ this tree's), which is true on both sides and still catches a branch that
+*deletes* CI steps. Run the command; do not re-mint the numeral.
 
 That third line read `# 28` until the PR #8 merge on 2026-08-15 equalised the two. It was
 missed by the same merge-day edit that corrected its twin twenty lines below — **two sites,
@@ -541,17 +550,16 @@ count, because `actions/checkout` carries no `name:`. Count step *items* (`^    
 
 ```bash
 grep -c '^      - ' .github/workflows/checks.yml                      # 32, this tree
-git show main:.github/workflows/checks.yml | grep -c '^      - '      # 30, main — 2 BEHIND
-                                                                      # again, because this
-                                                                      # branch adds the two
-                                                                      # moc-sync.test.sh steps.
-                                                                      # The main-side numeral is
-                                                                      # deliberately NOT updated:
-                                                                      # no value is green on both
-                                                                      # sides of a merge. It takes
-                                                                      # a documented post-merge
-                                                                      # correction, which is the
-                                                                      # fourth time — see below.
+git show main:.github/workflows/checks.yml | grep -c '^      - '      # NO NUMERAL — read it,
+                                                                      # do not re-mint it. This
+                                                                      # line carried one through
+                                                                      # four corrections; the
+                                                                      # fourth is what removed it.
+                                                                      # No value is green on both
+                                                                      # sides of a merge, so the
+                                                                      # gate now asserts the
+                                                                      # RELATIONSHIP (main <= this
+                                                                      # tree) rather than a count.
                                                                       # They were equal as of the PR #8
                                                                       # merge on 2026-08-15,
                                                                       # which carried the

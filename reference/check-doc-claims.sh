@@ -325,7 +325,6 @@ CONTRIBUTING.md|checks in CI (word form)|s/^\([A-Z][a-z]*\) run in CI on every p
 CLAUDE.md|check inventory (word form)|s/^There are \([a-z][a-z-]*\) executable checks\..*/\1/p|truth_check_files|
 CLAUDE.md|checks in CI (word form)|s/^There are [a-z]* executable checks\. \([A-Z][a-z]*\) run in CI.*/\1/p|truth_ci_run_checks|
 CLAUDE.md|CI step items (this branch)|s/^grep -c .\^      - . \.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps|
-CLAUDE.md|CI step items (main)|s/^git show main:\.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps_main|
 CLAUDE.md|link-extraction fence total|s/^ *\$s reference\/test\/link-extraction\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|link-extraction
 CLAUDE.md|guard-failure fence total|s/^ *\$s reference\/test\/guard-failure\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|guard-failure
 CLAUDE.md|bump-version fence total|s/^ *\$s reference\/test\/bump-version\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|bump-version
@@ -440,6 +439,43 @@ check_list_len CLAUDE.md "verification fence is complete" \
 # collapsed (8 and 9 folded into 7) or closed. Only a REPEATED number is a
 # defect, because entries are cross-referenced by number and two entries sharing
 # one makes every reference ambiguous.
+# CI STEPS NEVER REGRESS AGAINST main — A RELATIONSHIP, NOT A DECLARED NUMERAL.
+#
+# This replaces a CLAIMS row that pinned main's step count as a literal in CLAUDE.md. That
+# row was STRUCTURALLY UNSATISFIABLE ACROSS A MERGE: before the merge the document had to
+# say 30, after it 32, and nothing in any working tree changes when a branch lands — so the
+# PR ran green and main went red the moment it merged, with no diff to notice and no signal
+# until main's own CI run. Measured, not predicted: merging this branch into main and
+# running this gate produced "document says 30, tree measures 32".
+#
+# So every branch touching CI owed a follow-up commit to un-redden main. A gate that
+# manufactures its own failures trains people to ignore it, which costs more than the drift
+# it was built to catch. It also contradicted this file's own governing idiom, which
+# CLAUDE.md states a dozen times: re-derive a number, never quote one.
+#
+# The RELATIONSHIP is stable in both states — 30 <= 32 before, 32 <= 32 after — needs no
+# numeral in any document, and cannot rot. It still catches a real defect nothing else here
+# sees: a branch that DELETES CI steps. That is strictly more coverage than the numeral had,
+# since the numeral only ever detected its own staleness.
+printf '  %-18s %-30s ' ".github/" "CI steps vs main"
+_ci_tree=$(truth_ci_steps || true)
+_ci_main=$(truth_ci_steps_main || true)
+if [ -z "$_ci_tree" ]; then
+    echo "ERROR  cannot count steps in this tree's checks.yml"
+    errors=$((errors + 1))
+elif [ -z "$_ci_main" ]; then
+    # UNREACHABLE main IS A COULD-NOT-RUN, NOT A PASS. A shallow clone with no main must not
+    # read as "steps never regressed" — that is the silent-green this repo's gates exist to
+    # refuse, and truth_ci_steps_main already returns 1 rather than 0 for the same reason.
+    echo "ERROR  main unreachable — relationship UNCHECKED (not a pass)"
+    errors=$((errors + 1))
+elif [ "$_ci_main" -gt "$_ci_tree" ]; then
+    echo "MISMATCH  main has $_ci_main step(s), this tree has $_ci_tree — CI steps were removed"
+    mismatches=$((mismatches + 1))
+else
+    echo "ok     $_ci_tree here, $_ci_main on main"
+fi
+
 printf '  %-18s %-30s ' "CLAUDE.md" "divergence numbers unique"
 if [ ! -r CLAUDE.md ]; then
     echo "ERROR  CLAUDE.md not readable"; errors=$((errors + 1))
