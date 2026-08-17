@@ -129,5 +129,58 @@ ok "render emits no stray variable lines" "0" \
 moc_render "$FIX/no-such-dir" "$MOC_MAP_OBSERVATIONS" >/dev/null 2>&1
 ok "bad notes-dir is rc 1" "1" "$?"
 
+# --- rule 2: divergent summary preserved AND warned about ------------------
+ERRF="$FIX/stderr.txt"
+BODY=$(MOC_SYNC_EXISTING="$FIX/observations.md" \
+       moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+
+ok "divergent summary is preserved" "Zebra description that was EDITED" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/sed -n 's/^- \[\[zebra-note\]\] — //p')"
+ok "divergence warns exactly once" "1" "$(/usr/bin/grep -c 'summary not derivable' "$ERRF")"
+ok "the warning names the slug" "1" \
+   "$(/usr/bin/grep -c 'summary not derivable from current frontmatter: zebra-note' "$ERRF")"
+
+# THE WARNING MUST NOT CLAIM A CAUSE. "someone hand-edited this" is measurably wrong for
+# most divergent entries: 7 of the 29 divergent Implemented entries follow a second
+# derivation convention ("implemented via <target>"), the rest are stale derivations.
+# Paired with the positive assertion above so it cannot pass on absence.
+ok "warning does not assert hand-editing" "0" "$(/usr/bin/grep -ci 'hand.edit' "$ERRF")"
+ok "an agreeing summary does not warn" "0" \
+   "$(/usr/bin/grep -c 'not derivable from current frontmatter: alpha-note' "$ERRF")"
+
+# --- rule 3(b): note exists, status unreadable ----------------------------
+# frontmatter.sh treats an UNCLOSED frontmatter block as NO frontmatter. Such a note
+# EXISTS, so "the note is gone" cannot catch it.
+printf -- '---\ndescription: Unclosed\nstatus: open\n\nbody\n' > "$FIX/observations/broken-note.md"
+BODY=$(MOC_SYNC_EXISTING="$FIX/observations.md" \
+       moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+ok "unreadable status is reported" "1" "$(/usr/bin/grep -c 'no readable status' "$ERRF")"
+ok "unreadable note names the path" "1" "$(/usr/bin/grep -c 'broken-note.md' "$ERRF")"
+ok "unreadable note is NOT placed" "0" "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '\[\[broken-note\]\]')"
+rm -f "$FIX/observations/broken-note.md"
+
+# --- rule 3(c) / rule 6: status readable but off-map ----------------------
+mknote orphan-note superseded "Orphan description"
+BODY=$(MOC_SYNC_EXISTING="$FIX/observations.md" \
+       moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+ok "off-map status is reported" "1" "$(/usr/bin/grep -c 'maps to no section' "$ERRF")"
+ok "off-map report names status and slug" "1" \
+   "$(/usr/bin/grep -c "status 'superseded' maps to no section, not placed: orphan-note" "$ERRF")"
+ok "off-map note is NOT placed" "0" "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '\[\[orphan-note\]\]')"
+rm -f "$FIX/observations/orphan-note.md"
+
+# --- rule 3(a): an entry whose note is gone -------------------------------
+# Spec rule 3(a). The first draft of this plan claimed this in a commit message and
+# never implemented it.
+cat > "$FIX/gone.md" <<'EOF'
+## Open (1)
+- [[deleted-note]] — This note was deleted from disk
+EOF
+BODY=$(MOC_SYNC_EXISTING="$FIX/gone.md" \
+       moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+ok "gone entry is reported" "1" "$(/usr/bin/grep -c 'entry has no note, not removed: deleted-note' "$ERRF")"
+ok "gone entry is not silently resurrected" "0" \
+   "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '\[\[deleted-note\]\]')"
+
 printf '\nmoc-sync: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -118,6 +118,13 @@ moc_render() {
   local notes="" pair="" sec="" st_want="" note="" st="" slug="" desc="" summary="" lines="" count=0
   notes=$(LC_ALL=C find -H "$dir" -type f -name '*.md' 2>/dev/null | LC_ALL=C sort)
 
+  # The outer loop visits EVERY note once per section, so an unguarded report fires 4x for
+  # observations and 7x for tensions. Each report is guarded on the first section so it
+  # fires exactly once per note.
+  local first_sec="" placed_slugs=""
+  first_sec=$(_moc_each_pair "$map" | /usr/bin/sed -n 1p)
+  first_sec="${first_sec#*:}"
+
   while IFS= read -r pair; do
     [ -n "$pair" ] || continue
     st_want="${pair%%:*}"
@@ -128,13 +135,41 @@ moc_render() {
     while IFS= read -r note; do
       [ -n "$note" ] || continue
       st=$(frontmatter_field "$note" status 2>/dev/null)
+
+      # Rule 3(b): the note EXISTS but its status cannot be read — frontmatter.sh treats an
+      # unclosed block as no frontmatter. "The note is gone" cannot catch this case.
+      if [ -z "$st" ]; then
+        [ "$sec" = "$first_sec" ] && \
+          echo "warn: moc-sync: note has no readable status, not placed: $note" >&2
+        continue
+      fi
+      # Rule 3(c) / rule 6: status readable but off-map. Reported rather than guessed at.
+      if ! moc_section_for "$st" "$map" >/dev/null 2>&1; then
+        [ "$sec" = "$first_sec" ] && \
+          echo "warn: moc-sync: status '$st' maps to no section, not placed: $(basename "$note" .md)" >&2
+        continue
+      fi
       [ "$st" = "$st_want" ] || continue
+
       slug=$(basename "$note" .md)
+      placed_slugs="${placed_slugs}${slug}
+"
 
       summary=$(printf '%s\n' "$harvest" | /usr/bin/awk -F'\t' -v s="$slug" '$1==s{print $2; exit}')
+      desc=$(frontmatter_field "$note" description 2>/dev/null)
       if [ -z "$summary" ]; then
-        desc=$(frontmatter_field "$note" description 2>/dev/null)
         summary="$desc"
+      else
+        # Rule 2: keep the file's version; warn only when it is not derivable.
+        # NORMALISE FIRST — the live convention truncates with an ellipsis, so a raw
+        # compare would flag every correctly-derived entry.
+        local a="" b=""
+        a=$(printf '%s' "$summary" | /usr/bin/tr -d '\r' | /usr/bin/sed 's/[.… ]*$//')
+        b=$(printf '%s' "$desc"    | /usr/bin/tr -d '\r' | /usr/bin/sed 's/[.… ]*$//')
+        case "$b" in
+          "$a"*) : ;;
+          *) echo "warn: moc-sync: summary not derivable from current frontmatter: $slug" >&2 ;;
+        esac
       fi
       lines="${lines}- [[${slug}]] — ${summary}
 "
@@ -149,5 +184,21 @@ INNER
   done <<OUTER
 $(_moc_each_pair "$map")
 OUTER
+
+  # Rule 3(a): a harvested entry with no surviving note. Reported, never silently
+  # dropped: that is either a rename to fix or a deletion to record.
+  local hslug=""
+  while IFS= read -r hslug; do
+    [ -n "$hslug" ] || continue
+    case "
+$placed_slugs" in
+      *"
+$hslug
+"*) : ;;
+      *) echo "warn: moc-sync: entry has no note, not removed: $hslug" >&2 ;;
+    esac
+  done <<GONE
+$(printf '%s\n' "$harvest" | /usr/bin/awk -F'\t' 'NF{print $1}')
+GONE
   return 0
 }
