@@ -202,3 +202,70 @@ $(printf '%s\n' "$harvest" | /usr/bin/awk -F'\t' 'NF{print $1}')
 GONE
   return 0
 }
+
+# _moc_lock <file> -> prints the lock dir, rc 0; rc 1 on timeout.
+# mkdir is the atomic primitive. A BOUNDED WAIT THAT FAILS MUST NOT BREAK THE LOCK IT
+# COULD NOT TAKE — an auto-break wearing a failure message is how concurrent writers lose
+# updates. queue-edit.sh's header argues this at length; same contract.
+_moc_lock() {
+  local file="$1" lockdir="$1.lock" waited=0
+  while ! mkdir "$lockdir" 2>/dev/null; do
+    waited=$((waited + 1))
+    if [ "$waited" -ge 60 ]; then
+      echo "error: moc-sync: could not acquire lock '$lockdir' within 60s; NOT breaking it" >&2
+      return 1
+    fi
+    sleep 1
+  done
+  printf '%s\n' "$lockdir"
+}
+
+# rebuild_status_moc <moc-file> <notes-dir> <map-string>
+rebuild_status_moc() {
+  local file="$1" dir="$2" map="$3"
+  if [ -z "$file" ] || [ -z "$dir" ] || [ -z "$map" ]; then
+    echo "error: moc-sync: rebuild_status_moc needs <moc-file> <notes-dir> <map-string>" >&2
+    return 1
+  fi
+
+  local lockdir="" tmp="" body_tmp=""
+  lockdir=$(_moc_lock "$file") || return 1
+  tmp="${file}.$$.tmp"
+  body_tmp="${file}.$$.body"
+
+  # RENDER FIRST, INTO ITS OWN FILE, AND CHECK THE RC. The first draft rendered inside a
+  # brace group that had already written header lines, discarded the group's status, and
+  # guarded only on emptiness — so a render failure replaced the MOC with a header and
+  # returned 0. Content destruction at exit 0 is this repo's cardinal failure class, and
+  # it was in the one function whose contract promised the opposite.
+  if ! MOC_SYNC_EXISTING="$file" moc_render "$dir" "$map" > "$body_tmp"; then
+    echo "error: moc-sync: render failed; '$file' left unchanged" >&2
+    rm -f "$body_tmp"; rm -rf "$lockdir"; return 1
+  fi
+  if [ ! -s "$body_tmp" ]; then
+    echo "error: moc-sync: render produced no sections; '$file' left unchanged" >&2
+    rm -f "$body_tmp"; rm -rf "$lockdir"; return 1
+  fi
+
+  {
+    printf '# %s\n\n' "$(basename "$file" .md)"
+    printf 'derived: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf '<!-- Derived from note frontmatter. Do not move entries by hand; they will be\n'
+    printf '     regenerated. Re-derive with:\n'
+    printf '       . ops/lib/moc-sync.sh && rebuild_status_moc <moc-file> <notes-dir> <map> -->\n\n'
+    cat "$body_tmp"
+  } > "$tmp"
+  rm -f "$body_tmp"
+
+  # THE GUARDED RENAME. Ending this `mv` without a failure branch returns the exit status
+  # of the following `rm -rf` — 0 — while leaving an undeclared second copy on disk. That
+  # exact defect shipped in queue-edit.sh and its suite was written red to pin it.
+  if ! mv "$tmp" "$file"; then
+    echo "error: moc-sync: could not move '$tmp' into place at '$file'" >&2
+    rm -f "$tmp"
+    rm -rf "$lockdir"
+    return 1
+  fi
+  rm -rf "$lockdir"
+  return 0
+}

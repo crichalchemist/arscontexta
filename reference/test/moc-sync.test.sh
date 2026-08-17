@@ -182,5 +182,69 @@ ok "gone entry is reported" "1" "$(/usr/bin/grep -c 'entry has no note, not remo
 ok "gone entry is not silently resurrected" "0" \
    "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '\[\[deleted-note\]\]')"
 
+# --- rebuild_status_moc ---------------------------------------------------
+rebuild_status_moc "$FIX/observations.md" "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>/dev/null
+ok "rebuild returns 0" "0" "$?"
+ok "rebuild wrote the Open heading" "## Open (2)" "$(/usr/bin/grep -m1 '^## Open' "$FIX/observations.md")"
+ok "rebuild emitted provenance" "1" "$(/usr/bin/grep -c '^derived: [0-9]' "$FIX/observations.md")"
+ok "provenance carries the re-derive command" "1" "$(/usr/bin/grep -c 'rebuild_status_moc' "$FIX/observations.md")"
+
+# IDEMPOTENCE (1): two consecutive rebuilds byte-identical. The provenance timestamp is
+# excluded — a wall-clock stamp legitimately differs.
+body_only() { /usr/bin/sed -n '/^## /,$p' "$1"; }
+rebuild_status_moc "$FIX/observations.md" "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>/dev/null
+body_only "$FIX/observations.md" > "$FIX/pass1.txt"
+rebuild_status_moc "$FIX/observations.md" "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>/dev/null
+body_only "$FIX/observations.md" > "$FIX/pass2.txt"
+cmp -s "$FIX/pass1.txt" "$FIX/pass2.txt"; ok "two rebuilds are byte-identical" "0" "$?"
+
+# IDEMPOTENCE (2): reordered existing entries produce the same BODY. An implementation
+# that preserves current order and appends passes (1) and fails (2).
+# COMPARE BODIES ONLY: the header is `# $(basename file)` and the provenance embeds the
+# file and dir arguments, so a whole-file cmp of two differently-named fixtures can never
+# pass and would read as a broken implementation.
+mkdir -p "$FIX/obs2"; cp "$FIX/observations/zebra-note.md" "$FIX/observations/alpha-note.md" \
+                          "$FIX/observations/middle-note.md" "$FIX/obs2/"
+cat > "$FIX/moc2.md" <<'EOF'
+## Open (2)
+- [[zebra-note]] — Zebra description that was EDITED
+- [[alpha-note]] — Alpha description here
+EOF
+rebuild_status_moc "$FIX/moc2.md" "$FIX/obs2" "$MOC_MAP_OBSERVATIONS" 2>/dev/null
+body_only "$FIX/moc2.md" > "$FIX/pass3.txt"
+cmp -s "$FIX/pass1.txt" "$FIX/pass3.txt"; ok "reordered input yields identical body" "0" "$?"
+
+# RENDER FAILURE MUST NOT DESTROY THE TARGET. The first draft wrote header lines into the
+# temp BEFORE rendering and guarded only on `[ ! -s "$tmp" ]`, which cannot fire — so a
+# typo'd notes-dir replaced the MOC with a header and returned 0. Demonstrated: 2 entries
+# became 0 entries at rc 0.
+cp "$FIX/observations.md" "$FIX/before-bad-dir.txt"
+rebuild_status_moc "$FIX/observations.md" "$FIX/TYPO-no-such-dir" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF"
+ok "bad notes-dir returns 1" "1" "$?"
+cmp -s "$FIX/observations.md" "$FIX/before-bad-dir.txt"; ok "bad notes-dir leaves target intact" "0" "$?"
+# EXPECTED 3, NOT 2. The plan's text says 2 — the count in the HAND-WRITTEN fixture, which
+# lists only alpha and zebra. By the time this line runs, the idempotence assertions above
+# have rebuilt this file three times and the rebuild correctly ADDED middle-note (status
+# implemented), which the fixture never listed. 2 is a pre-rebuild number carried forward.
+# The assertion keeps its full discriminating power at 3: the defect it exists to catch
+# replaces the MOC with a header, which yields 0.
+ok "bad notes-dir still has its entries" "3" "$(/usr/bin/grep -c '^- \[\[' "$FIX/observations.md")"
+
+# GUARDED RENAME: forced with a shell-function stub. A genuine same-directory mv failure
+# needs `chflags uchg` (macOS) or `chattr +i` (root, Linux), neither portable to CI. The
+# MECHANISM is covered; the organic trigger is hand-run only, and that is not the same
+# claim. queue-edit.test.sh records the identical limitation.
+cp "$FIX/observations.md" "$FIX/before-mv.txt"
+mv() { return 1; }
+rebuild_status_moc "$FIX/observations.md" "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF"
+ok "failed rename returns 1" "1" "$?"
+unset -f mv
+ok "failed rename names the path" "1" "$(/usr/bin/grep -c "observations.md" "$ERRF")"
+cmp -s "$FIX/observations.md" "$FIX/before-mv.txt"; ok "target unchanged after failed rename" "0" "$?"
+ok "no temp survives beside the target" "0" \
+   "$(find "$FIX" -maxdepth 1 -name 'observations.md.*' ! -name '*.txt' | /usr/bin/grep -c .)"
+ok "no lock survives beside the target" "0" \
+   "$(find "$FIX" -maxdepth 1 -name 'observations.md.lock' | /usr/bin/grep -c .)"
+
 printf '\nmoc-sync: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
