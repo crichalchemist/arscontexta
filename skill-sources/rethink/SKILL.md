@@ -387,14 +387,30 @@ fi
 # THE MAP IS ONE QUOTED ARGUMENT. Unquoted, zsh passes the whole string as a single
 # argument, only the first pair is honoured, and every non-open note is silently
 # dropped at rc 0 — on the user-facing path, under the shell half of real users run.
+# REPORT PER MOC, AND DO NOT CLAIM MORE THAN IS TRUE. A single rc collapsed both rebuilds
+# into one verdict, so a vault with observations but no ops/tensions/ — a shape
+# validate-kernel.sh's C1 explicitly tolerates — got "the MOCs are unchanged" after the
+# observations MOC had already been rewritten. Naming which side failed is the difference
+# between a user trusting the file and a user re-deriving it by hand.
 rc=0
-rebuild_status_moc ops/observations.md ops/observations "$MOC_MAP_OBSERVATIONS" || rc=1
-rebuild_status_moc ops/tensions.md     ops/tensions     "$MOC_MAP_TENSIONS"     || rc=1
-if [ "$rc" -ne 0 ]; then
-  echo "error: MOC rebuild failed; the MOCs are unchanged and still reflect the pre-triage state" >&2
-  exit 1
+if rebuild_status_moc ops/observations.md ops/observations "$MOC_MAP_OBSERVATIONS"; then
+  echo "ops/observations.md rebuilt from frontmatter."
+else
+  echo "error: observations MOC rebuild failed; ops/observations.md is unchanged" >&2
+  rc=1
 fi
-echo "MOCs rebuilt from frontmatter. Unplaceable notes, if any, are reported above."
+if rebuild_status_moc ops/tensions.md ops/tensions "$MOC_MAP_TENSIONS"; then
+  echo "ops/tensions.md rebuilt from frontmatter."
+else
+  echo "error: tensions MOC rebuild failed; ops/tensions.md is unchanged" >&2
+  rc=1
+fi
+if [ "$rc" -ne 0 ]; then
+  echo "warn: at least one MOC did not rebuild — the messages above say which." >&2
+  echo "      CONTINUE the run regardless: deferred acts are persisted in Phase 1e, and" >&2
+  echo "      aborting here would discard them, which is worse than a stale MOC." >&2
+fi
+echo "Unplaceable notes, if any, are reported above."
 ```
 
 ### 1e. Persist Deferred Acts and Proposals
@@ -457,6 +473,12 @@ at the end, together with any proposals deferred later in the same run.
 ## Phase 2: Methodology Folder Updates
 
 For items triaged as METHODOLOGY, create or update notes in `ops/methodology/`.
+
+**If no approval channel is available, do NOT create or update anything here.** Those items
+were already deferred to `ops/rethink/pending.yaml` with `act: methodology` in 1d; creating
+the note anyway would perform the exact act the deferral withheld, and Phase 1's act split
+would be undone one phase later. Skip to Phase 3. This guard is what makes 1d's
+"(see Phase 2 below)" safe to follow.
 
 ### Creating New Methodology Notes
 
@@ -693,8 +715,17 @@ earlier:
 
 ```
 Pending acts and proposals: [count] written to ops/rethink/pending.yaml
-Resume with: /rethink approve
+These await human review. Read the file and act on the items directly.
 ```
+
+**Do not print an invocation that does not exist.** The first version of this report said
+"Resume with: `/rethink approve`", and `approve` is not one of this skill's targets — it would
+fall through to the "specific observation filename" rule and run a fresh full rethink,
+appending a SECOND batch to the same file. Nothing in the system reads `pending.yaml` yet:
+every reference to it is a write, and `awaiting_approval` has no consumer. Persisting the run's
+output so it is not lost is what this design claims; **draining it is a separate piece of work
+and is recorded in the plan's Deferrals**. Telling a user to run a command that silently does
+something else is worse than telling them nothing.
 
 This does not weaken "Auto-implement system changes — proposals require human
 approval, always": a *persisted* proposal is not an implemented one. The approval still

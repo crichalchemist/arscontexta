@@ -1363,6 +1363,18 @@ both sides of a merge. It has been corrected three times for exactly this reason
 - **`1d`'s pre-existing gate ambiguity** — not fixed. PROMOTE and IMPLEMENT already execute system changes behind a *triage* approval rather than a *proposal* approval. Task 7's split resolves it as a side effect; it is not targeted. **Tracked home:** the spec, under the corrected split.
 - **G1, G4, G5** — out of scope by the spec's "What is NOT claimed". **Tracked home:** the spec's own "What is NOT claimed" list names all three; `docs/field-intel-2026-08-17.md` carries the evidence but is **untracked and is not a home**. G5 (a gate for enums with no consumer inside `generators/`) must additionally be filed as a numbered item in `docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md` — an entry deferred without a tracked home is divergence 10's failure mode, and this plan's first draft committed it by pointing at the untracked file.
 - **The `main`-side CI step numeral** — deliberately left stale by Task 9 Step 3. Takes the documented post-merge correction. **Tracked home:** Task 9's commit message.
+- **A drain for `ops/rethink/pending.yaml`** — deferred, and added by the final whole-branch
+  review rather than foreseen here. This plan makes a channel-less run *terminate in an
+  artifact* instead of stalling, which is what G3 asked for; it does **not** make anything read
+  that artifact back. Measured at the end of the branch: all 8 references to `pending.yaml` are
+  writes, `awaiting_approval` has zero consumers, and `approve` is not one of `/rethink`'s
+  parsed targets — so the report's original "Resume with: `/rethink approve`" named an
+  invocation that would have fallen through to the specific-filename rule and run a fresh full
+  rethink, appending a second batch to the same file. The message now says the items await
+  human review and names no command. **Tracked home:** this line, plus the paragraph in
+  `skill-sources/rethink/SKILL.md` beside the report that states the gap in full. Building the
+  drain is a design question — a new `/rethink approve` target that reads the artifact and
+  re-enters 1d — and belongs to its own spec, not to a fix wave.
 
 ---
 

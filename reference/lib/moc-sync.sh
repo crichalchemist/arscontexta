@@ -27,8 +27,24 @@ MOC_SYNC_VERSION=1
 # rebuild under any one of them silently drops the others' notes — measured 2026-08-17:
 # 2 dissolved observations, 8 promoted + 6 archived tensions. Silent omission of a note that
 # exists is the defect this library removes, so every status a vault can hold gets a section.
-MOC_MAP_OBSERVATIONS="open:Open implemented:Implemented archived:Archived dissolved:Dissolved"
-MOC_MAP_TENSIONS="open:Open blocked:Blocked implemented:Implemented promoted:Promoted archived:Archived dissolved:Dissolved resolved:Resolved"
+# THE MAP IS THE GENERATOR'S DECLARED ENUM PLUS THE STATUSES THE SPEC ITSELF NAMES — and no
+# more. Re-derive it from `generators/features/self-evolution.md` whenever that enum moves;
+# NEVER from a field measurement.
+#
+# THAT BOUNDARY IS NARROW ON PURPOSE, in both directions. Widen it to "whatever the field
+# holds" and the map absorbs every ad-hoc status a vault invents, which is how rule 6 dies:
+# an unknown status would get a section instead of a report. The field vault carries exactly
+# one such today — `status: executed`, declared in no enum anywhere — and the correct behavior
+# is the one you get below: reported, not placed, not guessed at. `dissolved` is here despite
+# being absent from the OBSERVATION enum only because the spec measures 2 such notes by name. The first version of this map was measured against one live vault, scored
+# "0 off-map", and was wrong anyway: that vault happens to use `open`, while the generator
+# declares `pending` and `/rethink` itself WRITES it (KEEP PENDING leaves `status: pending`;
+# PROMOTE sets `status: promoted`). So the template that calls this rebuild wrote two statuses
+# the rebuild silently dropped — this library's own failure class, inside its pinned input.
+# `dissolved` is in neither observation enum but is live on observations in the field, so the
+# union carries it: a status that exists must have a section, whatever declared it.
+MOC_MAP_OBSERVATIONS="pending:Pending open:Open promoted:Promoted implemented:Implemented archived:Archived dissolved:Dissolved"
+MOC_MAP_TENSIONS="pending:Pending open:Open blocked:Blocked promoted:Promoted implemented:Implemented resolved:Resolved archived:Archived dissolved:Dissolved"
 
 # _moc_each_pair <map-string> -> one "status:Section" pair per line.
 #
@@ -103,6 +119,16 @@ moc_harvest_entries() {
 # re-declaration prints `name=value` on stdout, i.e. into the MOC.
 moc_render() {
   local dir="$1" map="$2"
+  # FAIL LOUD WHEN frontmatter.sh WAS NOT SOURCED. Without this the status read below returns
+  # empty for every note, every note is reported as "no readable status", and the rebuild writes
+  # a MOC with every section at (0) at rc 0 — content destruction at exit 0, with the warning
+  # blaming the notes for a missing library. Reproduced by following this file's own provenance
+  # banner verbatim, which is how the defect was found.
+  if ! command -v frontmatter_field >/dev/null 2>&1; then
+    echo "error: moc-sync: frontmatter_field is not defined — source ops/lib/frontmatter.sh" >&2
+    echo "       before this library; moc_render cannot read any status without it" >&2
+    return 1
+  fi
   if [ ! -d "$dir" ]; then
     echo "error: moc-sync: not a directory: '$dir'" >&2
     return 1
@@ -127,7 +153,11 @@ moc_render() {
   # invariant the two pinned maps happen to satisfy and nothing states or enforces. Hand
   # this function `open:Everything implemented:Everything` and the name compare is true on
   # two iterations, so every unplaceable note is reported twice. An index cannot collide.
-  local sec_index=0 placed_slugs=""
+  # TWO SETS, NOT ONE. `placed_slugs` is what landed in a section; `seen_slugs` is every note
+  # that exists on disk, placed or not. Rule 3(a) must key on SEEN, because an off-map or
+  # unreadable note is not placed yet plainly exists — keying on placed made the gone-report
+  # fire for notes the other two reports had just named, asserting they had "no note".
+  local sec_index=0 placed_slugs="" seen_slugs=""
 
   while IFS= read -r pair; do
     [ -n "$pair" ] || continue
@@ -139,6 +169,10 @@ moc_render() {
 
     while IFS= read -r note; do
       [ -n "$note" ] || continue
+      if [ "$sec_index" -eq 1 ]; then
+        seen_slugs="${seen_slugs}$(basename "$note" .md)
+"
+      fi
       st=$(frontmatter_field "$note" status 2>/dev/null)
 
       # Rule 3(b): the note EXISTS but its status cannot be read — frontmatter.sh treats an
@@ -198,17 +232,27 @@ INNER
 $(_moc_each_pair "$map")
 OUTER
 
-  # Rule 3(a): a harvested entry with no surviving note. Reported, never silently
-  # dropped: that is either a rename to fix or a deletion to record.
+  # Rule 3(a): a harvested entry with no surviving note ANYWHERE on disk — keyed on seen_slugs,
+  # not placed_slugs, so an off-map or unreadable note (already reported above, and plainly
+  # present) is not additionally accused of not existing.
+  #
+  # THE MESSAGE SAYS "removed" BECAUSE THE ENTRY IS REMOVED. The spec's Testing table asks for
+  # "reported, not deleted", and this deliberately diverges on the second half while honouring
+  # the first: preserving an entry whose note is gone would emit a wiki-link to a file that does
+  # not exist, which is precisely what validate-kernel.sh primitive 2 counts as a dangling link.
+  # Satisfying one row of the contract by manufacturing the defect another primitive gates on is
+  # not a fix. The anti-pattern that row names is SILENT deletion; this is loud. A message that
+  # said "not removed" while removing would be the very mismatch this library exists to end —
+  # and the first version of this line said exactly that.
   local hslug=""
   while IFS= read -r hslug; do
     [ -n "$hslug" ] || continue
     case "
-$placed_slugs" in
+$seen_slugs" in
       *"
 $hslug
 "*) : ;;
-      *) echo "warn: moc-sync: entry has no note, not removed: $hslug" >&2 ;;
+      *) echo "warn: moc-sync: entry has no note on disk, removed from the MOC: $hslug" >&2 ;;
     esac
   done <<GONE
 $(printf '%s\n' "$harvest" | /usr/bin/awk -F'\t' 'NF{print $1}')

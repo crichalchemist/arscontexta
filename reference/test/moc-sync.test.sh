@@ -50,19 +50,19 @@ moc_section_for open ""       >/dev/null 2>&1; ok "empty map is rc 1"    "1" "$?
 
 # --- the pinned maps ------------------------------------------------------
 ok "observations map is pinned" \
-   "open:Open implemented:Implemented archived:Archived dissolved:Dissolved" \
+   "pending:Pending open:Open promoted:Promoted implemented:Implemented archived:Archived dissolved:Dissolved" \
    "$MOC_MAP_OBSERVATIONS"
 ok "tensions map is pinned" \
-   "open:Open blocked:Blocked implemented:Implemented promoted:Promoted archived:Archived dissolved:Dissolved resolved:Resolved" \
+   "pending:Pending open:Open blocked:Blocked promoted:Promoted implemented:Implemented resolved:Resolved archived:Archived dissolved:Dissolved" \
    "$MOC_MAP_TENSIONS"
 
 # Every status the field vault holds must be mappable — rule 6's whole point.
 # Counted through ok(), so the totals stay honest.
-for s in open implemented archived dissolved; do
+for s in pending open promoted implemented archived dissolved; do
   moc_section_for "$s" "$MOC_MAP_OBSERVATIONS" >/dev/null 2>&1
   ok "observations map places '$s'" "0" "$?"
 done
-for s in open blocked implemented promoted archived dissolved resolved; do
+for s in pending open blocked promoted implemented resolved archived dissolved; do
   moc_section_for "$s" "$MOC_MAP_TENSIONS" >/dev/null 2>&1
   ok "tensions map places '$s'" "0" "$?"
 done
@@ -178,7 +178,7 @@ cat > "$FIX/gone.md" <<'EOF'
 EOF
 BODY=$(MOC_SYNC_EXISTING="$FIX/gone.md" \
        moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
-ok "gone entry is reported" "1" "$(/usr/bin/grep -c 'entry has no note, not removed: deleted-note' "$ERRF")"
+ok "gone entry is reported" "1" "$(/usr/bin/grep -c 'entry has no note on disk, removed from the MOC: deleted-note' "$ERRF")"
 ok "gone entry is not silently resurrected" "0" \
    "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '\[\[deleted-note\]\]')"
 
@@ -283,6 +283,83 @@ ok "punctuation-only summary still warns" "1" \
 ok "punctuation-only summary is still preserved" "..." \
    "$(printf '%s\n' "$BODY" | /usr/bin/sed -n 's/^- \[\[punct-note\]\] — //p')"
 rm -f "$FIX/observations/punct-note.md"
+
+# --- the map must cover what the GENERATOR declares, not what one vault happens to hold ---
+# This is the assertion whose absence let the first map ship missing `pending` and `promoted`
+# while a field measurement scored it "0 off-map" — that vault uses `open`. A field measurement
+# can only ever confirm the dialect it measured; this reads the declaration instead.
+GENFILE="$(cd "$(dirname "$0")/../.." && pwd)/generators/features/self-evolution.md"
+gen_enum() { # gen_enum <file> <nth status: line> -> one status per line
+  /usr/bin/sed -n 's/^status: //p' "$1" | /usr/bin/sed -n "${2}p" \
+    | /usr/bin/tr -d ' ' | /usr/bin/tr '|' '\n' | /usr/bin/grep -c . >/dev/null
+  /usr/bin/sed -n 's/^status: //p' "$1" | /usr/bin/sed -n "${2}p" \
+    | /usr/bin/tr -d ' ' | /usr/bin/tr '|' '\n'
+}
+if [ -r "$GENFILE" ]; then
+  # PAIRED POSITIVE FIRST: if the extraction breaks, the coverage loops below iterate zero
+  # times and pass vacuously — the exact shape this suite exists to refuse.
+  ok "generator declares 5 observation statuses" "5" "$(gen_enum "$GENFILE" 1 | /usr/bin/grep -c .)"
+  ok "generator declares 8 tension statuses"     "8" "$(gen_enum "$GENFILE" 2 | /usr/bin/grep -c .)"
+
+  gmiss=""
+  while IFS= read -r gst; do
+    [ -n "$gst" ] || continue
+    moc_section_for "$gst" "$MOC_MAP_OBSERVATIONS" >/dev/null 2>&1 || gmiss="$gmiss $gst"
+  done <<GENOBS
+$(gen_enum "$GENFILE" 1)
+GENOBS
+  ok "observations map covers every declared status" "" "$gmiss"
+
+  gmiss=""
+  while IFS= read -r gst; do
+    [ -n "$gst" ] || continue
+    moc_section_for "$gst" "$MOC_MAP_TENSIONS" >/dev/null 2>&1 || gmiss="$gmiss $gst"
+  done <<GENTEN
+$(gen_enum "$GENFILE" 2)
+GENTEN
+  ok "tensions map covers every declared status" "" "$gmiss"
+else
+  ok "generator enum file is readable" "readable" "MISSING $GENFILE"
+fi
+
+# --- moc_render must FAIL LOUD when frontmatter.sh was never sourced -------
+# Without this the status read returns empty for every note, every note is reported as
+# "no readable status", and the rebuild writes every section at (0) at rc 0 — content
+# destruction at exit 0, blaming the notes for a missing library. Reproduced by following
+# this library's own provenance banner verbatim, which is how it was found.
+unset -f frontmatter_field
+moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" >/dev/null 2>"$ERRF"
+ok "unsourced frontmatter.sh is rc 1" "1" "$?"
+ok "unsourced frontmatter.sh names the remedy" "1" \
+   "$(/usr/bin/grep -c 'source ops/lib/frontmatter.sh' "$ERRF")"
+# PAIRED POSITIVE: prove the library really is restored, or every assertion after this
+# point would be measuring the broken state.
+. "$FMLIB"
+command -v frontmatter_field >/dev/null 2>&1; ok "frontmatter_field is restored" "0" "$?"
+ok "render works again after restore" "## Open (2)" \
+   "$(MOC_SYNC_EXISTING="$FIX/observations.md" moc_render "$FIX/observations" \
+      "$MOC_MAP_OBSERVATIONS" 2>/dev/null | /usr/bin/grep -m1 '^## Open')"
+
+# --- rule 3(a) must key on EXISTENCE, not on placement --------------------
+# An off-map note is not placed but plainly exists. Keying the gone-report on placement
+# made it fire for notes the off-map report had just named, asserting they had "no note".
+mknote ghost-note superseded "Off-map but present"
+cat > "$FIX/haunted.md" <<'EOF'
+## Open (2)
+- [[ghost-note]] — Off-map but present
+- [[really-gone]] — This one truly does not exist
+EOF
+BODY=$(MOC_SYNC_EXISTING="$FIX/haunted.md" \
+       moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+ok "a present-but-off-map note is NOT called missing" "0" \
+   "$(/usr/bin/grep -c 'has no note on disk.*ghost-note' "$ERRF")"
+ok "the off-map report still names it" "1" \
+   "$(/usr/bin/grep -c "status 'superseded' maps to no section, not placed: ghost-note" "$ERRF")"
+ok "a genuinely absent note IS called missing" "1" \
+   "$(/usr/bin/grep -c 'entry has no note on disk, removed from the MOC: really-gone' "$ERRF")"
+# The message must match the behaviour: the entry IS removed, so it must not claim otherwise.
+ok "the gone message does not claim the entry survived" "0" "$(/usr/bin/grep -c 'not removed' "$ERRF")"
+rm -f "$FIX/observations/ghost-note.md"
 
 printf '\nmoc-sync: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
