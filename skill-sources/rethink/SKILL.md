@@ -397,6 +397,60 @@ fi
 echo "MOCs rebuilt from frontmatter. Unplaceable notes, if any, are reported above."
 ```
 
+### 1e. Persist Deferred Acts and Proposals
+
+**File:** `ops/rethink/pending.yaml`, a bare YAML list. **Deliberately NOT the operational
+queue:** no queue schema declares `awaiting_approval`, and a status no consumer declares is
+exactly the unfalsifiable state this skill legislates against elsewhere.
+
+**Item shape:**
+
+```yaml
+- id: p-2026-08-17-001
+  act: implement             # promote | implement | methodology | proposal
+  status: awaiting_approval  # -> approved | rejected | deferred
+  source: observations/some-observation-slug.md
+  summary: One line, what would change
+  detail: |
+    The full disposition and its reasoning, so the approving invocation
+    need not re-derive the triage.
+```
+
+```bash
+QE_LIB="ops/lib/queue-edit.sh"
+if [ ! -r "$QE_LIB" ]; then
+  echo "error: library not found at '$QE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+. "$QE_LIB"
+
+if [ "${QUEUE_EDIT_VERSION:-0}" -lt 2 ]; then
+  echo "error: ops/lib/queue-edit.sh is older than this skill requires (need >= 2, have ${QUEUE_EDIT_VERSION:-none})" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+mkdir -p ops/rethink || exit 1
+
+# THE SEED MUST BE AN EMPTY FILE, NEVER '[]'. queue_yaml appends a BLOCK sequence; appended
+# beneath a flow-style '[]' the result is not a YAML document at all — and queue_yaml still
+# reports success. Verified both ways: an empty seed parses to a list of one dict, while the
+# '[]' seed raises yaml.parser.ParserError while queue_edit prints "1 task(s) updated".
+[ -f ops/rethink/pending.yaml ] || : > ops/rethink/pending.yaml
+```
+
+Write **one `queue_yaml` call per item**, each carrying the fields above. A zero-match
+`--where` fails loud rather than silently writing nothing — that silence is what left seven
+fences dead for a month.
+
+**Then report and exit 0. Do not wait.**
+
+```
+Pending acts and proposals: [count] written to ops/rethink/pending.yaml
+Resume with: /rethink approve
+```
+
 ---
 
 ## Phase 2: Methodology Folder Updates
@@ -628,7 +682,13 @@ If 10+ pending or open observations or 5+ pending or open tensions remain after 
 
 ### User Approval Interaction
 
-Use AskUserQuestion: "Which proposals should I implement? (all / none / list numbers, e.g. '1, 3'). You can also ask me to modify a proposal before deciding."
+**If an approval channel is available,** use AskUserQuestion: "Which proposals should I implement? (all / none / list numbers, e.g. '1, 3'). You can also ask me to modify a proposal before deciding."
+
+**If no approval channel is available,** write each proposal to `ops/rethink/pending.yaml` per
+Phase 1e with `act: proposal` and `status: awaiting_approval`, report the count, and exit 0 —
+do not wait. This does not weaken "Auto-implement system changes — proposals require human
+approval, always": a *persisted* proposal is not an implemented one. The approval still
+happens, in a separate invocation that reads the artifact instead of re-deriving it.
 
 **Handle each response:**
 
@@ -697,6 +757,7 @@ After rethink completes, capture the session itself. Create or append to `ops/re
 **Triage:** [count] promoted, [count] methodology, [count] implemented, [count] archived, [count] pending
 **Patterns:** [count] detected
 **Proposals:** [count] generated, [count] approved, [count] rejected, [count] deferred
+**Pending:** [count] awaiting approval in `ops/rethink/pending.yaml`
 **Changes applied:** [list of files modified]
 ```
 
