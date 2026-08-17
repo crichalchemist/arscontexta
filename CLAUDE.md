@@ -1058,10 +1058,10 @@ first draft.) That is the one-rename evasion
 `check-portability.sh`'s own header describes rejecting for `--exclude`, and it was reintroduced here in
 prose before this line was fixed.
 
-Verified against the tree, not remembered: **7 hits**, and the claim worth making is what they are
+Verified against the tree, not remembered: **9 hits**, and the claim worth making is what they are
 not: zero of the seven are executable code that inlines a matcher inside `skill-sources/` — the
 governed property above holds, and holds more tightly than the `9 = 7 + 2` split this entry used to
-publish. The decomposition is `7 = 2 + 1 + 1 + 3`, not a bare total:
+publish. The decomposition is `9 = 2 + 1 + 1 + 5`, not a bare total:
 
 | Site | Role | Why it survives |
 |---|---|---|
@@ -1069,9 +1069,9 @@ publish. The decomposition is `7 = 2 + 1 + 1 + 3`, not a bare total:
 | `skill-sources/graph/SKILL.md:794` | documentation-table row | same table, `rg '^source:.*\[\[X\]\]'` |
 | `skills/health/SKILL.md:661` | shape matcher | `rg '^\s*- \[\[' \| grep -v ' — '` — takes no note title at all; carries `portability-exempt` |
 | `reference/testing-milestones.md:425` | test spec | `grep -rl "\[\[$TITLE\]\]"` — a test SPEC's own worked example, not shipped code |
-| `reference/test/moc-sync.test.sh` ×3 | assertion on rendered output | fixed-name greps for `[[broken-note]]`, `[[orphan-note]]` and `[[deleted-note]]`, each asserting a note is **not** placed in a MOC the suite just rendered. They match a literal slug the same file wrote, interpolate nothing, and read a `$BODY` string rather than selecting notes from a vault |
+| `reference/test/moc-sync.test.sh` ×5 | assertion on rendered output | fixed-name greps for `[[broken-note]]`, `[[orphan-note]]`, `[[deleted-note]]`, `[[pending-note]]` and `[[promoted-note]]` — the first three asserting a note is **not** placed, the last two asserting one **is** in a MOC the suite just rendered. They match a literal slug the same file wrote, interpolate nothing, and read a `$BODY` string rather than selecting notes from a vault |
 
-**Those last three arrived with `moc-sync.test.sh` and took this count from 4 to 7 — recorded as a
+**Those last five arrived with `moc-sync.test.sh` and took this count from 4 to 9, in two steps (3 with the suite, 2 more when the final-review fix wave added end-to-end coverage for `pending` and `promoted`) — recorded as a
 decomposition rather than a corrected total, because that is what the rest of this entry is about.**
 They do not weaken the governed property, which is scoped to *executable code in `skill-sources/`*:
 they are test assertions in `reference/test/`. The gated numeral moved, so the gate caught it; the
@@ -1175,7 +1175,7 @@ class.** The distinguishing property is the *capture*: this class extracts a tar
 `([^\]|#]+)' -r '$1'`. A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which
 is a link **count**, a different operation with none of the per-target problem this entry describes.
 Two such sites exist (`skill-sources/graph/SKILL.md:552`, `skill-sources/stats/SKILL.md:386`), so
-`2 = 0 + 2`. **Divergence 12 now publishes `7 = 2 + 1 + 1 + 3` for a different set** — there the residue
+`2 = 0 + 2`. **Divergence 12 now publishes `9 = 2 + 1 + 1 + 5` for a different set** — there the residue
 is two documentation-table rows, a non-interpolating shape matcher and a test spec's worked example;
 here it is only the bracket counters, a different operation entirely. Same "publish the
 decomposition" idiom, different subject; do not merge them. Match the capture, not the brackets:
