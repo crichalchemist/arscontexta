@@ -35,6 +35,7 @@ LINK_LIB_SRC="$ROOT/reference/lib/link-extraction.sh"
 FM_LIB_SRC="$ROOT/reference/lib/frontmatter.sh"
 QUEUE_LIB_SRC="$ROOT/reference/lib/queue-edit.sh"
 QUEUE_PY_SRC="$ROOT/reference/lib/queue_edit.py"
+MOC_LIB_SRC="$ROOT/reference/lib/moc-sync.sh"
 
 # Every spawned shell must be THIS harness's shell, not `sh`. On macOS `sh` is
 # bash 3.2 regardless of what launched the harness, so an `sh` site silently
@@ -181,6 +182,13 @@ build_fixture() {
   # than on anything the fence is being judged for.
   cp "$QUEUE_PY_SRC" "$v/ops/lib/queue_edit.py" || {
     printf 'harness: cannot copy %s into the fixture\n' "$QUEUE_PY_SRC" >&2
+    return 1
+  }
+  # rethink's MOC-rebuild fence requires ops/lib/moc-sync.sh and exits 1 without it.
+  # Copied here rather than allowlisted: an allowlist entry would record a shipped fence
+  # as a known-open defect, which is the rot the two-directional check exists to drain.
+  cp "$MOC_LIB_SRC" "$v/ops/lib/moc-sync.sh" || {
+    printf 'harness: cannot copy %s into the fixture\n' "$MOC_LIB_SRC" >&2
     return 1
   }
 
