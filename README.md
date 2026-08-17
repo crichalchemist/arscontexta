@@ -40,6 +40,31 @@ No templates. No configuration. Just conversation.
 
 ---
 
+## Other hosts
+
+The plugin's commands are also installable on Codex, OpenCode and Pi. Each host
+registers this repo's `skills/` directory; the commands are then invoked the
+same way.
+
+| Host | Adapter | Install | Tool mapping | Verified |
+|---|---|---|---|---|
+| Claude Code | `.claude-plugin/plugin.json` | `/plugin install arscontexta@agenticnotetaking` | native | yes |
+| Codex | `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json` | via the Codex plugin marketplace | `reference/hosts/codex-tools.md` | **not yet** |
+| OpenCode | `.opencode/plugins/arscontexta.js` | `.opencode/INSTALL.md` | `reference/hosts/opencode-tools.md` | **not yet** |
+| Pi | `.pi/extensions/arscontexta.ts` | add this repo to Pi's extension path | `reference/hosts/pi-tools.md` | **not yet** |
+
+**"Not yet" is literal.** Those three adapters have never been run against their
+host. No gate in this repo can execute them — every check here reads this repo,
+and the claim is about another runtime. They are believed correct by
+construction and are unverified in fact. The row flips to `yes` when someone
+installs the plugin on that host and runs `/arscontexta:health` successfully.
+
+One capability differs everywhere but Claude Code: `AskUserQuestion` has no
+equivalent, so `/setup` asks in prose instead of collecting structured answers.
+Each tool-mapping document says so.
+
+---
+
 ## What It Does
 
 Most AI tools start every session blank. Ars Contexta changes that by generating
