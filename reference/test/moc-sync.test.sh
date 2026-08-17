@@ -291,8 +291,6 @@ rm -f "$FIX/observations/punct-note.md"
 GENFILE="$(cd "$(dirname "$0")/../.." && pwd)/generators/features/self-evolution.md"
 gen_enum() { # gen_enum <file> <nth status: line> -> one status per line
   /usr/bin/sed -n 's/^status: //p' "$1" | /usr/bin/sed -n "${2}p" \
-    | /usr/bin/tr -d ' ' | /usr/bin/tr '|' '\n' | /usr/bin/grep -c . >/dev/null
-  /usr/bin/sed -n 's/^status: //p' "$1" | /usr/bin/sed -n "${2}p" \
     | /usr/bin/tr -d ' ' | /usr/bin/tr '|' '\n'
 }
 if [ -r "$GENFILE" ]; then
@@ -321,6 +319,22 @@ GENTEN
 else
   ok "generator enum file is readable" "readable" "MISSING $GENFILE"
 fi
+
+# --- the two statuses C1 dropped must PLACE, end to end, not just map ------
+# The map-coverage assertions above prove `pending`/`promoted` RESOLVE. They do not prove a
+# note carrying one lands in a section, which is the behaviour that was actually broken: the
+# old map dropped both silently at rc 0. No fixture note carried either status until now.
+mknote pending-note   pending   "Pending description"
+mknote promoted-note  promoted  "Promoted description"
+BODY=$(moc_render "$FIX/observations" "$MOC_MAP_OBSERVATIONS" 2>"$ERRF")
+ok "a pending note is placed"  "1" "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '^- \[\[pending-note\]\]')"
+ok "a promoted note is placed" "1" "$(printf '%s\n' "$BODY" | /usr/bin/grep -c '^- \[\[promoted-note\]\]')"
+ok "Pending section counts 1"  "## Pending (1)"  "$(printf '%s\n' "$BODY" | /usr/bin/grep -m1 '^## Pending')"
+ok "Promoted section counts 1" "## Promoted (1)" "$(printf '%s\n' "$BODY" | /usr/bin/grep -m1 '^## Promoted')"
+# PAIRED NEGATIVE: neither may be reported off-map, which is how the old map failed.
+ok "neither is reported off-map" "0" \
+   "$(/usr/bin/grep -cE 'maps to no section, not placed: (pending|promoted)-note' "$ERRF")"
+rm -f "$FIX/observations/pending-note.md" "$FIX/observations/promoted-note.md"
 
 # --- moc_render must FAIL LOUD when frontmatter.sh was never sourced -------
 # Without this the status read returns empty for every note, every note is reported as

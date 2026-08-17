@@ -802,7 +802,8 @@ rebuild_status_moc() {
     printf 'derived: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '<!-- Derived from note frontmatter. Do not move entries by hand; they will be\n'
     printf '     regenerated. Re-derive with:\n'
-    printf '       . ops/lib/moc-sync.sh && rebuild_status_moc <moc-file> <notes-dir> <map> -->\n\n'
+    printf '       . ops/lib/frontmatter.sh && . ops/lib/moc-sync.sh &&\n'
+    printf '       rebuild_status_moc <moc-file> <notes-dir> <map> -->\n\n'
     cat "$body_tmp"
   } > "$tmp"
   rm -f "$body_tmp"
@@ -1380,7 +1381,7 @@ both sides of a merge. It has been corrected three times for exactly this reason
 
 ## Self-Review
 
-**Spec coverage.** D1/D2 → Tasks 2, 5; D3 → Tasks 1-4, 6; D4 → Task 3; D5 → Deferrals + Task 5's guard; D6 → Task 7; D7/D8 → Task 8; D9 → Task 9; D10 → no task, correctly (a decision *not* to build); D11 → Task 1; D12 → Tasks 2, 4. Rebuild-contract rules 1-6 → Tasks 2 (1, 6), 3 (2, 3a-c, 6), 4 (1, 4, 5). Spec Testing-table rows: all covered in Tasks 1-4 **except** "renamed `ops/`", now recorded in Deferrals rather than claimed — the first draft's Self-Review asserted full coverage and was false on that row and on rule 3(a).
+**Spec coverage.** D1/D2 → Tasks 2, 5; D3 → Tasks 1-4, 6; D4 → Task 3; D5 → Deferrals + Task 5's guard; D6 → Task 7; D7/D8 → Task 8; D9 → Task 9; D10 → no task, correctly (a decision *not* to build); D11 → Task 1; D12 → Tasks 2, 4. Rebuild-contract rules 1-6 → Tasks 2 (1, 6), 3 (2, 3a-c, 6), 4 (1, 4, 5). Spec Testing-table rows: all covered in Tasks 1-4 **except two**, neither claimed. "renamed `ops/`" is recorded in Deferrals. **"a hub line whose note is gone is reported, not deleted" is covered on its first half only, and the second half is a DELIBERATE DIVERGENCE** decided during the final-review fix wave: the entry is reported loudly and removed, because preserving it would emit a wiki-link to a file that does not exist — exactly what `validate-kernel.sh` primitive 2 counts as a dangling link — and a derived projection has no section to keep such an entry in without inventing an undeclared heading. A preserved entry would also be immortal, re-harvested from the previous MOC forever with no event able to clear it. The row's own "Catches" column names *silent* deletion; this is not silent. Argued in full at the rule-3(a) block in `reference/lib/moc-sync.sh`. The first draft's Self-Review asserted full coverage and was false on the `ops/` row and on rule 3(a); this sentence is its third correction and the first to state the divergence rather than imply completeness.
 
 **Placeholder scan.** No "TBD", no "add error handling", no "similar to Task N". Every code step carries runnable code; every verification step carries its command and its expected result, including the intermediate failure counts (9 / 6 / 7), which the first draft stated wrongly as 10 / 11 / 12. Three steps deliberately instruct *stopping* (Task 5 Step 1, Task 7 Step 1, and Task 4 Step 5's "a mutation that changes nothing is itself a finding").
 

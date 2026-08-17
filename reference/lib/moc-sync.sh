@@ -35,14 +35,24 @@ MOC_SYNC_VERSION=1
 # holds" and the map absorbs every ad-hoc status a vault invents, which is how rule 6 dies:
 # an unknown status would get a section instead of a report. The field vault carries exactly
 # one such today — `status: executed`, declared in no enum anywhere — and the correct behavior
-# is the one you get below: reported, not placed, not guessed at. `dissolved` is here despite
-# being absent from the OBSERVATION enum only because the spec measures 2 such notes by name. The first version of this map was measured against one live vault, scored
-# "0 off-map", and was wrong anyway: that vault happens to use `open`, while the generator
-# declares `pending` and `/rethink` itself WRITES it (KEEP PENDING leaves `status: pending`;
-# PROMOTE sets `status: promoted`). So the template that calls this rebuild wrote two statuses
-# the rebuild silently dropped — this library's own failure class, inside its pinned input.
-# `dissolved` is in neither observation enum but is live on observations in the field, so the
-# union carries it: a status that exists must have a section, whatever declared it.
+# is the one you get below: reported, not placed, not guessed at.
+#
+# WHY `dissolved` IS HERE AND `executed` IS NOT — and the test is checkable, not a judgement
+# call. `dissolved` is DECLARED in this file's tension enum (`self-evolution.md:220`) and
+# described at `:235-236`; it is simply absent from the OBSERVATION enum, which is a gap in
+# that enum rather than an invention of one vault. `executed` has ZERO hits anywhere in
+# `generators/` or `reference/kernel.yaml`. Grep for the status: if the generator names it,
+# it belongs here; if nothing names it, it gets reported. An earlier draft of this comment
+# justified `dissolved` by saying the spec "measures 2 such notes by name" — that launders a
+# field measurement into a rule, which is precisely the mistake below.
+#
+# THE MISTAKE, RECORDED SO IT IS NOT REPEATED: the first version of this map was measured
+# against one live vault, scored "0 off-map", and was wrong anyway — that vault happens to use
+# `open`, while the generator declares `pending` and `/rethink` itself WRITES it (KEEP PENDING
+# leaves `status: pending`; PROMOTE sets `status: promoted`). So the template that calls this
+# rebuild wrote two statuses the rebuild silently dropped: this library's own failure class,
+# inside its pinned input. A measurement confirms a sample; only a declaration confirms a
+# contract.
 MOC_MAP_OBSERVATIONS="pending:Pending open:Open promoted:Promoted implemented:Implemented archived:Archived dissolved:Dissolved"
 MOC_MAP_TENSIONS="pending:Pending open:Open blocked:Blocked promoted:Promoted implemented:Implemented resolved:Resolved archived:Archived dissolved:Dissolved"
 
@@ -309,7 +319,8 @@ rebuild_status_moc() {
     printf 'derived: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '<!-- Derived from note frontmatter. Do not move entries by hand; they will be\n'
     printf '     regenerated. Re-derive with:\n'
-    printf '       . ops/lib/moc-sync.sh && rebuild_status_moc <moc-file> <notes-dir> <map> -->\n\n'
+    printf '       . ops/lib/frontmatter.sh && . ops/lib/moc-sync.sh &&\n'
+    printf '       rebuild_status_moc <moc-file> <notes-dir> <map> -->\n\n'
     cat "$body_tmp"
   } > "$tmp"
   rm -f "$body_tmp"
