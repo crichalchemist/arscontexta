@@ -894,16 +894,17 @@ that makes a shrinking scope impossible to mistake for a clean one — re-derive
 either number:
 
 ```bash
-awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 12 in scope
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 13 in scope
 grep -c 'session-orient' reference/check-prose-paths.sh                    # 2: both now listed
 ```
 
-**It became twelve on the branch that rewrote `.opencode/INSTALL.md` into a procedure
-an agent executes.** That rewrite made the file dense with repo paths — `skills/`,
-`reference/hosts/opencode-tools.md`, `.opencode/plugins/arscontexta.js` — so it was added
-to SCOPE in the same change. Recorded here rather than silently corrected, per the
-paragraph above; the count in the fence moved with it, and it is still ungated, so the
-command remains the only thing to trust.
+**It became thirteen on the branch that rewrote `.opencode/INSTALL.md` and added
+`.pi/INSTALL.md`, both as procedures a host's own model executes.** That shape makes them
+dense with repo paths — `skills/`, `reference/hosts/opencode-tools.md`,
+`.opencode/plugins/arscontexta.js`, `.pi/extensions/arscontexta.ts` — so both were added to
+SCOPE in the same change. Recorded here rather than silently corrected, per the paragraph
+above; the count in the fence moved with them, and it is still ungated, so the command
+remains the only thing to trust.
 
 The scope count itself is not gated — `check-doc-claims.sh` reads a different sentence in this file
 for a different quantity, and a gate that reads one phrasing does not protect a synonym, per this

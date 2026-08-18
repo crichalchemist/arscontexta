@@ -52,7 +52,7 @@ the adapter is run.
 | Claude Code | `.claude-plugin/plugin.json` | `/plugin install arscontexta@agenticnotetaking` | native | yes |
 | Codex | `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json` | via the Codex plugin marketplace | `reference/hosts/codex-tools.md` | **not yet** |
 | OpenCode | `.opencode/plugins/arscontexta.js` | `.opencode/INSTALL.md` | `reference/hosts/opencode-tools.md` | **not yet** |
-| Pi | `.pi/extensions/arscontexta.ts` | add this repo to Pi's extension path | `reference/hosts/pi-tools.md` | **not yet** |
+| Pi | `.pi/extensions/arscontexta.ts` | `.pi/INSTALL.md` | `reference/hosts/pi-tools.md` | **not yet** |
 
 **"Not yet" is literal.** Those three adapters have never been run against their
 host. No gate in this repo can execute them — every check here reads this repo,

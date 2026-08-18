@@ -103,7 +103,9 @@ if [ ! -L "$LINK" ] || [ ! -e "$LINK" ]; then
   echo "INSTALL: FAIL — $LINK is not a symlink that resolves"; exit 1
 fi
 
-n=$(ls -1 "$REPO/skills" | wc -l | tr -d ' ')
+# Count skills by the property that defines one — a directory holding SKILL.md.
+# `ls -1 | wc -l` counts entries, so a stray file (a macOS .DS_Store) fails a good install.
+n=$(find "$REPO/skills" -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
 if [ "$n" -eq 10 ]; then
   echo "INSTALL: PASS — $LINK -> $REPO, $n skills reachable"
 else
