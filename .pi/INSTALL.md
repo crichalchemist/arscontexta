@@ -16,35 +16,41 @@ and the eight external tools they shell out to are on `PATH`. That is the
 success criterion, and nothing below satisfies it until Step 4 confirms it in a
 restarted session.
 
-## How this extension loads — read before Step 2
+## How Pi finds these skills — read before Step 2
 
-`.pi/extensions/arscontexta.ts` subscribes to `resources_discover` and returns
-`{ skillPaths: [<repo>/skills] }`. Pi loads extensions through jiti, so the
-TypeScript needs no build step, and the file's only import is type-only and
-erased — this repository deliberately ships no `package.json`.
+**There is no Pi extension in this repository, and none is needed.** One existed
+and was deleted. Its entire body registered a `skills/` directory that Pi
+already finds on its own, so it was a second way to get the same result and a
+second way to get it wrong.
 
-Pi offers three ways in, and **which one you pick decides whether the extension
-can find the skills at all**:
+The mechanism is Pi's own, documented under *Packages → Convention Directories*:
+when a package ships no `pi` manifest, Pi auto-discovers `skills/` from the
+package root, finding every directory that holds a `SKILL.md`. This repository
+ships no `package.json` at all, so the convention applies and the ten skills
+register with nothing declared.
 
-1. **A path in `settings.json`.** The `extensions` array takes absolute paths to
-   local files or directories. The file stays where it is. **This is the route
-   to use**, and Step 2 uses it.
-2. **An auto-discovered directory** — `~/.pi/agent/extensions/*.ts` for every
-   project, `.pi/extensions/*.ts` for the current one. Correct only when the
-   file is *already* in such a directory, which is true exactly when the user's
-   project is a checkout of this repository.
-3. **A pi package** via `packages` (`git:github.com/...`). **Closed to this
-   repository by design.** Distributed packages need a `package.json` declaring
-   `pi.extensions`, and this repo has none — the extension's own header comment
-   says why. Do not add one to make this route work.
+Two routes reach that, and the difference between them is **whether the
+installed copy tracks your checkout**:
 
-The property that rules out the obvious move: the extension finds the skills at
-`../..` **relative to its own location**, so it only works while it sits inside
-a checkout. **Copying it into `~/.pi/agent/extensions/` breaks it** — from
-there, `../..` is `~/.pi`, and it registers `~/.pi/skills`, which does not
-exist. That failure is silent: the extension loads, the handler returns a path,
-and no skills appear, with nothing reported. Route 1 avoids it entirely by never
-moving the file.
+1. **Package install — the default.** `pi install git:<url>` clones to
+   `~/.pi/agent/git/<host>/<path>` and appends the source to `packages` in
+   settings. **That clone is a snapshot.** A later `git pull` in some other
+   working copy does not touch it; `pi update --extensions` reconciles it to the
+   configured ref. Use this when the user wants the plugin, not the repository.
+2. **Local directory — for working on this repo.** `pi install /absolute/path`
+   registers a directory **in place, without copying**, and Pi applies the same
+   package rules to it. Edits in that checkout are live at the next restart. Use
+   this when the user already has a checkout they intend to edit.
+
+Both write user settings (`~/.pi/agent/settings.json`) by default; `-l` writes
+project settings (`.pi/settings.json`) instead, which requires the project to be
+trusted before Pi will load anything from it.
+
+A third route exists and is narrower: a `skills` array in settings takes
+directories directly, so `"skills": ["/absolute/path/to/this/repo/skills"]`
+registers the skills without registering the repository as a package. Prefer
+route 1 or 2 — this one is here so you recognise it in a settings file you did
+not write.
 
 ## Step 1 — Prerequisites
 
@@ -69,93 +75,62 @@ else echo "PREREQS: FAIL —$missing"; exit 1; fi
 install under their own names. This list is the prerequisite table in
 `README.md` — if the two ever disagree, the table is authoritative.
 
-## Step 2 — Register the extension by path
+## Step 2 — Install
 
-**Establish two things from the user before running anything.**
-
-1. **Where is the checkout of this repository?** You need its absolute path. If
-   the user is already working inside it, `git rev-parse --show-toplevel`
-   answers this without asking.
-2. **Global or project-only?** Global is `~/.pi/agent/settings.json` and applies
-   everywhere, which is what someone who wants a knowledge system in their own
-   projects needs. Project-only is `.pi/settings.json` in the project they are
-   working in, and Pi will not read it until they trust that project. Prefer
-   global unless the user asks otherwise; if they choose project-local, set
-   `CFG` accordingly and expect a trust prompt at the next start.
-
-**This step edits a settings file the user already owns.** It merges rather than
-replaces, keeps a backup, and proves afterwards that no existing key was lost.
+Pick exactly one source, per the two routes above. If the user's intent is not
+obvious from context, ask which before running anything — route 1 leaves them a
+snapshot they will later wonder why `git pull` does not update.
 
 ```bash
-REPO=/absolute/path/to/arscontexta          # set this before running
-EXT="$REPO/.pi/extensions/arscontexta.ts"
-CFG="$HOME/.pi/agent/settings.json"         # or .pi/settings.json for project-only
+# Choose ONE. Route 1 clones a snapshot; route 2 registers a live checkout.
+SRC="git:https://github.com/agenticnotetaking/arscontexta"
+# SRC="/absolute/path/to/arscontexta"
 
-if [ ! -f "$EXT" ]; then
-  echo "INSTALL: FAIL — no extension at $EXT"; exit 1
+pi install "$SRC" || { echo "INSTALL: FAIL — pi install rejected $SRC"; exit 1; }
+
+# Ask Pi where it put it rather than assuming: route 1 clones into
+# ~/.pi/agent/git/..., route 2 registers the path unchanged.
+ROOT=$(pi list 2>/dev/null | awk -v s="$SRC" '
+  { line=$0; sub(/^[[:space:]]+/,"",line); sub(/[[:space:]]+$/,"",line)
+    if (found) { print line; exit }
+    if (line == s) found=1 }')
+
+if [ -z "$ROOT" ]; then
+  echo "INSTALL: FAIL — pi list does not show $SRC. Registered sources are:"
+  pi list 2>&1
+  exit 1
+fi
+if [ ! -d "$ROOT" ]; then
+  echo "INSTALL: FAIL — pi resolved $SRC to $ROOT, which is not a directory"; exit 1
 fi
 
-# Count skills by the property that defines one — a directory holding SKILL.md.
-# `ls -1 | wc -l` counts entries, so a stray file (a macOS .DS_Store) fails a good install.
-n=$(find "$REPO/skills" -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
-if [ "$n" -ne 10 ]; then
-  echo "INSTALL: FAIL — expected 10 skills under $REPO/skills, found $n"; exit 1
-fi
-
-mkdir -p "$(dirname "$CFG")" || { echo "INSTALL: FAIL — cannot create $(dirname "$CFG")"; exit 1; }
-[ -f "$CFG" ] || echo '{}' > "$CFG"
-
-if ! jq -e 'type == "object"' "$CFG" >/dev/null 2>&1; then
-  echo "INSTALL: FAIL — $CFG is not a JSON object; refusing to touch it"; exit 1
-fi
-cp "$CFG" "$CFG.arscontexta-backup" || { echo "INSTALL: FAIL — could not back up $CFG"; exit 1; }
-
-if ! jq --arg p "$EXT" \
-     'if ((.extensions // []) | index($p)) then . else .extensions = ((.extensions // []) + [$p]) end' \
-     "$CFG" > "$CFG.tmp"; then
-  echo "INSTALL: FAIL — jq could not rewrite $CFG; the original is untouched"
-  rm -f "$CFG.tmp"; exit 1
-fi
-
-# Write THROUGH the existing file rather than mv-ing over it: mv replaces the
-# inode and can silently change the file's mode, which nothing downstream reports.
-if ! cat "$CFG.tmp" > "$CFG"; then
-  echo "INSTALL: FAIL — could not write $CFG; restore from $CFG.arscontexta-backup"
-  rm -f "$CFG.tmp"; exit 1
-fi
-rm -f "$CFG.tmp"
-
-lost=$(jq -n --slurpfile a "$CFG.arscontexta-backup" --slurpfile b "$CFG" \
-       '(($a[0]|keys) - ($b[0]|keys)) | length')
-if [ "$lost" -ne 0 ]; then
-  echo "INSTALL: FAIL — $lost existing setting(s) disappeared; restore $CFG.arscontexta-backup"; exit 1
-fi
-
-if jq -e --arg p "$EXT" '.extensions | index($p)' "$CFG" >/dev/null; then
-  echo "INSTALL: PASS — $CFG lists $EXT, $n skills reachable, $lost settings lost"
+# Count skills by the property that DEFINES one — a directory holding SKILL.md.
+# `ls -1 | wc -l` counts directory entries instead, so one stray file (a macOS
+# .DS_Store) fails a healthy install and a missing SKILL.md passes a broken one.
+n=$(find "$ROOT/skills" -maxdepth 2 -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "$n" -eq 10 ]; then
+  echo "INSTALL: PASS — $SRC -> $ROOT, $n skills present for convention discovery"
 else
-  echo "INSTALL: FAIL — the path is not in $CFG after writing it"; exit 1
+  echo "INSTALL: FAIL — expected 10 skills under $ROOT/skills, found $n"; exit 1
 fi
 ```
 
-**Assert:** the last line reads `INSTALL: PASS`.
-
-**On failure:** report which branch fired. Where a backup was already written,
-say where it is — the user's settings file matters more than this install.
-
-Running this twice is a no-op: the path is appended only when absent, and the
-array is never sorted, so an order the user chose is preserved.
+**A PASS here means the files are in place, not that Pi has loaded them.**
+Convention discovery runs at startup, so nothing is registered in the current
+session. Step 4 is what closes that gap.
 
 ## Step 3 — Restart
 
-You cannot restart Pi yourself. Ask the user to restart it, and continue in the
-new session.
+Pi reads `packages` when it starts. Restart it before checking anything.
 
-**`/reload` is not a substitute here.** Pi hot-reloads extensions in
-*auto-discovered* locations; this install registers a path through
-`settings.json`, which is read at startup. If the user chose project-local
-settings, they will also see a trust prompt — Pi does not load `.pi/settings.json`
-or project extensions until the project is trusted.
+**Do not substitute `/reload`.** It is documented for extensions, and this
+install registers no extension — whether it re-runs package discovery is not
+established here, so a `/reload` that appears to do nothing is indistinguishable
+from a failed install. Restart, and the ambiguity does not arise.
+
+If the install used `-l` (project settings), expect a trust prompt: Pi loads
+nothing from `.pi/settings.json` until the project is trusted. An untrusted
+project produces exactly the symptom of a broken install — no skills, no error.
 
 ## Step 4 — Confirm the skills loaded
 
@@ -164,56 +139,72 @@ criterion appear.
 
 **Assert:** ten of ten present.
 
-**Do not verify by invoking a skill.** Whether Pi takes a bare name or a
-namespaced form is not verified by this repository —
-`reference/hosts/pi-tools.md` says the invocation syntax is unverified. A failed
-invocation therefore cannot distinguish a broken install from an unknown syntax,
-and those have different fixes. Listing separates them.
+**Do not verify by invoking a skill.** Whether Pi takes the bare name or a
+namespaced form is not established by this repository —
+`reference/hosts/pi-tools.md` records the invocation syntax as unverified. A
+failed invocation therefore cannot distinguish a broken install from unknown
+syntax, and those have different fixes. Listing separates them.
 
-**On failure:** an empty result means the extension never loaded — confirm the
-path in `settings.json` and, for project-local installs, that the project was
-trusted. **A result that is empty rather than wrong is the expected shape of the
-copy mistake**, so also confirm the registered path still points inside a
-checkout and was not copied out of one.
+**On failure, the shape of the result tells you which thing broke:**
+
+- **No arscontexta skills at all** — discovery never ran against this package.
+  Re-check that `pi list` still shows the source, that Pi was actually
+  restarted, and, for a project-local install, that the project was trusted.
+- **Some but not ten** — discovery ran and found a `skills/` tree that is not
+  this one, or one that is incomplete. Re-run the Step 2 count against the
+  `ROOT` Pi reports now, not the one you recorded earlier.
 
 ## Step 5 — Measure what this repo has not verified
 
-`README.md` marks Pi **"Verified: not yet"**. Several claims are believed rather
-than measured, and you are the first reader in a position to settle them,
+`README.md` marks Pi **"Verified: not yet"**. Several claims there are believed
+rather than measured, and you are the first reader in a position to settle them,
 because you are inside Pi looking at the real surface.
 
 1. **The tool names** in `reference/hosts/pi-tools.md` — compare each against
    the tools you actually have.
 2. **Invocation syntax** — bare name or namespaced form. Determine which.
-3. **That `resources_discover` is enough.** The extension assumes returning
-   `skillPaths` makes the skills invocable. Confirm they are, not merely listed.
+3. **That discovery is sufficient.** Appearing in a skill listing is not the
+   same as being invocable. Confirm one actually runs.
 
 Where a finding contradicts `reference/hosts/pi-tools.md`, correct that file.
-**Do not touch README's "Verified: not yet" row** — a successful install is not
-a verified adapter, and only running the skills establishes that.
+
+**Do not touch README's "Verified: not yet" row.** A successful install does not
+verify the adapter; only running the skills does.
 
 ## Step 6 — Report
 
-State all of: which settings file you edited and the checkout path you
-registered, the Step 1 results, whether ten of ten skills appeared, and each
+State all of: which route and source you used, the `ROOT` Pi resolved it to, the
+Step 1 results, whether ten of ten skills appeared after the restart, and any
 Step 5 finding with the evidence behind it.
 
 ## Do not report success if
 
-- any prerequisite is missing — that failure surfaces later, inside a skill
-- `find` did not count ten skills under the checkout you registered
-- fewer than ten skills appeared, even if the extension itself loaded
-- you could not complete Step 3. A Pi that has not restarted has loaded nothing;
-  say so plainly rather than reporting Step 2 as the install
+- any prerequisite was missing — that failure surfaces later, inside a skill
+- `find` did not count ten skills under the `ROOT` Pi reported
+- fewer than ten skills appeared after the restart
+- Pi was not restarted. A Pi that has not restarted has loaded nothing; say so
+  plainly rather than reporting Step 2's PASS as the outcome.
 
-A plausible summary over a step that did not run is this repository's cardinal
-defect class, and this extension's own failure mode is silence: a wrong path
-returns cleanly and registers nothing.
+A plausible summary written over a step that did not run is this repository's
+cardinal defect class. It is also the specific failure this install is shaped to
+avoid: convention discovery pointed at the wrong directory finds nothing,
+returns cleanly, and reports no error.
 
 ## Updating
 
-The registered path points into a git checkout, so updating is
-`git -C <checkout> pull` followed by a restart. Nothing is copied and no package
-is installed, so a pull is immediately live. Confirm the skills still appear
-afterwards; an upstream change that adds or renames one moves the count this
-file asserts.
+**The route decides this, and getting it wrong is silent.**
+
+- **Route 1 (git package).** The clone under `~/.pi/agent/git/` is independent of
+  any other working copy. `git pull` elsewhere does nothing to it. Use
+  `pi update <source>`, or `pi update --extensions` to reconcile every package
+  to its configured ref. Restart afterwards.
+- **Route 2 (local directory).** `git -C <checkout> pull`, then restart. Nothing
+  was copied, so the pull is live immediately.
+
+Either way, confirm the ten skills still appear: an upstream change that adds or
+renames one moves the count this file asserts.
+
+**Do not add a `package.json` with a `pi` key to this repository.** Convention
+discovery applies only when no `pi` manifest is present, so adding one turns it
+off — and a manifest that declares `extensions` but forgets `skills` produces an
+install that registers nothing while looking deliberate.
