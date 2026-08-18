@@ -217,3 +217,16 @@ jobs:
         run: bash reference/test/queue-edit.test.sh
       - name: Queue edit library tests (zsh)
         run: zsh reference/test/queue-edit.test.sh
+
+      # moc-sync.sh derives a status MOC from note frontmatter, replacing an
+      # instruction that told an agent to move entries between sections by hand.
+      # Its failure mode is a PLAUSIBLE MOC — correct headings above silently
+      # missing notes — so the suite pins the four unplaceable-note reports and
+      # both senses of idempotence, not just that the function returns 0. Under
+      # zsh specifically: `status` is read-only, unquoted expansions are not
+      # word-split, and a bare in-loop `local` prints `name=value` onto stdout,
+      # i.e. into the rendered MOC. All three are only visible under zsh.
+      - name: MOC sync library tests (bash)
+        run: bash reference/test/moc-sync.test.sh
+      - name: MOC sync library tests (zsh)
+        run: zsh reference/test/moc-sync.test.sh

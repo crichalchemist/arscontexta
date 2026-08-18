@@ -759,13 +759,20 @@ if [ "$v" -ge 2 ] && [ ! -r "$VAULT_ROOT/ops/lib/queue_edit.py" ]; then
   echo "FAIL: queue-edit companion queue_edit.py missing or unreadable at '$VAULT_ROOT/ops/lib/queue_edit.py'"
   echo "      every YAML queue write will fail until it is restored; run /arscontexta:upgrade"
 fi
+
+# DELIBERATELY AFTER the queue_edit.py test, not beside the three calls above. That test
+# reads `$v`, which still holds queue-edit's version from the check_lib call preceding it
+# in this same fence. A moc-sync call inserted between the two would leave $v at 1, so
+# `[ "$v" -ge 2 ]` would go false and the companion check would stop firing — PASSing while
+# testing nothing.
+check_lib "$VAULT_ROOT/ops/lib/moc-sync.sh"        MOC_SYNC_VERSION        moc-sync        1
 ```
 
 **Thresholds:**
 
 Applied to **each** library independently; the category FAILs if any row FAILs. The floor is
 per-library, derived from the consuming skills' own guards (link-extraction 4, frontmatter 1,
-queue-edit 2 — re-derive from the guards, per the comment in the fence).
+queue-edit 2, moc-sync 1 — re-derive from the guards, per the comment in the fence).
 
 | Condition | Result |
 |-----------|--------|
@@ -776,7 +783,7 @@ queue-edit 2 — re-derive from the guards, per the comment in the fence).
 
 There is no WARN band. A library is a precondition, not a quality measure: the skills that source it either run or do not.
 
-**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — `queue-edit.sh` is the newest of the three, so on most existing vaults it is the queue-edit row that fires, missing rather than merely outdated. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
+**Ranking:** when this category FAILs, place `run /arscontexta:upgrade` **first** in Recommended Actions. Every vault generated before a library shipped will report that library's FAIL at its next session-start quick check, through no fault of the user — `moc-sync.sh` is the newest of the four, so on most existing vaults it is the moc-sync row that fires, missing rather than merely outdated, with `queue-edit.sh` the next most likely for the same reason. Ranked below three other items it reads as noise; ranked first it reads as what it is — broken commands with a one-command fix.
 
 **Example output:**
 

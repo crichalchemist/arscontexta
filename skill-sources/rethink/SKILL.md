@@ -289,24 +289,57 @@ Present the full triage to the user before executing any changes:
 
 Use AskUserQuestion: "Review the triage above. Approve all, or list items to reclassify (e.g., 'keep obs-003 pending, promote obs-007 instead')."
 
-**Wait for user confirmation before proceeding to 1d.** Do not execute triage without approval.
+**If an approval channel is available, wait for confirmation before proceeding to 1d.**
+
+**If no approval channel is available** (subagent execution, where `AskUserQuestion` cannot
+be used), proceed under the split below rather than stalling. A run that generates a triage
+and then stops has produced nothing a later invocation can act on, which is how 21+
+proposals accumulated across three runs.
+
+| Act | Branches | Without a channel |
+|---|---|---|
+| frontmatter status edit | ARCHIVE, KEEP PENDING, **BLOCKED** | **proceed** — reversible, recorded in the note's own history |
+| note creation | PROMOTE step 1 | **defer** to the pending artifact |
+| file/section modification | IMPLEMENT step 1 | **defer** to the pending artifact |
+| methodology elevation | METHODOLOGY | **defer** to the pending artifact |
+
+All six `1d` branches appear in this table. Deferring is not skipping: the item is persisted
+with its full disposition and reasoning, so the approval invocation need not re-derive the
+triage.
 
 ### 1d. Execute Triage
 
 After user confirmation, apply all dispositions in order:
 
 **For PROMOTE items:**
+
+**If no approval channel is available:** do not perform this act. Append the item to
+`ops/rethink/pending.yaml` per Phase 1e with `act: promote`, and leave the source observation/tension at its
+current status — a status claiming an act that did not happen is worse than a pending one,
+because nothing downstream can tell the difference.
+
 1. Create {DOMAIN:note} with prose-as-title in {vocabulary.notes}/
 2. Follow standard note schema: YAML frontmatter (description, type, created), body developing the insight, Topics footer linking to relevant {vocabulary.topic_map}(s)
 3. The observation content becomes the seed for the note body — but develop it fully, do not just copy the observation
 4. Update the observation: set `status: promoted`, add `promoted_to: [[note title]]`
 
 **For IMPLEMENT items:**
+
+**If no approval channel is available:** do not perform this act. Append the item to
+`ops/rethink/pending.yaml` per Phase 1e with `act: implement`, and leave the source observation/tension at its
+current status — a status claiming an act that did not happen is worse than a pending one,
+because nothing downstream can tell the difference.
+
 1. Make the specific change to the identified file/section
 2. Show the change to the user (before/after) and get confirmation if the change is non-trivial
 3. Update the observation/tension: set `status: implemented`, add `implemented_in: [filepath]`
 
 **For METHODOLOGY items:** (see Phase 2 below)
+
+**If no approval channel is available:** do not perform this act. Append the item to
+`ops/rethink/pending.yaml` per Phase 1e with `act: methodology`, and leave the source observation/tension at its
+current status — a status claiming an act that did not happen is worse than a pending one,
+because nothing downstream can tell the difference.
 
 **For ARCHIVE items:**
 1. Update observation status: `status: archived`, and add `archived_reason: [why]` in the SAME edit.
@@ -326,13 +359,126 @@ After user confirmation, apply all dispositions in order:
    and re-reviewing something whose blocker has not moved is exactly the routing defect it causes.
 3. Revisit when the blocker clears: `blocked` is a live state, not an archive.
 
-**Update MOCs:** After triage execution, update `ops/observations.md` and `ops/tensions.md` to reflect status changes. Move entries between Pending/Promoted/Blocked/Archived/Resolved/Dissolved sections as appropriate.
+**Rebuild MOCs:** After triage execution, rebuild `ops/observations.md` and
+`ops/tensions.md` from frontmatter. The rebuild is idempotent and authoritative on
+membership, links and counts; existing summaries are preserved. **Do not move entries by
+hand** — they will be regenerated, and a hand-move cannot correct a status that changed
+outside this run, which is how the MOC diverged three times.
+
+```bash
+MOC_LIB="ops/lib/moc-sync.sh"
+FM_LIB="ops/lib/frontmatter.sh"
+for lib in "$MOC_LIB" "$FM_LIB"; do
+  if [ ! -r "$lib" ]; then
+    echo "error: library not found at '$lib'" >&2
+    echo "       run /arscontexta:upgrade to restore it" >&2
+    exit 1
+  fi
+done
+. "$FM_LIB"
+. "$MOC_LIB"
+
+if [ "${MOC_SYNC_VERSION:-0}" -lt 1 ]; then
+  echo "error: ops/lib/moc-sync.sh is older than this skill requires (need >= 1, have ${MOC_SYNC_VERSION:-none})" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+# THE MAP IS ONE QUOTED ARGUMENT. Unquoted, zsh passes the whole string as a single
+# argument, only the first pair is honoured, and every non-open note is silently
+# dropped at rc 0 — on the user-facing path, under the shell half of real users run.
+# REPORT PER MOC, AND DO NOT CLAIM MORE THAN IS TRUE. A single rc collapsed both rebuilds
+# into one verdict, so a vault with observations but no ops/tensions/ — a shape
+# validate-kernel.sh's C1 explicitly tolerates — got "the MOCs are unchanged" after the
+# observations MOC had already been rewritten. Naming which side failed is the difference
+# between a user trusting the file and a user re-deriving it by hand.
+rc=0
+if rebuild_status_moc ops/observations.md ops/observations "$MOC_MAP_OBSERVATIONS"; then
+  echo "ops/observations.md rebuilt from frontmatter."
+else
+  echo "error: observations MOC rebuild failed; ops/observations.md is unchanged" >&2
+  rc=1
+fi
+if rebuild_status_moc ops/tensions.md ops/tensions "$MOC_MAP_TENSIONS"; then
+  echo "ops/tensions.md rebuilt from frontmatter."
+else
+  echo "error: tensions MOC rebuild failed; ops/tensions.md is unchanged" >&2
+  rc=1
+fi
+if [ "$rc" -ne 0 ]; then
+  echo "warn: at least one MOC did not rebuild — the messages above say which." >&2
+  echo "      CONTINUE the run regardless: deferred acts are persisted in Phase 1e, and" >&2
+  echo "      aborting here would discard them, which is worse than a stale MOC." >&2
+fi
+echo "Unplaceable notes, if any, are reported above."
+```
+
+### 1e. Persist Deferred Acts and Proposals
+
+**File:** `ops/rethink/pending.yaml`, a bare YAML list. **Deliberately NOT the operational
+queue:** no queue schema declares `awaiting_approval`, and a status no consumer declares is
+exactly the unfalsifiable state this skill legislates against elsewhere.
+
+**Item shape:**
+
+```yaml
+- id: p-2026-08-17-001
+  act: implement             # promote | implement | methodology | proposal
+  status: awaiting_approval  # -> approved | rejected | deferred
+  source: observations/some-observation-slug.md
+  summary: One line, what would change
+  detail: |
+    The full disposition and its reasoning, so the approving invocation
+    need not re-derive the triage.
+```
+
+```bash
+QE_LIB="ops/lib/queue-edit.sh"
+if [ ! -r "$QE_LIB" ]; then
+  echo "error: library not found at '$QE_LIB'" >&2
+  echo "       run /arscontexta:upgrade to restore it" >&2
+  exit 1
+fi
+. "$QE_LIB"
+
+if [ "${QUEUE_EDIT_VERSION:-0}" -lt 2 ]; then
+  echo "error: ops/lib/queue-edit.sh is older than this skill requires (need >= 2, have ${QUEUE_EDIT_VERSION:-none})" >&2
+  echo "       run /arscontexta:upgrade to refresh it" >&2
+  exit 1
+fi
+
+mkdir -p ops/rethink || exit 1
+
+# THE SEED MUST BE AN EMPTY FILE, NEVER '[]'. queue_yaml appends a BLOCK sequence; appended
+# beneath a flow-style '[]' the result is not a YAML document at all — and queue_yaml still
+# reports success. Verified both ways: an empty seed parses to a list of one dict, while the
+# '[]' seed raises yaml.parser.ParserError while queue_edit prints "1 task(s) updated".
+[ -f ops/rethink/pending.yaml ] || : > ops/rethink/pending.yaml
+```
+
+Write **one `queue_yaml` call per item**, each carrying the fields above. A zero-match
+`--where` fails loud rather than silently writing nothing — that silence is what left seven
+fences dead for a month.
+
+**Then CONTINUE to Phase 2. Phase 1e persists and moves on; it does NOT end the run.**
+
+Termination belongs only at the Phase 5 proposal gate, which is the last decision the run
+makes. Ending the run here would make that gate's no-channel branch — and the `**Pending:**`
+line in the session log, which is written *after* rethink completes — unreachable in exactly
+the no-channel case this phase exists to serve. Carry the count forward; it is reported once,
+at the end, together with any proposals deferred later in the same run.
 
 ---
 
 ## Phase 2: Methodology Folder Updates
 
 For items triaged as METHODOLOGY, create or update notes in `ops/methodology/`.
+
+**If no approval channel is available, do NOT create or update anything here.** Those items
+were already deferred to `ops/rethink/pending.yaml` with `act: methodology` in 1d; creating
+the note anyway would perform the exact act the deferral withheld, and Phase 1's act split
+would be undone one phase later. Skip to Phase 3. This guard is what makes 1d's
+"(see Phase 2 below)" safe to follow.
 
 ### Creating New Methodology Notes
 
@@ -559,7 +705,31 @@ If 10+ pending or open observations or 5+ pending or open tensions remain after 
 
 ### User Approval Interaction
 
-Use AskUserQuestion: "Which proposals should I implement? (all / none / list numbers, e.g. '1, 3'). You can also ask me to modify a proposal before deciding."
+**If an approval channel is available,** use AskUserQuestion: "Which proposals should I implement? (all / none / list numbers, e.g. '1, 3'). You can also ask me to modify a proposal before deciding."
+
+**If no approval channel is available,** write each proposal to `ops/rethink/pending.yaml` per
+Phase 1e with `act: proposal` and `status: awaiting_approval`, then report and exit 0 — do not
+wait. **This is the only place the run terminates without a channel**, and the count it reports
+covers everything written to the artifact this run, including the acts Phase 1e deferred
+earlier:
+
+```
+Pending acts and proposals: [count] written to ops/rethink/pending.yaml
+These await human review. Read the file and act on the items directly.
+```
+
+**Do not print an invocation that does not exist.** The first version of this report said
+"Resume with: `/rethink approve`", and `approve` is not one of this skill's targets — it would
+fall through to the "specific observation filename" rule and run a fresh full rethink,
+appending a SECOND batch to the same file. Nothing in the system reads `pending.yaml` yet:
+every reference to it is a write, and `awaiting_approval` has no consumer. Persisting the run's
+output so it is not lost is what this design claims; **draining it is a separate piece of work
+and is recorded in the plan's Deferrals**. Telling a user to run a command that silently does
+something else is worse than telling them nothing.
+
+This does not weaken "Auto-implement system changes — proposals require human
+approval, always": a *persisted* proposal is not an implemented one. The approval still
+happens, in a separate invocation that reads the artifact instead of re-deriving it.
 
 **Handle each response:**
 
@@ -628,6 +798,7 @@ After rethink completes, capture the session itself. Create or append to `ops/re
 **Triage:** [count] promoted, [count] methodology, [count] implemented, [count] archived, [count] pending
 **Patterns:** [count] detected
 **Proposals:** [count] generated, [count] approved, [count] rejected, [count] deferred
+**Pending:** [count] awaiting approval in `ops/rethink/pending.yaml`
 **Changes applied:** [list of files modified]
 ```
 
