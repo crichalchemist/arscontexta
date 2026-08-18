@@ -894,15 +894,16 @@ that makes a shrinking scope impossible to mistake for a clean one — re-derive
 either number:
 
 ```bash
-awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 13 in scope
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh   # the 14 in scope
 grep -c 'session-orient' reference/check-prose-paths.sh                    # 2: both now listed
 ```
 
-**It became thirteen on the branch that rewrote `.opencode/INSTALL.md` and added
-`.pi/INSTALL.md`, both as procedures a host's own model executes.** That shape makes them
-dense with repo paths — `skills/`, `reference/hosts/opencode-tools.md`,
-`.opencode/plugins/arscontexta.js`, `.pi/extensions/arscontexta.ts` — so both were added to
-SCOPE in the same change. Recorded here rather than silently corrected, per the paragraph
+**It became fourteen on the branch that rewrote `.opencode/INSTALL.md` and added
+`.pi/INSTALL.md` and `.codex-plugin/INSTALL.md`, all three as procedures a host's own
+model executes.** That shape makes them dense with repo paths — `skills/`,
+`reference/hosts/codex-tools.md`, `.opencode/plugins/arscontexta.js`,
+`.pi/extensions/arscontexta.ts` — so all three were added to SCOPE in the same change.
+Recorded here rather than silently corrected, per the paragraph
 above; the count in the fence moved with them, and it is still ungated, so the command
 remains the only thing to trust.
 

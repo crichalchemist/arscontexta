@@ -50,7 +50,7 @@ the adapter is run.
 | Host | Adapter | Install | Tool mapping | Verified |
 |---|---|---|---|---|
 | Claude Code | `.claude-plugin/plugin.json` | `/plugin install arscontexta@agenticnotetaking` | native | yes |
-| Codex | `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json` | via the Codex plugin marketplace | `reference/hosts/codex-tools.md` | **not yet** |
+| Codex | `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json` | `.codex-plugin/INSTALL.md` | `reference/hosts/codex-tools.md` | **not yet** |
 | OpenCode | `.opencode/plugins/arscontexta.js` | `.opencode/INSTALL.md` | `reference/hosts/opencode-tools.md` | **not yet** |
 | Pi | `.pi/extensions/arscontexta.ts` | `.pi/INSTALL.md` | `reference/hosts/pi-tools.md` | **not yet** |
 

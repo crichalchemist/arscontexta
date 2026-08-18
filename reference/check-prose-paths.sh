@@ -55,6 +55,7 @@ hooks/scripts/session-orient.sh
 platforms/claude-code/hooks/session-orient.sh.template
 .opencode/INSTALL.md
 .pi/INSTALL.md
+.codex-plugin/INSTALL.md
 "
 
 # Repo top-level directories. A path must start with one of these to be treated
