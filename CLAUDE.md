@@ -902,10 +902,20 @@ grep -c 'session-orient' reference/check-prose-paths.sh                    # 2: 
 `.pi/INSTALL.md` and `.codex-plugin/INSTALL.md`, all three as procedures a host's own
 model executes.** That shape makes them dense with repo paths — `skills/`,
 `reference/hosts/codex-tools.md`, `.opencode/plugins/arscontexta.js`,
-`.pi/extensions/arscontexta.ts` — so all three were added to SCOPE in the same change.
+`reference/hosts/pi-tools.md` — so all three were added to SCOPE in the same change.
 Recorded here rather than silently corrected, per the paragraph
 above; the count in the fence moved with them, and it is still ungated, so the command
 remains the only thing to trust.
+
+**One of those example paths is gone.** The Pi extension this repository shipped
+under `.pi/` was deleted on `fix/pi-package-route`, once Pi's own packages
+documentation established that a package shipping no `pi` manifest has its `skills/`
+directory auto-discovered — the extension's entire body registered that same
+directory. The example above now names a path that still exists; SCOPE itself is
+unchanged, and the command above remains the only thing to trust for its size. The
+deleted path is deliberately not spelled as a path here — prose asserting a file that
+does not exist is the property `check-prose-paths.sh` rejects, though see divergence
+17 for why that gate could not currently see it.
 
 The scope count itself is not gated — `check-doc-claims.sh` reads a different sentence in this file
 for a different quantity, and a gate that reads one phrasing does not protect a synonym, per this
@@ -1360,6 +1370,36 @@ own spec and is explicitly out of scope for Spec H.
 generator counterpart for the enforced tier that today exists only as hand-written vault code. Both
 are generation-surface changes. Until then, every "we fixed it in the generator" in this file should
 be read as "we fixed it for vaults not yet created".
+
+**17. `check-prose-paths.sh` cannot see any path under a dot-directory, and widening it is
+NOT a one-token fix.** Filed 2026-08-18 from `fix/pi-package-route`. `PREFIXES` lists eleven
+top-level names plus `.github`; `.pi`, `.opencode`, `.codex-plugin`, `.claude-plugin` and
+`.agents` are absent, so a path naming any of those trees fails the prefix filter and is
+counted in neither `found` nor `missing`. The three host INSTALL docs were added to SCOPE
+precisely because they are dense with repo paths — and the adapter paths they and `README.md`
+name are exactly the ones the filter drops. This branch deleted a file that `CLAUDE.md` then
+named in prose, and the gate reported `0 missing`: it passed on absence, not on correctness.
+
+**Measured by probe, and the result is why this is deferred rather than fixed.** Adding the
+five dot-prefixes moves the check from `309 paths, 0 missing` to `330 paths, 3 missing`.
+**Only one of the three was a real defect** — this branch's own, fixed before commit. The
+other two are `.pi/settings.json`, named twice in `.pi/INSTALL.md`, which is **a user's
+project config file, not a file in this repository**. That is the design problem in one line:
+`.pi/`, `.opencode/` and `.codex-plugin/` each name both a directory here and the
+conventional per-project config directory on the host, so a prefix match cannot separate a
+repo path from a host path, and a naive widening turns correct prose into a FAIL. Any real
+fix needs a per-prefix rule about which side of that line a token falls on.
+
+Deferred to the CI-hardening spec, per this file's standing rule that building a missing gate
+is a gate-design question and does not get bolted on to the branch that finds it. Re-derive —
+the probe is a copy with the prefixes prepended, run from inside `reference/` because the
+script resolves its scope relative to its own location and fails loudly when that scope comes
+out empty:
+
+```bash
+/usr/bin/grep -n '^PREFIXES=' reference/check-prose-paths.sh    # .pi and friends absent
+bash reference/check-prose-paths.sh | tail -2                   # 0 missing -- dot-paths unseen
+```
 
 ### Closed divergences
 
