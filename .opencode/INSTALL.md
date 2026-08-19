@@ -42,6 +42,39 @@ nothing. Symlinking it does work — both Bun and Node resolve a symlinked modul
 to its real path before evaluating it, so `../../skills` still lands inside the
 checkout. Step 2 asserts this rather than trusting it.
 
+## A second route exists — measured, and deliberately not adopted
+
+OpenCode also finds skills by convention with no adapter at all, but only where
+they sit **inside one of its config directories**. This loads the same ten with
+no plugin file anywhere:
+
+```bash
+ln -sfn /absolute/path/to/arscontexta/skills "$HOME/.config/opencode/skills"
+```
+
+Measured on `opencode 1.14.24` with `opencode debug skill`, against an otherwise
+empty project in a sandboxed `HOME`: `~/.config/opencode/skills/` lists all ten
+as a plain copy, as a symlink to the checkout's `skills/`, and as a directory of
+per-skill symlinks. Per project, `.opencode/skills/` and `.opencode/skill/` do
+the same. With none of them present the listing is empty, which is what makes
+those readings attributable rather than coincidental.
+
+What no convention reaches is a `skills/` directory at a **project root** —
+this repository's own layout. A project holding `skills/` and nothing else
+lists empty, and stays empty when given a `.opencode/` directory, an
+`opencode.json`, or a `.claude/` or `.agents/` directory. That is why the
+adapter is load-bearing here rather than redundant.
+
+The checkout itself looks like a counter-example and is not one. Running
+OpenCode inside this repository lists all ten with no global install, because
+`.opencode/plugins/arscontexta.js` already sits on the **project-local** plugin
+path. That is the adapter working from where it lives, not a convention: the
+same directory with that file removed lists nothing.
+
+Choosing between the two routes is an install-surface decision rather than a
+repair, so this document still prescribes the adapter and records the measured
+alternative instead of switching to it.
+
 ## Step 1 — Prerequisites
 
 The skills shell out to these. A missing one fails at run time, long after the
@@ -103,22 +136,58 @@ if [ ! -L "$LINK" ] || [ ! -e "$LINK" ]; then
   echo "INSTALL: FAIL — $LINK is not a symlink that resolves"; exit 1
 fi
 
-# Count skills by the property that defines one — a directory holding SKILL.md.
-# `ls -1 | wc -l` counts entries, so a stray file (a macOS .DS_Store) fails a good install.
+# Two counts follow, and the second is the one that matters.
+
+# Repo-side: skills present in the checkout, counted by the property that
+# defines one — a directory holding SKILL.md. (`ls -1 | wc -l` counts entries,
+# so a stray macOS .DS_Store would fail a good install.) Catches a wrong REPO.
 n=$(find "$REPO/skills" -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
-if [ "$n" -eq 10 ]; then
-  echo "INSTALL: PASS — $LINK -> $REPO, $n skills reachable"
-else
+if [ "$n" -ne 10 ]; then
   echo "INSTALL: FAIL — expected 10 skills in $REPO/skills, found $n"; exit 1
+fi
+
+# Host-side: what OpenCode actually resolved. The count above passes on a
+# machine with no OpenCode installed at all, so alone it establishes nothing
+# about this install. Match on the checkout path rather than on the total: a
+# user with other skills installed would otherwise fail a correct install.
+#
+# Redirect to a file. Do NOT pipe it and do NOT use $( ) — `opencode debug
+# skill` stops writing after roughly one pipe buffer and still exits 0, so a
+# pipeline silently reads a truncated listing and reports a smaller count that
+# looks entirely plausible. Measured on 1.14.24: 336648 bytes to a file,
+# 65536 through $( ), and 135360 on one run, so it is not even consistent.
+if ! command -v opencode >/dev/null 2>&1; then
+  echo "INSTALL: PARTIAL — $LINK -> $REPO, $n skills in the checkout; host side"
+  echo "  unverified, no 'opencode' on PATH. Report this in Step 6."
+else
+  tmp=$(mktemp) || { echo "INSTALL: FAIL — cannot create a temp file"; exit 1; }
+  if ! opencode debug skill > "$tmp" 2>/dev/null; then
+    echo "INSTALL: PARTIAL — $LINK -> $REPO, $n skills in the checkout; host side"
+    echo "  unverified, 'opencode debug skill' failed. Report this in Step 6."
+  else
+    loaded=$(grep -cF "\"location\": \"$REPO/skills/" "$tmp")
+    if [ "$loaded" -eq 10 ]; then
+      echo "INSTALL: PASS — OpenCode resolved $loaded skills from $REPO"
+    else
+      echo "INSTALL: FAIL — OpenCode resolved $loaded of 10 skills from $REPO"
+      rm -f "$tmp"; exit 1
+    fi
+  fi
+  rm -f "$tmp"
 fi
 ```
 
-**Assert:** the last line reads `INSTALL: PASS`.
+**Assert:** the last line reads `INSTALL: PASS`, or `INSTALL: PARTIAL` with a
+reason named. `PARTIAL` is not failure: it means the checkout side is right and
+the host side could not be checked from here. Carry it into Step 6 rather than
+reporting a clean install.
 
-**On failure:** report which of the five branches fired. Do not tell the user to
-restart — an unresolvable symlink loads nothing, and a wrong `REPO` produces a
-link that exists and registers an empty directory, which is the worse outcome
-because it looks installed.
+**On failure:** report which branch fired, quoting its message — the fence names
+exactly one, and no numeral is given here on purpose, because a count of branches
+in prose goes stale the moment the fence gains one. Do not tell the user to
+restart: an unresolvable symlink loads nothing, and a wrong `REPO` produces a link
+that exists and registers an empty directory, which is the worse outcome because
+it looks installed.
 
 Running this twice is a no-op; `ln -sfn` replaces an existing link in place, so
 it is safe to re-run after a partial attempt.
