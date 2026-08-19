@@ -12,6 +12,15 @@ on:
 jobs:
   portability:
     runs-on: ubuntu-latest
+    # Measured over the last 11 completed runs: the job finishes in about two
+    # minutes and its slowest step, the apt install below, takes 9-20s. On
+    # 2026-08-18 a pull_request run wedged inside that step for over three hours
+    # and did not respond to a cancel. With no timeout declared the job inherits
+    # GitHub's 360-minute default, so a wedged runner reads as `in progress` for
+    # six hours instead of failing — a run that neither passes nor fails, which
+    # is indistinguishable from one still working. This bounds the damage. It
+    # does not make the step reliable; that is not something this repo controls.
+    timeout-minutes: 20
     steps:
       # fetch-depth: 0 is REQUIRED by the placeholder gate below and is not a
       # preference. The default is depth 1, under which `git merge-base` cannot
@@ -28,8 +37,12 @@ jobs:
       # image. The fence-isolation gate asserts its tools are present and halts
       # loudly if they are not — installing them here keeps that assertion from
       # ever firing for an environment reason.
+      # `-y` answers the prompt. DPkg::Lock::Timeout covers the OTHER way this
+      # step hangs forever: blocking on the dpkg lock held by the runner image's
+      # own unattended-upgrades, which apt waits on with no bound at all. A
+      # bounded wait fails the step; an unbounded one wedges the whole job.
       - name: Install ripgrep, zsh, jq and bc
-        run: sudo apt-get update && sudo apt-get install -y ripgrep zsh jq bc
+        run: sudo apt-get update && sudo apt-get install -y -o DPkg::Lock::Timeout=120 ripgrep zsh jq bc
       - name: Portability guard
         run: bash reference/check-portability.sh
       # Checks the CHECKOUT, not the packaged plugin -- see the script's banner,
