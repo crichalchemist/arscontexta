@@ -1,5 +1,5 @@
 ---
-description: Philosophy with proof of work — for agents, this is verifiable constraint: the system cannot claim what it does not practice, and agents can test claims against vault structure
+description: "Philosophy with proof of work — for agents, this is verifiable constraint: the system cannot claim what it does not practice, and agents can test claims against vault structure"
 kind: research
 topics: ["[[note-design]]"]
 methodology: ["Original"]
