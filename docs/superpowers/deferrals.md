@@ -547,8 +547,11 @@ sed -n '/^FM_ALLOW="/,/^"$/p' reference/check-portability.sh | /usr/bin/grep -c 
 
 ### 24. `check-prose-paths.sh`'s SCOPE count is itself an ungated prose numeral
 
-**What:** CLAUDE.md states the gate's SCOPE count in prose (`:782`, "across 11 documents") and
-republishes it inside its own bash re-derive block (`:805-806`). Neither numeral is checked by any
+**FIRED 2026-08-23** — and independently of what tripped it. The prose half is fixed on
+`fix/ci-timeout-bound`; the gate half below is unchanged and still owned by the CI-hardening spec.
+
+**What:** the sentence stating the gate's SCOPE count in prose ("across 11 documents") and
+republishing it inside its own bash re-derive block. Neither numeral is checked by any
 gate — `check-doc-claims.sh` reads other sentences in this file for other quantities (the
 executable-checks count, the CI-step count) and never mentions `check-prose-paths.sh` at all, so a
 gate that reads one phrasing does not protect a synonym, per this file's own opening paragraph on
@@ -562,7 +565,20 @@ claim-registration mechanism, not to `check-prose-paths.sh`, and is out of Task 
 question, per the gate-table row near the top of CLAUDE.md ("Building the missing check is a
 gate-design question and belongs to the CI-hardening spec").
 
-**Reopens if:** `check-prose-paths.sh`'s SCOPE list changes size again without CLAUDE.md's stated
+**How it actually fired:** by drift, exactly as predicted, and it had already fired before the
+split noticed. SCOPE went 11 -> 14 on the host-adapter branch while the prose stayed at eleven;
+the same file said "It became fourteen" thirty-three lines below the stale "across 11 documents",
+and no gate saw either. The split then took SCOPE to 16, which would have made the numeral wrong
+a third time.
+
+**Fixed on that branch (prose only):** the live numeral is REMOVED, not re-minted — the sentence
+now reads "across the documents in its stated SCOPE list", and the entry's own re-derive command
+carries the count. Re-minting it as "fourteen" or "sixteen" would have reproduced the exact defect
+this entry describes; the precedent is the main-side CI-step count, fixed the same way. A history
+sentence recording the 16 was appended beside the existing one, because a numeral describing a
+past event does not rot. The sentence now lives in `docs/open-divergences.md`, not `CLAUDE.md`.
+
+**Reopens if:** `check-prose-paths.sh`'s SCOPE list changes size again without the stated
 count moving with it, found by drift rather than by a gate. Or: `check-doc-claims.sh` gains a
 mechanism generic enough to register an arbitrary computed-count-vs-prose-numeral pair without a
 bespoke assertion, at which point this pair should be its first user.
@@ -571,9 +587,12 @@ bespoke assertion, at which point this pair should be its first user.
 `fix/post-merge-hardening`
 
 ```bash
-awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | /usr/bin/grep -c .   # 11, the live count
-/usr/bin/grep -c 'across 11 documents' CLAUDE.md                                                 # 1, the prose claim
-/usr/bin/grep -c 'check-prose-paths' reference/check-doc-claims.sh                                # 0: gate never reads this file's name
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | /usr/bin/grep -c .   # 16, the live count
+# POSITIVE assertion on the new wording. The old form was `grep -c 'across 11 documents' CLAUDE.md`,
+# which returns 0 at exit 0 the moment the phrase moves or is reworded -- passing on absence, the
+# very failure class this repo is about, inside a deferral entry about ungated numerals.
+/usr/bin/grep -c 'across the documents in its stated SCOPE list' docs/open-divergences.md         # 1, the prose claim
+/usr/bin/grep -c 'check-prose-paths' reference/check-doc-claims.sh                                # 0: gate STILL never reads this file's name
 ```
 
 ---
