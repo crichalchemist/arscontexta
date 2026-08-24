@@ -368,6 +368,8 @@ arscontexta/
 |-- presets/                     # Pre-validated configurations
 |-- scripts/                     # Utility scripts
 |-- docs/                        # Specs and implementation plans
+|   |-- verification.md          # The run fence and the gate table
+|   +-- open-divergences.md      # Known defects, a re-derive command each
 |-- .github/                     # CI workflows
 |-- CLAUDE.md                    # Repo guidance for coding agents
 |-- CONTRIBUTING.md              # Human contribution workflow
@@ -408,9 +410,9 @@ suites that each run under both `bash` and `zsh` -- several shipped defects were
 forks, so one shell is not enough. Most run in CI on every push; kernel validation and
 `reference/test/check-doc-claims.test.sh` are the exceptions, the former because it needs
 a generated vault to run against and the latter deliberately, since each run already costs
-three invocations of the script it tests. See `CLAUDE.md`'s Verification section for why.
+three invocations of the script it tests. See `docs/verification.md` for why.
 
-`CONTRIBUTING.md` carries the commands and the contribution workflow. `CLAUDE.md`
+`CONTRIBUTING.md` carries the commands and the contribution workflow. `docs/verification.md`
 carries the gate table -- what each gate uniquely catches, and, more usefully, what
 none of them catch.
 

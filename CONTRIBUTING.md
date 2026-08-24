@@ -141,7 +141,7 @@ field vault today, which is that vault's content and not a regression here.
 
 **That is a criterion about primitives, and it deliberately does not quote a total.** An earlier
 revision of this line replaced it with one private vault's result-line totals, which is a different
-quantity — `CLAUDE.md` explains at length that the summary counts result lines rather than
+quantity — `docs/verification.md` explains at length that the summary counts result lines rather than
 primitives, that primitive 2 emits two of them, and that the total equalling 15 is a coincidence of
 arithmetic. Quoting a measurement here also mints a number no gate can check, because CI has no
 generated vault to measure: it would go stale the first time anyone fixed anything in the vault it
@@ -266,7 +266,7 @@ took it at its word (`741b2b7`, `c122d9e`), each claiming in its message that so
 "recorded" when the only copy was in scratch. Neither author was confused about `.superpowers/`
 being ignored; the tracked guidance had said that was fine.
 
-**Where a record actually goes:** `CLAUDE.md`'s divergence list for a defect that survives the
+**Where a record actually goes:** `docs/open-divergences.md` for a defect that survives the
 branch, the plan's `## Deferrals` section for work consciously not done, the spec for a decision.
 **Plans from this branch forward** carry a required `## Deferrals` slot whose value is either one
 line per deferral naming the tracked file it landed in, or the literal word `none` — an empty slot
@@ -293,7 +293,7 @@ next author copies the last plan.
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
 executed and merged. A status file that lies about status is this project's own defect class wearing
 a different hat. Tick as you go, or delete the checkboxes and point at a **tracked** record — a
-completion note in the plan itself, or the divergence entry in `CLAUDE.md`.
+completion note in the plan itself, or the divergence entry in `docs/open-divergences.md`.
 
 This sentence used to end "point at the ledger", which contradicted the paragraph above: ledgers
 under `.superpowers/sdd/` are git-ignored, so pointing a status file at one reintroduces exactly the

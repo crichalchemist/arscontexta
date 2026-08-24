@@ -112,7 +112,7 @@ jobs:
       # configured threshold, and INVERTING vaultguard's inertness were all
       # caught by nothing at all.
       #
-      # The first two are the exact defects CLAUDE.md divergence 3 documents.
+      # The first two are the exact defects docs/open-divergences.md divergence 3 documents.
       # vaultguard is the widest: it decides whether every plugin hook runs, so
       # inverting it fires auto-commit and write-validate in EVERY repository the
       # plugin is installed in.

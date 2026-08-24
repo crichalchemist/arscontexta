@@ -161,14 +161,14 @@ truth_check_files() {
 # Anchored on `^echo "<n>. `, the form every check header uses, so adding a check
 # updates this without anyone remembering to. A count of zero means the anchor
 # moved, not that the guard lost its checks.
-# Test SUITES named in CLAUDE.md's verification fence — a different quantity from
+# Test SUITES named in docs/verification.md's run fence — a different quantity from
 # truth_check_files (which counts every gate FILE, standalone checks included).
 # The prose "the N test suites each run under both shells" went stale twice
 # without anyone noticing, because no claim row read it.
 truth_fence_suites() {
     local _n
-    [ -r CLAUDE.md ] || return 1
-    _n=$(awk '/^for s in bash zsh; do/,/^done/' CLAUDE.md | /usr/bin/grep -c 'test\.sh' || true)
+    [ -r docs/verification.md ] || return 1
+    _n=$(awk '/^for s in bash zsh; do/,/^done/' docs/verification.md | /usr/bin/grep -c 'test\.sh' || true)
     [ "${_n:-0}" -gt 0 ] || return 1
     printf '%s' "$_n"
 }
@@ -186,7 +186,7 @@ truth_kernel_primitives() {
 }
 
 # check 7's allowlist totals. Ungated, these drift the moment an entry drains —
-# the check goes green at 73/24 while CLAUDE.md still says 74/25. Global
+# the check goes green at 73/24 while docs/verification.md still says 74/25. Global
 # constraint: gate every number you mint, in the commit that mints it.
 truth_fm_sites() {
     local _n
@@ -301,15 +301,15 @@ CLAIMS='reference/lib/link-extraction.sh|portability check count (word)|s/.*runs
 reference/lib/frontmatter.sh|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
 reference/skill-authoring.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
 skill-sources/next/SKILL.md|portability check count (word)|s/.*runs \([a-z][a-z-]*\) checks.*/\1/p|truth_portability_checks|
-CLAUDE.md|portability check count (word)|s/.*the \([a-z][a-z-]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
-CLAUDE.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) test suites each run under both.*/\1/p|truth_fence_suites|
+docs/verification.md|portability check count (word)|s/.*the \([a-z][a-z-]*\) checks are enumerated above.*/\1/p|truth_portability_checks|
+docs/verification.md|test suites run under both shells (word)|s/.*\*\*the \([a-z][a-z-]*\) test suites each run under both.*/\1/p|truth_fence_suites|
 README.md|kernel primitives|s/.*`reference\/kernel\.yaml` -- \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
 CLAUDE.md|kernel primitives|s/.*`reference\/kernel\.yaml` declares the \([0-9][0-9]*\) primitives.*/\1/p|truth_kernel_primitives|
-CLAUDE.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
+docs/open-divergences.md|divergence 12 matcher sites|s/.*not remembered: \*\*\([0-9][0-9]*\) hits\*\*.*/\1/p|truth_divergence12_matchers|
 reference/lib/frontmatter.sh|check-7 allowlist sites (library header)|s/.*born red at \([0-9][0-9]*\) allowlisted sites.*/\1/p|truth_fm_sites|
-CLAUDE.md|check-7 allowlist sites|s/.*born red at \([0-9][0-9]*\) sites across.*/\1/p|truth_fm_sites|
-CLAUDE.md|check-7 allowlist files|s/.*born red at [0-9][0-9]* sites across \([0-9][0-9]*\) files.*/\1/p|truth_fm_files|
-CLAUDE.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
+docs/verification.md|check-7 allowlist sites|s/.*born red at \([0-9][0-9]*\) sites across.*/\1/p|truth_fm_sites|
+docs/verification.md|check-7 allowlist files|s/.*born red at [0-9][0-9]* sites across \([0-9][0-9]*\) files.*/\1/p|truth_fm_files|
+docs/verification.md|portability check count, gate table (word)|s/.*check-portability\.sh[^a-z]*\([a-z][a-z-]*\) checks:.*/\1/p|truth_portability_checks|
 CONTRIBUTING.md|guard-failure suite total|s/.*guard-failure.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|guard-failure
 CONTRIBUTING.md|link-extraction suite total|s/.*link-extraction.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|link-extraction
 CONTRIBUTING.md|bump-version suite total|s/.*bump-version.*passed=\([0-9][0-9]*\) failed=0.*/\1/p|truth_suite|bump-version
@@ -322,18 +322,18 @@ CONTRIBUTING.md|CI step count (word form)|s/.*[Aa]ll \([a-z][a-z-]*\) CI steps m
 CONTRIBUTING.md|CI step count, green (word)|s/.*means all \([a-z][a-z-]*\) CI steps ran.*/\1/p|truth_ci_steps|
 CONTRIBUTING.md|check inventory (word form)|s/^## Verification — run all \([a-z][a-z-]*\),.*/\1/p|truth_check_files|
 CONTRIBUTING.md|checks in CI (word form)|s/^\([A-Z][a-z]*\) run in CI on every push.*/\1/p|truth_ci_run_checks|
-CLAUDE.md|check inventory (word form)|s/^There are \([a-z][a-z-]*\) executable checks\..*/\1/p|truth_check_files|
-CLAUDE.md|checks in CI (word form)|s/^There are [a-z]* executable checks\. \([A-Z][a-z]*\) run in CI.*/\1/p|truth_ci_run_checks|
-CLAUDE.md|CI step items (this branch)|s/^grep -c .\^      - . \.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps|
-CLAUDE.md|link-extraction fence total|s/^ *\$s reference\/test\/link-extraction\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|link-extraction
-CLAUDE.md|guard-failure fence total|s/^ *\$s reference\/test\/guard-failure\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|guard-failure
-CLAUDE.md|bump-version fence total|s/^ *\$s reference\/test\/bump-version\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|bump-version
-CLAUDE.md|kernel-note-dirs fence total|s/^ *\$s reference\/test\/kernel-note-dirs\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|kernel-note-dirs
-CLAUDE.md|threshold-namespace fence total|s/^ *\$s reference\/test\/threshold-namespace\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|threshold-namespace
-CLAUDE.md|placeholder-count fence total|s/^ *\$s reference\/test\/placeholder-count\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|placeholder-count
-CLAUDE.md|hook-config fence total|s/^ *\$s reference\/test\/hook-config\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|hook-config
-CLAUDE.md|vocabulary-schema fence total|s/^ *\$s reference\/test\/vocabulary-schema\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|vocabulary-schema
-CLAUDE.md|executable check count|s/^ls reference\/check-\*\.sh [^#]*# *\([0-9][0-9]*\).*/\1/p|truth_check_files|'
+docs/verification.md|check inventory (word form)|s/^There are \([a-z][a-z-]*\) executable checks\..*/\1/p|truth_check_files|
+docs/verification.md|checks in CI (word form)|s/^There are [a-z]* executable checks\. \([A-Z][a-z]*\) run in CI.*/\1/p|truth_ci_run_checks|
+docs/open-divergences.md|CI step items (this branch)|s/^grep -c .\^      - . \.github\/workflows\/checks\.yml[^#]*# *\([0-9][0-9]*\).*/\1/p|truth_ci_steps|
+docs/verification.md|link-extraction fence total|s/^ *\$s reference\/test\/link-extraction\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|link-extraction
+docs/verification.md|guard-failure fence total|s/^ *\$s reference\/test\/guard-failure\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|guard-failure
+docs/verification.md|bump-version fence total|s/^ *\$s reference\/test\/bump-version\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|bump-version
+docs/verification.md|kernel-note-dirs fence total|s/^ *\$s reference\/test\/kernel-note-dirs\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|kernel-note-dirs
+docs/verification.md|threshold-namespace fence total|s/^ *\$s reference\/test\/threshold-namespace\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|threshold-namespace
+docs/verification.md|placeholder-count fence total|s/^ *\$s reference\/test\/placeholder-count\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|placeholder-count
+docs/verification.md|hook-config fence total|s/^ *\$s reference\/test\/hook-config\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|hook-config
+docs/verification.md|vocabulary-schema fence total|s/^ *\$s reference\/test\/vocabulary-schema\.test\.sh[^#]*# *\([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p|truth_suite|vocabulary-schema
+docs/open-divergences.md|executable check count|s/^ls reference\/check-\*\.sh [^#]*# *\([0-9][0-9]*\).*/\1/p|truth_check_files|'
 
 while IFS='|' read -r file label extract truthfn arg; do
     [ -n "${file:-}" ] || continue
@@ -417,23 +417,30 @@ check_list_len() {  # <file> <label> <awk program selecting the list> <expected 
 check_list_len CONTRIBUTING.md "verification list is complete" \
     '/^## Verification/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{exit} b&&/reference\//' \
     truth_check_files
-# CLAUDE.md's fence deliberately OMITS validate-kernel.sh -- it needs a generated
+# docs/verification.md's fence deliberately OMITS validate-kernel.sh -- it needs a generated
 # vault and is documented in its own fence directly below. Comparing this list
 # against the raw file count would demand an entry that does not belong here, so
 # the expectation is the count minus that one, and the reason is stated rather
 # than left as an unexplained -1.
 truth_checks_no_vault() { local n; n=$(truth_check_files) || return 1; echo $((n - 1)); }
-check_list_len CLAUDE.md "verification fence is complete" \
+check_list_len docs/verification.md "verification fence is complete" \
     '/^bash reference\/check-portability/{f=1} f&&/^```/{exit} f&&/reference\//' \
     truth_checks_no_vault
 
 # --- divergence-number uniqueness -------------------------------------------
 # SCOPED TO THE DIVERGENCE LIST, NOT THE WHOLE FILE, and that scoping is the
-# whole correctness of this sub-check. CLAUDE.md carries at least two unrelated
-# bold-numbered lists — `## Architecture: three generation paths` numbers 1..3,
-# and `## Known open divergences` numbers 1..13. An unscoped `^\*\*[0-9]+\.`
+# whole correctness of this sub-check. Before the 2026-08-23 split, ONE file carried
+# two unrelated bold-numbered lists — `## Architecture: three generation paths`
+# numbers 1..3, and `## Known open divergences` numbers 1..13. An unscoped `^\*\*[0-9]+\.`
 # extraction reports 1, 2 and 3 as duplicates ON A CLEAN TREE. A gate that fires
 # on correct documents gets deleted rather than fixed.
+#
+# The split moved those two lists into different files (Architecture stayed in
+# CLAUDE.md, the divergences went to docs/open-divergences.md), so the collision this
+# scoping guards against is now cross-file and cannot occur. The scoping is kept
+# because it is still correct and because the two lists could rejoin. What DOES still
+# bite: the range ends at the next `^## `, and docs/open-divergences.md currently has
+# exactly one — adding an h2 below the heading would silently truncate the scan.
 #
 # A GAP IS NOT A DEFECT. The list legitimately skips numbers when entries are
 # collapsed (8 and 9 folded into 7) or closed. Only a REPEATED number is a
@@ -476,11 +483,11 @@ else
     echo "ok     $_ci_tree here, $_ci_main on main"
 fi
 
-printf '  %-18s %-30s ' "CLAUDE.md" "divergence numbers unique"
-if [ ! -r CLAUDE.md ]; then
-    echo "ERROR  CLAUDE.md not readable"; errors=$((errors + 1))
+printf '  %-18s %-30s ' "docs/open-diverg" "divergence numbers unique"
+if [ ! -r docs/open-divergences.md ]; then
+    echo "ERROR  docs/open-divergences.md not readable"; errors=$((errors + 1))
 else
-    section=$(awk '/^## Known open divergences/{f=1;next} f&&/^## /{exit} f' CLAUDE.md)
+    section=$(awk '/^## Known open divergences/{f=1;next} f&&/^## /{exit} f' docs/open-divergences.md)
     nums=$(printf '%s\n' "$section" | sed -n 's/^\*\*\([0-9][0-9]*\)[.,].*/\1/p')
     n_nums=$(printf '%s\n' "$nums" | grep -c . || true)
     if [ "$n_nums" -eq 0 ]; then

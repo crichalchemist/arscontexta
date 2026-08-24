@@ -3,7 +3,7 @@ description: Claude Code allocates 2% of context for skill descriptions (16k cha
 kind: research
 topics: ["[[agent-cognition]]"]
 methodology: ["Original"]
-source: [[agent-platform-capabilities-research-source]], [[composable-knowledge-architecture-research-source]]
+source: ["[[agent-platform-capabilities-research-source]]", "[[composable-knowledge-architecture-research-source]]"]
 ---
 
 # skill context budgets constrain knowledge system complexity on agent platforms

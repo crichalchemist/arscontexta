@@ -31,7 +31,7 @@
 # and check-doc-claims.sh's own header states its totals are BASH-RUN ONLY
 # -- there is nothing for a zsh run of THIS suite to check that a zsh run
 # of the target script wouldn't already need to check first. Matches the
-# precedent CLAUDE.md's Verification section states for
+# precedent docs/verification.md states for
 # check-portability.sh: run under one shell by declared choice, not by
 # omission. It is still listed as a standalone line in both fences (outside
 # the both-shells loop), because check-doc-claims.sh's own check_list_len

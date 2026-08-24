@@ -6,3 +6,9 @@
 .superpowers/
 __pycache__/
 *.pyc
+
+# ASD-STE100 dictionary rule: derived from the ASD-STE100 specification,
+# copyright ASD. Free to download is NOT free to redistribute, and this repo is
+# public — so the rule file is generated locally and never committed. Its
+# generator is not tracked here either; nothing in styles/ is, yet.
+styles/STE/DictionaryFull.yml

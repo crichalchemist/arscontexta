@@ -5,8 +5,9 @@ on 2026-08-11 so that completed work stops loading into every session; the conte
 unchanged from what that file carried.
 
 **This is an archive, not guidance.** Open divergences, the "Won't fix" list, and the
-cross-cutting pattern all remain in `CLAUDE.md`. Entries here are referenced by number from
-that file, which is why they are kept verbatim and in order rather than renumbered.
+cross-cutting pattern all remain in `docs/open-divergences.md`. Entries here are
+referenced by number from that file, which is why they are kept verbatim and in order
+rather than renumbered.
 
 ---
 

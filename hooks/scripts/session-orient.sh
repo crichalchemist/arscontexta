@@ -267,7 +267,7 @@ fi
 #   cmd3 -> 10 = 2 placeholder declarations (template:120,126)
 #              + 2 same-named shell variable, NOT a substitution (:200, :206)
 #              + 6 prose mentions added by this commit (this block, the template's
-#                cross-reference comment, and CLAUDE.md's divergence 3 entry)
+#                cross-reference comment, and docs/open-divergences.md's divergence 3 entry)
 #          SUBSTITUTIONS FOUND: ZERO. That, not the total, is the load-bearing figure.
 #   grep -rn -- '-ge 30\|-gt 30\|mtime +30' skill-sources/ skills/ platforms/ hooks/
 #   grep -rn 'SESS_COUNT" -ge\|INBOX_COUNT" -ge\|DAYS_STALE" -ge' hooks/ platforms/ skill-sources/ skills/

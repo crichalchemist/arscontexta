@@ -3,7 +3,7 @@ description: The three encoding levels -- instruction, skill, hook -- represent 
 kind: research
 topics: ["[[processing-workflows]]", "[[agent-cognition]]"]
 methodology: ["Original"]
-source: [[hooks-as-methodology-encoders-research-source]], [[composable-knowledge-architecture-blueprint]]
+source: ["[[hooks-as-methodology-encoders-research-source]]", "[[composable-knowledge-architecture-blueprint]]"]
 ---
 
 # methodology development should follow the trajectory from documentation to skill to hook as understanding hardens

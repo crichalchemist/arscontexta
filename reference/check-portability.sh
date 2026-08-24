@@ -415,7 +415,7 @@ echo "6. Wiki-link matchers do not interpolate a note name into the pattern"
 # matches is STALE and also fails. The list drains rather than rots.
 #
 # WHY <path>|<count> AND NOT <path>:<line>:
-# Line numbers drift on every edit — CLAUDE.md's divergence 12 table still says
+# Line numbers drift on every edit — docs/open-divergences.md's divergence 12 table still says
 # session-orient.sh.template:149 for a site now at :160, and the comment this
 # replaces gave "no line numbers here" as a deliberate choice for the same reason.
 # A bare path without a count would let skills/health quietly grow a fourth site
@@ -545,7 +545,7 @@ fi
 #
 # Spec G item 23, deferred there ("a ban on inlining a library that does not
 # exist yet mandates nothing") and unbuilt when fix/spec-f-divergence-drain
-# merged. CLAUDE.md divergence 15 records both halves.
+# merged. docs/open-divergences.md divergence 15 records both halves.
 #
 # READ THE LINK-LIBRARY BAN'S HISTORY BEFORE TRUSTING THIS ONE. CLAIMED bans are
 # how this repo got here: CLAUDE.md's gate table asserted for months that check 4

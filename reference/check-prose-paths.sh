@@ -43,6 +43,8 @@ cd "$ROOT" || { echo "check-prose-paths: cannot cd to repo root" >&2; exit 2; }
 # missing is an ERROR, never a skip — a shrinking scope must not read as clean.
 SCOPE="
 CLAUDE.md
+docs/verification.md
+docs/open-divergences.md
 docs/closed-divergences.md
 CONTRIBUTING.md
 README.md
