@@ -9,6 +9,13 @@ __pycache__/
 
 # ASD-STE100 dictionary rule: derived from the ASD-STE100 specification,
 # copyright ASD. Free to download is NOT free to redistribute, and this repo is
-# public — so the rule file is generated locally and never committed. Its
-# generator is not tracked here either; nothing in styles/ is, yet.
+# public — so the rule file is generated locally and never committed. The rest
+# of styles/ is tracked now, build-dict.py included: the generator parses your
+# own licensed copy of the spec and reproduces none of it.
 styles/STE/DictionaryFull.yml
+
+# Field intelligence: read-only triage passes over the ~/second-brain vault.
+# They quote that vault's own notes wholesale while working out what is worth
+# porting back here. A finding belongs in this repo once it is ported and
+# reverse-transformed; the raw triage that produced it does not.
+docs/field-intel-*.md
