@@ -75,7 +75,7 @@ shipping it.
 
 **Reopens if:** the spec's examples ever become executable fixtures.
 
-**From:** same two documents. Note CLAUDE.md's divergence-12 table still cites `:410`;
+**From:** same two documents. Note docs/open-divergences.md's divergence-12 table still cites `:410`;
 the true line is `:425`.
 
 ### 3. `skill-sources/next:261` — the odd `LINK_LIB` spelling — CLOSED
@@ -562,7 +562,7 @@ identical risk with nothing to catch it.
 **Why not now:** wiring this count into `check-doc-claims.sh` is a change to that gate's own
 claim-registration mechanism, not to `check-prose-paths.sh`, and is out of Task 14's stated scope
 (widen SCOPE by two named files). `check-doc-claims.sh`'s design is itself a CI-hardening-spec
-question, per the gate-table row near the top of CLAUDE.md ("Building the missing check is a
+question, per the gate-table row in docs/verification.md ("Building the missing check is a
 gate-design question and belongs to the CI-hardening spec").
 
 **How it actually fired:** by drift, exactly as predicted, and it had already fired before the

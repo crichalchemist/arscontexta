@@ -32,7 +32,7 @@
 # not "four of five unprotected".
 #
 # Two of the uncovered rows are not hypothetical. "Unparseable returns the
-# default" is the thing CLAUDE.md divergence 3 says must never happen —
+# default" is the thing docs/open-divergences.md divergence 3 says must never happen —
 # *returning the default is exactly how the hardcoded 10 stayed invisible*. And
 # "ignore the configured threshold" is that divergence's entire subject, the
 # defect commit 820af90 was written to fix. Both shipped with nothing holding them.
@@ -133,7 +133,7 @@ eq "read_config: the second key too"                 "5" \
    "$(out "$V" hooks/scripts/read_config.sh self_evolution.tension_threshold 99)"
 
 # CONFIGURED BUT UNREADABLE -> exit 1 and say so, NEVER the default. This is the
-# assertion the whole file is for. CLAUDE.md divergence 3: "returning the default
+# assertion the whole file is for. docs/open-divergences.md divergence 3: "returning the default
 # is exactly how the hardcoded 10 stayed invisible".
 printf 'self_evolution:\n  observation_threshold:\n' > "$V/ops/config.yaml"
 eq "read_config: an unparseable value exits 1"       "1" \

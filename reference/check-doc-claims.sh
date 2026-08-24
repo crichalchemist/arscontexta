@@ -429,17 +429,18 @@ check_list_len docs/verification.md "verification fence is complete" \
 
 # --- divergence-number uniqueness -------------------------------------------
 # SCOPED TO THE DIVERGENCE LIST, NOT THE WHOLE FILE, and that scoping is the
+# whole correctness of this sub-check. Before the 2026-08-23 split, ONE file carried
+# two unrelated bold-numbered lists — `## Architecture: three generation paths`
+# numbers 1..3, and `## Known open divergences` numbers 1..13. An unscoped `^\*\*[0-9]+\.`
+# extraction reports 1, 2 and 3 as duplicates ON A CLEAN TREE. A gate that fires
+# on correct documents gets deleted rather than fixed.
+#
 # The split moved those two lists into different files (Architecture stayed in
 # CLAUDE.md, the divergences went to docs/open-divergences.md), so the collision this
 # scoping guards against is now cross-file and cannot occur. The scoping is kept
 # because it is still correct and because the two lists could rejoin. What DOES still
 # bite: the range ends at the next `^## `, and docs/open-divergences.md currently has
 # exactly one — adding an h2 below the heading would silently truncate the scan.
-# whole correctness of this sub-check. Before the 2026-08-23 split, ONE file carried
-# two unrelated bold-numbered lists — `## Architecture: three generation paths`
-# numbers 1..3, and `## Known open divergences` numbers 1..13. An unscoped `^\*\*[0-9]+\.`
-# extraction reports 1, 2 and 3 as duplicates ON A CLEAN TREE. A gate that fires
-# on correct documents gets deleted rather than fixed.
 #
 # A GAP IS NOT A DEFECT. The list legitimately skips numbers when entries are
 # collapsed (8 and 9 folded into 7) or closed. Only a REPEATED number is a

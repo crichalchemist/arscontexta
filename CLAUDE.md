@@ -46,7 +46,7 @@ Silently editing and re-running a skill without reinstalling is the single most 
 
 ### Verifying changes
 
-The verification inventory — the run fence for all eighteen executable checks, the
+The verification inventory — the run fence for every executable check, the
 gate table, and the forensics on what each gate can and cannot catch — lives in
 [docs/verification.md](docs/verification.md). Run the fence there before trusting any
 change.
