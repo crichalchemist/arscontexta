@@ -75,7 +75,8 @@ When generating a knowledge system for a specific domain, every universal term i
 
 ```bash
 # Re-derive both halves of that claim.
-awk -F'|' 'NR>=63 && NR<=70 { cmd=$2; gsub(/ /,"",cmd);
+# Rows are selected by shape, not line number: only this table's rows start `| /`.
+awk -F'|' '/^\| \// { cmd=$2; gsub(/ /,"",cmd);
   same=1; for(i=3;i<=9;i++){ v=$i; gsub(/ /,"",v); if(v!=cmd) same=0 }
   printf "%-12s all-universal=%s\n", cmd, (same?"YES":"NO") }' reference/vocabulary-transforms.md
 grep -rn '{DOMAIN:remember}' skills/ skill-sources/ generators/ presets/ | wc -l   # 16
