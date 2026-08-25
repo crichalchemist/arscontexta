@@ -469,11 +469,42 @@ The frozen mirror keeps the old spellings: `platforms/shared/skill-blocks/valida
 parity is explicitly unmaintained — and is recorded here so a future reader files it as known
 rather than as a fresh defect.
 
-**Re-derive** — the tallies Unit 1 repaired move again, and this unit owns updating them:
-`CLAUDE.md:123-124` and `reference/skill-authoring.md:70`. Capture the numbers **at the
-substitution**, not afterwards: a figure recalled after the fact is a reconstruction. No gate reads
-either number (`/usr/bin/grep -c '146\|203' reference/check-doc-claims.sh` → 0), so nothing will
-catch it if this step is skipped — which is precisely why it is a numbered step and not a note.
+**Re-derive** — the tallies Unit 1 repaired move again, and this unit owns updating them at
+**all three** carriers, not two: `CLAUDE.md:124`, `reference/skill-authoring.md:70`, and
+`reference/check-placeholder-count.sh:43`. A draft of this unit named only the first two. Unit 1
+repairs three sites and this unit re-derived two, so the gate comment would have shipped a number
+this same spec falsified one unit later — the ratchet where a fix stales the count it documents.
+The carriers are not interchangeable: `skill-authoring.md:70` states all three file-pairs on one
+line, while `CLAUDE.md:124` and `check-placeholder-count.sh:43` state only `verify`'s.
+
+Capture the numbers **at the substitution**, not afterwards: a figure recalled after the fact is a
+reconstruction. No gate reads either number (`/usr/bin/grep -c '146\|203'
+reference/check-doc-claims.sh` → 0), so nothing will catch it if this step is skipped — which is
+precisely why it is a numbered step and not a note.
+
+**State the expected value before running the command.** `check-placeholder-count.sh` is
+range-relative against the merge base with `main` (deferral #18), so PR 2 surfaces a count move
+that has to be attributed to a cause. A step that says "re-derive" without a predicted number
+gives up exactly the attributability packaging B exists to buy. Baselines re-derived on `develop`
+with `reference/skill-authoring.md` §2's command, `awk` substituted for its two `wc` calls:
+
+| File | Baseline | E-1 sites | Markers added | Expected after Unit 3 |
+|---|---|---|---|---|
+| `skill-sources/verify` | 30 | `:197` (5 literals → 6 markers) | +6 | **36** |
+| `skill-sources/validate` | 5 | `:146` (5 → 6) | +6 | **11** |
+| `skill-sources/reflect` | 123 | `:295-300` (6 rows) + `:378` (6) | +12 | **135** |
+| `skill-sources/reduce` | 132 | `:279` (3) + `:494` (3) | +6 | **138** |
+
+Total `skill-sources/` delta **+30**. Two sites yield six markers from five literals because
+`verify` and `validate` declare a five-verb list whose spellings are wrong; harmonizing onto the
+six-verb enum adds a member as well as renaming two. A measured delta that is not +30 means the
+substitution missed a site or hit one twice — investigate before repairing the prose, because the
+prose is downstream of the count.
+
+**No site sits in an executable ` ```bash ` fence**, so the fence gate is unaffected:
+`reduce:494` is inside ` ```markdown ` and the other five are in bare markdown tables or prose.
+Re-confirm this if a site moves, since the fence gate executes every ` ```bash ` block against a
+generated-vault fixture where `skill-sources/` does not exist.
 
 Only the `rel_*` substitution moves markers; the harmonize and re-derive halves do not. That keeps
 `check-placeholder-count.sh`'s delta attributable to a single cause.
@@ -504,11 +535,32 @@ resequenced out, this is the formulation that has to be used anyway.
 Report it — do not merely count it. A silent unknown-status bucket is the same defect one layer
 down.
 
+**The residual must be OMITTED, not reported as 0, when the frontmatter library is missing.**
+This is the sharpest hazard in the unit and it is not symmetric with the counts beside it.
+`OBS_TOTAL`/`TENS_TOTAL` come from `find` (`session-orient.sh:158-159`) and are still correct with
+`ops/lib/frontmatter.sh` gone, while `OBS_COUNT`/`TENS_COUNT` are deliberately left `""`
+(`:160-171`, guarded by `FM_OK`). So `unknown = total − matched − known-closed` written the obvious
+way evaluates against empty strings and either errors or reports **the entire register as
+unknown** — a fabricated alarm arriving at precisely the moment the tooling is broken. The new
+branch must sit inside the existing `[ "$FM_OK" -eq 1 ]` guard and emit nothing outside it. The
+file's own comment at `:132-136` already states the principle for the counts; this extends it to the
+residual.
+
 **Executable coverage is part of this unit.** `reference/test/hook-config.test.sh` is, per
 `docs/verification.md`, the only gate that executes `session-orient.sh`; its fixtures carry
 `status: open` and `pending` only, so the new branch would land with none. Add unknown-status
 fixtures to that suite. This extends an existing suite rather than adding a gate or a CI step, so
 the no-new-gate constraint holds.
+
+**The suite's existing pinned assertions do not break — and that is not reassurance.** The
+omitted-not-zero assertions at `:324-330` match the literal string `pending observations`, which
+the residual line will not contain, so they stay green whatever Unit 4 does. They are negative
+assertions, and a negative assertion passes on absence: they would report green against a residual
+branch that emits nothing at all, and equally green against one that fabricates a total. Unit 4
+therefore adds its **own** pair, mirroring their shape — the signal is omitted when the library is
+gone, and specifically is not rendered as `0` — plus a positive assertion that a fixture carrying
+an off-enum status is actually counted and named. Without the positive arm the whole set passes on
+a branch that never fires.
 
 **The zsh hazard is live here regardless of the shebang.** That suite invokes the hook as
 `$SH hooks/scripts/session-orient.sh` (`:111`) with `SH=zsh` under zsh (`:60`), overriding the
@@ -558,6 +610,13 @@ guard into rc 2. That was a real defect and a correct fix — it travels with de
 companion spec. With #12 resequenced out, this gate never sees a placeholder and is left untouched.
 **PR 2 therefore carries no gate-logic risk at all**, which is the concrete payoff of the scoping
 rule.
+
+Stated precisely, because the claim is narrower than it sounds: no gate *script's logic* is
+modified. Two executable files are still touched — `check-placeholder-count.sh:43`, a comment
+carrying a rotted numeral (Unit 1), and `reference/test/hook-config.test.sh`, which gains fixtures
+and assertions (Unit 4). Neither changes a gate's decision procedure, but "no gate-logic risk" is
+not the same as "no executable file is edited", and a plan step that conflates them will skip
+running the suite it just changed.
 
 **The boundary check is the full CI suite, not the five gates.** `.github/workflows/checks.yml`
 runs ~12 test suites beyond `check-*.sh`, each under bash *and* zsh — including
