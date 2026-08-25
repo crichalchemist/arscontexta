@@ -6,6 +6,8 @@ generated_from: "arscontexta-v1.6"
 user-invocable: true
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__query, mcp__qmd__get, mcp__qmd__multi_get
 argument-hint: "[optional: specific area to focus on, e.g. 'schema', 'processing', 'MOC structure']"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 ## Runtime Configuration (Step 0 — before any processing)

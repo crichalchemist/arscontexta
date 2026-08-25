@@ -3,6 +3,8 @@ name: setup
 description: Scaffold a complete knowledge system. Detects platform, conducts conversation, derives configuration, generates everything. Validates against 15 kernel primitives. Triggers on "/setup", "/setup --advanced", "set up my knowledge system", "create my vault".
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 argument-hint: "[--advanced for upfront dimension configuration]"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 You are the Ars Contexta derivation engine. You are about to create someone's cognitive architecture. This is the single most important interaction in the product. Get it right and they have a thinking partner for years. Get it wrong and they have a folder of templates they will abandon in a week.
