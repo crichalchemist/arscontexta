@@ -30,22 +30,52 @@
 #     all. The downgrade-to-INFO this gate depends on happens HERE, not inside skillspector.
 # Setting the two consistently is what this script does; nv_build satisfies both from one key.
 #
-# WHY --llm-verify IS REQUIRED, NOT OPTIONAL. skillspector's static pass flags 13 HIGH
-# findings against this repo under its agentic-risk taxonomy -- Self-Modification (RA1),
-# Memory Manipulation (MP3), Direct Prompt Extraction (P6), Chaining Abuse (TM2), Agent
-# Config Directory Access (AS1). This repo is a GENERATOR whose entire purpose is writing
-# skills, seeding memory and editing agent config, so its correct behaviour and the taxonomy
-# are describing the same acts. Several match on prose asserting the OPPOSITE of the risk:
-# skills/reseed/SKILL.md is flagged Memory Manipulation for the line
-# "**PRESERVE self/memory/ entirely.** Never modify".
+# WHY --llm-verify IS PASSED, AND WHAT IT HAS NOT YET DONE. skillspector's static pass
+# flags 13 HIGH findings against this repo under its agentic-risk taxonomy --
+# Self-Modification (RA1), Memory Manipulation (MP3), Direct Prompt Extraction (P6),
+# Chaining Abuse (TM2), Agent Config Directory Access (AS1). This repo is a GENERATOR whose
+# entire purpose is writing skills, seeding memory and editing agent config, so its correct
+# behaviour and the taxonomy are describing the same acts. Several match on prose asserting
+# the OPPOSITE of the risk: skills/reseed/SKILL.md is flagged Memory Manipulation for the
+# line "**PRESERVE self/memory/ entirely.** Never modify".
 #
 # The wrong fix is a policy entry downgrading SECURITY.* -- that yields a permanently green
-# run that has stopped measuring anything. The right one is
+# run that has stopped measuring anything. The intended one is
 # validators/security.py::_verify_findings_with_llm(), reached by --llm-verify: it re-reads
 # each finding in context and downgrades to INFO only those an LLM rates false_positive at
 # HIGH confidence. Findings it rates true_positive or uncertain keep their severity and still
-# fail this gate. That is why a missing key is CANNOT CONCLUDE below and never PASS -- the
-# security verdict has not been reached, and "we could not check" must never read as "clean".
+# fail this gate. So a missing key is CANNOT CONCLUDE below and never PASS -- the security
+# verdict has not been reached, and "we could not check" must never read as "clean".
+#
+# MEASURED 2026-08-25, AND IT QUALIFIES THE PARAGRAPH ABOVE: the downgrade is not reaching
+# every skill, and the report does not say which. When a skill's skillspector report fails
+# the consistency check below, the stage returns at validators/security.py:554 --
+# mark_scan_incomplete() -- one line BEFORE _process_skillspector_cli_result() would add
+# that skill's findings. They are dropped silently. A one-skill probe against skills/ask
+# (LOW band, mismatched) yielded SCHEMA findings only and zero SECURITY, while a whole-repo
+# run yields SECURITY findings in quantity -- from the skills that did validate.
+#
+# So a populated SECURITY list is NOT evidence that every skill was scanned, and the
+# per-skill split is invisible in the output. This is the partial-coverage sibling of the
+# absent-scanner problem this gate was built for: not findings=0 reported as clean, but
+# findings>0 reported as complete. It is why incomplete_scans outranks the finding count in
+# the parser below even when findings look plentiful.
+#
+# THE KNOWN BLOCKER, and why it is not ours to fix. That early return fires on
+# security.py:675: skillspector's risk_assessment.recommendation must equal
+# f(severity), where LOW maps to SAFE. skillspector emits CAUTION whenever its own analysis
+# is incomplete, and for THIS repo it always is -- not from a failed analyzer (with a live
+# model all 26 report completed/not_applicable and limitations is empty) but from
+# reference_unresolved ledger exceptions: 32 in skills/ask/SKILL.md alone, against
+# ops/derivation.md, methodology.md, kernel.yaml. Those are generated-vault paths that
+# intentionally do not exist in a generator repo. The mismatch is an add_error(), NOT a
+# finding, so severity_overrides cannot reach it -- policy applies to findings only.
+# Pinning an older tool pair does not help either: the incompleteness comes from this repo's
+# own reference structure. Until skillspector separates "incomplete" from "cautionary", this
+# gate reports CANNOT CONCLUDE, which is the honest verdict rather than a broken one.
+#
+# READ THE ERROR FROM results[].legacy.errors, NOT results[].errors. The latter key is
+# absent, so a parser looking there prints "no errors" beside passed=false.
 #
 # EXIT CODES follow the sibling gates: 0 PASS, 1 FAIL (real gating findings), 2 CANNOT
 # CONCLUDE (a precondition is missing, so no verdict exists). The distinction matters here
@@ -110,6 +140,17 @@ else
   unset SKILLSPECTOR_PROVIDER
 fi
 
+# Pin the model. skillevaluator overrides SKILLSPECTOR_MODEL from its own provider default
+# (nv_build -> nvidia/nemotron-3-nano-30b-a3b), so this is not what makes the gate work --
+# it makes the invocation reproducible and states the version the findings were measured
+# against. It also documents the trap for anyone copying this to run skillspector DIRECTLY:
+# skillspector's own default was z-ai/glm-5.2, which reached end of life on 2026-08-21 and
+# now returns HTTP 410. Every LLM analyzer then fails, skillspector logs "LLM stage degraded
+# ... report reflects static analysis only", and still writes a normal-looking report. A
+# model name that has quietly died is this repo's dominant failure class wearing a vendor's
+# clothes, which is why the degradation is asserted after the run rather than assumed away.
+export SKILLSPECTOR_MODEL="${SKILLSPECTOR_MODEL:-nvidia/nemotron-3-nano-30b-a3b}"
+
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
@@ -120,6 +161,17 @@ rc=$?
 
 # `set -e` is deliberately off: rc=1 is the tool's normal way of reporting findings, and the
 # findings are exactly what this gate exists to read. Only an unreadable report is fatal.
+# Fail loud on a degraded LLM stage. skillspector downgrades to static-only on an unusable
+# model and keeps going; the report that lands is structurally valid and says nothing about
+# it. Checked positively -- a grep that matches nothing is what a clean run looks like, so
+# the absence below is only meaningful because run.log is known non-empty.
+[ -s "$OUT/run.log" ] || die2 "skillevaluator wrote no log to $OUT/run.log -- cannot tell whether the LLM stage ran at all"
+if /usr/bin/grep -qE 'LLM stage degraded|has reached its end of life' "$OUT/run.log"; then
+  die2 "the LLM analyzers degraded to static-only -- the report is not an LLM-backed verdict:
+$(/usr/bin/grep -m2 -oE "LLM stage degraded[^\"]*|The model '[^']*' has reached its end of life[^\"]*" "$OUT/run.log" | sed 's/^/    /')
+  Pin a live model with SKILLSPECTOR_MODEL=<model>; list them with 'skillevaluator models'."
+fi
+
 REPORT="$(ls -1 "$OUT"/*.json 2>/dev/null | head -1)"
 [ -n "$REPORT" ] || die2 "skillevaluator exited $rc and wrote no JSON report to $OUT -- see the tail below
 $(tail -5 "$OUT/run.log" 2>/dev/null | sed 's/^/    /')"
