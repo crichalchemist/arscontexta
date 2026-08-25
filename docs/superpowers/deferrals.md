@@ -133,7 +133,30 @@ link count would assert a quality claim nothing checked.
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
 
-### 6. The `~150` vs `200` description-length disagreement — PARTIAL; **merged with entry 32 item 1, same residue**
+### 6. The `~150` vs `200` description-length disagreement — **CLOSED 2026-08-24**
+
+**CLOSED 2026-08-24 (vocabulary-integrity Unit 5), together with entry 32 item 1 as this entry
+required.** The residue was **twelve** normative sites, not the two named below: the two
+`generators/` sites, plus `reference/kernel.yaml:57` — the invariant contract, which would
+otherwise have gone on declaring `~150` while the generators feeding it said `200` — plus
+`reference/methodology.md:55` and all eight `reference/templates/*-note.md`, which teach the
+value to every vault that instantiates one. Both re-derive commands below are scoped to
+`skill-sources/ generators/ skills/` and so could not see nine of the twelve; the tree-wide form
+is in the block at the end of this entry. All twelve now read `200 chars, no trailing period`,
+the spelling `generators/features/schema.md:26` already used — the `no trailing period` clause is
+now carried uniformly, where before only two of the twelve had it.
+
+`reference/claim-map.md:84` is deliberately KEPT: it discusses the tension rather than declaring
+the value, and rewriting it would erase the record of why the question was open.
+
+```bash
+git -c core.quotePath=false ls-files -z | xargs -0 /usr/bin/grep -ln '~150' \
+  | /usr/bin/grep -v '^methodology/' | /usr/bin/grep -v '^platforms/shared/skill-blocks/' \
+  | /usr/bin/grep -v '^docs/'
+#   reference/claim-map.md           (KEEP -- discusses, does not declare)
+#   reference/semantic-vs-keyword.md ("~150 notes", a volume threshold)
+#   skills/architect/SKILL.md        ("line ~150", a line number)
+```
 
 **What:** two sites say `~150` (`generators/features/schema.md:18`,
 `skill-sources/reduce/SKILL.md:473`), three say `200`.
@@ -879,7 +902,7 @@ gate.
 
 | items | status | why |
 |---|---|---|
-| **1** | **LIVE — and it is the same residue as entry 6.** Merge them; do not fix one and leave the other. Both reduce to `generators/features/schema.md:18` and `generators/features/atomic-notes.md:75` | the generators tree was out of scope for `/reduce` |
+| **1** | **CLOSED 2026-08-24**, with entry 6, as both required. The residue was twelve normative sites, not the two named here — see entry 6 for the full list and the tree-wide re-derive | the generators tree was out of scope for `/reduce` |
 | **2** | **LIVE** — a design question, not a defect. `/verify`'s gate is a defensible subset of the computable checks, not the complete one | shipped at `skill-sources/verify/SKILL.md:326-327` |
 | **3–9** | **MOOT ×7 — nobody fixed these; the ground disappeared.** Every one is a property of `reference/migrate-note-lifecycle.sh` and its suite, which were created and deleted **inside** `94f44de..a5ccae3` and do not exist at HEAD | see the re-derive below |
 
@@ -898,6 +921,8 @@ test -e reference/migrate-note-lifecycle.sh || echo "GONE at HEAD"
 1. **`~150 chars` survives at TWO generators sites, not one.** The plan's Deferrals names
    `generators/features/schema.md:18`; `generators/features/atomic-notes.md:75` is a second.
    Both belong to the generators tree rather than to `/reduce`, which is why Task 3 left them.
+   **CLOSED 2026-08-24.** Two was itself an undercount — the term-keyed survey was scoped to
+   `generators/` and could not see `reference/`, where nine more sites lived. Twelve in total.
    A third hit, `skills/architect/SKILL.md:482`, is the phrase `"line ~150"` — a line-number
    reference, not a description-length claim — and is correctly out of scope.
 

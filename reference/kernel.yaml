@@ -54,7 +54,7 @@ primitives:
 
   - id: description-field
     name: Description field for progressive disclosure
-    description: "YAML description (~150 chars) adds information beyond the title. Enables filter-before-read."
+    description: "YAML description (200 chars, no trailing period) adds information beyond the title. Enables filter-before-read."
     layer: convention
     requires: markdown-yaml
     enforcement: invariant

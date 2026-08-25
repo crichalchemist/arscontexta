@@ -1,5 +1,5 @@
 ---
-description: One sentence adding context beyond the title (~150 chars)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 methodology: Zettelkasten | Evergreen | Cornell | Memory Arts | Network Science | Cognitive Science | Original
 source: "[[source-name]]"
 classification: claim | methodology | tension
