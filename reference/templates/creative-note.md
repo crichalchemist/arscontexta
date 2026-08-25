@@ -1,5 +1,5 @@
 ---
-description: One sentence adding context beyond the title (~150 chars)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 stage: idea | draft | revision | complete
 medium: writing | visual | music | code
 inspiration: ["[[reference]]"]

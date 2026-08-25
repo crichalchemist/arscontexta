@@ -1,5 +1,5 @@
 ---
-description: One sentence adding context beyond the title (~150 chars)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 person: Name
 category: preference | pattern | important-date | interaction | care-task
 last_confirmed: YYYY-MM-DD

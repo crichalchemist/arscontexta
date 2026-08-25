@@ -1,5 +1,5 @@
 ---
-description: One sentence adding context beyond the title (~150 chars, no period)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 type: insight | pattern | preference | fact | decision | question
 created: YYYY-MM-DD
 ---

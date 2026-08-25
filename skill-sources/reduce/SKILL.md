@@ -276,7 +276,7 @@ Pass: genuinely new angle not yet articulated
 Relates to existing thinking in the vault. Isolated insights that do not connect to anything are orphans. They rot.
 
 Fail: interesting observation about unrelated domain
-Pass: extends, contradicts, or deepens existing {vocabulary.note_plural}
+Pass: {vocabulary.rel_extends}, {vocabulary.rel_grounds}, {vocabulary.rel_contradicts}, {vocabulary.rel_exemplifies}, {vocabulary.rel_synthesizes}, or {vocabulary.rel_enables} existing {vocabulary.note_plural}
 
 **If ANY criterion fails: do not extract.**
 
@@ -491,7 +491,7 @@ Show the path to the conclusion, not just the conclusion.
 Source: [[source filename]]
 
 Relevant Notes:
-- [[related claim]] — [why it relates: extends, contradicts, builds on]
+- [[related claim]] — [why it relates: {vocabulary.rel_extends}, {vocabulary.rel_contradicts}, {vocabulary.rel_grounds}]
 
 Topics:
 - [[relevant {vocabulary.topic_map}]]
@@ -778,7 +778,7 @@ Topics:
 The relationship context explains WHY to follow the link:
 - Bad: "-- related"
 - Good: "-- contradicts by arguing for explicit structure"
-- Good: "-- provides the foundation this challenges"
+- Good: "-- provides the grounds this challenges"
 
 ---
 
@@ -1163,9 +1163,9 @@ When processing content, route to the correct skill:
 | Task Type | Required Skill | Why |
 |-----------|---------------|-----|
 | New content to process | /{vocabulary.reduce} | Extraction requires quality gates |
-| {vocabulary.note} just created | /{vocabulary.cmd_reflect} | New {vocabulary.note_plural} need connections |
-| After connecting | /{vocabulary.cmd_reweave} | Old {vocabulary.note_plural} need updating |
-| Quality check | /{vocabulary.cmd_verify} | Combined verification gate |
+| {vocabulary.note} just created | {vocabulary.cmd_reflect} | New {vocabulary.note_plural} need connections |
+| After connecting | {vocabulary.cmd_reweave} | Old {vocabulary.note_plural} need updating |
+| Quality check | {vocabulary.cmd_verify} | Combined verification gate |
 | System health | /health | Systematic diagnostics |
 
 ## Pipeline Chaining

@@ -1,5 +1,5 @@
 ---
-description: One sentence adding context beyond the title (~150 chars)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 domain: subject area
 mastery: new | developing | solid | expert
 prerequisites: ["[[concept]]"]

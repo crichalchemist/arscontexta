@@ -33,7 +33,7 @@ When you write `because [[the anxiety usually starts when I skip morning routine
 
 Relevant Notes:
 - [[related note]] — extends this by adding the temporal dimension
-- [[another note]] — provides the evidence this builds on
+- [[another note]] — provides the evidence this depends on
 
 Topics:
 - [[methodology]]
@@ -46,15 +46,16 @@ Topics:
 Every connection must articulate the relationship. The question is never "are these related?" but "HOW are these related?"
 
 Standard relationship types:
-- **extends** — builds on an idea by adding a new dimension
-- **foundation** — provides the evidence or reasoning this depends on
+- **extends** — adds a new dimension to an idea
+- **grounds** — provides the evidence or reasoning this depends on
 - **contradicts** — conflicts with this claim (capture as a tension if significant)
+- **exemplifies** — illustrates or demonstrates this concept in practice
+- **synthesizes** — combines two or more ideas into something neither states alone
 - **enables** — makes this possible or practical
-- **example** — illustrates or demonstrates this concept in practice
 
 Bad: `[[{DOMAIN:note}]] — related`
 Good: `[[{DOMAIN:note}]] — extends this by adding the temporal dimension`
-Good: `[[{DOMAIN:note}]] — provides the foundation this challenges`
+Good: `[[{DOMAIN:note}]] — provides the grounds this challenges`
 
 The context phrase serves two audiences: it tells a future agent WHY to follow this link (should I read this or skip it?), and it documents the intellectual relationship for anyone maintaining the graph.
 

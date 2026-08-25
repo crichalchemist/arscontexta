@@ -72,7 +72,7 @@ Every {DOMAIN:note} has structured metadata in YAML frontmatter:
 
 ```yaml
 ---
-description: One sentence adding context beyond the title (~150 chars)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 ---
 ```
 

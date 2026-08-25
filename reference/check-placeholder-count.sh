@@ -40,7 +40,7 @@
 #     CLAUDE.md records that changing what they emit is a design decision. A gate
 #     that fires on a legitimate generator edit gets deleted, not fixed.
 #   * platforms/shared/skill-blocks/ holds the repo's densest markup — 146 in
-#     `verify` where skill-sources has 30 — but it is FROZEN by check-portability.sh
+#     `verify` where skill-sources has 36 — but it is FROZEN by check-portability.sh
 #     check 4, so it cannot appear in a diff at all. Scanning it is dead code.
 #   * skills/ are the plugin's own commands and legitimately carry none, so
 #     scanning them yields 0 -> 0 noise.

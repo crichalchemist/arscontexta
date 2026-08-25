@@ -1,5 +1,5 @@
 ---
-description: One sentence adding context beyond the title (~150 chars)
+description: One sentence adding context beyond the title (200 chars, no trailing period)
 category: pattern | trigger | coping-strategy | insight | growth-goal
 confidence: observed | hypothesized | verified
 frequency: once | occasional | regular | constant

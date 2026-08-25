@@ -45,7 +45,7 @@ Parse immediately:
 
 The knowledge graph grows silently. Without metrics, the user cannot tell whether their system is healthy, growing, stagnating, or fragmenting. /stats provides a snapshot that makes growth tangible — numbers that show progress, health indicators that catch problems, and trends that reveal trajectory.
 
-The output should make the user feel informed, not overwhelmed. Metrics are evidence, not judgment. "12 orphans" is a fact. What to DO about it belongs to /graph or /{vocabulary.cmd_reflect}.
+The output should make the user feel informed, not overwhelmed. Metrics are evidence, not judgment. "12 orphans" is a fact. What to DO about it belongs to /graph or {vocabulary.cmd_reflect}.
 
 ---
 
@@ -525,7 +525,7 @@ After the stats block, add brief interpretation for any notable findings:
 | COMPLIANCE < 90 | "Schema compliance below 90% — some {vocabulary.note_plural} missing required fields" |
 | OBS_PENDING >= 10 | "[N] pending observations — consider running /{vocabulary.rethink}" |
 | TENSION_PENDING >= 5 | "[N] open tensions — consider running /{vocabulary.rethink}" |
-| DENSITY < 0.02 | "Graph density is low — connections are thin. Run /{vocabulary.cmd_reflect} to strengthen the network" |
+| DENSITY < 0.02 | "Graph density is low — connections are thin. Run {vocabulary.cmd_reflect} to strengthen the network" |
 | PROCESSED_PCT < 50 | "More content in inbox than in {vocabulary.notes}/ — consider processing backlog" |
 | THIS_WEEK_NOTES == 0 | "No new {vocabulary.note_plural} this week" |
 

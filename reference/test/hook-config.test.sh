@@ -357,6 +357,41 @@ cp "$FM_SRC" "$V2/ops/lib/frontmatter.sh"
 eq "session-orient: with the library back, threshold 0 DOES fire"  "yes" \
    "$(orient "$V2" | grep -q '12 pending observations' && echo yes || echo no)"
 
+# === the off-enum residual ===================================================
+# count_open_items() matches only `pending open`, so every other status vanished
+# between numerator and denominator: a register whose notes carry an off-enum
+# status reported "0 pending" and read as clean. The residual is
+# total - open - closed, computed PER REGISTER. The observation and tension
+# enums genuinely differ (generators/features/self-evolution.md), and a union
+# of the two closed lists OVER-matches closed, which UNDER-reports unknown —
+# the silent direction, and the one way this ships broken with every assertion
+# green. `superseded` is the probe: outside both accept-lists and both closed
+# lists, and a status this repo's registers have really carried.
+V3=$(mkvault)
+printf -- '---\nstatus: superseded\n---\nobservation 13\n' > "$V3/ops/observations/o13.md"
+printf -- '---\nstatus: superseded\n---\nobservation 14\n' > "$V3/ops/observations/o14.md"
+staged "$V3" 14 6 || true
+cfg "$V3" 10 5
+eq "session-orient: an off-enum status is counted and reported"   "yes" \
+   "$(orient "$V3" | grep -q 'outside the recognized set' && echo yes || echo no)"
+eq "session-orient: and the off-enum VALUE is named on stderr"    "yes" \
+   "$(orient_e "$V3" | grep -q 'superseded' && echo yes || echo no)"
+
+# V4: the same shape with the frontmatter library removed. staged() asserts the
+# library is readable, so it MUST run before the rm — the ordering the V2 block
+# above already uses.
+V4=$(mkvault)
+printf -- '---\nstatus: superseded\n---\nobservation 13\n' > "$V4/ops/observations/o13.md"
+staged "$V4" 13 6 || true
+cfg "$V4" 10 5
+rm -f "$V4/ops/lib/frontmatter.sh"
+# BOTH OF THESE PASS ON ABSENCE — they stay green against a branch that never
+# fires at all. That is why the positive assertion above is not optional.
+eq "session-orient: the residual is OMITTED when the lib is gone" "yes" \
+   "$(orient "$V4" | grep -q 'outside the recognized set' && echo no || echo yes)"
+eq "session-orient: and NOT fabricated as a residual of 0"        "yes" \
+   "$(orient "$V4" | grep -q '0 observations carry' && echo no || echo yes)"
+
 # THE TOTAL MUST NOT MOVE WHEN AN ASSERTION IS SKIPPED. As root, chmod 000 does
 # not deny reads, so the four permission assertions correctly SKIP — and the
 # suite then printed passed=36, which check-doc-claims reads as "document says
