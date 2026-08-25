@@ -6,7 +6,7 @@ allowed-tools: Read, Write, Edit, Grep, Glob, AskUserQuestion, Bash
 context: fork
 model: opus
 version: "1.0"
-generated_from: "arscontexta-v1.6"
+generated_from: "arscontexta-0.10.0"
 metadata:
   author: "arscontexta <info@arscontexta.org>"
 ---

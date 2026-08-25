@@ -5,6 +5,11 @@
     { "path": ".claude-plugin/marketplace.json", "field": "plugins.0.version" },
     { "path": ".codex-plugin/plugin.json", "field": "version" }
   ],
+  "text": [
+    { "glob": "README.md", "prefix": "**v", "suffix": "**" },
+    { "glob": "skills/*/SKILL.md", "prefix": "generated_from: \"arscontexta-", "suffix": "\"" },
+    { "glob": "skill-sources/*/SKILL.md", "prefix": "generated_from: \"arscontexta-", "suffix": "\"" }
+  ],
   "audit": {
     "exclude": [
       ".git",
