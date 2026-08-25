@@ -17,7 +17,7 @@ Read these files to configure domain-specific behavior:
 1. **`ops/derivation-manifest.md`** — vocabulary mapping, platform hints
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
-   - Use `vocabulary.topic_map` / `vocabulary.topic_map_plural` for MOC references
+   - Use `vocabulary.topic_map` / `vocabulary.topic_maps` for MOC references
    - Use `vocabulary.inbox` for the inbox folder name
    - Use `vocabulary.cmd_reflect` for connection-finding command name
    - Use `vocabulary.cmd_reweave` for backward-pass command name

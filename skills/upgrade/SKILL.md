@@ -375,11 +375,11 @@ EOF_VOCAB
 **What this catches and what it doesn't — stated, not silent.** Covers the
 `{vocabulary.X}`/`{DOMAIN:X}` placeholder forms, the literal Levels-1-6 key
 names as bare words, and the one sourced MOC alias. It does NOT cover any
-other synonym outside that closed set: `{vocabulary.topic_map_plural}` — a
-spelling that does not literally match the manifest's declared key
-(`topic_maps`) — appears 24 times across 5 `skill-sources/` files (measured)
-and will not substitute, reading as false-positive divergence; a
-pre-existing naming mismatch this step does not fix. Nor does it cover
+other synonym outside that closed set: a spelling that does not literally
+match the manifest's declared key will not substitute, reading as a
+false-positive divergence. `reference/check-vocabulary-schema.sh` is what
+keeps that class empty in `skill-sources/`: it fails on any vocabulary
+placeholder there that no schema key declares. Nor does it cover
 `{DOMAIN:extraction_categories}` (a Level 7 nested list, never a
 substitution pair by design) — any template using it always shows that
 token as unsubstituted. Case-folding is exercised only against BSD `tr`
