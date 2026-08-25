@@ -2,7 +2,7 @@
 name: ask
 description: Query the bundled research knowledge graph for methodology guidance. Routes questions through a 3-tier knowledge base — WHY (research claims), HOW (guidance docs), WHAT IT LOOKS LIKE (domain examples) — plus structured reference documents. Returns research-backed answers grounded in specific claims with practical application to the user's system. Triggers on "/ask", "/ask [question]", "why does my system...", "how should I...".
 version: "1.0"
-generated_from: "arscontexta-v1.6"
+generated_from: "arscontexta-0.10.0"
 context: fork
 model: opus
 allowed-tools: Read, Grep, Glob, mcp__qmd__query, mcp__qmd__get, mcp__qmd__multi_get

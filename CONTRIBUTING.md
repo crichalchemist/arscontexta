@@ -108,7 +108,7 @@ for s in bash zsh; do
   $s reference/test/link-extraction.test.sh     | tail -1   # expect: passed=101 failed=0
   $s reference/test/guard-failure.test.sh       | tail -1   # expect: passed=66 failed=0
   $s reference/test/fence-isolation.test.sh     | tail -1   # expect: FENCE ISOLATION: PASS
-  $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=41 failed=0
+  $s reference/test/bump-version.test.sh        | tail -1   # expect: passed=53 failed=0
   $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=76 failed=0
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 57 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0

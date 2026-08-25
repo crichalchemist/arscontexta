@@ -4,7 +4,7 @@ description: Contextual guidance and command discovery. Three modes — narrativ
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Bash
 version: "1.0"
-generated_from: "arscontexta-v1.6"
+generated_from: "arscontexta-0.10.0"
 metadata:
   author: "arscontexta <info@arscontexta.org>"
 ---

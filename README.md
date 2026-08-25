@@ -9,7 +9,7 @@ and note templates -- tailored to your domain and backed by 249 research claims.
 
 No templates. No configuration. Just conversation.
 
-**v0.9.9** · Claude Code plugin · MIT
+**v0.10.0** · Claude Code plugin · MIT
 
 ---
 
