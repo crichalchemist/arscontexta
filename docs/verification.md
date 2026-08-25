@@ -174,23 +174,28 @@ did not follow.
 line above, recorded rather than silently corrected. **It read "now 11" from 2026-08-11 until
 2026-08-15**, when task 12a's port drained those seven — that move is a fix landing with its own
 count, not drift, and it returns the total to a coincidental 4 whose composition differs from the
-2026-08-08 "now 4": read the composition, not the number.
+2026-08-08 "now 4": read the composition, not the number. **2026-08-25 makes it 5**, and this one is
+neither a fix nor a new defect: teaching fence discovery to see indented fences added three fences
+to `skill-sources/reflect` ahead of the existing `reflect f01` entry, so that entry's original
+subject became `f04`. Both LOCKDIR blocks now fail N for the one documented reason, and both are
+listed — an entry that silently changes which fence it absorbs is the failure this table exists to
+prevent. The entry count moved because the *keying* moved, not because the tree got worse.
 
 **Re-derive it, and do not read the gate's own `known-open=` as the table size — it is SHELL-SCOPED.**
 The header counts entries in scope for the shell running it, so the same unchanged table reports
-`known-open=2` under bash and `known-open=4` under zsh: the two `ZSH ONLY:` entries are correctly out
+`known-open=3` under bash and `known-open=5` under zsh: the two `ZSH ONLY:` entries are correctly out
 of scope under bash. A reader taking either number as "how many known-open defects are there" gets a
 different answer depending on which shell they happened to run, and both look authoritative. Count
 the table for the total; run both shells for the split:
 
 ```bash
-# 5 = 4 table entries + 1 comment line, the one documenting the fabricated
+# 6 = 5 table entries + 1 comment line, the one documenting the fabricated
 # `.probe-skill f01~H~` absorption probe. Stated as a sum rather than filtered with
 # an exclusion, per the idiom divergence 12 uses: an exclusion rots silently and can
 # quietly match nothing, whereas a sum fails loudly the moment it stops adding up.
-/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 5 = 4 + 1
-bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 2 — in scope for bash
-zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 4 — in scope for zsh
+/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 6 = 5 + 1
+bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 3 — in scope for bash
+zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 5 — in scope for zsh
 ```
 
 It also carries one assertion that is **not** about fences: **F**, which runs once against a

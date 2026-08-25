@@ -140,6 +140,15 @@ Before using semantic search, verify the index is current. This is self-healing:
    ```
 3. Count actual files:
    ```bash
+   # A missing notes directory must not read as "zero notes". `ls` fails, `wc -l`
+   # still prints 0, and the comparison below then reports the index in sync with
+   # a vault it never found -- exit 0, a plausible number, no error. Assert the
+   # directory before counting.
+   if [ ! -d "{vocabulary.notes}" ]; then
+     echo "error: {vocabulary.notes}/ not found under '$(pwd)'" >&2
+     echo "       run this from the vault root" >&2
+     exit 1
+   fi
    file_count=$(ls -1 {vocabulary.notes}/*.md 2>/dev/null | wc -l | tr -d ' ')
    ```
 4. If the counts differ, sync the index:
