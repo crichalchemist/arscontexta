@@ -15,7 +15,7 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
    - Use `vocabulary.verify` for the process verb in output
    - Use `vocabulary.topic_map` for MOC references
-   - Use `vocabulary.templates` for the templates folder path
+   - The templates folder is `templates/` in every domain — no key declares it
    - Use `vocabulary.cmd_reflect` for redirect when missing connections found
 
 2. **`ops/config.yaml`** — processing depth, verification settings

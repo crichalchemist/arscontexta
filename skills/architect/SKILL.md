@@ -22,7 +22,7 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.cmd_reflect` for connection-finding command name
    - Use `vocabulary.cmd_reweave` for backward-pass command name
    - Use `vocabulary.cmd_verify` for verification command name
-   - Use `vocabulary.architect` for the command name in output
+   - The command name in output is `/arscontexta:architect` — a plugin command, never renamed
 
 2. **`ops/config.yaml`** — processing depth, pipeline chaining, automation settings
 
