@@ -13,8 +13,6 @@ metadata:
 
 # Tutorial
 
-Walk a new user through the system by doing — each step creates real content in their vault.
-
 ## Runtime Configuration (Step 0 — before any processing)
 
 Read these files to configure domain-specific behavior:
