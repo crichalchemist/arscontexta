@@ -235,7 +235,7 @@ generator" in this repo as "we fixed it for vaults not yet created."
 
 **From:** CLAUDE.md divergence 16
 
-### 12. The `generators/` status enum declarations are not placeholder-bearing — **REOPEN TRIGGER FIRED 2026-08-15, NOW DUE**
+### 12. The `generators/` status enum declarations are not placeholder-bearing — **TRIGGER FIRED 2026-08-15; RE-DEFERRED 2026-08-24, BLOCKED ON A MECHANISM**
 
 **What:** once status values are vocabulary (`{vocabulary.status_preliminary}` et al.),
 the enum declarations in `generators/features/atomic-notes.md`, `schema.md` (×2) and
@@ -252,6 +252,20 @@ blind spot divergence 15's amendment documents and `bump-version.test.sh` exists
 
 **Reopens:** immediately after the note-convention-and-lifecycle plan lands. This is a
 "next, separately", not a "never".
+
+**Amended 2026-08-24 (vocabulary-integrity spec).** This was carried into that spec as its sixth
+item and resequenced out on a *mechanism* finding, not on effort. `generators/` carries **0**
+`{vocabulary.*}` markers against **527** `{DOMAIN:*}`, resolves `{vocabulary.*}` by no documented
+mechanism, and is excluded from both placeholder gates (`check-vocabulary-schema.sh:12-15`,
+`check-placeholder-count.sh:37-47`). Converting the four declarations there would ship a marker
+family that nothing substitutes and no gate checks — a new silent-failure surface, which is the
+exact class that spec exists to close.
+
+**Prerequisite — supersedes the `Reopens:` trigger above.** Either document how `{vocabulary.*}`
+resolves for the composition path, **or** rule that tree permanently `{DOMAIN:*}`-only. Until one
+of those lands this entry is not actionable, and the older trigger is retired because it gates on
+the wrong event: the note-convention plan landing says nothing about whether a substitution
+mechanism exists.
 
 **From:** `2026-08-08-note-convention-and-lifecycle.md` self-review
 

@@ -121,7 +121,7 @@ Supporting layers:
   and that is a failure. It is a
   read-only inventory of vocabulary points, and it holds the repo's most complete markup: counting
   `{vocabulary.*}`, `{config.*}` and `{DOMAIN:*}`, 146 markers in `verify` where `skill-sources` has
-  27. `reference/skill-authoring.md` §2 carries the exact command — a placeholder tally that does not
+  30. `reference/skill-authoring.md` §2 carries the exact command — a placeholder tally that does not
   state its pattern cannot be re-derived, and a bare `{…}` also counts `${TARGET}` and `${FILE}`.
   Consult it when you need
   to know whether a string is vocabulary-variable; never port a behavior change into it. Its

@@ -99,13 +99,19 @@ outcome points somewhere, it carries the field that names the target:
 - `pending` — just captured, not yet reviewed
 - `open` — reviewed, still stands, and its fix is not in any file yet
 - `promoted` — it became a {DOMAIN:note}; add `promoted_to: [[note title]]`
-- `implemented` — the fix exists; add `implemented_in: path/to/file`
+- `implemented` — the fix exists; add `implemented_in: path/to/file` and `closes: [the property
+  this fix actually closes]`
 - `archived` — no longer applicable, or subsumed; add `archived_reason: [why]`, and name the
   superseding item if there is one
 
 **An outcome without its field is unfalsifiable.** Nothing distinguishes a real fix from a
 closed-by-fiat one, which is the whole reason these fields exist. Add the field in the same edit
 that sets the status — not later, because later does not happen.
+
+**A path is weak evidence; `closes:` is the discriminator.** A closure that names a real, existing
+file passes any check that only asks whether `implemented_in` resolves — which is exactly how a
+falsified closure survives review. `closes:` must restate, in the item's own terms, the property
+the fix actually closes, so a reader checks the claim rather than the link.
 
 **`resolution:` is the free-text companion to any of them** — one or two sentences on what actually
 happened, for a reader who has only this file. The target fields say *where* it went; `resolution:`
@@ -237,7 +243,8 @@ What conflicts, why both sides seem valid, and what resolution might look like.
 - `promoted` — the contradiction was itself worth keeping and became a {DOMAIN:note}; add
   `promoted_to: [[note title]]`. A genuine disagreement between two sourced claims is often the
   most valuable thing in the graph, which is why this is an outcome and not a failure
-- `implemented` — resolving it required a system change; add `implemented_in: path/to/file`
+- `implemented` — resolving it required a system change; add `implemented_in: path/to/file` and
+  `closes: [the property this change actually closes]`
 - `archived` — superseded or no longer applicable; add `archived_reason: [why]`, or `resolution:`
   if what happened needs a sentence rather than a pointer
 - `blocked` — real, but not resolvable here: waiting on extraction, an external source, or a

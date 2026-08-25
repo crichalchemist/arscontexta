@@ -25,6 +25,14 @@ When generating a knowledge system for a specific domain, every universal term i
 | self/ space | research identity | reflection partner | study companion | relationship tracker | creative identity | project mind | companion memory |
 | orient | orient | center | review progress | check in | survey ideas | status check | remember |
 | persist | persist | journal | log progress | update records | save state | update status | save memories |
+| relationship: extends | extends | develops | advances | carries forward | expands | extends | adds to |
+| relationship: grounds | grounds | anchors | supports | establishes | underpins | justifies | roots |
+| relationship: contradicts | contradicts | challenges | conflicts with | disputes | subverts | blocks | differs from |
+| relationship: exemplifies | exemplifies | illustrates | demonstrates | shows | embodies | instances | reminds of |
+| relationship: synthesizes | synthesizes | integrates | combines | weaves together | fuses | consolidates | ties together |
+| relationship: enables | enables | makes possible | unlocks | allows | sparks | unblocks | lets |
+
+**Note:** the six `relationship:` rows are the enum declared at Level 6.6 of `skills/setup/SKILL.md`, one row per `{vocabulary.rel_*}` key. The `wiki link` row above renames the link; these rename the verb riding inside it. Do not offer "builds on" as an *extends* spelling — it maps to `grounds`, and the Level 6.6 example list omits it for that reason.
 
 ---
 

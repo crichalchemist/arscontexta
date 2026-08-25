@@ -67,7 +67,7 @@ for p in verify validate reflect; do
 done
 ```
 
-That yields `verify` 27 against 146 and `validate` 5 against 60, while `reflect` is 121 against 203 —
+That yields `verify` 30 against 146 and `validate` 5 against 60, while `reflect` is 123 against 203 —
 the gap is widest exactly where `skill-sources` is sparsest, which is where you need the answer. Do
 not widen the pattern to a bare `{…}`: that also matches `${TARGET}` and `${FILE}`, inflating a
 shell-variable count into a placeholder count. Consult this directory; do not edit it, and do not port

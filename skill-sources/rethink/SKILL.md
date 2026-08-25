@@ -229,8 +229,8 @@ Assign exactly one disposition per observation or tension:
 | Disposition | Meaning | When to Apply | Action |
 |-------------|---------|---------------|--------|
 | PROMOTE | Reusable insight worth keeping as a permanent {DOMAIN:note} | General principle across sessions. Would work as a claim note. Crystallized insight, not operational guidance. | Create {DOMAIN:note} in {vocabulary.notes}/, set observation `status: promoted`, add `promoted_to: [[title]]` |
-| IMPLEMENT | Operational guidance that should change the system | "System should do X differently." Points to a concrete improvement in context file, template, or skill. | Update the specific file, set `status: implemented`, add `implemented_in: [filepath]` |
-| METHODOLOGY | Friction pattern that should inform agent behavior | Behavioral learning. Not a domain insight (PROMOTE) or a system change (IMPLEMENT) — a methodology learning about HOW to operate. | Create or update methodology note in `ops/methodology/`, set `status: implemented`, add `implemented_in: ops/methodology/[file]` |
+| IMPLEMENT | Operational guidance that should change the system | "System should do X differently." Points to a concrete improvement in context file, template, or skill. | Update the specific file, set `status: implemented`, add `implemented_in: [filepath]` and `closes: [the property this fix actually closes]` |
+| METHODOLOGY | Friction pattern that should inform agent behavior | Behavioral learning. Not a domain insight (PROMOTE) or a system change (IMPLEMENT) — a methodology learning about HOW to operate. | Create or update methodology note in `ops/methodology/`, set `status: implemented`, add `implemented_in: ops/methodology/[file]` and `closes: [the behavioral property this note closes]` |
 | ARCHIVE | Session-specific, no longer relevant | One-session-specific with no lasting value. Already addressed by later work. Superseded by newer evidence. | Set `status: archived`, add `archived_reason: [why]` — and name the superseding item if there is one |
 | BLOCKED | Real, but waiting on work outside this system | TENSIONS ONLY. An extraction that has not run, a source not yet available, a decision someone else owns. Distinguish from KEEP PENDING: that is "not enough evidence", this is "evidence is fine, the blocker is elsewhere". | Set `status: blocked` and say what it is blocked on. NOT counted toward the /{DOMAIN:rethink} threshold |
 | KEEP PENDING | Not enough evidence yet | Might matter but need more data. Part of a pattern that has not fully emerged. Single data point that could go either way. | No change — leave `status: pending` |
@@ -332,7 +332,8 @@ because nothing downstream can tell the difference.
 
 1. Make the specific change to the identified file/section
 2. Show the change to the user (before/after) and get confirmation if the change is non-trivial
-3. Update the observation/tension: set `status: implemented`, add `implemented_in: [filepath]`
+3. Update the observation/tension: set `status: implemented`, add `implemented_in: [filepath]` and
+   `closes: [the property this fix actually closes]` — the path says where, `closes:` says what
 
 **For METHODOLOGY items:** (see Phase 2 below)
 
@@ -354,7 +355,7 @@ because nothing downstream can tell the difference.
 **For BLOCKED items (tensions only):**
 1. Set `status: blocked` and state the blocker in the note body — what has to happen elsewhere, and
    ideally who or what owns it. A `blocked` with no named blocker is the same unfalsifiable state an
-   `implemented` with no `implemented_in:` is.
+   `implemented` with no `implemented_in:` — or with a path but no `closes:` — is.
 2. Do NOT count it toward the /{DOMAIN:rethink} threshold. That threshold exists to trigger review,
    and re-reviewing something whose blocker has not moved is exactly the routing defect it causes.
 3. Revisit when the blocker clears: `blocked` is a live state, not an archive.
@@ -513,7 +514,8 @@ If a methodology note with similar content already exists:
 2. Instead, add the new evidence to the existing note
 3. Update the evidence array in frontmatter
 4. Strengthen or nuance the existing guidance based on the new observation
-5. Update the observation: set `status: implemented`, add `implemented_in: ops/methodology/[existing-file]`
+5. Update the observation: set `status: implemented`, add `implemented_in: ops/methodology/[existing-file]` and
+   `closes: [the behavioral property this note closes]`
 
 ### Checking for Methodology Duplicates
 
