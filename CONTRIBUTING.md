@@ -357,7 +357,13 @@ Any check you add here must distinguish those three states, and you must *verify
 one. A scan that cannot report failure will eventually tell you the repo is clean because it
 crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
-Branch from `main`. All thirty-two CI steps must pass. State in the PR what is **not** claimed —
+Branch from `develop` and open the PR against `develop`. `main` is the staging branch: it holds
+what is ready to go upstream, and `develop` merges into it as a batch rather than one feature at a
+time. This paragraph read "Branch from `main`" until 2026-08-25 — true through PR #18 and false
+from #19 onward, by which point every merged PR had targeted `develop`. The guidance was
+describing a convention the repository had already left.
+
+All thirty-two CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.
 
 ---
