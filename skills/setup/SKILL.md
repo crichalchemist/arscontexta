@@ -1664,6 +1664,76 @@ After kernel validation, run a functional test:
 
 If the smoke test fails, report the failure with specific remediation steps. A vault that passes structural validation but fails functional testing is not ready.
 
+### Vocabulary Transform Completeness
+
+Step 3c renamed each command to its domain-native form using the Skill Name Mapping table in
+`${CLAUDE_PLUGIN_ROOT}/reference/vocabulary-transforms.md`. That rename is a semantic pass over
+prose, not a mechanical substitution, so it can finish one file and miss the next — or miss a
+single occurrence inside a file it otherwise transformed. Nothing downstream notices. The vault
+generates, the skills load, and an instruction naming a command this vault does not have simply
+does nothing when a user follows it.
+
+```bash
+# Assert the postcondition of the command rename. Run from the vault root.
+manifest="ops/derivation-manifest.md"
+skills="./.claude/skills"
+
+[ -f "$manifest" ] || { echo "CANNOT CONCLUDE: $manifest not found -- run from the vault root"; exit 2; }
+[ -d "$skills" ]   || { echo "CANNOT CONCLUDE: $skills not found -- run from the vault root"; exit 2; }
+grep -q '# Level 7:' "$manifest" || { echo "CANNOT CONCLUDE: $manifest has no '# Level 7:' marker -- the vocabulary: block is unbounded"; exit 2; }
+block=$(sed -n '/^vocabulary:/,/# Level 7:/p' "$manifest")
+[ -n "$block" ] || { echo "CANNOT CONCLUDE: $manifest has no 'vocabulary:' block"; exit 2; }
+
+# Command position only. An unanchored /reduce also matches the path .claude/skills/reduce/.
+pre='(^|[^A-Za-z0-9_])'
+post='([^A-Za-z0-9_-]|$)'
+declared=0; renamed=0; failed=0; unseen=0
+
+while IFS= read -r line; do
+  key=$(printf '%s\n' "$line" | sed -n 's/^  \(cmd_[a-z_]*\): ".*"$/\1/p')
+  [ -n "$key" ] || continue
+  val=$(printf '%s\n' "$line" | sed -n 's/^  cmd_[a-z_]*: "\(.*\)"$/\1/p')
+  [ -n "$val" ] || continue
+  declared=$((declared + 1))
+  canon="/${key#cmd_}"
+  [ "$val" = "$canon" ] && continue          # not renamed: nothing to assert
+  renamed=$((renamed + 1))
+  surv=$(grep -rnE "${pre}${canon}${post}" "$skills" 2>/dev/null | awk 'END{print NR}')
+  have=$(grep -rnE "${pre}${val}${post}"   "$skills" 2>/dev/null | awk 'END{print NR}')
+  if [ "$surv" -gt 0 ]; then
+    failed=$((failed + 1))
+    echo "FAIL  $canon -> $val : $surv canonical name(s) survived the rename"
+    grep -rlE "${pre}${canon}${post}" "$skills" 2>/dev/null | sed 's/^/          /'
+  elif [ "$have" -eq 0 ]; then
+    unseen=$((unseen + 1))
+    echo "INCONCLUSIVE  $canon -> $val : neither name appears anywhere"
+  else
+    echo "ok    $canon -> $val : 0 canonical, $have derived"
+  fi
+done <<EOF_CMD
+$block
+EOF_CMD
+
+[ "$declared" -eq 0 ] && { echo "CANNOT CONCLUDE: no cmd_* keys parsed -- the schema predates Level 6, or the parser broke"; exit 2; }
+[ "$renamed"  -eq 0 ] && { echo "SKIP: $declared cmd_* declared, none renamed -- this check asserts nothing here"; exit 0; }
+[ "$failed"   -gt 0 ] && { echo "TRANSFORM INCOMPLETE: $failed of $renamed renamed command(s) still carry the canonical name"; exit 1; }
+[ "$unseen" -eq "$renamed" ] && { echo "CANNOT CONCLUDE: every renamed command inconclusive -- suspect the search, not the vault"; exit 2; }
+echo "TRANSFORM COMPLETE: $renamed renamed command(s), 0 canonical survivors"
+```
+
+Read the exit code, not only the output. `0` with `TRANSFORM COMPLETE` is the sole passing
+result. `SKIP` is also `0`, but it means the check asserted nothing because this domain renamed
+no commands — do not report it as verified. `1` lists the files still carrying the canonical
+name; re-run the rename on those. `2` means a precondition failed and no verdict exists, which
+must never be reported as clean.
+
+The check pairs its negative assertion with a positive one deliberately. "Zero canonical names
+survive" is also what a broken search returns, so it additionally requires the derived name to
+appear somewhere; when neither appears it reports `2` rather than a pass. Its guarantee is
+narrow and worth stating plainly: it proves no canonical name survived **where the manifest
+declares a rename**. It is silent for any command the domain left at its canonical name, and it
+cannot tell you the rename was semantically thorough — only that the old name is gone.
+
 ### Clean CLI Output
 
 Present results using clean formatting per Section 10.5 design language. No runes, no sigils, no decorative Unicode, no ASCII art. Clean indented text with standard markdown formatting only.
