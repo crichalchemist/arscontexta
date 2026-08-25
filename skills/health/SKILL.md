@@ -211,7 +211,7 @@ done
 rm -f "$idx" "$tgts" "$edges" "$tmp_awk"
 ```
 
-**Nuance:** Orphans are not automatically failures. A note created today that hasn't been through /{vocabulary.cmd_reflect} yet is expected to be orphaned temporarily. Check file age:
+**Nuance:** Orphans are not automatically failures. A note created today that hasn't been through {vocabulary.cmd_reflect} yet is expected to be orphaned temporarily. Check file age:
 
 | Condition | Level |
 |-----------|-------|

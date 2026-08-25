@@ -1182,6 +1182,7 @@ vocabulary:
   cmd_reflect: "[/domain-verb]" # e.g., "/reflect", "/find-patterns", "/link-decisions"
   cmd_reweave: "[/domain-verb]" # e.g., "/reweave", "/revisit", "/update-old"
   cmd_verify: "[/domain-verb]"  # e.g., "/verify", "/check", "/audit"
+  cmd_validate: "[/domain-verb]" # e.g., "/validate", "/check-schema", "/conform"
   cmd_rethink: "[/domain-verb]" # e.g., "/rethink", "/reassess", "/retrospect"
 
   # Level 6.5: Lifecycle states (one key per enum value)

@@ -399,7 +399,7 @@ Display vault state summary:
 
   {vocabulary.note_plural}: [N]
   Connections: [M] wiki links
-  {vocabulary.topic_map_plural}: linked to [[index]]
+  {vocabulary.topic_maps}: linked to [[index]]
 
   Your graph so far:
     [[note 1]] ----> [[note 2]]

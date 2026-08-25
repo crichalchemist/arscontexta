@@ -174,8 +174,8 @@ or `decisions/`), but the separation is invariant.
 
 ## Processing Pipeline
 
-The vault implements the **6 Rs**, extending Cornell Note-Taking's 5 Rs with a
-meta-cognitive layer:
+The vault implements a six-phase pipeline adapted from Cornell Note-Taking's
+5 Rs, with a meta-cognitive layer added:
 
 | Phase | What Happens | Command |
 |-------|-------------|---------|
