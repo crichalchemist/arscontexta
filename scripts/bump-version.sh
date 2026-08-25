@@ -68,7 +68,75 @@ stage_json_field() {
   jq --arg v "$3" "$(jq_path "$2") = \$v" "$1" > "$work" && mv "$work" "$4" || { rm -f "$work"; return 1; }
 }
 declared_files() { jq -r '.files[] | "\(.path)\t\(.field)"' "$CONFIG"; }
-declared_paths() { jq -r '.files[].path' "$CONFIG" | sort -u; }
+
+# TEXT SITES: version strings that are not JSON fields. README carries a `**v0.9.9**`
+# badge and every SKILL.md carries `generated_from: "arscontexta-<ver>"`; neither can be
+# addressed by a jq path, and both drifted for exactly that reason -- the stamps were set
+# in the initial release and never moved again while the manifests went 0.8.0 -> 0.9.9.
+#
+# A site is declared by LITERAL prefix and suffix, not by a regex. Patterns would live in
+# JSON, where every backslash doubles, and a mis-escaped pattern matches nothing while
+# reporting the same success as a correct one.
+#
+# Globs are expanded with `find -path` rather than a shell glob: zsh aborts a command on a
+# non-matching glob where bash passes the pattern through, and neither shell word-splits
+# the result the same way. `find` yields one path per line and a while-read consumes it
+# without splitting at all.
+declared_text() {
+  jq -r '.text[]? | "\(.glob)\t\(.prefix)\t\(.suffix)"' "$CONFIG" |
+  while IFS="$(printf '\t')" read -r glob pre suf; do
+    [ -n "$glob" ] || continue
+    find "$REPO_ROOT" -path "$REPO_ROOT/$glob" -type f 2>/dev/null | sort |
+    while IFS= read -r abs; do
+      printf '%s\t%s\t%s\n' "${abs#"$REPO_ROOT"/}" "$pre" "$suf"
+    done
+  done
+}
+
+# THE VERSION SHAPE IS THE GUARD, and it is the whole reason this reads a value before
+# rewriting it. `skills/setup/SKILL.md` carries seven `generated_from: "arscontexta-{version}"`
+# lines that setup substitutes at generation time; they match the same prefix and suffix as
+# a real stamp. Rewriting one would replace the mechanism with a frozen literal and every
+# vault generated afterwards would carry this repo's version instead of its own -- silently,
+# because the result still looks like a stamp. A value that is not version-shaped is not a
+# site, and both readers below skip it.
+VERSION_SHAPE='^v?[0-9]+(\.[0-9]+)+$'
+
+read_text_field() {   # read_text_field <file> <prefix> <suffix> -> first version-shaped value
+  awk -v pre="$2" -v suf="$3" -v shape="$VERSION_SHAPE" '
+    index($0, pre) == 1 {
+      rest = substr($0, length(pre) + 1)
+      p = index(rest, suf)
+      if (p > 0) { v = substr(rest, 1, p - 1); if (v ~ shape) { print v; exit } }
+    }' "$1"
+}
+
+# rc 3 means "no version-shaped site in this file" -- not a failure. setup is placeholder-only
+# and must stage cleanly as a no-op; collapsing that into rc 1 would abort every bump.
+stage_text_field() {  # stage_text_field <src> <prefix> <suffix> <new> <out>
+  work="$5.work"; rm -f "$work"
+  awk -v pre="$2" -v suf="$3" -v new="$4" -v shape="$VERSION_SHAPE" '
+    { line = $0
+      if (index(line, pre) == 1) {
+        rest = substr(line, length(pre) + 1)
+        p = index(rest, suf)
+        if (p > 0) {
+          v = substr(rest, 1, p - 1)
+          if (v ~ shape) { line = pre new substr(rest, p); changed++ }
+        }
+      }
+      print line
+    }
+    END { if (changed == 0) exit 3 }
+  ' "$1" > "$work"
+  rc=$?
+  if [ "$rc" -eq 3 ]; then rm -f "$work"; return 3; fi
+  [ "$rc" -eq 0 ] || { rm -f "$work"; return 1; }
+  mv "$work" "$5" || { rm -f "$work"; return 1; }
+  return 0
+}
+
+declared_paths() { { jq -r '.files[].path' "$CONFIG"; declared_text | cut -f1; } | sort -u; }
 
 # The version the declared files agree on, or the most common if they do not.
 current_version() {
@@ -98,6 +166,22 @@ cmd_check() {
 "
   done <<EOF
 $(declared_files)
+EOF
+  while IFS="$(printf '\t')" read -r vpath pre suf; do
+    [ -n "$vpath" ] || continue
+    if [ ! -f "$REPO_ROOT/$vpath" ]; then
+      printf '  %-46s MISSING\n' "$vpath (text)"; drift=1; continue
+    fi
+    ver=$(read_text_field "$REPO_ROOT/$vpath" "$pre" "$suf")
+    # Empty means no version-shaped value in the file -- a placeholder-only template such
+    # as setup. Not a site, not drift, and not worth a row: reporting it would put a
+    # permanent non-finding in the output every reader has to learn to ignore.
+    [ -n "$ver" ] || continue
+    printf '  %-46s %s\n' "$vpath (text)" "$ver"
+    seen="$seen$ver
+"
+  done <<EOF
+$(declared_text)
 EOF
   distinct=$(printf '%s' "$seen" | sort -u | grep -c . || true)
   if [ "$distinct" -gt 1 ]; then
@@ -220,6 +304,39 @@ cmd_bump() {
   done <<EOF
 $(declared_files)
 EOF
+
+  # Text sites stage into the SAME temps and join the SAME staged_paths list, so the
+  # rollback and commit phases below cover them without knowing they are a different kind
+  # of site. Skipped entirely if JSON staging already failed -- the barrier is the point.
+  if [ -z "$stage_fail" ]; then
+  while IFS="$(printf '\t')" read -r vpath pre suf; do
+    [ -n "$vpath" ] || continue
+    if [ ! -f "$REPO_ROOT/$vpath" ]; then printf '  SKIP (missing) %s\n' "$vpath"; continue; fi
+    tmp="$REPO_ROOT/$vpath.tmp.$BUMP_PID"
+    if printf '%s\n' "$staged_paths" | grep -qxF "$vpath"; then
+      src="$tmp"; already_staged=yes
+    else
+      src="$REPO_ROOT/$vpath"; rm -f "$tmp" "$tmp.work"; already_staged=no
+    fi
+    was=$(read_text_field "$src" "$pre" "$suf")
+    # `|| trc=$?` and not `; trc=$?`: under set -e a non-zero return aborts the shell
+    # before the status is ever read, which is the trap cmd_audit documents at length.
+    trc=0
+    stage_text_field "$src" "$pre" "$suf" "$new" "$tmp" || trc=$?
+    # rc 3 is "nothing version-shaped here" -- a no-op, not a failure.
+    if [ "$trc" -eq 3 ]; then
+      [ "$already_staged" = yes ] || rm -f "$tmp" "$tmp.work"
+      continue
+    fi
+    [ "$trc" -eq 0 ] || { stage_fail="$vpath (text) could not be written"; break; }
+    [ "$already_staged" = yes ] || staged_paths="$staged_paths$vpath
+"
+    report="$report$(printf '  %-46s %s -> %s' "$vpath (text)" "$was" "$new")
+"
+  done <<EOF
+$(declared_text)
+EOF
+  fi
 
   if [ -n "$stage_fail" ]; then
     # Discard every staged temp. One left beside a manifest is a second copy of release

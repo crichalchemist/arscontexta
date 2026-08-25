@@ -6,8 +6,12 @@ allowed-tools: Read, Write, Edit, Grep, Glob, AskUserQuestion, Bash
 context: fork
 model: opus
 version: "1.0"
-generated_from: "arscontexta-v1.6"
+generated_from: "arscontexta-0.10.0"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
+
+# Tutorial
 
 ## Runtime Configuration (Step 0 — before any processing)
 
@@ -395,7 +399,7 @@ Display vault state summary:
 
   {vocabulary.note_plural}: [N]
   Connections: [M] wiki links
-  {vocabulary.topic_map_plural}: linked to [[index]]
+  {vocabulary.topic_maps}: linked to [[index]]
 
   Your graph so far:
     [[note 1]] ----> [[note 2]]

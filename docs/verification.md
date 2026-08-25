@@ -12,7 +12,7 @@
 
 ### Verification
 
-There are eighteen executable checks. Sixteen run in CI (`.github/workflows/checks.yml`) on every push.
+There are nineteen executable checks. Sixteen run in CI (`.github/workflows/checks.yml`) on every push.
 Three defects shipped here were bash/zsh forks, so **the eleven test suites each run under both
 shells** — but read the paragraph below the table before treating that as "everything is tested
 under both": `check-portability.sh` itself runs bash-only, and one suite's zsh run exercises the
@@ -24,12 +24,13 @@ bash reference/check-prose-paths.sh                      # 0 missing (path count
 bash reference/check-doc-claims.sh                       # exit 0 (declared claims only)
 bash reference/check-placeholder-count.sh main           # exit 0 (1 = a template lost placeholders)
 bash reference/check-vocabulary-schema.sh                # exit 0 (1 = an undeclared key; also runs under zsh in CI)
+bash reference/check-skillevaluator.sh                   # exit 0; 2 = a precondition is missing, NOT a verdict (not in CI)
 bash reference/test/check-doc-claims.test.sh              # bash-only (see the suite's own header); 13/13
 for s in bash zsh; do
   $s reference/test/link-extraction.test.sh              # 101/101
   $s reference/test/guard-failure.test.sh                # 66/66
   $s reference/test/fence-isolation.test.sh              # PASS
-  $s reference/test/bump-version.test.sh                 # 41/41
+  $s reference/test/bump-version.test.sh                 # 53/53
   $s reference/test/kernel-note-dirs.test.sh             # 76/76
   $s reference/test/threshold-namespace.test.sh          # 57/57
   $s reference/test/placeholder-count.test.sh            # 40/40
@@ -83,6 +84,7 @@ write fails at run time.
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given; and (assertion M) `mechanically_compare` substituting the installed side as well as the canonical side, which silently launders a real divergence into false agreement — caught via a fixture built on the real `topic_map`/`hub` vocabulary collision, the specific pair that makes symmetric substitution wrong |
 | `bump-version.test.sh` | the release tool's failure paths — a `MISSING` row summarised as agreement, jq's `"null"` accepted as a version, a failed audit scan read as "all clear", and a bump that moves some declared sites and not others (including two fields of the *same* file, which no file-to-file comparison sees) |
 | `check-prose-paths.sh` | prose naming a repo path that does not exist **in this checkout**. Read its banner: it does *not* check the packaged plugin, and prints that every run |
+| `check-skillevaluator.sh` | this plugin failing NVIDIA skillevaluator's Tier 1 contract — a published-plugin standard no other gate here models: `metadata.author` in `Name <email>` shape, a body `# Title`, and the agentic-risk taxonomy skillspector applies. Its value is in what it refuses to call a verdict. A missing scanner reports `findings=0` with `passed=False`, which renders in the CLI panel exactly like a real finding and in a naive finding count exactly like a clean tree, so this gate reads `incomplete_scans` from the JSON and exits **2 CANNOT CONCLUDE**, never 0 or 1, whenever `skillspector`, `gitleaks`, or the provider credential is absent. It also refuses to reach a security verdict without `--llm-verify`: skillspector flags 13 HIGH findings against a repo whose *purpose* is writing skills and seeding memory (one fires on the line `**PRESERVE self/memory/ entirely.** Never modify`), and the only honest way to clear them is the LLM second pass that downgrades a finding it rates false_positive at high confidence — not a `SECURITY.*` policy entry, which would buy a green run by ceasing to measure. **Not in CI**: it needs an `NVIDIA_API_KEY` (nv_build is skillevaluator's own default provider and the one credential that satisfies both its verifier and skillspector), so the sixteen-in-CI count above is unchanged |
 | `hook-config.test.sh` | the only gate that executes `session-orient.sh` or `vaultguard.sh` at all. Before it, three of five hook scripts could be broken with every other gate green, and `session-orient.sh` had only TEXTUAL coverage — `threshold-namespace` checks that it NAMES its config key, so a break that keeps the name and ignores the value passes there (57/0) and fails only here. Measured by mutation, one script at a time. An unparseable config value silently becoming the default, and `session-orient.sh` ignoring its configured threshold, are the two defects divergence 3 documents; `vaultguard.sh` decides whether **every** plugin hook runs, so inverting its inertness fires auto-commit in every repo the plugin is installed in |
 | `check-placeholder-count.sh` | a backport that HARDCODED a vault's vocabulary into a `skill-sources/` template — `nodes/` where `{vocabulary.notes}` stood — shipping one user's dialect to every future system. The only gate that reads a git range, so CI needs `fetch-depth: 0`; it exits 2, not 0, where the merge base is unreachable |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
@@ -172,23 +174,28 @@ did not follow.
 line above, recorded rather than silently corrected. **It read "now 11" from 2026-08-11 until
 2026-08-15**, when task 12a's port drained those seven — that move is a fix landing with its own
 count, not drift, and it returns the total to a coincidental 4 whose composition differs from the
-2026-08-08 "now 4": read the composition, not the number.
+2026-08-08 "now 4": read the composition, not the number. **2026-08-25 makes it 5**, and this one is
+neither a fix nor a new defect: teaching fence discovery to see indented fences added three fences
+to `skill-sources/reflect` ahead of the existing `reflect f01` entry, so that entry's original
+subject became `f04`. Both LOCKDIR blocks now fail N for the one documented reason, and both are
+listed — an entry that silently changes which fence it absorbs is the failure this table exists to
+prevent. The entry count moved because the *keying* moved, not because the tree got worse.
 
 **Re-derive it, and do not read the gate's own `known-open=` as the table size — it is SHELL-SCOPED.**
 The header counts entries in scope for the shell running it, so the same unchanged table reports
-`known-open=2` under bash and `known-open=4` under zsh: the two `ZSH ONLY:` entries are correctly out
+`known-open=3` under bash and `known-open=5` under zsh: the two `ZSH ONLY:` entries are correctly out
 of scope under bash. A reader taking either number as "how many known-open defects are there" gets a
 different answer depending on which shell they happened to run, and both look authoritative. Count
 the table for the total; run both shells for the split:
 
 ```bash
-# 5 = 4 table entries + 1 comment line, the one documenting the fabricated
+# 6 = 5 table entries + 1 comment line, the one documenting the fabricated
 # `.probe-skill f01~H~` absorption probe. Stated as a sum rather than filtered with
 # an exclusion, per the idiom divergence 12 uses: an exclusion rots silently and can
 # quietly match nothing, whereas a sum fails loudly the moment it stops adding up.
-/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 5 = 4 + 1
-bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 2 — in scope for bash
-zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 4 — in scope for zsh
+/usr/bin/grep -c '~[A-Z]~' reference/test/fence-isolation.test.sh                    # 6 = 5 + 1
+bash reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 3 — in scope for bash
+zsh  reference/test/fence-isolation.test.sh 2>&1 | grep -m1 -o 'known-open=[0-9]*'   # 5 — in scope for zsh
 ```
 
 It also carries one assertion that is **not** about fences: **F**, which runs once against a

@@ -2,7 +2,7 @@
 name: remember
 description: Capture friction as methodology notes. Three modes — explicit description, contextual (review recent corrections), session mining (scan transcripts for patterns). Triggers on "/remember", "/remember [description]".
 version: "1.0"
-generated_from: "arscontexta-v1.6"
+generated_from: "arscontexta-0.10.0"
 user-invocable: true
 context: fork
 model: sonnet

@@ -2,10 +2,12 @@
 name: architect
 description: Research-backed evolution advice for your knowledge system. Analyzes health reports, friction patterns, and derivation history to propose specific changes with research justification. Never auto-implements — proposals require your approval.
 version: "1.0"
-generated_from: "arscontexta-v1.6"
+generated_from: "arscontexta-0.10.0"
 user-invocable: true
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__qmd__query, mcp__qmd__get, mcp__qmd__multi_get
 argument-hint: "[optional: specific area to focus on, e.g. 'schema', 'processing', 'MOC structure']"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 ## Runtime Configuration (Step 0 — before any processing)
@@ -15,12 +17,12 @@ Read these files to configure domain-specific behavior:
 1. **`ops/derivation-manifest.md`** — vocabulary mapping, platform hints
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
-   - Use `vocabulary.topic_map` / `vocabulary.topic_map_plural` for MOC references
+   - Use `vocabulary.topic_map` / `vocabulary.topic_maps` for MOC references
    - Use `vocabulary.inbox` for the inbox folder name
    - Use `vocabulary.cmd_reflect` for connection-finding command name
    - Use `vocabulary.cmd_reweave` for backward-pass command name
    - Use `vocabulary.cmd_verify` for verification command name
-   - Use `vocabulary.architect` for the command name in output
+   - The command name in output is `/arscontexta:architect` — a plugin command, never renamed
 
 2. **`ops/config.yaml`** — processing depth, pipeline chaining, automation settings
 

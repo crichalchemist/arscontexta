@@ -367,5 +367,72 @@ F=$(mkfix)
 eq "an unknown flag is rejected"                   "1"   "$(rc_of "$F" --nope)"
 eq "no argument prints usage and succeeds"         "0"   "$(rc_of "$F")"
 
+# --- text sites -------------------------------------------------------------
+# Version strings that are not JSON fields: README's badge and every SKILL.md's
+# `generated_from:` stamp. Both drifted for years precisely because no mechanism
+# addressed them, so the mechanism that now does needs the coverage the JSON path has.
+#
+# THE GHOST FIXTURE IS THE POINT. `mods/ghost/SKILL.md` carries
+# `generated_from: "arscontexta-{version}"`, matching the SAME prefix and suffix as a real
+# stamp. In the live tree that shape is setup's generation-time placeholder, seven times
+# over. A rewrite that cannot tell it from a literal would freeze this repo's version into
+# every vault generated afterwards, and the result would still look like a valid stamp.
+mkfix_text() { # mkfix_text [version] -> fixture root
+  local d v
+  v="${1:-7.7.7}"
+  d=$(mktemp -d)
+  TMPDIRS+=("$d")
+  mkdir -p "$d/scripts" "$d/pkg" "$d/mods/alpha" "$d/mods/beta" "$d/mods/ghost"
+  cp "$SRC" "$d/scripts/bump-version.sh"
+  chmod +x "$d/scripts/bump-version.sh"
+  printf '{"version": "%s"}\n' "$v" > "$d/pkg/plugin.json"
+  printf '**v%s** . fixture badge\n' "$v" > "$d/README.md"
+  printf 'generated_from: "arscontexta-v1.6"\n' > "$d/mods/alpha/SKILL.md"
+  printf 'generated_from: "arscontexta-v1.6"\n' > "$d/mods/beta/SKILL.md"
+  printf 'generated_from: "arscontexta-{version}"\n' > "$d/mods/ghost/SKILL.md"
+  cat > "$d/.version-bump.json" <<'EOF'
+{
+  "files": [
+    {"path": "pkg/plugin.json", "field": "version"}
+  ],
+  "text": [
+    {"glob": "README.md", "prefix": "**v", "suffix": "**"},
+    {"glob": "mods/*/SKILL.md", "prefix": "generated_from: \"arscontexta-", "suffix": "\""}
+  ],
+  "audit": { "exclude": [".git"] }
+}
+EOF
+  printf '%s' "$d"
+}
+
+F=$(mkfix_text)
+# Stamps say v1.6 while the manifest says 7.7.7 -- the live tree's condition exactly.
+eq "text: --check sees stamp drift the JSON path cannot"  "1"   "$(rc_of "$F" --check)"
+"$SELF" "$F/scripts/bump-version.sh" 8.8.8 >/dev/null 2>&1 || true
+eq "text: README badge keeps its v and moves"       '**v8.8.8** . fixture badge' "$(cat "$F/README.md")"
+eq "text: a glob rewrites the first match"          'generated_from: "arscontexta-8.8.8"' "$(cat "$F/mods/alpha/SKILL.md")"
+eq "text: a glob rewrites every match, not one"     'generated_from: "arscontexta-8.8.8"' "$(cat "$F/mods/beta/SKILL.md")"
+# The one that matters: a generation-time placeholder is not a version and is left alone.
+eq "text: a {version} placeholder is not rewritten" 'generated_from: "arscontexta-{version}"' "$(cat "$F/mods/ghost/SKILL.md")"
+eq "text: --check agrees once every site moved"     "0"   "$(rc_of "$F" --check)"
+eq "text: no temp survives a clean bump"            "0"   "$(find "$F" -name '*.tmp.*' | grep -c . || true)"
+
+# A file matched by a glob but carrying no version-shaped value must not abort the run.
+# setup is exactly this file in the live tree, so treating it as a write failure would
+# make every bump from here on impossible.
+F=$(mkfix_text)
+rm -f "$F/mods/alpha/SKILL.md" "$F/mods/beta/SKILL.md"
+eq "text: a placeholder-only tree still bumps"      "0"   "$(rc_of "$F" 8.8.8)"
+eq "text: and its placeholder is still intact"      'generated_from: "arscontexta-{version}"' "$(cat "$F/mods/ghost/SKILL.md")"
+
+# The barrier covers text sites too: a JSON site that cannot be read aborts before any
+# text file is touched. Without this, the rollback would restore the manifests and leave
+# seventeen stamps rewritten -- drift wearing a different hat.
+F=$(mkfix_text)
+printf 'not json at all\n' > "$F/pkg/plugin.json"
+eq "text: a JSON failure aborts before text is written" "1" "$(rc_of "$F" 8.8.8)"
+eq "text: and the stamp is untouched by the abort"  'generated_from: "arscontexta-v1.6"' "$(cat "$F/mods/alpha/SKILL.md")"
+eq "text: and the README is untouched by the abort" '**v7.7.7** . fixture badge' "$(cat "$F/README.md")"
+
 printf '\npassed=%s failed=%s\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
