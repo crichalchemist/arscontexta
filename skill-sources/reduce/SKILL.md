@@ -1163,9 +1163,9 @@ When processing content, route to the correct skill:
 | Task Type | Required Skill | Why |
 |-----------|---------------|-----|
 | New content to process | /{vocabulary.reduce} | Extraction requires quality gates |
-| {vocabulary.note} just created | /{vocabulary.cmd_reflect} | New {vocabulary.note_plural} need connections |
-| After connecting | /{vocabulary.cmd_reweave} | Old {vocabulary.note_plural} need updating |
-| Quality check | /{vocabulary.cmd_verify} | Combined verification gate |
+| {vocabulary.note} just created | {vocabulary.cmd_reflect} | New {vocabulary.note_plural} need connections |
+| After connecting | {vocabulary.cmd_reweave} | Old {vocabulary.note_plural} need updating |
+| Quality check | {vocabulary.cmd_verify} | Combined verification gate |
 | System health | /health | Systematic diagnostics |
 
 ## Pipeline Chaining

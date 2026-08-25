@@ -201,7 +201,7 @@ If graph helper scripts exist in `ops/scripts/graph/`, use them instead of inlin
 
   Orphans ([N]):
     - [[orphan name]] — [description from YAML]
-    → Suggestion: Run /{vocabulary.cmd_reflect} to find connections
+    → Suggestion: Run {vocabulary.cmd_reflect} to find connections
 
   Dangling Links ([N]):
     - [[missing name]] — referenced from [[source note]]
@@ -343,7 +343,7 @@ For each open triangle:
      C: "[description]"
      → These may benefit from a connection because [specific reasoning
         about WHY B and C might relate through A's lens]
-     → Action: Run /{vocabulary.cmd_reflect} on [[note B]] to evaluate
+     → Action: Run {vocabulary.cmd_reflect} on [[note B]] to evaluate
 
   2. [[note D]] and [[note E]]
      Common parent: [[note F]]
@@ -439,7 +439,7 @@ For each cluster:
 
   Isolated {vocabulary.note_plural} ([N]):
     - [[isolated note]] — [description]
-    → Action: Run /{vocabulary.cmd_reflect} to find connections
+    → Action: Run {vocabulary.cmd_reflect} to find connections
 
   [If 1 cluster: "All {vocabulary.note_plural} are in one connected component.
    The graph is fully connected. This is healthy."]
@@ -654,7 +654,7 @@ For each unconnected pair:
 
   Appropriately separate: [N] pairs — no connection needed
 
-  → Action: Run /{vocabulary.cmd_reflect} on the "likely" pairs
+  → Action: Run {vocabulary.cmd_reflect} on the "likely" pairs
 ```
 
 ### /graph forward [[note]] [depth]
@@ -872,11 +872,11 @@ If no arguments provided:
 ## Output Rules
 
 - **Never dump raw data.** Always interpret results with {vocabulary.note} descriptions and context.
-- **Always suggest actions.** "Run /{vocabulary.cmd_reflect} on these pairs" or "Consider adding a bridge {vocabulary.note} about X."
+- **Always suggest actions.** "Run {vocabulary.cmd_reflect} on these pairs" or "Consider adding a bridge {vocabulary.note} about X."
 - **Use domain vocabulary** for all labels and descriptions — {vocabulary.note}, {vocabulary.topic_map}, etc.
 - **For large result sets,** summarize top findings (max 10) and offer to show more: "[N] more results. Show all? (yes/no)"
 - **Include density benchmarks** for context — "your density of 0.04 is in the healthy range."
-- **Distinguish structural from semantic.** Graph analysis reveals structural properties. Semantic judgment about WHETHER connections should exist requires /{vocabulary.cmd_reflect}.
+- **Distinguish structural from semantic.** Graph analysis reveals structural properties. Semantic judgment about WHETHER connections should exist requires {vocabulary.cmd_reflect}.
 
 ---
 
