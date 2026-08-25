@@ -647,7 +647,7 @@ printf '%s\n' "$FILES" | while IFS= read -r rel; do
   [ -n "$rel" ] || continue
   slug=$(printf '%s' "$rel" | sed 's|/SKILL\.md$||; s|/|--|g')
   awk -v dir="$WORK/fences" -v slug="$slug" '
-    FNR==1 { n=0; inf=0 }
+    FNR==1 { n=0; inf=0; ind=0 }
     /^[ \t]*```bash[[:space:]]*$/ && !inf { inf=1; ind=match($0,/[^ \t]/)-1; n++; f=sprintf("%s/%s__f%02d.raw", dir, slug, n); printf "" > f; next }
     /^[ \t]*```[[:space:]]*$/ && inf { inf=0; close(f); next }
     inf { line=$0; if (ind>0 && substr(line,1,ind) ~ /^[ \t]+$/) line=substr(line,ind+1); print line >> f }
