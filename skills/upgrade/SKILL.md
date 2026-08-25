@@ -1005,6 +1005,66 @@ After applying all approved upgrades:
 
 4. **Pipeline compatibility** — if pipeline skills were upgraded (/{vocabulary.reduce}, /{vocabulary.reflect}, /{vocabulary.reweave}, /{vocabulary.verify}), verify handoff format compatibility with /ralph
 
+5. **Vocabulary transform completeness** — confirm no canonical command name survived where the
+   manifest declares a rename. The rename applied in Step 5b is a semantic pass over prose, so it
+   can complete on one skill and miss the next, or miss one occurrence in a file it otherwise
+   rewrote. Unlike item 3, this pairs the negative assertion with a positive one: an empty result
+   is also what a broken search returns, so it requires the derived name to be present before
+   reporting a pass, and reports `2` when neither name appears.
+
+   ```bash
+   # Assert the postcondition of the command rename. Run from the vault root.
+   manifest="ops/derivation-manifest.md"
+   skills="./.claude/skills"
+
+   [ -f "$manifest" ] || { echo "CANNOT CONCLUDE: $manifest not found -- run from the vault root"; exit 2; }
+   [ -d "$skills" ]   || { echo "CANNOT CONCLUDE: $skills not found -- run from the vault root"; exit 2; }
+   grep -q '# Level 7:' "$manifest" || { echo "CANNOT CONCLUDE: $manifest has no '# Level 7:' marker -- the vocabulary: block is unbounded"; exit 2; }
+   block=$(sed -n '/^vocabulary:/,/# Level 7:/p' "$manifest")
+   [ -n "$block" ] || { echo "CANNOT CONCLUDE: $manifest has no 'vocabulary:' block"; exit 2; }
+
+   # Command position only. An unanchored /reduce also matches the path .claude/skills/reduce/.
+   pre='(^|[^A-Za-z0-9_])'
+   post='([^A-Za-z0-9_-]|$)'
+   declared=0; renamed=0; failed=0; unseen=0
+
+   while IFS= read -r line; do
+     key=$(printf '%s\n' "$line" | sed -n 's/^  \(cmd_[a-z_]*\): ".*"$/\1/p')
+     [ -n "$key" ] || continue
+     val=$(printf '%s\n' "$line" | sed -n 's/^  cmd_[a-z_]*: "\(.*\)"$/\1/p')
+     [ -n "$val" ] || continue
+     declared=$((declared + 1))
+     canon="/${key#cmd_}"
+     [ "$val" = "$canon" ] && continue          # not renamed: nothing to assert
+     renamed=$((renamed + 1))
+     surv=$(grep -rnE "${pre}${canon}${post}" "$skills" 2>/dev/null | awk 'END{print NR}')
+     have=$(grep -rnE "${pre}${val}${post}"   "$skills" 2>/dev/null | awk 'END{print NR}')
+     if [ "$surv" -gt 0 ]; then
+       failed=$((failed + 1))
+       echo "FAIL  $canon -> $val : $surv canonical name(s) survived the rename"
+       grep -rlE "${pre}${canon}${post}" "$skills" 2>/dev/null | sed 's/^/          /'
+     elif [ "$have" -eq 0 ]; then
+       unseen=$((unseen + 1))
+       echo "INCONCLUSIVE  $canon -> $val : neither name appears anywhere"
+     else
+       echo "ok    $canon -> $val : 0 canonical, $have derived"
+     fi
+   done <<EOF_CMD
+   $block
+   EOF_CMD
+
+   [ "$declared" -eq 0 ] && { echo "CANNOT CONCLUDE: no cmd_* keys parsed -- the schema predates Level 6, or the parser broke"; exit 2; }
+   [ "$renamed"  -eq 0 ] && { echo "SKIP: $declared cmd_* declared, none renamed -- this check asserts nothing here"; exit 0; }
+   [ "$failed"   -gt 0 ] && { echo "TRANSFORM INCOMPLETE: $failed of $renamed renamed command(s) still carry the canonical name"; exit 1; }
+   [ "$unseen" -eq "$renamed" ] && { echo "CANNOT CONCLUDE: every renamed command inconclusive -- suspect the search, not the vault"; exit 2; }
+   echo "TRANSFORM COMPLETE: $renamed renamed command(s), 0 canonical survivors"
+   ```
+
+   `0` with `TRANSFORM COMPLETE` passes. `SKIP` is `0` but asserts nothing — no command was
+   renamed in this vault. `1` lists the files still carrying the canonical name; re-render those
+   through Step 5b rather than editing them by hand, or the next upgrade reintroduces the drift.
+   `2` means a precondition failed and no verdict exists.
+
 ---
 
 ## Final Report
