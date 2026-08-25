@@ -69,7 +69,20 @@ When generating a knowledge system for a specific domain, every universal term i
 | /stats | /stats | /stats | /stats | /stats | /stats | /stats | /stats |
 | /graph | /graph | /graph | /graph | /graph | /graph | /graph | /graph |
 
-**Note:** /remember (formerly /friction) captures operational friction with automatic detection in session transcripts. /next (formerly /work + /next) surfaces the next recommended action from the task stack. /stats provides vault metrics and progress visualization. /graph enables graph query generation. These commands use universal names across all domains.
+**Note:** /next (formerly /work + /next) surfaces the next recommended action from the task stack, /stats provides vault metrics and progress visualization, and /graph enables graph query generation. Those three use universal names across all domains — their rows above are uniform on purpose, and renaming one is a defect rather than a domain choice.
+
+/remember (formerly /friction) captures operational friction with automatic detection in session transcripts. It is **not** universal: its row above renames it in five of the seven domains, so substitute it like any other skill name. A previous revision of this note listed /remember alongside the three universal commands, contradicting its own table one line above; the table is correct. The generator's own markup agrees with the table — `{DOMAIN:remember}` appears 16 times across `skills/setup`, `skills/upgrade`, `generators/claude-md.md` and three `generators/features/` blocks, which is substitution intent, not a universal name.
+
+```bash
+# Re-derive both halves of that claim.
+# Rows are selected by shape, not line number: only this table's rows start `| /`.
+awk -F'|' '/^\| \// { cmd=$2; gsub(/ /,"",cmd);
+  same=1; for(i=3;i<=9;i++){ v=$i; gsub(/ /,"",v); if(v!=cmd) same=0 }
+  printf "%-12s all-universal=%s\n", cmd, (same?"YES":"NO") }' reference/vocabulary-transforms.md
+grep -rn '{DOMAIN:remember}' skills/ skill-sources/ generators/ presets/ | wc -l   # 16
+```
+
+**Two commands carry a schema key but no row here:** `cmd_validate` and `cmd_rethink` are declared at Level 6 of `skills/setup/SKILL.md`, while /validate and /rethink have no line in the table above. That gap is recorded, not closed — inventing seven domain spellings apiece would assert a mapping nobody has derived. Until it is derived, those two rename through the Level 6 key alone.
 
 ---
 
