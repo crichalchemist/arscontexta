@@ -125,6 +125,29 @@ Two earlier discovery commands were both too narrow, in the same way.
 still C2's defect narrowed by one tree rather than fixed. Only the repo-wide sweep above closes
 the inventory, and it must be the command the plan re-runs.
 
+**Triage disposition for the whole sweep, so the untriaged remainder is a stated number rather
+than an implied zero.** Narrowed to the two generation trees,
+`/usr/bin/grep -rn 'contradicts' generators/ skill-sources/` returns **21** hits. Ten are
+accounted for above — the seven declaring sites that fall in these trees, the two ruled-OUT
+partial carriers in `processing-pipeline.md`, and `reflect:385-388`. The remaining **eleven** are
+ruled OUT as a class, in three groups:
+
+| Group | Hits | Ruling |
+|---|---|---|
+| Ordinary English (`claude-md.md`, `maintenance.md`) | 2 | The word used as a verb about ideas, not a relationship-type token |
+| Detection rules — `reduce`, `reflect`, `remember`: *"contradicts existing {vocabulary.note_plural} → create a tension"* | 5 | Single-verb triggers for an action, not spelling-family declarations. Substituting would couple tension-detection to the relationship enum, which is a design change, not a harmonization |
+| `reweave` content-evolution language (4 hits) | 4 | About a revision contradicting an earlier version of the same note — a different sense of the word entirely |
+
+A delta review reported 36 hits for this command and named three untriaged files —
+`graph-structure.md`, `dimension-claim-map.md`, `conversation-patterns.md`. Re-measured: the
+command returns 21, and none of those three files exists under `generators/features/`; they are
+`methodology/graph-structure.md`, `reference/dimension-claim-map.md` and
+`reference/conversation-patterns.md`. Both trees sit outside the generation paths — `methodology/`
+is the 249-claim research corpus, not a declaration surface, the same exclusion Unit 5 applies to
+it for `~150`. The finding pointed at a real gap (the spec did triage fewer hits than the sweep
+returns); its evidence did not survive re-measurement. Re-run the command rather than trusting
+either number.
+
 | Site | Verbs |
 |---|---|
 | `reflect:295-300` (table rows; caption at `:291`, header `:293-294`) | extends, grounds, contradicts, exemplifies, synthesizes, enables |
@@ -287,9 +310,18 @@ materially different templates:
 | `reduce:494` | `builds on` | **`{vocabulary.rel_grounds}`** — see below |
 | `wiki-links.md:48-53` | literal words | harmonized, **not** substituted — see Unit 3 |
 
-**`deepens` and `builds on` both map to `rel_grounds` — and this is a judgment call with no
-textual anchor.** Said plainly, because a confident-sounding derivation here would be invented.
-Measured, neither string is defined anywhere in the repo:
+**`deepens` and `builds on` both map to `rel_grounds` — a judgment call whose two textual
+anchors point opposite ways and cancel.** An earlier revision of this line said "no textual
+anchor". The measurement below is sound and stands — neither string is *declared* as a
+relationship verb — but two **glosses** use `builds on`, and they pull against each other:
+`wiki-links.md:49` glosses **extends** as *"builds on an idea by adding a new dimension"*, while
+`:36` glosses **foundation** as *"provides the evidence this builds on"*. Because they cancel, the
+call is free; because `:49` survives, it must be reworded or every generated vault's CLAUDE.md
+will define *extends* with the exact phrase this table assigns to *grounds*. That rewording is in
+Unit 3's harmonize list. The distinction worth keeping: a declaration is a spelling carrier, a
+gloss is a semantic one, and a sweep for the former does not find the latter.
+
+Measured, neither string is *declared* anywhere in the repo:
 
 ```bash
 git -c core.quotePath=false ls-files '*.md' | xargs /usr/bin/grep -n 'builds on\|deepens' \
@@ -382,8 +414,11 @@ unexpectedly there would be no way to attribute which item moved it.
 
 `skill-authoring.md:70` carries all three figures on one physical line — *"That yields `verify` 27
 against 146, `validate` 5 against 60, `reflect` 121 against 203"* — so it needs value edits only.
-`validate` 5/60 is correct and must be left alone: it is the born-green control that proves the
-re-derivation command still binds, and changing it destroys the only positive signal in the set.
+`validate` 5/60 is correct and must be left alone **in this unit** — it is the born-green control
+that proves the re-derivation command still binds, and changing it here destroys the only positive
+signal in the set. It stops being a control in Unit 3, which moves `validate` to 11 and owns
+updating it. Left without that clause, "must be left alone" reads as permanent and an implementer
+ships a stale 5.
 
 An earlier draft of this unit listed two edits and would have left `skill-authoring.md`'s `27`
 standing — a partial repair that reads as complete.
@@ -437,6 +472,24 @@ to confirm it holds, *then* start Unit 2.
 
 ### Unit 2 — declare. (PR 1)
 
+**Append the new `reference/vocabulary-transforms.md` row BELOW the existing rows** (`:11-25`).
+Root `CLAUDE.md:115` says *"line 14 of that file is the mapping table"*; inserting above line 14
+silently invalidates that pointer, and no gate reads it.
+
+**This unit also amends `docs/superpowers/deferrals.md`, and that edit is not bookkeeping.**
+Entries 6 and 32.1 close when Unit 5 lands, and entry 12 changes state — yet no unit touched the
+register. Worse, entry 12's stated destination did not exist: "moves to the companion
+agreement-gate spec" names no file, and
+`docs/superpowers/specs/2026-08-24-rot-prone-numeral-gate-design.md` is a different subject
+(`/usr/bin/grep -c '#12\|status_\|enum_values'` against it → 0). Entry 12's own reopen trigger has
+already fired — it reads **NOW DUE** at `deferrals.md:238`.
+
+A deferral whose trigger has fired, re-deferred to an unwritten document with no tracking entry,
+is precisely how `deferrals.md` says items get lost. So amend entry 12 in place with the mechanism
+reason and its prerequisite — *document `{vocabulary.*}` resolution for the composition path, or
+rule that tree permanently `{DOMAIN:*}`-only* — and the date. That is the landing place; no stub
+spec is required.
+
 - Six `rel_*` keys at Level 6.6 in `skills/setup/SKILL.md`
 - The verb-family row in `reference/vocabulary-transforms.md`
 - `closes:` on both terminal-status blocks in `generators/features/self-evolution.md` — `:102`
@@ -455,7 +508,31 @@ correct direction to fail, and means the two units cannot be safely reordered.
 
 **Substitute** — six `skill-sources/` verb sites → `{vocabulary.rel_*}`, per Decision 1's
 per-occurrence table: `reflect:295-300`, `reflect:378`, `validate:146`, `verify:197`,
-`reduce:279`, `reduce:494`.
+`reduce:279`, `reduce:494` — **plus two carriers the sweep structurally could not find**, below.
+
+**`reduce:279` takes all six verbs, not three.** It reads *"Pass: extends, contradicts, or deepens
+existing {vocabulary.note_plural}"* and sits under `### 4. Connected`, closing with **"If ANY
+criterion fails: do not extract."** It is therefore a gating **accept-list**, not an illustration:
+a note whose relationship is *exemplifies*, *synthesizes* or *enables* fails the Connected
+criterion and is silently not extracted. That is Finding 6's defect — a closed accept-list
+dropping valid values — one layer earlier in the pipeline, and substituting only the three verbs
+present would preserve it under new spelling. `reduce:494` is a template *hint*, not a gate, so it
+keeps its three.
+
+**Two carriers the `contradicts`-anchored sweep could not see.** Both hold a single verb, and the
+sweep matches multi-verb lists; these were found by reading, as `wiki-links.md:36`/`:57` were.
+
+| Site | Content | Treatment |
+|---|---|---|
+| `skill-sources/reduce/SKILL.md:781` | `- Good: "-- provides the foundation this challenges"` | Harmonize the literal — the deprecated `foundation` spelling, taught from a **Good** example, in a file this unit already edits. Same phrase as `wiki-links.md:57`, which this spec harmonizes; leaving the twin ships the dead verb from inside `reduce`. It reads as a noun in a prose gloss, so it harmonizes without a marker — same treatment as `:57`, and no effect on the count. |
+| `skill-sources/reflect/SKILL.md:385-388` | `"extends"`, `"exemplifies"`, `"contradicts"`, `"synthesizes"` in the asymmetry guidance | Substitute. These are quoted verb *tokens*, so a vault that renames `extends` would find guidance naming a verb it does not have. This is what separates them from the two carriers ruled OUT below, which discuss relationship quality without naming spellings. |
+
+**State the closure as "7/7 declared enum sites, plus 3 harmonized literals" — and say that the
+literal count is a floor.** The declared class is closed and verified. The literal-carrier class
+is not a census: the sweep finds multi-verb lists by construction, so every single-verb carrier in
+this spec arrived by reading. Two were found this way after the inventory was called complete.
+Naming some gaps makes the unlisted ones read as covered, so: the declared class is 7 of 7; the
+literal class is 3 found, of an unknown total.
 
 **Harmonize** — `generators/features/wiki-links.md` gets the canonical words as *literals*:
 `:48-53`'s `foundation`→`grounds` and `example`→`exemplifies`, a `synthesizes` row added, and the
@@ -492,14 +569,15 @@ with `reference/skill-authoring.md` §2's command, `awk` substituted for its two
 |---|---|---|---|---|
 | `skill-sources/verify` | 30 | `:197` (5 literals → 6 markers) | +6 | **36** |
 | `skill-sources/validate` | 5 | `:146` (5 → 6) | +6 | **11** |
-| `skill-sources/reflect` | 123 | `:295-300` (6 rows) + `:378` (6) | +12 | **135** |
-| `skill-sources/reduce` | 132 | `:279` (3) + `:494` (3) | +6 | **138** |
+| `skill-sources/reflect` | 123 | `:295-300` (6 rows) + `:378` (6) + `:385-388` (4) | +16 | **139** |
+| `skill-sources/reduce` | 132 | `:279` (**6**, accept-list) + `:494` (3) + `:781` (literal, +0) | +9 | **141** |
 
-Total `skill-sources/` delta **+30**. Two sites yield six markers from five literals because
+Total `skill-sources/` delta **+37**. Two sites yield six markers from five literals because
 `verify` and `validate` declare a five-verb list whose spellings are wrong; harmonizing onto the
-six-verb enum adds a member as well as renaming two. A measured delta that is not +30 means the
-substitution missed a site or hit one twice — investigate before repairing the prose, because the
-prose is downstream of the count.
+six-verb enum adds a member as well as renaming two. `reduce:279` yields six from three under the
+accept-list ruling above, and `reduce:781` harmonizes a literal without adding a marker. A
+measured delta that is not +37 means the substitution missed a site or hit one twice —
+investigate before repairing the prose, because the prose is downstream of the count.
 
 **No site sits in an executable ` ```bash ` fence**, so the fence gate is unaffected:
 `reduce:494` is inside ` ```markdown ` and the other five are in bare markdown tables or prose.
@@ -516,21 +594,50 @@ Only the `rel_*` substitution moves markers; the harmonize and re-derive halves 
 stays; what changes is that items matching neither it nor a known closed state are counted and
 reported, rather than silently dropped between numerator and denominator.
 
-**Formulated without an enum, which is what decouples this unit from deferral #12.** The obvious
-implementation — "match against the rest of the enum" — has no single source: `count_open_items`
-serves **both** registers (`session-orient.sh:163,167`), and their enums differ
-(`self-evolution.md:88` vs `:220`). Hardcoding either in the hook would plant a fifth and sixth
-literal enum declaration in yet another file: the exact "literals where placeholders are due"
-shape of #12, reproduced in the tree `docs/verification.md` already flags as the observation
-enum's only consumer *in another tree*. So compute the residual instead:
+**The residual, and the closed lists it needs.** Compute per directory, independently:
 
 ```
-unknown = total − matched − known-closed        (per directory, independently)
+unknown = total − matched − known-closed        (per register, independently)
 ```
 
-Nothing enumerates; the hook subtracts what it recognized from what it found. This was previously
-sequenced "after #12" on the assumption it needed the converted enum. It does not — and with #12
-resequenced out, this is the formulation that has to be used anyway.
+**A prior revision called this "enum-free" and claimed "nothing enumerates". That was false, and
+the correction matters more than the error.** `known-closed` cannot be computed without naming the
+closed statuses somewhere: `count_open_items()` (`session-orient.sh:149-152`) matches only
+`pending open`, and the totals at `:158-159` count every `.md` recursively. There is no third
+quantity in between. Building the branch forces two literal argument lists — observations
+`promoted implemented archived`, tensions `resolved dissolved promoted implemented archived
+blocked` — and pretending otherwise would have sent an implementer looking for a formulation that
+does not exist.
+
+**Those lists are not a #12 instance, which is why this unit still travels without #12.** The
+scoping rule sorts on the *tree*, and `hooks/scripts/` is live code, not a template. It carries
+zero `{vocabulary.*}` markers (`/usr/bin/grep -rc '{vocabulary\.' hooks/scripts/` → 0 in every
+file), and its own comment at `:257` records that the `{{TENSION_THRESHOLD:-5}}` forms "are
+substituted by nothing in this repo." Nothing there resolves a placeholder, so no placeholder is
+due. The hook already hardcodes the other half of the same enum one line away —
+`count_notes_by_field "$1" status pending open` at `:151` — and no one has ever called that a #12
+instance. #12's shape is literals where placeholders are *due*, in a tree that resolves them; the
+scoping table sorts F6 as `hooks/scripts/ | logic | in` for exactly this reason.
+
+**Two lists, one per register — never a union.** Their enums genuinely differ
+(`self-evolution.md:88` vs `:220`), and `count_open_items()` serving both registers
+(`:163,167`) makes a shared list the tempting shortcut. A union over-matches closed, which
+**under-reports unknown** — the silent direction, and the exact failure this unit exists to close.
+Put the source line in a comment beside each list so the next reader can check it.
+
+`count_open_items()` takes only `<dir>` and hardcodes its accept-list, so the closed count needs
+either a sibling function or a parameterized call. Say which in the plan; left unstated, an
+implementer inlines a third variant of the same scan.
+
+**Report the values, not just the count.** Beside the CONDITION, emit the distinct status values
+actually found outside the accept-list, using the library's own documented idiom
+(`reference/lib/frontmatter.sh:80-95`): a `frontmatter_field` loop piped through `sort | uniq -c`.
+That names `wontfix` or `superseded` where a bare residual says only "3". It enumerates nothing —
+it discovers — but it cannot drive the threshold, because it cannot tell a legitimate closure from
+an unknown without the closed list above. Diagnostic on stderr; the count drives the CONDITION.
+
+This was previously sequenced "after #12" on the assumption it needed #12's *converted* enum. It
+does not: it needs two literal lists in a tree where literals are correct.
 
 Report it — do not merely count it. A silent unknown-status bucket is the same defect one layer
 down.
@@ -552,6 +659,40 @@ residual.
 fixtures to that suite. This extends an existing suite rather than adding a gate or a CI step, so
 the no-new-gate constraint holds.
 
+**Extending the suite turns `check-doc-claims.sh` RED, and two documents must move in the same
+commit.** This is the sharpest sequencing hazard in the spec and an earlier revision missed it
+entirely while claiming the opposite. `check-doc-claims.sh` does not merely grep: `truth_suite()`
+at `:69` *runs* each suite (`line=$(bash "$f" 2>/dev/null | tail -1)`) and compares the passed
+total against pinned declarations. `hook-config.test.sh` is pinned at **60** in exactly two places:
+
+| Carrier | Text | Gate claim row |
+|---|---|---|
+| `docs/verification.md:36` | `$s reference/test/hook-config.test.sh   # 60/60` | `:334` |
+| `CONTRIBUTING.md:114` | `$s reference/test/hook-config.test.sh \| tail -1   # expect: passed=60 failed=0` | `:319` |
+
+Any fixture or assertion Unit 4 adds moves the total off 60 and the gate fails with *"document
+says 60, tree measures N — Fix document, not gate."* Both carriers join Unit 4's edit list and are
+updated in the same commit as the assertions. The gate goes red through its **data** changing, not
+its logic — which is why the earlier "no gate-logic risk" framing did not catch it.
+
+**Two carriers, and that is measured, not assumed.** A repo-wide sweep
+(`git -c core.quotePath=false ls-files | xargs /usr/bin/grep -n 'hook-config.*60\|60.*hook-config'`)
+returns a third hit in `docs/superpowers/reviews/2026-08-24-vocabulary-integrity-review.md:288`,
+which cites `:60` as a *line number*, not a total — a false positive. Unlike the `27` tally, which
+had three carriers where a draft of this spec said two, `60` genuinely has two. Re-run the sweep
+before editing rather than trusting this sentence.
+
+**The baseline is 60 under both shells** (`bash` and `zsh` each print `passed=60 failed=0`), so
+there is no pre-existing shell divergence to work around. The gate pins the `bash` total
+specifically, since `truth_suite()` hardcodes `bash "$f"`.
+
+**Phrasing constraint on the new report line.** The suite pins negatives on the substrings
+`pending observations` and `0 pending observations` (`:324-327`) and on
+`^CONDITION: 0 pending observations` (`:350-353`). The residual line must not contain the
+substring `pending observations` — the natural phrasing "N pending observations with unknown
+status" trips four assertions. Use the register name and the condition instead, e.g. *"N
+observations carry a status outside the recognized set (of M total)"*.
+
 **The suite's existing pinned assertions do not break — and that is not reassurance.** The
 omitted-not-zero assertions at `:324-330` match the literal string `pending observations`, which
 the residual line will not contain, so they stay green whatever Unit 4 does. They are negative
@@ -572,8 +713,42 @@ fatally — this unit edits status-handling code under exactly that execution pa
 - `E-4`: strip the leading slash at 11 sites — `graph` ×6, `reduce` ×3, `stats` ×2
 - `#6` + entry 32 item 1: `~150` → `200` at `atomic-notes.md:75` and `schema.md:18`
 
-Entry #6 states its own condition: *fix them together or not at all* — it and entry 32 item 1
-describe the identical two files, and closing one leaves the other reading as live.
+**The `~150` residue is twelve normative sites, not two, and a two-site edit does not close
+entry #6.** The discovery command in [Measurements](#measurements) scoped `generators/` and
+`skill-sources/`; the string lives in five other trees. Re-derived tree-wide:
+
+```bash
+git -c core.quotePath=false ls-files -z | xargs -0 /usr/bin/grep -n '~150'   # 75 hits, 36 files
+```
+
+Normative description-length carriers, all of which must move to `200` together:
+
+| Site | Count | Why it binds |
+|---|---|---|
+| `generators/features/atomic-notes.md:75`, `generators/features/schema.md:18` | 2 | The originally-named pair |
+| `reference/kernel.yaml:57` | 1 | **The invariant contract.** The highest-authority surface in the repo would otherwise disagree with the generators feeding it |
+| `reference/templates/*.md:2` — `base-note`, `companion-note`, `creative-note`, `learning-note`, `life-note`, `relationship-note`, `research-note`, `therapy-note` | 8 | Shipped note templates; every vault instantiating one is taught `~150` |
+| `reference/methodology.md:55` | 1 | Reference doc carrying the same description line |
+
+`reference/claim-map.md:84` (*"~150 chars may not accommodate all styles"*) is **KEEP**: it
+discusses the tension rather than declaring the value, and rewriting it to `200` would erase the
+record of why the question was open. Note the secondary split while editing — `schema.md:18` and
+`base-note.md:2` carry a `no period` clause that the other ten sites lack; carry the clause
+uniformly rather than preserving the inconsistency.
+
+**Excluded, stated so the class size is explicit rather than implied.**
+`platforms/shared/skill-blocks/reduce.md:501,753` — the cksum-frozen mirror, expected stale by
+design. The `methodology/` research corpus — it discusses the convention as historical research
+content, and 249 atomic claims are not a declaration surface. Two false hits:
+`skills/architect/SKILL.md:482` (*"line ~150"*, a line number) and
+`reference/semantic-vs-keyword.md:244` (*"~150 notes"*, a volume threshold).
+
+Entry #6 states its own condition: *fix them together or not at all*. Editing the two
+`generators/` sites while ten normative carriers keep saying `~150` closes the entry while the
+disagreement survives — including in the kernel contract. **This is the same failure this spec
+diagnoses for E-1: a discovery command too narrow to see its own class.** Having caught it there
+and reproduced it here one section later is the argument for re-running every count tree-wide
+before acting on it.
 
 ## Constraints
 
@@ -636,8 +811,11 @@ never meant the documented numbers are true, and Unit 1 does not change that. Cl
 numeral-gate spec's job.
 
 `check-placeholder-count.sh` will legitimately move in **Unit 3 only**. A prior revision said
-Units 2 and 3: false — Unit 2 edits `skills/setup/`, `reference/` and `generators/`, no
-`skill-sources/` file, and the gate scans `skill-sources/` alone. It also fails only on a
+Units 2 and 3, and the reason given for the correction was itself wrong: it claimed Unit 2 touches
+no `skill-sources/` file, which the same revision's own fold falsifies — Unit 2 edits
+`skill-sources/rethink/SKILL.md` at `232`, `233`, `335`, `516` and `:357`. The conclusion survives
+on a different premise: those rethink edits add no placeholders, so the gate's count does not move
+even though the tree it scans is touched. It also fails only on a
 *decrease*, so it never enforces the additions this spec makes; the per-unit before/after
 bookkeeping is worth doing for attribution, but do not mistake it for enforcement.
 
