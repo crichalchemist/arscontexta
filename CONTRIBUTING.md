@@ -359,3 +359,44 @@ crashed — which is INVARIANT 2, in the file that states INVARIANT 2.
 
 Branch from `main`. All thirty-two CI steps must pass. State in the PR what is **not** claimed —
 deferred items belong in the description so a reviewer meets them as decisions, not omissions.
+
+---
+
+## Releases
+
+**Never hand-edit a version string.** `scripts/bump-version.sh` moves every declared site in
+one two-phase run; editing one by hand is how README spent four releases being corrected from
+memory and how seventeen `generated_from:` stamps sat at the initial-release value while the
+manifests advanced six times.
+
+```bash
+./scripts/bump-version.sh --check       # every declared site agrees, and on what
+./scripts/bump-version.sh 0.11.0        # bump, then audit the OLD version for stragglers
+./scripts/bump-version.sh --check       # agreement again, at the new value
+```
+
+Sites are declared in `.version-bump.json`, in two kinds. `files[]` are JSON fields addressed by
+path. `text[]` are literal prefix/suffix pairs for strings no jq path can reach — README's badge
+and the `generated_from:` stamps — expanded through globs.
+
+**A straggler is a finding, not noise.** `--audit` runs automatically after a bump and exits 1 on
+any occurrence of the old version outside the declared set. Either add the site to
+`.version-bump.json` or record why not in `audit.exclude`. Leaving it is how the drift starts.
+
+**`{version}` is not a version.** `skills/setup/SKILL.md` carries generation-time placeholders
+that match the same prefix and suffix as a real stamp. The bumper skips any value that is not
+version-shaped, and `reference/test/bump-version.test.sh` pins that behaviour — relax the guard
+and a placeholder becomes a frozen literal in every vault generated afterwards, still looking
+like a valid stamp. Do not widen it.
+
+Tag the release commit, annotated, and push the tag to `origin` explicitly:
+
+```bash
+git tag -a v0.11.0 -m "arscontexta 0.11.0"
+git push origin v0.11.0
+```
+
+Annotated, because a lightweight tag carries no date or author and `git describe` treats it
+differently. Explicitly named, because this repo has an `upstream` remote and a bare
+`git push --tags` does not ask which one you meant. Tags before v0.10.0 were backfilled onto
+their release commits; 0.9.1–0.9.4 and 0.9.8 have no tag because those versions never shipped.
