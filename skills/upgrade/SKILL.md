@@ -5,6 +5,8 @@ version: "1.0"
 generated_from: "arscontexta-v1.6"
 user-invocable: true
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 ## Runtime Configuration (Step 0 — before any processing)

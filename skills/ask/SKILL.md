@@ -7,6 +7,8 @@ context: fork
 model: opus
 allowed-tools: Read, Grep, Glob, mcp__qmd__query, mcp__qmd__get, mcp__qmd__multi_get
 argument-hint: "[question about knowledge systems or methodology]"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 ## EXECUTE NOW

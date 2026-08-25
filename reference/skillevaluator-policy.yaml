@@ -1,0 +1,47 @@
+# skillevaluator-policy.yaml -- narrow severity overlay for `skillevaluator validate`.
+#
+# Layered on top of the bundled `external` profile by reference/check-skillevaluator.sh.
+# skillevaluator has NO policy auto-discovery: validators/policy.py::resolve_policy() reads
+# --policy explicitly, and SKILLEVALUATOR_PROFILE names only a profile bundled inside the
+# installed package. So this file is inert unless the gate passes it.
+#
+# The loader accepts exactly three top-level keys -- profile, identity, severity_overrides
+# (validators/policy.py::_KNOWN_TOP_LEVEL_KEYS). Anything else logs an "unknown key" warning
+# and is ignored, so a typo here degrades silently. Keys are "CATEGORY.check_name" or
+# "CATEGORY.*", resolved exact-before-wildcard.
+#
+# WHAT AN OVERRIDE ACTUALLY DOES: models/result.py::Severity.is_error() fails a run on
+# CRITICAL and HIGH unconditionally; MEDIUM and LOW only under fail_on_medium/fail_on_low,
+# which this gate does not set; INFO never. So `info` here means "still reported, never
+# gates" -- not "hidden".
+#
+# WHY THIS FILE IS DELIBERATELY TINY. Every entry blinds a real detector for the whole repo,
+# forever, with no expiry and no per-site scoping. The 13 SECURITY high findings this repo
+# collects are NOT listed below on purpose: suppressing SECURITY.* by policy would
+# manufacture a green run that means nothing, which is the exact failure class CLAUDE.md
+# says governs every edit here. They are cleared instead by --llm-verify, which downgrades
+# only findings an LLM rates false_positive at high confidence
+# (validators/security.py::_verify_findings_with_llm). Verification, not fiat.
+#
+# Before adding an entry, ask whether the finding is wrong about THIS repo or wrong in
+# general. Only the first justifies a line here, and only with the reason written down.
+
+profile: external
+
+severity_overrides:
+  # gitleaks fires generic-api-key on skills/upgrade/SKILL.md:279, which is a bash local
+  # declaration -- `local block line key value topic_map_val="" ...`. The rule matches the
+  # adjacent words `key value`, not a credential. There is no narrower fix available:
+  # validators/secrets.py::_create_gitleaks_config() writes its allowlist to a TEMP toml and
+  # honours no repo-root .gitleaksignore, and SecretsValidator() is constructed without
+  # verify_llm (tier1/commands.py), so the LLM second pass never sees secret findings.
+  # The alternative was renaming working shell variables to dodge a regex -- the worse trade.
+  # Scoped to this ONE rule id, never SECRET.*, so every other secret rule still gates.
+  SECRET.generic-api-key: info
+
+  # "Unexpected 'skill.json' in skill root", once per skill. All 10 skills/<name>/skill.json
+  # are git-tracked and carry name/description/version/author/tags/entry/platform_hints --
+  # a deliberate multi-platform manifest convention this repo maintains, not stray files.
+  # skillevaluator has no notion of it. Already LOW (non-gating); this only quiets the noise
+  # so a real finding is not lost among ten expected ones.
+  SCHEMA.unexpected_file: info

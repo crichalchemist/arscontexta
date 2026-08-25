@@ -5,6 +5,8 @@ context: fork
 model: opus
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, AskUserQuestion
 argument-hint: "[domain name or description, e.g. 'therapy sessions' or 'creative writing']"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 You are extending an existing knowledge system with a new domain. This is composition, not replacement. The new domain must coexist with existing domains while maintaining its own vocabulary, schema, and processing patterns. The shared graph (wiki links, hub MOC, description fields) connects everything.

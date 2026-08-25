@@ -8,7 +8,13 @@ context: fork
 model: opus
 allowed-tools: Read, Grep, Glob, mcp__qmd__query, mcp__qmd__get, mcp__qmd__multi_get
 argument-hint: "[use case description and constraints] — describe what you want to build"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
+
+# Recommend
+
+Give research-backed architecture advice for a knowledge system, grounded in the methodology corpus.
 
 ## Runtime Configuration (Step 0 — before any processing)
 

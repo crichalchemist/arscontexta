@@ -7,7 +7,13 @@ context: fork
 model: opus
 version: "1.0"
 generated_from: "arscontexta-v1.6"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
+
+# Tutorial
+
+Walk a new user through the system by doing — each step creates real content in their vault.
 
 ## Runtime Configuration (Step 0 — before any processing)
 

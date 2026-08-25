@@ -5,6 +5,8 @@ version: "1.0"
 generated_from: "arscontexta-v1.6"
 allowed-tools: Read, Grep, Glob, Bash, mcp__qmd__query
 argument-hint: "[optional: 'quick', 'full', or 'three-space']"
+metadata:
+  author: "arscontexta <info@arscontexta.org>"
 ---
 
 ## Runtime Configuration (Step 0 — before any processing)
