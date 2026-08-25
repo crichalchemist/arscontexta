@@ -1189,6 +1189,14 @@ vocabulary:
   status_archived: "[domain term]"     # e.g., "archived", "retired", "closed"
   status_superseded: "[domain term]"   # e.g., "superseded", "replaced", "obsolete"
 
+  # Level 6.6: Relationship types (one key per enum value)
+  rel_extends: "[domain term]"      # e.g., "extends", "develops", "advances"
+  rel_grounds: "[domain term]"      # e.g., "grounds", "supports", "establishes"
+  rel_contradicts: "[domain term]"  # e.g., "contradicts", "challenges", "disputes"
+  rel_exemplifies: "[domain term]"  # e.g., "exemplifies", "illustrates", "shows"
+  rel_synthesizes: "[domain term]"  # e.g., "synthesizes", "combines", "unifies"
+  rel_enables: "[domain term]"      # e.g., "enables", "permits", "makes possible"
+
   # Level 7: Extraction categories (domain-specific, from conversation)
   extraction_categories:
     - name: "[category name]"
