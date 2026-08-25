@@ -662,7 +662,7 @@ the no-new-gate constraint holds.
 **Extending the suite turns `check-doc-claims.sh` RED, and two documents must move in the same
 commit.** This is the sharpest sequencing hazard in the spec and an earlier revision missed it
 entirely while claiming the opposite. `check-doc-claims.sh` does not merely grep: `truth_suite()`
-at `:69` *runs* each suite (`line=$(bash "$f" 2>/dev/null | tail -1)`) and compares the passed
+at `:67` *runs* each suite (`line=$(bash "$f" 2>/dev/null | tail -1)`) and compares the passed
 total against pinned declarations. `hook-config.test.sh` is pinned at **60** in exactly two places:
 
 | Carrier | Text | Gate claim row |
