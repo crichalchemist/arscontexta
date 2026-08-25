@@ -34,7 +34,7 @@ it.**
 
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
-not a claim you should take on trust: it is what the eighteen checks in `docs/verification.md` enforce — sixteen of them
+not a claim you should take on trust: it is what the nineteen checks in `docs/verification.md` enforce — sixteen of them
 in CI, as defined by the thirty-two steps in `.github/workflows/checks.yml`. The other two are
 `validate-kernel.sh`, which needs a generated vault to run against, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
@@ -65,7 +65,7 @@ executable checks", "Twelve run in CI", `# 24` — sat correct in the same file.
 phrasing does not protect a synonym, and prose is where the synonyms live. Re-derive all four:
 
 ```bash
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 18
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 19
 grep -c '^      - ' .github/workflows/checks.yml                                        # 32
 git show main:.github/workflows/checks.yml | grep -c '^      - '                        # NO NUMERAL
 ```
@@ -129,7 +129,7 @@ git show main:.github/workflows/checks.yml | grep -c '^      - '      # NO NUMER
                                                                       # why the gate reads it
                                                                       # rather than trusting
                                                                       # anyone to remember
-ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 18
+ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l   # 19
 ```
 
 What follows is what remains.
