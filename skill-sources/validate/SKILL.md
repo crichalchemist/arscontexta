@@ -15,7 +15,7 @@ Read these files to configure domain-specific behavior:
    - Use `vocabulary.notes` for the notes folder name
    - Use `vocabulary.note` / `vocabulary.note_plural` for note type references
    - Use `vocabulary.topic_map` for MOC references
-   - The templates folder is `templates/` in every domain — no key declares it
+   - The templates folder is `templates/`
 
 2. **`ops/config.yaml`** — processing depth
    - `processing.depth`: deep | standard | quick
