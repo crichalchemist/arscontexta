@@ -86,7 +86,9 @@ SEEN_LABELS="$WORK/labels.txt"; : > "$SEEN_LABELS"
 #
 # Format: <label>~<reason>
 ILLUSTRATIVE='skills/reseed f03~single git mv over literal placeholder operands (old-folder/, new-folder/) under prose that reads "If folder names change"
-skill-sources/tasks f03~an if whose entire body is comments describing the steps; bash -n rejects the empty then-branch and zsh accepts it, so listing it keeps the two shells reporting the same counts'
+skill-sources/tasks f03~an if whose entire body is comments describing the steps; bash -n rejects the empty then-branch and zsh accepts it, so listing it keeps the two shells reporting the same counts
+skill-sources/refactor f03~single git mv over literal placeholder operands (old/path/file.md, new/path/file.md) under prose that reads "Use git mv to preserve history" -- the same shape as reseed f03 above
+skill-sources/refactor f04~invokes ops/scripts/rename-note.sh over literal operands ("old name", "new name") under a comment that reads "Use rename script if available"; the script is a vault artifact the fixture has no reason to carry, so executing it tests the fixture, not the fence'
 
 # --- known-open defects this gate FOUND and does not yet block on -----------
 # Most lines below are real defects, found by this gate on the tree they landed
@@ -133,7 +135,8 @@ skill-sources/tasks f03~an if whose entire body is comments describing the steps
 KNOWN_OPEN='skill-sources/seed f01~H~ZSH ONLY: ops/queue*.yaml matches nothing in a vault whose queue lives at ops/queue/queue.yaml, and zsh aborts the command on a non-matching glob where bash passes the pattern through
 skills/health f09~H~ZSH ONLY: self/memory/*.md matches nothing in a vault with no memory notes, same non-matching-glob fork as seed f01. Was f08 until 2026-08-08, when the Category 1 enum-value check added a fence ahead of it; the defect did not move, its INDEX did. This is the (letter, label) keying CLAUDE.md flags -- a renumber makes the entry read STALE and its unchanged subject read as a new failure, and only the message tells them apart
 skill-sources/reflect f01~N~2026-08-08: {vocabulary.notes_collection} to {vocabulary.notes} (docs/superpowers/plans/archive/2026-08-08-vocabulary-schema-coverage.md Task 3) newly matches assertion N selector, since here {vocabulary.notes} names a qmd COLLECTION, not a notes-directory reference the selector means to scope to. The flagged digit is waited, the lock-retry counter, always present in the trailer regardless of whether the notes directory exists, not a fabricated note count. has_digit checks the whole file, not the narrower trailer_digit scope, so it cannot tell the two apart
-skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer'
+skill-sources/reweave f02~N~2026-08-08: same fence pattern and same reason as reflect f01 above -- {vocabulary.notes} qmd collection reference, waited counter in the trailer
+skill-sources/reflect f04~N~2026-08-25: the SAME artifact as reflect f01, and the entry that shows why the keying of this table bites. reflect carries two near-identical Tier-2 LOCKDIR blocks; only the second was discovered while fence discovery was anchored at column 0, so it was f01. Discovering indented fences added three ahead of it, so the original subject of the f01 entry is now f04 and f01 is the first LOCKDIR block. Both fail N for the documented reason -- {vocabulary.notes} naming a qmd COLLECTION, waited being the lock-retry counter -- so both are listed rather than one entry silently changing which fence it absorbs'
 # 2026-08-15: the seven 2026-08-11 assertion-H queue entries (next f01-f03, reduce f03,
 # reflect f06, reweave f04, verify f01) drained here, in the same commit that
 # repointed those fences to detect the queue format and write YAML via
@@ -388,7 +391,7 @@ extract_shared_step() {   # extract_shared_step <heading> <next-heading> <outfil
   m_end=$(/usr/bin/grep -nF "$2" "$ROOT/skills/upgrade/SKILL.md" | head -1 | cut -d: -f1)
   [ -n "$m_start" ] && [ -n "$m_end" ] || return 1
   sed -n "${m_start},${m_end}p" "$ROOT/skills/upgrade/SKILL.md" \
-    | awk '/^```bash[[:space:]]*$/{f=1;next} /^```[[:space:]]*$/{if(f)exit} f' > "$3"
+    | awk '/^[ \t]*```bash[[:space:]]*$/{f=1;ind=match($0,/[^ \t]/)-1;next} /^[ \t]*```[[:space:]]*$/{if(f)exit} f { line=$0; if (ind>0 && substr(line,1,ind) ~ /^[ \t]+$/) line=substr(line,ind+1); print line }' > "$3"
 }
 
 build_plugin_stub() {   # build_plugin_stub <dir>
@@ -645,9 +648,9 @@ printf '%s\n' "$FILES" | while IFS= read -r rel; do
   slug=$(printf '%s' "$rel" | sed 's|/SKILL\.md$||; s|/|--|g')
   awk -v dir="$WORK/fences" -v slug="$slug" '
     FNR==1 { n=0; inf=0 }
-    /^```bash[[:space:]]*$/ && !inf { inf=1; n++; f=sprintf("%s/%s__f%02d.raw", dir, slug, n); printf "" > f; next }
-    /^```[[:space:]]*$/ && inf { inf=0; close(f); next }
-    inf { print $0 >> f }
+    /^[ \t]*```bash[[:space:]]*$/ && !inf { inf=1; ind=match($0,/[^ \t]/)-1; n++; f=sprintf("%s/%s__f%02d.raw", dir, slug, n); printf "" > f; next }
+    /^[ \t]*```[[:space:]]*$/ && inf { inf=0; close(f); next }
+    inf { line=$0; if (ind>0 && substr(line,1,ind) ~ /^[ \t]+$/) line=substr(line,ind+1); print line >> f }
   ' "$ROOT/$rel"
 done
 
