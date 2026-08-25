@@ -111,7 +111,7 @@ for s in bash zsh; do
   $s reference/test/kernel-note-dirs.test.sh    | tail -1   # expect: passed=76 failed=0
   $s reference/test/threshold-namespace.test.sh | tail -1   # expect: 57 passed, 0 failed
   $s reference/test/placeholder-count.test.sh   | tail -1   # expect: passed=40 failed=0
-  $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=60 failed=0
+  $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=64 failed=0
   $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
   $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=77 failed=0
   $s reference/test/moc-sync.test.sh            | tail -1   # expect: 68 passed, 0 failed

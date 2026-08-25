@@ -33,7 +33,7 @@ for s in bash zsh; do
   $s reference/test/kernel-note-dirs.test.sh             # 76/76
   $s reference/test/threshold-namespace.test.sh          # 57/57
   $s reference/test/placeholder-count.test.sh            # 40/40
-  $s reference/test/hook-config.test.sh                  # 60/60
+  $s reference/test/hook-config.test.sh                  # 64/64
   $s reference/test/vocabulary-schema.test.sh            # 12/12
   $s reference/test/queue-edit.test.sh                   # 77/77
   $s reference/test/moc-sync.test.sh                     # 68/68

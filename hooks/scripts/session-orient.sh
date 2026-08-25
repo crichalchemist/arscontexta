@@ -151,6 +151,42 @@ count_open_items() { # count_open_items <dir>
   count_notes_by_field "$1" status pending open
 }
 
+# THE CLOSED SET IS PER-REGISTER AND IS DELIBERATELY NOT SHARED. Observations
+# close as promoted|implemented|archived; tensions add resolved|dissolved|blocked.
+# generators/features/self-evolution.md declares the two enums SEPARATELY, and
+# count_open_items() serving both registers makes one shared list the tempting
+# shortcut. A union over-matches closed, which UNDER-reports the residual below —
+# the silent direction, and the only way this reports clean while a register is
+# full of statuses nothing recognizes.
+count_closed_items() { # count_closed_items <dir> <status>...
+  _ci_dir="$1"; shift
+  [ -d "$_ci_dir" ] || { printf '0'; return 0; }
+  count_notes_by_field "$_ci_dir" status "$@"
+}
+
+# DIAGNOSTIC ONLY, AND ON STDERR. It names `wontfix` where a bare count says "3".
+# It can never drive the threshold: it cannot tell a legitimate closure from an
+# unknown, so it is not the signal. Uses the library's own documented idiom
+# (reference/lib/frontmatter.sh:80-95) rather than a third variant of the scan.
+# A note with NO status field is part of the residual arithmetic below, so it is
+# named here too — skipping it would print a list shorter than the count it explains.
+emit_unknown_statuses() { # emit_unknown_statuses <dir> <known-status>...
+  _us_dir="$1"; shift
+  _us_known=" $* "
+  [ -d "$_us_dir" ] || return 0
+  find -H "$_us_dir" -type f -name '*.md' 2>/dev/null | while IFS= read -r _us_f; do
+    _us_v=$(frontmatter_field "$_us_f" status 2>/dev/null)
+    if [ -z "$_us_v" ]; then
+      printf '(no status field)\n'
+    else
+      case "$_us_known" in
+        *" $_us_v "*) ;;
+        *) printf '%s\n' "$_us_v" ;;
+      esac
+    fi
+  done | sort | uniq -c
+}
+
 # RECURSIVE, to match count_open_items above it. A flat `ls -1` total beside a
 # recursive open count printed "N pending (of M total)" with N > M whenever an
 # open note lived in a subdirectory (deferrals 17). `find` is already required
@@ -159,6 +195,10 @@ OBS_TOTAL=$(find -H ops/observations -type f -name '*.md' 2>/dev/null | wc -l | 
 TENS_TOTAL=$(find -H ops/tensions -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
 OBS_COUNT=""
 TENS_COUNT=""
+# Same contract as the two above: never measured is "", not 0. A 0 residual means
+# "measured, and every status was recognized" — the opposite of "not measured".
+OBS_UNKNOWN=""
+TENS_UNKNOWN=""
 if [ "$FM_OK" -eq 1 ]; then
   OBS_COUNT=$(count_open_items ops/observations) || {
     echo "CONDITION: observation scan failed — signal omitted this session." >&2
@@ -168,6 +208,23 @@ if [ "$FM_OK" -eq 1 ]; then
     echo "CONDITION: tension scan failed — signal omitted this session." >&2
     TENS_COUNT=""
   }
+  # THE RESIDUAL: total - open - closed, per register, independently.
+  # count_open_items() matches only `pending open`, so a note carrying any other
+  # status vanished between numerator and denominator — a register full of them
+  # reported "0 pending" and read as clean.
+  #
+  # INSIDE THE FM_OK GUARD ON PURPOSE. Outside it OBS_COUNT is "" while OBS_TOTAL
+  # still counts files from find, so the subtraction would either error or report
+  # the ENTIRE register as unknown — a fabricated alarm arriving exactly when the
+  # tooling is broken, which is the failure this whole block is built to avoid.
+  OBS_CLOSED=$(count_closed_items ops/observations promoted implemented archived) || OBS_CLOSED=""
+  TENS_CLOSED=$(count_closed_items ops/tensions resolved dissolved promoted implemented archived blocked) || TENS_CLOSED=""
+  if [ -n "$OBS_COUNT" ] && [ -n "$OBS_CLOSED" ]; then
+    OBS_UNKNOWN=$((OBS_TOTAL - OBS_COUNT - OBS_CLOSED))
+  fi
+  if [ -n "$TENS_COUNT" ] && [ -n "$TENS_CLOSED" ]; then
+    TENS_UNKNOWN=$((TENS_TOTAL - TENS_COUNT - TENS_CLOSED))
+  fi
 fi
 # NO `|| echo 0` HERE. `grep -c` prints `0` AND exits 1 when nothing matches, so a
 # `|| echo 0` fallback fires *in addition* to the 0 already printed and the variable
@@ -212,6 +269,19 @@ if [ -n "$OBS_COUNT" ] && [ "$OBS_COUNT" -ge "$OBS_THRESHOLD" ]; then
 fi
 if [ -n "$TENS_COUNT" ] && [ "$TENS_COUNT" -ge "$TENS_THRESHOLD" ]; then
   echo "CONDITION: $TENS_COUNT unresolved tensions (of $TENS_TOTAL total). Consider /rethink."
+fi
+# NO THRESHOLD HERE, AND THE `-gt 0` IS NOT A THRESHOLD. A residual of 0 is the
+# healthy case and says nothing; an EMPTY residual was never measured and must
+# also say nothing. Omitting is visible; a fabricated "0 ... outside the
+# recognized set" would not be. The wording deliberately avoids the substring
+# `pending observations` — four assertions pin that string to the line above.
+if [ -n "$OBS_UNKNOWN" ] && [ "$OBS_UNKNOWN" -gt 0 ]; then
+  echo "CONDITION: $OBS_UNKNOWN observations carry a status outside the recognized set (of $OBS_TOTAL total). Consider /rethink."
+  emit_unknown_statuses ops/observations pending open promoted implemented archived >&2
+fi
+if [ -n "$TENS_UNKNOWN" ] && [ "$TENS_UNKNOWN" -gt 0 ]; then
+  echo "CONDITION: $TENS_UNKNOWN tensions carry a status outside the recognized set (of $TENS_TOTAL total). Consider /rethink."
+  emit_unknown_statuses ops/tensions pending open resolved dissolved promoted implemented archived blocked >&2
 fi
 # DELIBERATELY FIXED, NOT MERELY UNDECLARED. These two, and the 30 in the staleness
 # check below, are not configurable on purpose. The reason is structural, not "nobody
