@@ -9,6 +9,28 @@
 # Defaults to current directory if no path given.
 
 VAULT="${1:-.}"
+
+# This validator measures a GENERATED VAULT. Pointed at the arscontexta
+# generator it still runs happily and prints a confident FAIL assembled
+# entirely from documentation — the generator holds no notes, so the
+# frontmatter primitive reports on docs/, reference/ and generators/ and every
+# later primitive measures a corpus that was never meant to satisfy it. A
+# plausible-looking number derived from the wrong target is exactly the silent
+# failure class this repo is built to refuse, so refuse it here instead.
+#
+# The test is POSITIVE — "does the target look like the generator?" — and not
+# the negative "does it lack a .arscontexta marker". reference/test/kernel-note-dirs.test.sh
+# runs this validator against temp fixtures that carry no marker; guarding on
+# marker absence would turn that suite red for a reason unrelated to its subject.
+if [ -d "$VAULT/skill-sources" ] && [ -d "$VAULT/generators" ]; then
+  echo "error: '$VAULT' is the arscontexta generator, not a generated vault" >&2
+  echo "       this script checks a vault against reference/kernel.yaml, and the" >&2
+  echo "       generator has no notes to check — every result would describe" >&2
+  echo "       documentation files instead." >&2
+  echo "       run it against a vault:  ./reference/validate-kernel.sh <path-to-vault>" >&2
+  exit 2
+fi
+
 PASS=0
 WARN=0
 FAIL=0
