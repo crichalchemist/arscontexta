@@ -143,7 +143,7 @@ If a field has a value not in the enum list, report the invalid value and list t
 |-------|------|----------|
 | Format | Array with context: `["[[note]] -- relationship"]` | WARN |
 | Context phrase present | Each entry should include `--` or `—` followed by relationship description | WARN |
-| Relationship type | Standard types: extends, foundation, contradicts, enables, example | INFO |
+| Relationship type | Standard types: {vocabulary.rel_extends}, {vocabulary.rel_grounds}, {vocabulary.rel_contradicts}, {vocabulary.rel_exemplifies}, {vocabulary.rel_synthesizes}, {vocabulary.rel_enables} | INFO |
 | No bare links | `["[[note]]"]` without context is a bare link — useless for navigation | WARN |
 
 ### Composability (WARN if fails)

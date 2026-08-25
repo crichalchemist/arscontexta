@@ -194,7 +194,7 @@ If the note has fields with enumerated values (type, category, status, etc.), ch
 | Constraint | Check | Severity |
 |------------|-------|----------|
 | Format | Array with context: `["[[note]] -- relationship"]` | WARN |
-| Relationship type | Should use standard types: extends, foundation, contradicts, enables, example | INFO |
+| Relationship type | Should use standard types: {vocabulary.rel_extends}, {vocabulary.rel_grounds}, {vocabulary.rel_contradicts}, {vocabulary.rel_exemplifies}, {vocabulary.rel_synthesizes}, {vocabulary.rel_enables} | INFO |
 | Links exist | Each referenced note must exist as a file | WARN |
 
 **Topics format (FAIL if invalid):**

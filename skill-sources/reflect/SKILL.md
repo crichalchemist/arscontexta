@@ -292,12 +292,12 @@ If you cannot fill in [specific reason] with something substantive, the connecti
 
 | Relationship | Signal | Example |
 |-------------|--------|---------|
-| extends | adds dimension | "extends [[X]] by adding temporal aspect" |
-| grounds | provides foundation | "this works because [[Y]] establishes..." |
-| contradicts | creates tension | "conflicts with [[Z]] because..." |
-| exemplifies | concrete instance | "demonstrates [[W]] in practice" |
-| synthesizes | combines insights | "emerges from combining [[A]] and [[B]]" |
-| enables | unlocks possibility | "makes [[C]] actionable by providing..." |
+| {vocabulary.rel_extends} | adds dimension | "extends [[X]] by adding temporal aspect" |
+| {vocabulary.rel_grounds} | provides foundation | "this works because [[Y]] establishes..." |
+| {vocabulary.rel_contradicts} | creates tension | "conflicts with [[Z]] because..." |
+| {vocabulary.rel_exemplifies} | concrete instance | "demonstrates [[W]] in practice" |
+| {vocabulary.rel_synthesizes} | combines insights | "emerges from combining [[A]] and [[B]]" |
+| {vocabulary.rel_enables} | unlocks possibility | "makes [[C]] actionable by providing..." |
 
 **Reject if:**
 - The connection is "related" without specifics
@@ -375,17 +375,17 @@ relevant_notes:
   - "[[another note]] — provides the mechanism this claim depends on"
 ```
 
-Context phrases use standard relationship vocabulary: extends, grounds, contradicts, exemplifies, synthesizes, enables.
+Context phrases use standard relationship vocabulary: {vocabulary.rel_extends}, {vocabulary.rel_grounds}, {vocabulary.rel_contradicts}, {vocabulary.rel_exemplifies}, {vocabulary.rel_synthesizes}, {vocabulary.rel_enables}.
 
 **Bidirectional Consideration:**
 
 When adding [[A]] to [[B]], ask: should [[B]] also link to [[A]]?
 
 Not always. Relationships are not always symmetric:
-- "extends" often is not bidirectional
-- "exemplifies" usually goes one direction
-- "contradicts" is often bidirectional
-- "synthesizes" might reference both sources
+- "{vocabulary.rel_extends}" often is not bidirectional
+- "{vocabulary.rel_exemplifies}" usually goes one direction
+- "{vocabulary.rel_contradicts}" is often bidirectional
+- "{vocabulary.rel_synthesizes}" might reference both sources
 
 Add the reverse link only if following that path would be useful for agent traversal.
 
