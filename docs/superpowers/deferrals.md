@@ -42,6 +42,15 @@ question gets re-litigated, or worse, silently answered the other way.
 
 ## Open
 
+**Swept 2026-08-26.** Every entry below was checked against the tree, running each
+re-derivation fence where one exists — 17 of the 22 carry one. **No entry here is complete:**
+none of the deferred work has since been done, and nothing moved to Closed as a result of this
+sweep. Two entries carry evidence that went stale without the deferral itself closing, and both
+are corrected in place at the end of their entry rather than by rewriting the original numbers —
+entry 27 (release tags now exist) and entry 28 (line citations moved). The sweep verified status
+only. It did not re-litigate any entry on its merits.
+
+
 ### 1. `generators/features/maintenance.md` — both link-matcher classes
 
 **What:** `:20` is an interpolated matcher (divergence 12's class, and the site check 6
@@ -581,6 +590,23 @@ done                                                               # 16, five ti
 
 ---
 
+
+**Evidence stale as of 2026-08-26; the deferral itself stays open.** The block above measures
+two things that have since moved. `git tag` now returns **7**, not 0: v0.8.0, v0.9.0, v0.9.5,
+v0.9.6, v0.9.7, v0.9.9 and v0.10.0 were backfilled onto their release commits on 2026-08-25.
+The stamps are no longer `arscontexta-v1.6` either — this tree carries 17 at
+`arscontexta-0.10.0`, plus 8 `{version}` and 1 `{current_plugin_version}` placeholders that
+setup substitutes at generation time. This bears directly on the reopening condition, which
+names release tags and a pinned per-vault baseline as the baseline-retention mechanism whose
+absence justified withholding: **that half now exists.** The withholding is unchanged, because
+the other half has not happened — no vault has reported customization lost to the replace path.
+
+```bash
+git tag | wc -l                                                          # 7
+/usr/bin/grep -rho 'generated_from: "arscontexta-[^"]*"' skills/ skill-sources/ \
+  | sort | uniq -c                                                       # 17 at 0.10.0
+```
+
 ### 28. `TENS_TOTAL`'s `find -H` has no symlink fixture of its own
 
 **What:** `hooks/scripts/session-orient.sh:159` computes `TENS_TOTAL` with `find -H`, added by
@@ -610,6 +636,19 @@ verify it red against a `-H`-less `:159`, then touch the hook.
 ```
 
 ---
+
+
+**Line citations stale as of 2026-08-26; the deferral itself stays open.** Every `:158` and
+`:159` above now reads `:194` and `:195`. `find -H` sits at three sites in the hook: `:177`
+inside a per-directory loop, `:194` for `OBS_TOTAL`, and `:195` for `TENS_TOTAL` — so the D17
+block described above is `:194`-`:195`. The original numbers are left standing rather than
+rewritten, because they record what was measured when the entry was filed; entry 13 carries the
+same kind of correction for the same file. No symlink fixture was added, so the substance of
+this deferral is untouched.
+
+```bash
+/usr/bin/grep -n 'find -H' hooks/scripts/session-orient.sh   # :177 loop, :194 obs, :195 tensions
+```
 
 ### 29. `comm`-collation residue: two stale rationales inside the governed trees, two unpinned sites outside them
 
