@@ -4,7 +4,7 @@
 (`link-extraction.sh` v2 → v3) is independent and unaffected; its plan is already archived.
 
 The plan built on the superseded design —
-`docs/superpowers/plans/2026-08-08-note-convention-and-lifecycle.md` — **must not be executed.**
+`docs/superpowers/plans/archive/2026-08-08-note-convention-and-lifecycle.md` — **must not be executed.**
 It is retained for reference only. Its Task 5 would have rewritten 1776 vault files without their
 quotes and produced invalid YAML on the 473 carrying a colon.
 

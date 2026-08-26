@@ -301,7 +301,7 @@ ls ~/second-brain/ops/lib/                                            # queue-ed
 # the first attempt at this sweep returned false zeros for exactly that reason)
 set -- docs/superpowers/specs/2026-08-08-corpus-wide-passes-design.md \
        docs/superpowers/specs/archive/2026-08-09-post-merge-hardening-design.md \
-       docs/superpowers/plans/2026-08-08-note-convention-and-lifecycle.md \
+       docs/superpowers/plans/archive/2026-08-08-note-convention-and-lifecycle.md \
        docs/superpowers/plans/archive/2026-08-09-post-merge-hardening.md \
        docs/superpowers/deferrals.md
 for kw in 'queue.yaml' 'tombstone' 'age filter' 'diff-filter' 'advisor' 'auto-commit' \

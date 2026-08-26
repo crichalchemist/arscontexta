@@ -1,4 +1,21 @@
 # Note Convention and Lifecycle Implementation Plan
+> # SUPERSEDED — DO NOT EXECUTE
+>
+> Superseded by `docs/superpowers/plans/archive/2026-08-15-note-lifecycle-and-description-convention.md`,
+> which shipped as PR #9 and delivered this plan's items by a different route. That plan states
+> the supersession at its line 13; until 2026-08-26 the statement existed **only** there, so this
+> file went on instructing an executor to run it.
+>
+> **Task 5 of this plan corrupts data.** Its one-pass normalizer reads a description through
+> `frontmatter_field`, which strips balanced quotes, then writes the value back unquoted. Run
+> against the field vault it rewrites 1776 notes without their quotes and produces invalid YAML
+> in the 473 that carry a colon inside the value — while its progress counter reads as plausible
+> forward motion. The superseding plan's `migrate-note-lifecycle.test.sh` carries a fixture named
+> `colon` for exactly that case.
+>
+> Kept rather than deleted, because a ledger that quietly drops items is the defect this repo
+> documents. Read it as history. Do not run it, in whole or in part.
+
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

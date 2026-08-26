@@ -8,9 +8,9 @@
 
 **Tech Stack:** Markdown skill templates, YAML frontmatter, bash fences, `awk`, `reference/lib/frontmatter.sh`.
 
-**Spec:** `docs/superpowers/specs/2026-08-15-note-lifecycle-and-description-convention-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md`
 
-**Supersedes:** `docs/superpowers/plans/2026-08-08-note-convention-and-lifecycle.md` — **do not execute that plan.** Its Task 5 would rewrite 1776 vault files without their quotes.
+**Supersedes:** `docs/superpowers/plans/archive/2026-08-08-note-convention-and-lifecycle.md` — **do not execute that plan.** Its Task 5 would rewrite 1776 vault files without their quotes.
 
 ## Global Constraints
 
