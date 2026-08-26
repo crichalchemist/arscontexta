@@ -306,10 +306,21 @@ If Phase 2 identified content-impacting changes:
 
 1. **Schema migration:** Add/remove/rename fields across notes
    ```bash
-   # Example: add a new required field to all notes
+   # Example: add a new required field to all notes.
+   # In-place editing is spelled differently on BSD and GNU, so a portable
+   # migration writes a temp file and moves it into place. cp -p stages that
+   # temp with the mode of the original; a bare redirect would replace it with
+   # whatever the umask says, silently, across every note at once.
    for f in {vocabulary.notes}/*.md; do
-     grep -q '^new_field:' "$f" || sed -i '' '/^description:/a\
-   new_field: [default value]' "$f"
+     grep -q '^new_field:' "$f" && continue
+     tmp="$f.tmp.$$"
+     cp -p "$f" "$tmp" || { echo "migration: cannot stage $f" >&2; continue; }
+     if awk '{ print } /^description:/ { print "new_field: [default value]" }' "$f" > "$tmp"; then
+       mv "$tmp" "$f" || { rm -f "$tmp"; echo "migration: could not replace $f" >&2; }
+     else
+       rm -f "$tmp"
+       echo "migration: awk failed on $f" >&2
+     fi
    done
    ```
 
