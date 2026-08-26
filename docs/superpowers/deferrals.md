@@ -78,25 +78,6 @@ shipping it.
 **From:** same two documents. Note docs/open-divergences.md's divergence-12 table still cites `:410`;
 the true line is `:425`.
 
-### 3. `skill-sources/next:261` — the odd `LINK_LIB` spelling — CLOSED
-
-**What:** 8 sites spell `LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"`; `next:261`
-spells the bare relative `LINK_LIB="ops/lib/link-extraction.sh"`, which depends on the
-fence's working directory.
-
-**Why not now:** converting it inside link-library work would mix a behaviour-neutral
-cleanup into a change whose whole risk is that reported numbers move. Fix it where it
-can be reviewed on its own.
-
-**Reopens:** immediately — this is a "do it separately", not a "do it never". Anyone
-touching `next`'s link fences should take it.
-
-**From:** `2026-08-08-link-edge-map.md`
-
-```bash
-/usr/bin/grep -rn 'LINK_LIB=' skill-sources/    # 8 prefixed, 1 bare
-```
-
 ### 4. The materialized backlink cache
 
 **What:** caching the link edge map to `ops/cache/` instead of recomputing it per fence.
@@ -120,84 +101,6 @@ a sound staleness check is measurably cheaper than a rebuild. Both halves requir
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
 
-### 5. The 681 statusless field-vault notes — CLOSED (rationale OVERRIDDEN, not satisfied)
-
-**What:** `/reduce` will stamp `status` on new notes; 681 existing notes predate the
-stamp and violate the vault's own `required` schema (`insight-node.md:5-11`).
-
-**Why not:** the stamp is forward-only. Backfilling needs a rule for what status a
-pre-existing note should receive, and no such rule exists — inferring one from age or
-link count would assert a quality claim nothing checked.
-
-**Reopens if:** a promotion criterion is agreed that does not require reading the note.
-
-**From:** `2026-08-08-corpus-wide-passes-design.md`
-
-### 6. The `~150` vs `200` description-length disagreement — **CLOSED 2026-08-24**
-
-**CLOSED 2026-08-24 (vocabulary-integrity Unit 5), together with entry 32 item 1 as this entry
-required.** The residue was **twelve** normative sites, not the two named below: the two
-`generators/` sites, plus `reference/kernel.yaml:57` — the invariant contract, which would
-otherwise have gone on declaring `~150` while the generators feeding it said `200` — plus
-`reference/methodology.md:55` and all eight `reference/templates/*-note.md`, which teach the
-value to every vault that instantiates one. Both re-derive commands below are scoped to
-`skill-sources/ generators/ skills/` and so could not see nine of the twelve; the tree-wide form
-is in the block at the end of this entry. All twelve now read `200 chars, no trailing period`,
-the spelling `generators/features/schema.md:26` already used — the `no trailing period` clause is
-now carried uniformly, where before only two of the twelve had it.
-
-`reference/claim-map.md:84` is deliberately KEPT: it discusses the tension rather than declaring
-the value, and rewriting it would erase the record of why the question was open.
-
-```bash
-git -c core.quotePath=false ls-files -z | xargs -0 /usr/bin/grep -ln '~150' \
-  | /usr/bin/grep -v '^methodology/' | /usr/bin/grep -v '^platforms/shared/skill-blocks/' \
-  | /usr/bin/grep -v '^docs/'
-#   reference/claim-map.md           (KEEP -- discusses, does not declare)
-#   reference/semantic-vs-keyword.md ("~150 notes", a volume threshold)
-#   skills/architect/SKILL.md        ("line ~150", a line number)
-```
-
-**What:** two sites say `~150` (`generators/features/schema.md:18`,
-`skill-sources/reduce/SKILL.md:473`), three say `200`.
-
-**AMENDED 2026-08-15 — both halves of that sentence are now stale, in opposite directions.**
-`skill-sources/reduce/SKILL.md` no longer says `~150` at all: the note-lifecycle branch moved
-**both** of its sites to "max 200 chars, no trailing period". The `~150` residue is now two
-sites, and **both are in `generators/`** — `schema.md:18` and `atomic-notes.md:75`, the latter
-never named by this entry. And "three say `200`" measured **8** at the time of the audit.
-
-**This is the same residue as entry 32 item 1. Fix them together or not at all** — they were
-filed from different branches, describe the identical two files, and a reader closing one
-would leave the other looking live.
-
-**Why not:** found while counting period declarations; reconciling a length constraint
-is a separate decision from a period. **The count is "at least" — a term-keyed survey
-cannot enumerate sites that omit the term.** That caveat is exactly why this entry undercounted
-its own subject by one file for a week.
-
-```bash
-/usr/bin/grep -rn '~150' skill-sources/ generators/ skills/   # 3 = 2 generators + 1 unrelated
-/usr/bin/grep -rn '200 char\|max 200\|<=200\|<= 200' generators/ skill-sources/ | wc -l   # 8
-```
-
-**Reopens if:** anyone edits the description schema for any reason.
-
-**From:** `2026-08-08-corpus-wide-passes-design.md`
-
-### 7. Off-enum vault statuses — two different questions — CLOSED (with an inversion, see record)
-
-**What:** the field vault carries `closed` (11), `investigating` (1) — in **neither** the
-canonical enum nor its own template enum, so genuine violations. And `superseded` (3) —
-in the vault's enum, absent from canonical, so a **dialect gap** like `draft`.
-
-**Why not:** reconciling the generator with one vault's practice is a separate decision
-with a different owner. Precedent: the divergences 7–9 closure made the same call.
-
-**Reopens if:** the canonical status enum is revisited for any reason.
-
-**From:** `2026-08-08-corpus-wide-passes-design.md`
-
 ### 8. `open`'s semantics
 
 **What:** the canonical enum declares `preliminary | open | active | archived`. Nothing
@@ -208,26 +111,6 @@ anywhere defines what `open` means or what transitions into or out of it.
 **Reopens if:** a vault or a skill needs the state, or it is retired from the enum.
 
 **From:** `2026-08-08-corpus-wide-passes-design.md`
-
-### 9. `check-prose-paths.sh` scope excludes two files that name repo paths — CLOSED
-
-**What:** `hooks/scripts/session-orient.sh` and
-`platforms/claude-code/hooks/session-orient.sh.template` both name repo paths in
-comments and in warning messages a user reads at SessionStart. Neither is in the gate's
-stated 8-file scope.
-
-**Why not:** the gate's scope is a **stated list**, not a discovered one, and that is
-deliberate — a shrinking scope must not read as a clean result. Widening it is a
-deliberate edit, not an oversight to patch.
-
-**Reopens:** whenever someone is editing that gate anyway.
-
-**From:** CLAUDE.md divergence 5
-
-```bash
-awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh
-grep -c 'session-orient' reference/check-prose-paths.sh    # 0 — neither is listed
-```
 
 ### 10. The contract-field assertion
 
@@ -341,45 +224,6 @@ failure to reach.
 
 ---
 
-### 14. `fence-isolation.test.sh` uses a fixed temp path, so two concurrent runs clobber each other — CLOSED
-
-**What:** `reference/test/fence-isolation.test.sh:50` sets `WORK="/tmp/fence-isolation-gate-$SELF"`.
-`$SELF` is the shell name, not a per-run token, so two runs of the same suite under the same shell
-share one directory. Observed while running the suite in the foreground beside a background sweep:
-the bash run reported `harness: extracted no fences — cannot conclude anything` and the zsh run died
-on `rm: Permission denied`.
-
-**Why not now:** CI cannot hit it — its steps are sequential — and the failure is LOUD rather than a
-false PASS, since the "cannot conclude anything" arm is doing exactly its job. Recorded because a
-local contributor running the suite twice sees a failure with no obvious cause.
-
-**CORRECTED 2026-08-09 — this entry originally said "`mktemp -d` fixes it in one line". It does
-not; it would reintroduce a defect the code already fixed.** The four comment lines above `:50`
-state why the path is pinned: assertion N asks whether a fence emitted digits, `has_digit` (`:701`)
-tests the **whole** captured file, and an `mktemp` path like `/var/folders/f2/9vss9brn…` carries
-digits — so any fence echoing a path under that root reports a defect against correct code. That was
-a measured near-miss false Critical. The entry proposed the remedy without reading the comment
-immediately above the line it cited, which is the same not-reading-the-neighbourhood error the entry
-itself is about.
-
-The real fix keeps the path **digit-free and** makes it unique, since `$SELF` is only `bash`/`zsh`
-(`:42`) and so separates the two CI jobs but not two runs of the same shell:
-
-```bash
-WORK="/tmp/fence-isolation-gate-$SELF-$(printf '%s' "$$" | tr '0-9' 'abcdefghij')"   # 91553 -> jbffd
-```
-
-**Reopens if:** CI ever runs the shells in parallel, or the fixed path is given to any check that
-fails soft instead of loud.
-
-**From:** `2026-08-04-ci-hardening.md` Task 2
-
-```bash
-/usr/bin/grep -n '/tmp/fence-isolation-gate-' reference/test/fence-isolation.test.sh   # line 50
-```
-
----
-
 ### 15. The PostToolUse matcher is `Write`, so `Edit`/`MultiEdit` bypass the content-destruction guard
 
 **What:** `hooks/hooks.json:17` matches `"Write"` only. `hooks/scripts/write-validate.sh` compares a
@@ -400,41 +244,6 @@ the only remaining thing keeping the guard from running.
 ```bash
 /usr/bin/grep -n '"matcher"' hooks/hooks.json                    # line 17, "Write"
 /usr/bin/grep -n 'notes/' hooks/scripts/write-validate.sh | head -2
-```
-
----
-
-### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths — CLOSED
-
-Closed by `d9662fd` (Task 12, `fix/post-merge-hardening`): the bare path now fails loud on a
-present-but-empty value exactly as the dotted path does, and both paths match keys fixed-string
-rather than through an interpolated ERE — pinned by the D16a/D16b assertions in
-`reference/test/threshold-namespace.test.sh`. The full entry moved to [Closed](#closed) per this
-file's own convention — **with a drift record**, because the commit that closed both asymmetries
-never touched this ledger: the entry kept asserting `52/52 — covers neither asymmetry` while the
-suite measured 56 and covered both. A status file lying about status, inside the ledger that
-exists to prevent exactly that. Kept numbered so references by number stay valid.
-
----
-
-### 17. `session-orient.sh` counts open notes recursively but their total non-recursively — CLOSED
-
-**What:** `hooks/scripts/session-orient.sh:151` counts open items with `count_notes_by_field`, which
-recurses; `:154`–`:155` compute `OBS_TOTAL`/`TENS_TOTAL` with `ls -1 ops/observations/*.md`, which
-does not. The two are combined in one sentence at `:207` — `"$OBS_COUNT pending observations (of
-$OBS_TOTAL total)"` — so a vault with open items under `ops/observations/archive/` can report a count
-larger than its own total.
-
-**Why not now:** Consistent today only by accident: no archive subdirectory in the field vault holds
-an `open` item. It is a display line that gates nothing — the threshold compares `OBS_COUNT` alone.
-
-**Reopens if:** any vault files an `open` observation or tension in a subdirectory, or `OBS_TOTAL`
-ever gains a second consumer that compares against it.
-
-**From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 1
-
-```bash
-/usr/bin/grep -n 'count_notes_by_field\|OBS_TOTAL=\|TENS_TOTAL=' hooks/scripts/session-orient.sh
 ```
 
 ---
@@ -462,18 +271,6 @@ process — the exact case (a) cannot see.
 /usr/bin/grep -n '\-M' reference/check-placeholder-count.sh
 bash reference/check-placeholder-count.sh main; echo "rc=$?"    # 0 clean, 1 finding, 2 no merge base
 ```
-
----
-
-### 19. `check-portability.sh` check 6 — substring matching and a whitespace-split allowlist — CLOSED
-
-Closed by `cbcd48f` (Task 13, `fix/post-merge-hardening`): the hit count is now anchored and the
-allowlist `|`-delimited, born-red and mutation-proved in `guard-failure.test.sh` (60/60 → 66/66,
-both shells). The full entry moved to [Closed](#closed) per this file's own convention — **with a
-drift record**, because the closure measured the entry's central claim false: it asserted the
-substring match "fails in the safe direction by construction — a false FAIL, never a false PASS",
-and the measured failure is a false PASS (a hit line naming a deleted allowlisted path masked the
-GONE arm). Kept numbered here so references by number stay valid.
 
 ---
 
@@ -1058,6 +855,20 @@ git -c core.quotePath=false ls-files | /usr/bin/grep ' ' \
   | /usr/bin/grep -c '^\(skill-sources\|skills\|platforms\|reference\|generators\)/'   # 0 — scanned trees
 ```
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 19. `check-portability.sh` check 6 — substring matching and a whitespace-split allowlist — CLOSED
+
+Closed by `cbcd48f` (Task 13, `fix/post-merge-hardening`): the hit count is now anchored and the
+allowlist `|`-delimited, born-red and mutation-proved in `guard-failure.test.sh` (60/60 → 66/66,
+both shells). The full entry moved to [Closed](#closed) per this file's own convention — **with a
+drift record**, because the closure measured the entry's central claim false: it asserted the
+substring match "fails in the safe direction by construction — a false FAIL, never a false PASS",
+and the measured failure is a false PASS (a hit line naming a deleted allowlisted path masked the
+GONE arm). Kept numbered here so references by number stay valid.
+
+---
 ### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths
 
 **CLOSED 2026-08-15, and the closure was recorded by a later fix round rather than by the commit
@@ -1101,6 +912,21 @@ key, which makes (b) reachable; or a bare key is added whose empty value is mean
 bash reference/test/threshold-namespace.test.sh | tail -1       # 52/52 — covers neither asymmetry
 ```
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 16. `read_config.sh` — two asymmetries between the bare-key and dotted-key paths — CLOSED
+
+Closed by `d9662fd` (Task 12, `fix/post-merge-hardening`): the bare path now fails loud on a
+present-but-empty value exactly as the dotted path does, and both paths match keys fixed-string
+rather than through an interpolated ERE — pinned by the D16a/D16b assertions in
+`reference/test/threshold-namespace.test.sh`. The full entry moved to [Closed](#closed) per this
+file's own convention — **with a drift record**, because the commit that closed both asymmetries
+never touched this ledger: the entry kept asserting `52/52 — covers neither asymmetry` while the
+suite measured 56 and covered both. A status file lying about status, inside the ledger that
+exists to prevent exactly that. Kept numbered so references by number stay valid.
+
+---
 ### 31. `README.md` declares the version but `bump-version.sh` cannot manage it
 
 **What:** `README.md:12` carries `**v0.9.9** · Claude Code plugin · MIT` — a real version
@@ -1133,6 +959,58 @@ bash scripts/bump-version.sh --audit | tail -3        # reports README every run
 
 ---
 
+
+### 6. The `~150` vs `200` description-length disagreement — **CLOSED 2026-08-24**
+**CLOSED 2026-08-24 (vocabulary-integrity Unit 5), together with entry 32 item 1 as this entry
+required.** The residue was **twelve** normative sites, not the two named below: the two
+`generators/` sites, plus `reference/kernel.yaml:57` — the invariant contract, which would
+otherwise have gone on declaring `~150` while the generators feeding it said `200` — plus
+`reference/methodology.md:55` and all eight `reference/templates/*-note.md`, which teach the
+value to every vault that instantiates one. Both re-derive commands below are scoped to
+`skill-sources/ generators/ skills/` and so could not see nine of the twelve; the tree-wide form
+is in the block at the end of this entry. All twelve now read `200 chars, no trailing period`,
+the spelling `generators/features/schema.md:26` already used — the `no trailing period` clause is
+now carried uniformly, where before only two of the twelve had it.
+
+`reference/claim-map.md:84` is deliberately KEPT: it discusses the tension rather than declaring
+the value, and rewriting it would erase the record of why the question was open.
+
+```bash
+git -c core.quotePath=false ls-files -z | xargs -0 /usr/bin/grep -ln '~150' \
+  | /usr/bin/grep -v '^methodology/' | /usr/bin/grep -v '^platforms/shared/skill-blocks/' \
+  | /usr/bin/grep -v '^docs/'
+#   reference/claim-map.md           (KEEP -- discusses, does not declare)
+#   reference/semantic-vs-keyword.md ("~150 notes", a volume threshold)
+#   skills/architect/SKILL.md        ("line ~150", a line number)
+```
+
+**What:** two sites say `~150` (`generators/features/schema.md:18`,
+`skill-sources/reduce/SKILL.md:473`), three say `200`.
+
+**AMENDED 2026-08-15 — both halves of that sentence are now stale, in opposite directions.**
+`skill-sources/reduce/SKILL.md` no longer says `~150` at all: the note-lifecycle branch moved
+**both** of its sites to "max 200 chars, no trailing period". The `~150` residue is now two
+sites, and **both are in `generators/`** — `schema.md:18` and `atomic-notes.md:75`, the latter
+never named by this entry. And "three say `200`" measured **8** at the time of the audit.
+
+**This is the same residue as entry 32 item 1. Fix them together or not at all** — they were
+filed from different branches, describe the identical two files, and a reader closing one
+would leave the other looking live.
+
+**Why not:** found while counting period declarations; reconciling a length constraint
+is a separate decision from a period. **The count is "at least" — a term-keyed survey
+cannot enumerate sites that omit the term.** That caveat is exactly why this entry undercounted
+its own subject by one file for a week.
+
+```bash
+/usr/bin/grep -rn '~150' skill-sources/ generators/ skills/   # 3 = 2 generators + 1 unrelated
+/usr/bin/grep -rn '200 char\|max 200\|<=200\|<= 200' generators/ skill-sources/ | wc -l   # 8
+```
+
+**Reopens if:** anyone edits the description schema for any reason.
+
+**From:** `2026-08-08-corpus-wide-passes-design.md`
+
 ## Closed by the 2026-08-15 audit
 
 **Six entries, and only two were closed by the note-lifecycle branch.** The other four were
@@ -1153,6 +1031,27 @@ Closed by `fix/post-merge-hardening`, not by this branch. All nine sites are now
 /usr/bin/grep -rn 'LINK_LIB=' skill-sources/ | grep -vc 'VAULT_ROOT'  # 0
 ```
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 3. `skill-sources/next:261` — the odd `LINK_LIB` spelling — CLOSED
+
+**What:** 8 sites spell `LINK_LIB="$VAULT_ROOT/ops/lib/link-extraction.sh"`; `next:261`
+spells the bare relative `LINK_LIB="ops/lib/link-extraction.sh"`, which depends on the
+fence's working directory.
+
+**Why not now:** converting it inside link-library work would mix a behaviour-neutral
+cleanup into a change whose whole risk is that reported numbers move. Fix it where it
+can be reviewed on its own.
+
+**Reopens:** immediately — this is a "do it separately", not a "do it never". Anyone
+touching `next`'s link fences should take it.
+
+**From:** `2026-08-08-link-edge-map.md`
+
+```bash
+/usr/bin/grep -rn 'LINK_LIB=' skill-sources/    # 8 prefixed, 1 bare
+```
 ### 5. The 681 statusless field-vault notes — CLOSED, rationale OVERRIDDEN not satisfied
 
 The migration (`~/second-brain` `6d941634`) backfilled **698** notes — the count had drifted
@@ -1172,6 +1071,21 @@ was independently tripped by the same branch: `/verify`'s mechanical gate is exa
 /usr/bin/grep -rL '^status:' ~/second-brain/nodes/ | grep -c .   # 0
 ```
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 5. The 681 statusless field-vault notes — CLOSED (rationale OVERRIDDEN, not satisfied)
+
+**What:** `/reduce` will stamp `status` on new notes; 681 existing notes predate the
+stamp and violate the vault's own `required` schema (`insight-node.md:5-11`).
+
+**Why not:** the stamp is forward-only. Backfilling needs a rule for what status a
+pre-existing note should receive, and no such rule exists — inferring one from age or
+link count would assert a quality claim nothing checked.
+
+**Reopens if:** a promotion criterion is agreed that does not require reading the note.
+
+**From:** `2026-08-08-corpus-wide-passes-design.md`
 ### 7. Off-enum vault statuses — CLOSED, **with an inversion worth flagging**
 
 `closed` and `investigating` are gone from the vault; `superseded` became canonical in
@@ -1188,6 +1102,21 @@ opposite direction — the vault's template does not know a value its corpus car
 See also entry 32 and the plugin spec's marker section: the `closed` → `archived` half of this
 remap **deviated from the criterion the migration itself applied**, affecting 11 notes.
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 7. Off-enum vault statuses — two different questions — CLOSED (with an inversion, see record)
+
+**What:** the field vault carries `closed` (11), `investigating` (1) — in **neither** the
+canonical enum nor its own template enum, so genuine violations. And `superseded` (3) —
+in the vault's enum, absent from canonical, so a **dialect gap** like `draft`.
+
+**Why not:** reconciling the generator with one vault's practice is a separate decision
+with a different owner. Precedent: the divergences 7–9 closure made the same call.
+
+**Reopens if:** the canonical status enum is revisited for any reason.
+
+**From:** `2026-08-08-corpus-wide-passes-design.md`
 ### 9. `check-prose-paths.sh` scope excludes two files that name repo paths — CLOSED
 
 Closed by `fix/post-merge-hardening`. Both `session-orient` files are now in `SCOPE`.
@@ -1200,6 +1129,28 @@ awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh \
   | grep -c session-orient    # 2
 ```
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 9. `check-prose-paths.sh` scope excludes two files that name repo paths — CLOSED
+
+**What:** `hooks/scripts/session-orient.sh` and
+`platforms/claude-code/hooks/session-orient.sh.template` both name repo paths in
+comments and in warning messages a user reads at SessionStart. Neither is in the gate's
+stated 8-file scope.
+
+**Why not:** the gate's scope is a **stated list**, not a discovered one, and that is
+deliberate — a shrinking scope must not read as a clean result. Widening it is a
+deliberate edit, not an oversight to patch.
+
+**Reopens:** whenever someone is editing that gate anyway.
+
+**From:** CLAUDE.md divergence 5
+
+```bash
+awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh
+grep -c 'session-orient' reference/check-prose-paths.sh    # 0 — neither is listed
+```
 ### 14. `fence-isolation.test.sh` uses a fixed temp path — CLOSED
 
 Closed by `fix/post-merge-hardening`, using the digit-free unique-path remedy. The entry cited
@@ -1209,6 +1160,47 @@ line 50; the fix is at line 56 and the content differs, so anchor on the phrase.
 /usr/bin/grep -n 'WORK=' reference/test/fence-isolation.test.sh   # unique per-process path
 ```
 
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 14. `fence-isolation.test.sh` uses a fixed temp path, so two concurrent runs clobber each other — CLOSED
+
+**What:** `reference/test/fence-isolation.test.sh:50` sets `WORK="/tmp/fence-isolation-gate-$SELF"`.
+`$SELF` is the shell name, not a per-run token, so two runs of the same suite under the same shell
+share one directory. Observed while running the suite in the foreground beside a background sweep:
+the bash run reported `harness: extracted no fences — cannot conclude anything` and the zsh run died
+on `rm: Permission denied`.
+
+**Why not now:** CI cannot hit it — its steps are sequential — and the failure is LOUD rather than a
+false PASS, since the "cannot conclude anything" arm is doing exactly its job. Recorded because a
+local contributor running the suite twice sees a failure with no obvious cause.
+
+**CORRECTED 2026-08-09 — this entry originally said "`mktemp -d` fixes it in one line". It does
+not; it would reintroduce a defect the code already fixed.** The four comment lines above `:50`
+state why the path is pinned: assertion N asks whether a fence emitted digits, `has_digit` (`:701`)
+tests the **whole** captured file, and an `mktemp` path like `/var/folders/f2/9vss9brn…` carries
+digits — so any fence echoing a path under that root reports a defect against correct code. That was
+a measured near-miss false Critical. The entry proposed the remedy without reading the comment
+immediately above the line it cited, which is the same not-reading-the-neighbourhood error the entry
+itself is about.
+
+The real fix keeps the path **digit-free and** makes it unique, since `$SELF` is only `bash`/`zsh`
+(`:42`) and so separates the two CI jobs but not two runs of the same shell:
+
+```bash
+WORK="/tmp/fence-isolation-gate-$SELF-$(printf '%s' "$$" | tr '0-9' 'abcdefghij')"   # 91553 -> jbffd
+```
+
+**Reopens if:** CI ever runs the shells in parallel, or the fixed path is given to any check that
+fails soft instead of loud.
+
+**From:** `2026-08-04-ci-hardening.md` Task 2
+
+```bash
+/usr/bin/grep -n '/tmp/fence-isolation-gate-' reference/test/fence-isolation.test.sh   # line 50
+```
+
+---
 ### 17. `session-orient.sh` counts open notes recursively but their total non-recursively — CLOSED
 
 Closed by `fix/post-merge-hardening`: both `OBS_TOTAL` and `TENS_TOTAL` now use
@@ -1220,3 +1212,28 @@ the two are easily conflated because they name the same variable.
 ```bash
 /usr/bin/grep -n 'OBS_TOTAL=\|TENS_TOTAL=' hooks/scripts/session-orient.sh   # both find -H
 ```
+
+
+**Deferral text, merged from `## Open` on 2026-08-26.** The ledger carried this item in both sections at once; the convention is one entry that MOVES, so the original deferral now sits with its closure rather than reading as open work.
+
+#### 17. `session-orient.sh` counts open notes recursively but their total non-recursively — CLOSED
+
+**What:** `hooks/scripts/session-orient.sh:151` counts open items with `count_notes_by_field`, which
+recurses; `:154`–`:155` compute `OBS_TOTAL`/`TENS_TOTAL` with `ls -1 ops/observations/*.md`, which
+does not. The two are combined in one sentence at `:207` — `"$OBS_COUNT pending observations (of
+$OBS_TOTAL total)"` — so a vault with open items under `ops/observations/archive/` can report a count
+larger than its own total.
+
+**Why not now:** Consistent today only by accident: no archive subdirectory in the field vault holds
+an `open` item. It is a display line that gates nothing — the threshold compares `OBS_COUNT` alone.
+
+**Reopens if:** any vault files an `open` observation or tension in a subdirectory, or `OBS_TOTAL`
+ever gains a second consumer that compares against it.
+
+**From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 1
+
+```bash
+/usr/bin/grep -n 'count_notes_by_field\|OBS_TOTAL=\|TENS_TOTAL=' hooks/scripts/session-orient.sh
+```
+
+---
