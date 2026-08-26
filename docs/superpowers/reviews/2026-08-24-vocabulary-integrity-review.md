@@ -1,6 +1,6 @@
 # Adversarial review — vocabulary integrity design spec
 
-**Spec:** `docs/superpowers/specs/2026-08-24-vocabulary-integrity-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-24-vocabulary-integrity-design.md`
 **Tree:** `develop` @ `db399d8` (clean). All commands below were run against this tree on 2026-08-24.
 Gates and fixtures were executed with `/opt/local/bin/bash`; nothing in the repo was modified —
 gate experiments used `SCAN_ROOT`/`SCHEMA_FILE` overrides against scratchpad fixtures.

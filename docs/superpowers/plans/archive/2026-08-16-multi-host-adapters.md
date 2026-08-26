@@ -8,7 +8,7 @@
 
 **Tech Stack:** JSON manifests; ESM JavaScript (opencode); unbuilt TypeScript with a type-only import (Pi); bash for verification.
 
-**Spec:** `docs/superpowers/specs/2026-08-16-multi-host-adapters-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-16-multi-host-adapters-design.md`
 
 ## Global Constraints
 
@@ -745,7 +745,7 @@ construction and unverified in fact."
 
 ## Deferrals
 
-- **`.agents/plugins/marketplace.json` ships gate-free.** After Task 1 no check reads it: `--check` sees only declared (path, field) pairs and it carries no version; `check-prose-paths.sh` checks existence, not content; `check-portability.sh` collects `*.md`/`*.sh`/`*.template`, not `*.json`. It can be malformed, wrong-schema, or reverted to a symlink with CI green. Task 1 Step 7 asserts these once, by hand, at creation. A standing gate belongs in the CI-hardening spec — recorded in `docs/superpowers/specs/2026-08-16-multi-host-adapters-design.md` under "What is NOT claimed".
+- **`.agents/plugins/marketplace.json` ships gate-free.** After Task 1 no check reads it: `--check` sees only declared (path, field) pairs and it carries no version; `check-prose-paths.sh` checks existence, not content; `check-portability.sh` collects `*.md`/`*.sh`/`*.template`, not `*.json`. It can be malformed, wrong-schema, or reverted to a symlink with CI green. Task 1 Step 7 asserts these once, by hand, at creation. A standing gate belongs in the CI-hardening spec — recorded in `docs/superpowers/specs/archive/2026-08-16-multi-host-adapters-design.md` under "What is NOT claimed".
 - **Deferral 31 is misfiled** under `## Closed` in `docs/superpowers/deferrals.md` while reading as open and while its defect is live. The misfiling predates `b47b9c3`. Not fixed here: `deferrals.md` is outside this plan's scope. Belongs to whichever branch next edits that file.
 - **`interface.category` is a reasoned guess.** `"Developer Tools"` is the only value observed in a working Codex manifest; `"Productivity"` is semantically better but Codex's enum is unpublished. Revisit after the manual acceptance run — Task 1 Step 4 records the ruling.
 - **The three `AskUserQuestion` absences are believed, not measured.** Each `reference/hosts/*.md` carries an "Unverified" section saying so. Settled by the manual acceptance run, not by this plan.

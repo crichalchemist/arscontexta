@@ -8,7 +8,7 @@
 
 **Tech Stack:** bash (POSIX-leaning, must also run under zsh), `awk`, `sed`, `/usr/bin/grep`, `find`; existing libraries `reference/lib/frontmatter.sh` and `reference/lib/queue-edit.sh` (v2, provides `queue_yaml`); test suites are hand-rolled bash assertion counters following `reference/test/queue-edit.test.sh`.
 
-**Spec:** `docs/superpowers/specs/2026-08-17-hub-derivation-and-approval-channel-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-17-hub-derivation-and-approval-channel-design.md`
 
 **Revision note.** This plan was adversarially reviewed on 2026-08-17 (8 Critical, 5 Major, 6 Minor) and rewritten. The first version dictated a library that was **dead under zsh three independent ways** and whose write path **destroyed the MOC at rc 0** on a render failure. Both are fixed below, and the mechanisms are recorded in the task text rather than silently corrected, because they are the defect classes this plan exists to remove.
 

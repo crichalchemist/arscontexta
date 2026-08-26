@@ -19,7 +19,7 @@ direction to fail.
 **Tech Stack:** Markdown, YAML, POSIX shell. There is no build, no package manager, no test runner.
 "Tests" are bash suites under `reference/test/` and five gate scripts under `reference/`.
 
-**Spec:** `docs/superpowers/specs/2026-08-24-vocabulary-integrity-design.md` (commit `c5d4257`).
+**Spec:** `docs/superpowers/specs/archive/2026-08-24-vocabulary-integrity-design.md` (commit `c5d4257`).
 Read it alongside this plan — the plan states *what* to do; the spec states *why*, and several
 steps below are only safe if you understand the reason.
 
