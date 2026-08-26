@@ -165,8 +165,12 @@ modes — if a count moves, you cannot attribute it.
 `schema.md` carries two. A file-to-file survey sees three and misses one, which is the
 blind spot divergence 15's amendment documents and `bump-version.test.sh` exists for.
 
-**Reopens:** immediately after the note-convention-and-lifecycle plan lands. This is a
-"next, separately", not a "never".
+**Reopens:** immediately after the `2026-08-15-note-lifecycle-and-description-convention.md`
+plan lands — that is the plan which shipped this vocabulary, as PR #9, and the trigger fired on
+2026-08-15 accordingly. Until 2026-08-26 this line named `note-convention-and-lifecycle`
+instead. That plan was superseded before it ever ran and will never land, so the condition as
+written named something that could not fire; the entry reads as correct only because the firing
+was recorded by hand in its title. This is a "next, separately", not a "never".
 
 **Amended 2026-08-24 (vocabulary-integrity spec).** This was carried into that spec as its sixth
 item and resequenced out on a *mechanism* finding, not on effort. `generators/` carries **0**
@@ -726,7 +730,7 @@ record, not a claim about the tree.
 
 ### 32. Note-lifecycle branch — nine items, of which two are live, seven are MOOT, and one is not a deferral
 
-**From:** `docs/superpowers/plans/2026-08-15-note-lifecycle-and-description-convention.md`,
+**From:** `2026-08-15-note-lifecycle-and-description-convention.md`,
 whose own `## Deferrals` section reads "Nothing else." That was true when written and is no
 longer, which is why these land here rather than only in commit messages and a gitignored
 ledger — divergence 10's rule.
