@@ -183,7 +183,7 @@ own `Reopens if` conditions the moment Item 3 is revisited.
 Retained for reference; **do not execute the plan.**
 
 - Spec: `docs/superpowers/specs/2026-08-08-corpus-wide-passes-design.md`, "Item 3 — the note lifecycle"
-- Plan: `docs/superpowers/plans/2026-08-08-note-convention-and-lifecycle.md` — 8 tasks
+- Plan: `docs/superpowers/plans/archive/2026-08-08-note-convention-and-lifecycle.md` — 8 tasks
 
 Measured coverage against the entries triage assigned to C: entries **8** (`open`'s semantics)
 and **12** (`generators/` enum placeholders) are covered by that spec and plan. Entries **5**
