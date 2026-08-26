@@ -1,7 +1,7 @@
 # Delta review: vocabulary-integrity design spec (revision 2)
 
 **Date:** 2026-08-24
-**Subject:** `docs/superpowers/specs/2026-08-24-vocabulary-integrity-design.md` (606 lines; first review covered the 408-line revision)
+**Subject:** `docs/superpowers/specs/archive/2026-08-24-vocabulary-integrity-design.md` (606 lines; first review covered the 408-line revision)
 **Tree:** `develop` @ `db399d8`, working tree clean
 **Prior report:** `docs/superpowers/reviews/2026-08-24-vocabulary-integrity-review.md` (unmodified; its verification table remains load-bearing)
 **Method:** every finding carries the command that proves it; inferences are marked UNVERIFIED. All gate and suite runs used `/opt/local/bin/bash` (and zsh where the fence requires it), never `/bin/bash` 3.2. Sandbox runs used full copies under the session scratchpad; no repo file was modified.
