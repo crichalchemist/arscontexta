@@ -587,17 +587,18 @@ fi
 # is not this task; making them visible and un-growable is. A GREEN RUN
 # THEREFORE MEANS "no NEW hand-rolled parse", NEVER "none exists".
 #
-# THREE DIFFERENT QUANTITIES: 71 LINES match, carrying 71 FIELD REFERENCES
-# (the three converted sites each carried two — `type` and `status` — which is
-# why LINES and REFERENCES moved by different amounts, 74→71 and 77→71), across
-# 16 DISTINCT NAMES, unchanged. Spec G framed this ban as being about `status:`
+# THREE DIFFERENT QUANTITIES: 72 LINES match, carrying 72 FIELD REFERENCES,
+# across 17 DISTINCT NAMES (re-derived 2026-10-09 with the command below). The
+# conversion left 71, 71 and 16 — the three converted sites each carried two
+# (`type` and `status`), which is why LINES and REFERENCES moved by different
+# amounts, 74→71 and 77→71. Spec G framed this ban as being about `status:`
 # alone; the spread is now `type` 21, `description` 14, `topics` 8, `status` 8,
-# `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each, then seven
-# singletons — 9 named + 7 = 16.
+# `mined`/`methodology`/`created` 3 each, `source`/`category` 2 each, then eight
+# singletons — 9 named + 8 = 17.
 #
 # THE RE-DERIVE COMMAND MUST USE THIS CHECK'S OWN DETECTOR, and the first version
 # of this comment did not. It matched a BARE `'^field:'` with no command prefix,
-# which now yields 72/72/17 — it still picks up
+# which yielded 72/72/17 against the detector's 71/71/16 — it still picks up
 # reference/test/threshold-namespace.test.sh, where `'^self_evolution:'` is an
 # argument to a test helper rather than a pattern given to grep. So the
 # published derivation disagreed with the gated 71 (formerly 74)

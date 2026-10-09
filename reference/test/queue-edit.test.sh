@@ -1,8 +1,8 @@
 #!/bin/bash
 # queue-edit.test.sh — behavioral tests for reference/lib/queue-edit.sh.
 #
-# WHY THIS EXISTS: queue-edit.sh is a shared library with SEVEN consumers and, until
-# this file, ZERO tests. That is how its unguarded commit step shipped: the function
+# WHY THIS EXISTS: queue-edit.sh is a shared library with SEVEN consumers (eight
+# since skill-sources/rethink began sourcing it) and, until this file, ZERO tests. That is how its unguarded commit step shipped: the function
 # ends `mv "$tmp" "$file"` with no `||`, so a rename that fails leaves the temp on
 # disk, says nothing, and returns the exit status of the following `rm -rf` — which
 # is 0. A lost queue write that reports success is the house failure class wearing

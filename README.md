@@ -5,7 +5,7 @@
 A Claude Code plugin that generates complete knowledge systems from conversation.
 You describe how you think and work. The engine derives a cognitive architecture
 -- folder structure, context files, processing pipeline, hooks, navigation maps,
-and note templates -- tailored to your domain and backed by 249 research claims.
+and note templates -- tailored to your domain and backed by 213 research claims.
 
 No templates. No configuration. Just conversation.
 
@@ -226,7 +226,8 @@ exits 0 without it, which is why they do nothing in this repo.
 
 ## The Research Graph
 
-The `methodology/` directory contains **249 interconnected research claims**
+The `methodology/` directory contains **249 interconnected notes** -- 213
+research claims, 9 guidance docs, 12 domain examples and 15 maps of content --
 about tools for thought, knowledge management, and agent-native cognitive
 architecture. These claims back every configuration decision.
 
@@ -323,6 +324,10 @@ arscontexta/
 |-- .claude-plugin/
 |   |-- plugin.json              # Plugin manifest
 |   +-- marketplace.json         # Marketplace listing
+|-- .codex-plugin/               # Codex adapter (see Other hosts)
+|-- .agents/                     # Codex marketplace listing
+|-- .opencode/                   # OpenCode adapter
+|-- .pi/                         # Pi install procedure
 |-- skills/                      # 10 plugin-level commands
 |   |-- setup/                   # Conversational onboarding
 |   |-- help/                    # Contextual guidance
@@ -341,14 +346,14 @@ arscontexta/
 |   |-- verify/                  # Combined quality check
 |   +-- ...                      # 12 more processing commands
 |-- agents/
-|   +-- knowledge-guide.md       # Pipeline subagent
+|   +-- knowledge-guide.md       # Methodology guidance subagent
 |-- hooks/
 |   |-- hooks.json               # Hook configuration
 |   +-- scripts/                 # Hook implementations
 |-- generators/
 |   |-- claude-md.md             # CLAUDE.md template
 |   +-- features/                # 17 composable feature blocks
-|-- methodology/                 # 249 research claims
+|-- methodology/                 # 249 research notes (213 claims)
 |-- reference/                   # Core reference documents
 |   |-- kernel.yaml              # 16 kernel primitives
 |   |-- three-spaces.md          # Architecture spec
@@ -360,6 +365,8 @@ arscontexta/
 |   |-- check-doc-claims.sh      # Documented numbers vs measured reality
 |   |-- check-placeholder-count.sh  # Templates must not lose placeholders
 |   |-- check-vocabulary-schema.sh  # Vocabulary placeholders must resolve to schema
+|   |-- check-skillevaluator.sh  # skillevaluator Tier 1 gate (not in CI)
+|   |-- hosts/                   # Per-host tool-name maps (Codex, OpenCode, Pi)
 |   |-- lib/                     # Shared shell libraries
 |   +-- test/                    # Gate test suites
 |-- platforms/                   # Platform-specific adapters
@@ -367,9 +374,12 @@ arscontexta/
 |   +-- shared/
 |-- presets/                     # Pre-validated configurations
 |-- scripts/                     # Utility scripts
+|-- styles/                      # Vale prose rule sets
 |-- docs/                        # Specs and implementation plans
 |   |-- verification.md          # The run fence and the gate table
-|   +-- open-divergences.md      # Known defects, a re-derive command each
+|   |-- open-divergences.md      # Known defects, a re-derive command each
+|   |-- closed-divergences.md    # Defects found, fixed and verified
+|   +-- superpowers/             # Specs, plans, reviews, deferrals
 |-- .github/                     # CI workflows
 |-- CLAUDE.md                    # Repo guidance for coding agents
 |-- CONTRIBUTING.md              # Human contribution workflow
@@ -453,11 +463,12 @@ on your conversation.
 | Marketplace listing | Available |
 | Multi-agent processing | In progress |
 | Antigravity CLI adapter | Planned |
-| Pi adapter | Planned |
+| Pi adapter | Available, unverified (`.pi/INSTALL.md`; see *Other hosts*) |
 
 Status here means what the tree contains, not what is intended. `platforms/` holds one adapter,
-`claude-code/`; the two planned rows have no code, no manifest entry, and no generator path. They are
-queued behind the current specs rather than in progress.
+`claude-code/`; the Codex, OpenCode and Pi install paths live at the repo root (see *Other hosts*).
+The Antigravity row has no code, no manifest entry, and no generator path. It is queued behind the
+current specs rather than in progress.
 
 ---
 
