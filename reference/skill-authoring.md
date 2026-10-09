@@ -110,9 +110,9 @@ applying it where nothing can be absent is the defect.
 spelling — `grep -rl "[[$NAME]]" | wc -l` — is the one every author reaches for and it is wrong in
 three ways at once: it counts links inside fenced code blocks, it does not case-fold, and it matches
 the wrong direction for orphan detection. That last one shipped in two templates (`next`, `graph`)
-before both moved onto the library, which is exactly why it must not reappear in a third. Prefer the `*_recursive` variants: a
-vault with no subdirectories today may grow one tomorrow, and the flat scan under-reports silently
-rather than failing.
+before both moved onto the library, which is exactly why it must not reappear in a third. Prefer
+the `*_recursive` variants: a vault with no subdirectories today may grow one tomorrow, and the
+flat scan under-reports silently rather than failing.
 
 **Reading a frontmatter field? Same rule, same reason.** `reference/lib/frontmatter.sh` is the single
 definition. The naive spelling — `grep -rl '^status: pending' dir/` — matches a line-anchored

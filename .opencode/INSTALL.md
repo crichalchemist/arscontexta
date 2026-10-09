@@ -221,9 +221,9 @@ directory: re-check `REPO` from Step 2.
 ## Step 5 — Measure what this repo has not verified
 
 `README.md` marks OpenCode **"Verified: not yet"**. Several claims in the
-adapter are believed rather than measured, and you are the first reader in a
-position to settle them, because you are inside OpenCode looking at the real
-tool surface.
+adapter are believed rather than measured. A real install on `opencode 1.14.24`
+has listed the skills before (see README's *Other hosts*) without settling them;
+you are inside OpenCode looking at the real tool surface, so you can.
 
 1. **The tool names.** `reference/hosts/opencode-tools.md` maps five —
    `read`, `apply_patch`, `bash`, `grep`, `glob`. Compare each

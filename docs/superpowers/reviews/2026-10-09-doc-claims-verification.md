@@ -33,8 +33,8 @@ plans, specs and reviews (dated records).
 execution rules, but no commit on any ref had ever created it. By owner decision it now holds the
 execution rules that previously lived only in session memory: running the gates on macOS, tool
 output that cannot be taken at face value, and git/PR conventions. Each rule was re-measured on
-2026-10-09 before it was written. The root `CLAUDE.md` is unchanged, so `AGENTS.md`, a symlink to
-it, still serves Codex in full.
+2026-10-09, but three were still wrong as first written (see "Review of these edits"). Nothing
+moved out of the root `CLAUDE.md`, so `AGENTS.md`, a symlink to it, still serves Codex in full.
 
 ## Ledger decisions
 
@@ -61,6 +61,33 @@ lines (divergence 15, and Sprint C, the standing decision and the 2026-08-15 dec
   were added to SCOPE on that branch, so it stays.
 - **W2-11 and W2-14** (two doc-volatile totals) were re-measured at this branch's final state, not
   at the drafter's. Each command matches documentation, including this file.
+
+## Review of these edits
+
+A second pass reviewed all 125 hunks of the four commits above against a frozen snapshot of the
+branch tip: one reviewer per commit, then an independent skeptic who tried to refute each finding
+by re-measuring it. It raised 28 findings. 12 were upheld (7 false claims, 5 layout defects), 1
+was refuted, and 15 were notes; all 12 and 9 of the notes were fixed in a follow-up commit. The
+false claims were introduced or re-asserted by this pass itself:
+
+- `docs/verification.md` said a CI step for `check-doc-claims.test.sh` would move a gated count
+  "that compares against `main` and rots on merge". No gated count does: the main-side row was
+  removed for exactly that rot. The same clause in the `docs/open-divergences.md` preamble was
+  fixed with it.
+- `platforms/claude-code/generator.md` said a vault's skills never read the plugin directory at
+  runtime. The `refactor` template does (`${CLAUDE_PLUGIN_ROOT}/reference/`).
+- `.claude/CLAUDE.md` had three rules that came from session memory and were not re-measured:
+  - Four scripts fail to parse under bash 3.2, not three: `validate-kernel.sh` was missing.
+  - The failing construct is a `case … ;;` inside `$(…)`, not a one-line `case`.
+  - `gh` on this clone resolves to `origin` (`remote.origin.gh-resolved=base`), not `upstream`.
+- Divergence 15's re-pointed `schema.md:142` contradicted the entry's own dated amendment, which
+  quotes `:137`. It is now annotated, and the same sentence's `self-evolution.md:195`, already
+  blank at the base, is re-pointed to `:226`. In `next-sprints.md`, the Sprint C coverage
+  sentence overstated where entries 5–7 appear.
+
+The six notes left unfixed were judged harmless or need a decision (the features Layer column).
+The reviewers also listed 29 items they could not check read-only: external host behaviour, and
+historical figures inside dated records.
 
 ## Judgment items — not edited, need an owner
 - **Setup takes "~20 minutes" (`README.md:33`, `:112`) or "about 5 minutes"

@@ -303,8 +303,8 @@ defect that paragraph exists to prevent. A remedy that routes the record somewhe
 not a remedy. Ticking a box means the step was **executed** — where the outcome was a measured
 rejection rather than a change (the Task 7 Step 2.2 gate of
 `docs/superpowers/plans/archive/2026-08-03-ten-open-divergences.md`, assessed and declined on 1 true
-positive against 2 false positives), the rejection and its measurement are recorded in the file the step
-names.
+positive against 2 false positives), the rejection and its measurement are recorded in the file the
+step names.
 
 Commit messages state **what the failure looked like**, not just what changed. "Fixed grep" is
 useless; "the failure surfaced as 0, never as an error, because every site piped into `wc -l`" tells

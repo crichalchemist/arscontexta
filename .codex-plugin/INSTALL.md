@@ -117,9 +117,9 @@ fi
 
 **On failure:** report which branch fired and the raw JSON where the message
 carries it. The marketplace entry declares `policy.authentication: ON_INSTALL`
-(`.agents/plugins/marketplace.json`), so an install may
-prompt for authentication; that is not a failure, but it does mean this step is
-not always non-interactive.
+(`.agents/plugins/marketplace.json`), so an install may prompt for
+authentication; that is not a failure, but it does mean this step is not always
+non-interactive.
 
 Re-running is safe: `marketplace add` reports `alreadyAdded: true` rather than
 duplicating, and `plugin add` reinstalls the same version into the same path.
@@ -141,10 +141,9 @@ Confirm all ten names from the success criterion are available to you as skills.
 
 **Do not verify by invoking a skill.** Whether Codex takes a bare name or a
 namespaced form is not verified by this repository —
-`README.md` says the invocation syntax is host-specific and unverified until
-the adapter is run. A
-failed invocation cannot distinguish a broken install from an unknown syntax,
-and those have different fixes.
+`README.md` says the invocation syntax is host-specific and unverified until the
+adapter is run. A failed invocation cannot distinguish a broken install from an
+unknown syntax, and those have different fixes.
 
 **On failure:** the plugin is installed and enabled, so the fault is between
 Codex and the manifest rather than in Step 2. Report it as such, and say which

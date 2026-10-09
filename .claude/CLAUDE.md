@@ -9,11 +9,14 @@
 
 ## Running the gates
 
-- **Use bash ≥ 4, never `/bin/bash`.** macOS ships bash 3.2, and three gates do not parse under it:
-  `check-portability.sh`, `check-placeholder-count.sh` and `check-vocabulary-schema.sh`. Each fails
-  `bash -n` with exit 2 on a one-line `case … ;; esac`. Linux CI runs bash 5, so the failure is
-  local-only. On this machine bash 5 is `/opt/local/bin/bash` (MacPorts). Run the dual-shell suites
-  under `zsh` too.
+- **Use bash ≥ 4, never `/bin/bash`.** macOS ships bash 3.2, and three gates and the kernel
+  validator do not parse under it: `check-portability.sh`, `check-placeholder-count.sh`,
+  `check-vocabulary-schema.sh` and `validate-kernel.sh`. The validator's shebang is
+  `#!/usr/bin/env bash`, so its documented `./reference/validate-kernel.sh` invocation reaches 3.2
+  on a stock `PATH`. Each fails `bash -n` with exit 2 on a `case … ;;` inside a `$(…)` command
+  substitution; the same `case` outside `$(…)` parses. Run directly, each exits 2, but behind a
+  pipe the run reads rc 0. Linux CI runs bash 5, so the failure is local-only. On this machine
+  bash 5 is `/opt/local/bin/bash` (MacPorts). Run the dual-shell suites under `zsh` too.
 - **Bound a run with `gtimeout`, never `timeout`.** GNU coreutils installs prefixed on macOS, so
   bare `timeout` does not exist and the command exits 127. Give `check-doc-claims.sh` at least 600s:
   it executes every suite it pins a total for.
@@ -51,8 +54,9 @@
 ## Git and pull requests
 
 - Branch from `develop` and open the PR against `develop` (`CONTRIBUTING.md`). Always pass the repo
-  and base explicitly: `gh pr create --repo crichalchemist/arscontexta --base develop`. On a fork,
-  `gh` otherwise resolves to `upstream` (agenticnotetaking).
+  and base explicitly: `gh pr create --repo crichalchemist/arscontexta --base develop`. Without
+  `gh repo set-default`, `gh` on a fork resolves to `upstream` (agenticnotetaking). This clone has
+  `remote.origin.gh-resolved=base`, so here it resolves to `origin`, but a fresh clone will not.
 - Do not add a `Co-Authored-By` trailer, or any other trailer naming an agent, to a commit message.
 - Push tags by name. An `upstream` remote exists, and bare `git push --tags` does not ask which
   remote you mean.

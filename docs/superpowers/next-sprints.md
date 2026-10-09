@@ -79,7 +79,12 @@ and is simply not pointed at this file. Belongs to the CI-hardening spec.
 
 ## In flight
 
-**Status 2026-10-09:** Sprint C shipped — the re-spec `specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md` and its 7-task plan merged as PR #9 (`a5ccae3`, 2026-08-15) and the vault migration ran (`~/second-brain` `6d941634`); the block below is the 2026-08-15 record that preceded it, verified by `git merge-base --is-ancestor a5ccae3 HEAD && echo merged; /usr/bin/grep -cE '^#+ Task [0-9]' docs/superpowers/plans/archive/2026-08-15-note-lifecycle-and-description-convention.md`.
+**Status 2026-10-09:** Sprint C shipped — the re-spec
+`specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md` and its 7-task plan
+merged as PR #9 (`a5ccae3`, 2026-08-15) and the vault migration ran (`~/second-brain` `6d941634`);
+the block below is the 2026-08-15 record that preceded it, verified by
+`git merge-base --is-ancestor a5ccae3 HEAD && echo merged` and
+`/usr/bin/grep -cE '^#+ Task [0-9]' docs/superpowers/plans/archive/2026-08-15-note-lifecycle-and-description-convention.md`.
 
 **Sprint C — schema coherence over status and description. BLOCKED on a re-spec, decided
 2026-08-15.** The plan below cannot be executed as written and its central task would damage the
@@ -153,7 +158,10 @@ published count was re-derived inside a bash script file using `/usr/bin/grep`.
 
 ### Standing decision
 
-**Status 2026-10-09:** reversed the same day — the full re-spec path was taken (`specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md:3` supersedes items 1 and 3 outright) and merged as PR #9 (`a5ccae3`), verified by `sed -n '3p' docs/superpowers/specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md`.
+**Status 2026-10-09:** reversed the same day — the full re-spec path was taken
+(`specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md:3` supersedes items 1
+and 3 outright) and merged as PR #9 (`a5ccae3`), verified by
+`sed -n '3p' docs/superpowers/specs/archive/2026-08-15-note-lifecycle-and-description-convention-design.md`.
 
 **Re-measure Item 3's design premises first, then revise the plan** — not a full re-spec. The
 design's conclusion holds, but the `1621` figure proved to be an artifact of *how* it was
@@ -163,7 +171,12 @@ open and this choice is the reversible one.
 
 ### Decisions taken 2026-08-15, for the re-spec to carry
 
-**Status 2026-10-09:** all three entries are closed and the shipped outcome differs from the bullets below — entry 5 (`b47b9c3`): all 698 backfilled to `active` with no MOC/orphan split and `preliminary` at 0; entry 6 (`432f765`, 2026-08-24): re-derived to twelve normative sites, all `200`; entry 7 (`b47b9c3`): `closed` and `investigating` gone from the vault, `superseded` canonical in `generators/` (its closure flags the `investigating` → `open` remap) — see each closure in `deferrals.md`, verified by `/usr/bin/grep -nE '^### (5|6|7)\. ' docs/superpowers/deferrals.md`.
+**Status 2026-10-09:** all three entries are closed and the shipped outcome differs from the bullets
+below — entry 5 (`b47b9c3`): all 698 backfilled to `active` with no MOC/orphan split and
+`preliminary` at 0; entry 6 (`432f765`, 2026-08-24): re-derived to twelve normative sites, all
+`200`; entry 7 (`b47b9c3`): `closed` and `investigating` gone from the vault, `superseded` canonical
+in `generators/` (its closure flags the `investigating` → `open` remap) — see each closure in
+`deferrals.md`, verified by `/usr/bin/grep -nE '^### (5|6|7)\. ' docs/superpowers/deferrals.md`.
 
 These settle the three entries the source spec deferred out of itself. All three fire by their
 own `Reopens if` conditions the moment Item 3 is revisited.
@@ -195,8 +208,8 @@ Retained for reference; **do not execute the plan.**
 Measured coverage against the entries triage assigned to C: entries **8** (`open`'s semantics)
 and **12** (`generators/` enum placeholders) are covered by that spec and plan. Entries **5**
 (statusless notes / backfill rule), **6** (~150 vs 200 description length) and **7** (off-enum
-vault statuses) appear in either document only where it defers them out, and are genuinely
-uncovered — and they
+vault statuses) are discussed in both documents, but no task in either resolves them: each defers
+them out. They are genuinely uncovered — and they
 are the three requiring a decision rather than an implementation.
 
 The plan was superseded 2026-08-15 by `plans/archive/2026-08-15-note-lifecycle-and-description-convention.md`

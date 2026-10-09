@@ -68,7 +68,7 @@ Merge additively: preserve existing non-qmd MCP servers and only upsert the qmd 
 
 ### 5. Processing Skills
 
-Processing skills (/reduce, /reflect, /reweave, /verify, /validate) are generated from the plugin's `skill-sources/` templates into the vault's `.claude/skills/<name>/SKILL.md`, vocabulary-transformed at generation, so a therapy system's `/surface` is its own copy of the canonical `/reduce`. A vault's skills never read from the plugin directory at runtime.
+Processing skills (/reduce, /reflect, /reweave, /verify, /validate) are generated from the plugin's `skill-sources/` templates into the vault's `.claude/skills/<name>/SKILL.md`, vocabulary-transformed at generation, so a therapy system's `/surface` is its own copy of the canonical `/reduce`. These five never read from the plugin directory at runtime; the `refactor` template, by contrast, tells the running skill to consult `${CLAUDE_PLUGIN_ROOT}/reference/` (`skill-sources/refactor/SKILL.md:163`, `:247`).
 
 Plugin updates to processing methodology reach an existing vault only through `/arscontexta:upgrade` proposals; the vault's copied skills do not change on their own. Vocabulary changes via /reseed take effect immediately.
 

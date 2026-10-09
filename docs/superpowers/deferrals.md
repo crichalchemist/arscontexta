@@ -36,7 +36,7 @@ question gets re-litigated, or worse, silently answered the other way.
   live under `docs/superpowers/plans/archive/` and `docs/superpowers/specs/archive/`; only
   plans still being executed sit at `docs/superpowers/plans/*.md`. Resolve a `**From:**` by
   looking in both, or in `docs/superpowers/specs/` for a spec whose plan was never written.
-Prose elsewhere in this file cites full paths and was rewritten when the
+  Prose elsewhere in this file cites full paths and was rewritten when the
   archive was created — the two addressing styles are intentional, not drift.
 
 ---

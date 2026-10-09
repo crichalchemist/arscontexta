@@ -220,9 +220,8 @@ inside the mechanism built to drain them.
 The eighth check is kernel validation, which does **not** run in CI, because it needs a
 generated vault to run against. It is no longer the only one: `reference/test/check-doc-claims.test.sh`
 is also not CI-wired, deliberately — a step there would also move the gated CI-step counts in
-`CONTRIBUTING.md` and `docs/open-divergences.md`, including the one that compares against `main` and rots on merge with no diff to notice. "Eighth"
-is stale numbering, kept because renumbering it is out of scope here, not because only one check
-sits outside CI:
+`CONTRIBUTING.md` and `docs/open-divergences.md`. "Eighth" is stale numbering, kept because
+renumbering it is out of scope here, not because only one check sits outside CI:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -301,10 +300,10 @@ counts and the dangling counts all come out of this one run:
 `PATH`, which is why 62 references to qmd tools removed from its MCP surface survived across 20
 files while the validator reported semantic search satisfied — qmd was on `PATH` the whole time. It
 now asserts that the declared tool names resolve, scanning the vault's **live** surface (`.claude/`,
-`.agents/`, `.mcp.json`, `CLAUDE.md`) rather than the whole tree: `ops/skills-archive/` and `ops/changelog.md`
-legitimately record retired names, and failing on those would make the check unfixable without
-rewriting history. *qmd absent* stays WARN; *qmd present but declaring names that do not resolve*
-is FAIL.
+`.agents/`, `.mcp.json`, `CLAUDE.md`) rather than the whole tree: `ops/skills-archive/` and
+`ops/changelog.md` legitimately record retired names, and failing on those would make the check
+unfixable without rewriting history. *qmd absent* stays WARN; *qmd present but declaring names
+that do not resolve* is FAIL.
 
 `tree` and `ripgrep` are required (per the README's prerequisite table) — `tree` by generated
 systems' SessionStart hook at runtime, `ripgrep` by generated systems and by `validate-kernel.sh`

@@ -41,7 +41,7 @@ in CI, as defined by the thirty-two steps in `.github/workflows/checks.yml`. The
 skillevaluator and its scanners are on PATH, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
 three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
-counts below, one of which compares against `main` and rots on merge.
+count below (the `main`-side count beside it is deliberately undeclared).
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
 RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
@@ -49,8 +49,9 @@ four out again while claiming they had been removed — an ungated restatement i
 asserting there was none. Both are gone now.
 
 Three counts survive above as words, and **they are not gated either**: the gate's rows for those
-quantities anchor on a different sentence, in `docs/verification.md`, and a gate that reads one phrasing does not
-protect a synonym — which is what this entry exists to say. The `main` step count is not restated at all,
+quantities anchor on a different sentence, in `docs/verification.md` and `CONTRIBUTING.md`, and a
+gate that reads one phrasing does not protect a synonym — which is what this entry exists to say.
+The `main` step count is not restated at all,
 because "`main` carries N" is a claim about another branch that goes stale on MERGE with no diff to
 notice. Read them from the tree:
 
@@ -542,9 +543,9 @@ count_notes_by_field ~/second-brain/ops/methodology status active  # 39, the lib
 
 The field vault also carries `status: implemented` on observations — a value declared in no generator
 enum at the time (`e54362d`, 2026-08-05, has since added it to `generators/features/self-evolution.md:88`
-and `:226`; nothing remains open here). Reported, not fixed: this task reconciled the generators *with each other*, which is what
-its evidence supports; reconciling them with one vault's practice is a separate decision with a
-different owner.
+and `:226`; nothing remains open here). Reported, not fixed: this task reconciled the generators
+*with each other*, which is what its evidence supports; reconciling them with one vault's practice
+is a separate decision with a different owner.
 
 **10. A ticked plan step for a check that was built and never shipped.**
 `docs/superpowers/plans/archive/2026-08-03-fourteen-open-items.md` Task 2 Step 4 is `[x]` for an assertion —
@@ -836,9 +837,11 @@ the same, verified by `/usr/bin/grep -n 'CHECK 7' reference/check-portability.sh
 
 **The fix HELD; it is the gate that is missing, and the distinction is the entry.** Measured: the
 note-status enum is currently *consistent* across all three files that declare it —
-`generators/features/atomic-notes.md:94`, `schema.md:142` and `templates.md:30` all read
-`preliminary | open | active | archived | superseded`. The other `status:` values in `generators/` are **different
-fields sharing a name** (`self-evolution.md:195` is `pending | resolved | dissolved` for tensions;
+`generators/features/atomic-notes.md:94`, `schema.md:142` (`:137` when filed; the AMENDED paragraph
+below quotes the original) and `templates.md:30` all read
+`preliminary | open | active | archived | superseded`. The other `status:` values in `generators/`
+are **different fields sharing a name** (`self-evolution.md:226`, `:195` when filed, is
+`pending | open | resolved | dissolved | promoted | implemented | archived | blocked` for tensions;
 `methodology-knowledge.md:31` is `active` for methodology notes), which the closed record for
 divergences 7-9 already documents. So nothing is broken today. What is absent is anything that would
 notice if it broke — and Spec F's own closing note said the enum had been split across those files

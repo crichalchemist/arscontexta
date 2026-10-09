@@ -1,9 +1,10 @@
 # skill-blocks — frozen reference inventory
 
-**Nothing generates from this directory.** `skills/setup/SKILL.md:1285` names
+**Nothing generates from this directory.** `skills/setup/SKILL.md:1307` names
 `${CLAUDE_PLUGIN_ROOT}/skill-sources/` as the template source and enumerates the 16 commands it
-copies; no `.sh`, `.md`, `.json` or `.yaml` under `skills/`, `generators/`, `hooks/`, `reference/`
-or `presets/` references `platforms/` at any depth. Editing a file here changes nothing that ships.
+copies. No file under `skills/`, `generators/` or `presets/` references `platforms/` at any depth;
+`hooks/` names it only in comments, and `reference/` inspects it without generating from it.
+Editing a file here changes nothing that ships.
 
 ## Why it still exists
 
