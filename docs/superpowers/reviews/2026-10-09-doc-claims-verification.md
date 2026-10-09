@@ -33,7 +33,7 @@ plans, specs and reviews (dated records).
 execution rules, but no commit on any ref had ever created it. By owner decision it now holds the
 execution rules that previously lived only in session memory: running the gates on macOS, tool
 output that cannot be taken at face value, and git/PR conventions. Each rule was re-measured on
-2026-10-09, but three were still wrong as first written (see "Review of these edits"). Nothing
+2026-10-09, but three were wrong as first written (see "Review of these edits"). Nothing
 moved out of the root `CLAUDE.md`, so `AGENTS.md`, a symlink to it, still serves Codex in full.
 
 ## Ledger decisions
@@ -64,7 +64,7 @@ lines (divergence 15, and Sprint C, the standing decision and the 2026-08-15 dec
 
 ## Review of these edits
 
-A second pass reviewed all 125 hunks of the four commits above against a frozen snapshot of the
+A second pass reviewed all 123 hunks of the four commits above against a frozen snapshot of the
 branch tip: one reviewer per commit, then an independent skeptic who tried to refute each finding
 by re-measuring it. It raised 28 findings. 12 were upheld (7 false claims, 5 layout defects), 1
 was refuted, and 15 were notes; all 12 and 9 of the notes were fixed in a follow-up commit. The
@@ -86,8 +86,31 @@ false claims were introduced or re-asserted by this pass itself:
   sentence overstated where entries 5–7 appear.
 
 The six notes left unfixed were judged harmless or need a decision (the features Layer column).
-The reviewers also listed 29 items they could not check read-only: external host behaviour, and
-historical figures inside dated records.
+
+The reviewers also listed 29 items they could not check read-only. Six were claims this pass had
+written, so each was probed directly and fixed in a further commit (below). The other 23 are scope
+notes, workflow tallies, behaviour outside this tree (host runtimes, the field vault), historical
+figures inside dated records, or numbers that were corroborated rather than reproduced.
+
+- `.claude/CLAUDE.md` says Claude Code loads it alongside the root `CLAUDE.md`. The documentation
+  names the two paths as alternatives and does not cover the case where both exist, so this was
+  measured on Claude Code 2.1.296. A scratch directory held a distinct marker sentence in each
+  file, and a tool-less `claude -p` quoted both.
+- Its header said every rule was measured on 2026-10-09, but the tool-output and concurrency
+  hazards come from earlier incidents. The header now says so.
+- Its "`git diff` can claim identical" had merged two incidents: plain `diff` printed
+  `[ok] Files are identical`, while `git diff` dropped lines.
+- `CONTRIBUTING.md`'s stat row quoted `Namelen: 255`, a Linux ext4 value; macOS prints `?`.
+- `CLAUDE.md` said the running skill resolves `skills/` markers. 6 of the 7 marker-bearing files
+  name `ops/derivation-manifest.md`; `recommend` names no source, and the sentence now says so.
+- `docs/verification.md` called `check-doc-claims.sh` the only gate reading what `generators/`
+  declares, but `moc-sync.test.sh` reads `self-evolution.md`'s status enums. The claim is now
+  narrowed to the note `status` enum.
+
+One reviewer reported 34 hunks for a commit that has 32; the total above is the measured one.
+
+A third review, with its own skeptic, covered every edit made after `a79ffe1`. It upheld one layout
+finding and raised three notes, all applied; one other finding was refuted.
 
 ## Judgment items — not edited, need an owner
 - **Setup takes "~20 minutes" (`README.md:33`, `:112`) or "about 5 minutes"

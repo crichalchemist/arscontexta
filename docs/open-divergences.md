@@ -41,7 +41,8 @@ in CI, as defined by the thirty-two steps in `.github/workflows/checks.yml`. The
 skillevaluator and its scanners are on PATH, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
 three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
-count below (the `main`-side count beside it is deliberately undeclared).
+count below (the `main`-side count is never declared; `check-doc-claims.sh` checks it only as a
+relationship).
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
 RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
@@ -51,9 +52,8 @@ asserting there was none. Both are gone now.
 Three counts survive above as words, and **they are not gated either**: the gate's rows for those
 quantities anchor on a different sentence, in `docs/verification.md` and `CONTRIBUTING.md`, and a
 gate that reads one phrasing does not protect a synonym — which is what this entry exists to say.
-The `main` step count is not restated at all,
-because "`main` carries N" is a claim about another branch that goes stale on MERGE with no diff to
-notice. Read them from the tree:
+The `main` step count is not restated at all, because "`main` carries N" is a claim about another
+branch that goes stale on MERGE with no diff to notice. Read them from the tree:
 
 ```bash
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l

@@ -81,8 +81,9 @@ prior revision of this sentence claimed `context:`/`model:` were both 16/16 in `
 measured false for `model:`; the bundling traces to `b2deea4`'s commit message ("model: goes with
 context:"), true of the tree that commit touched and never checked against this one. Only
 `skill-sources/` templates have their `{vocabulary.*}` placeholders substituted at generation (10 of
-16 carry them). 7 of the 10 `skills/` files carry the same markers, which nothing substitutes: the
-running skill resolves them (`skills/health` reads them from `ops/derivation-manifest.md`).
+16 carry them). 7 of the 10 `skills/` files carry the same markers, which nothing substitutes; they
+are left to the running skill (6 of the 7 name `ops/derivation-manifest.md`; `recommend` names no
+source).
 
 ```bash
 c=0; for f in skills/*/SKILL.md; do /usr/bin/grep -q '^allowed-tools:' "$f" && c=$((c+1)); done; echo "$c"        # 10 of 10

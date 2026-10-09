@@ -194,7 +194,7 @@ block you add is presumed guilty of it.
 |---|---|---|
 | `cmd \| wc -l` | pipeline yields the **last** stage's status, and `wc` always succeeds | check the producer's status separately |
 | `[ -d "$d" ] \|\| { echo err; exit 1; } \| head -10` | `\|\|` binds looser than `\|`; the guard body runs in a subshell and `exit` exits nothing | never pipe a guarded block |
-| `stat -f %m f \|\| stat -c %Y f` | GNU reads `-f` as *filesystem* status and `%m` as a file name: it prints the filesystem block for `f` (`Namelen: 255`) and only then exits 1 — the `\|\|` fires, but the digits are already on stdout | put `-c` first; BSD has no `-c` and fails cleanly |
+| `stat -f %m f \|\| stat -c %Y f` | GNU reads `-f` as *filesystem* status and `%m` as a file name: it prints the filesystem block for `f` (`Namelen:`, `Type:` …) and only then exits 1 — the `\|\|` fires, but the digits are already on stdout | put `-c` first; BSD has no `-c` and fails cleanly |
 | probing a locale *name* to prove folding works | GNU `tr` is byte-oriented in **every** locale | probe the behavior: fold `U+00DC`, require `U+00FC` |
 | checking a binary is on `PATH` to prove its tools resolve | qmd was on `PATH` while all 62 of its call sites named removed tools | assert the names resolve |
 

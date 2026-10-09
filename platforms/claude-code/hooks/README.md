@@ -48,7 +48,7 @@ Claude Code supports three hook events relevant to generated vaults:
 
 **Template behavior:**
 
-1. **Session capture** -- When `CLAUDE_CONVERSATION_ID` is set, write `ops/sessions/<timestamp>.json` and copy it to `ops/sessions/current.json`, so the next session's orientation can resume context. Session capture is a kernel invariant; it runs every session.
+1. **Session capture** -- When `CLAUDE_CONVERSATION_ID` is set, write `ops/sessions/<timestamp>.json` and copy it to `ops/sessions/current.json`, so the next session's orientation can resume context. Session capture is a kernel invariant: the hook runs every session, but writes nothing when that variable is unset.
 
 2. **Git commit** -- If the vault is in a git repository, stage and commit changes with an auto-generated message. This ensures nothing is lost between sessions.
 

@@ -2,9 +2,11 @@
 
 > The root `CLAUDE.md` is tracked repository guidance: what this repo is and how it is built.
 > This file covers how an agent runs things here without fooling itself. Human contribution workflow
-> lives in `CONTRIBUTING.md`. Claude Code loads this file alongside the root one, and `GEMINI.md`
-> imports it. `AGENTS.md` does not: it is a symlink to the root `CLAUDE.md` (check-portability
-> check 5). Every rule below was measured on macOS on 2026-10-09. Re-measure a rule before you
+> lives in `CONTRIBUTING.md`. Claude Code loads this file alongside the root one (measured on
+> Claude Code 2.1.296: with both present, both load), and `GEMINI.md` imports it. `AGENTS.md` does
+> not: it is a symlink to the root `CLAUDE.md` (check-portability check 5). The gate rules below
+> were re-measured on macOS on 2026-10-09. The concurrency and tool-output hazards come from
+> earlier incidents in this repo and may not reproduce on demand. Re-measure a rule before you
 > trust it on another machine.
 
 ## Running the gates
@@ -39,9 +41,9 @@
 
 - **`grep` in the agent's shell is a function (ugrep), not `/usr/bin/grep`.** `grep -P` works there
   and fails for users, so verify portability claims with `/usr/bin/grep`.
-- **git output goes through a filtering proxy.** `git log` can hide merge commits. `git diff` can
-  drop lines, or claim that differing files are identical. Use `rtk proxy git diff`,
-  `git rev-parse` and `git rev-list --count`.
+- **git output goes through a filtering proxy.** `git log` can hide merge commits, and `git diff`
+  can drop lines. Plain `diff` has printed `[ok] Files are identical` for files that differ. Use
+  `rtk proxy git diff`, `cmp`, `git rev-parse` and `git rev-list --count`.
 - **Large tool output is compressed silently.** A `[N items compressed to M …]` trailer means words
   and digits were dropped. Re-read the content in `sed -n 'A,Bp'` slices of a few dozen lines, and
   print any number you will quote with a one-line `printf`.

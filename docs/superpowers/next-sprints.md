@@ -205,12 +205,12 @@ Retained for reference; **do not execute the plan.**
 - Spec: `docs/superpowers/specs/2026-08-08-corpus-wide-passes-design.md`, "Item 3 — the note lifecycle"
 - Plan: `docs/superpowers/plans/archive/2026-08-08-note-convention-and-lifecycle.md` — 8 tasks
 
-Measured coverage against the entries triage assigned to C: entries **8** (`open`'s semantics)
-and **12** (`generators/` enum placeholders) are covered by that spec and plan. Entries **5**
-(statusless notes / backfill rule), **6** (~150 vs 200 description length) and **7** (off-enum
-vault statuses) are discussed in both documents, but no task in either resolves them: each defers
-them out. They are genuinely uncovered — and they
-are the three requiring a decision rather than an implementation.
+Measured coverage against the entries triage assigned to C: entries **8** (`open`'s semantics) and
+**12** (`generators/` enum placeholders) are covered by that spec and plan. Entries **5**
+(statusless notes / backfill rule), **6** (~150 vs 200 description length) and **7** (off-enum vault
+statuses) are discussed in both documents, but no task in either resolves them: each defers them
+out. They are genuinely uncovered — and they are the three requiring a decision rather than an
+implementation.
 
 The plan was superseded 2026-08-15 by `plans/archive/2026-08-15-note-lifecycle-and-description-convention.md`
 (shipped as PR #9) and banner-marked `SUPERSEDED — DO NOT EXECUTE` on 2026-08-26 (`278e6e6`).
