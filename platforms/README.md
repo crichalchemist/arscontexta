@@ -7,7 +7,7 @@ This directory maps the distribution layout for the Claude Code agent platform. 
 The `generators/` directory is the working structure:
 
 - `generators/claude-md.md` -- CLAUDE.md generation template
-- `generators/features/` -- 14 composable feature blocks
+- `generators/features/` -- 17 composable feature blocks
 
 `platforms/` organizes these same components from a distribution perspective: what does a Claude Code user get? What is shared across potential future platforms?
 
@@ -16,7 +16,8 @@ The `generators/` directory is the working structure:
 ```
 platforms/
 ├── shared/
-│   ├── features/     --> generators/features/ (14 canonical feature blocks)
+│   ├── features/     --> generators/features/ (17 canonical feature blocks)
+│   ├── skill-blocks/ Frozen inventory of vocabulary points; generates nothing (see its README.md)
 │   └── templates/    --> reference/templates/ (10 note type templates)
 ├── claude-code/
 │   ├── generator.md  --> generators/claude-md.md (CLAUDE.md generation)
@@ -26,9 +27,7 @@ platforms/
 
 ## How platforms/ is used
 
-During plugin packaging (Section 18 of the PRD), the build process references `platforms/` to assemble the distribution:
-
-- **Claude Code plugin** reads `platforms/shared/` and `platforms/claude-code/` to bundle feature blocks, templates, generation logic, and hook templates alongside the `skills/`, `reference/`, and `thinking/` directories.
+Nothing reads it to generate or package anything. There is no build step (see the root `CLAUDE.md`), and no file under `skills/`, `generators/` or `presets/` references `platforms/` (see `reference/skill-authoring.md`). The plugin ships as the repository, with `skills/`, `reference/` and `methodology/` beside this directory.
 
 The `generators/` directory remains the canonical source. Files here are not duplicated -- README files document the relationship and provide platform-specific context that the generator files themselves don't carry.
 
@@ -39,6 +38,6 @@ The `generators/` directory remains the canonical source. Files here are not dup
 | Context file | CLAUDE.md |
 | Hooks | .claude/hooks/ (bash scripts) |
 | Settings | .claude/settings.json |
-| Skills | Inherited from plugin skills/ |
+| Skills | .claude/skills/<name>/SKILL.md, generated from plugin skill-sources/ |
 | Identity | Embedded in CLAUDE.md |
 | Memory bootstrap | Embedded in CLAUDE.md |

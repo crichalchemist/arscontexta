@@ -1,6 +1,6 @@
 # shared/features/ -- Canonical Feature Blocks
 
-The 16 canonical feature blocks live at `generators/features/`. They are composable context file fragments that the derivation engine selects, transforms with domain vocabulary, and composes into a coherent system document.
+The 17 canonical feature blocks live at `generators/features/`. They are composable context file fragments that the derivation engine selects, transforms with domain vocabulary, and composes into a coherent system document.
 
 This directory does not duplicate those files. It exists to document the shared feature layer from a distribution perspective.
 
@@ -8,7 +8,7 @@ This directory does not duplicate those files. It exists to document the shared 
 
 All feature block files: `generators/features/`
 
-## The 16 Feature Blocks
+## The 17 Feature Blocks
 
 | # | Block | Included When | What It Adds |
 |---|-------|---------------|--------------|
@@ -20,9 +20,10 @@ All feature block files: `generators/features/`
 | 6 | `schema.md` | Always | Field definitions, query patterns, evolution rules, validation |
 | 7 | `maintenance.md` | Always | Health checks, reweaving triggers, condition-based maintenance |
 | 8 | `self-evolution.md` | Always | Architect advice, /remember-driven adoption, reseed lifecycle |
+| 8b | `methodology-knowledge.md` | Always | `ops/methodology/` self-knowledge: configuration rationale, learned behavioral patterns, operational evolution |
 | 9 | `personality.md` | When personality is derived | Voice instructions, identity generation, anti-patterns |
 | 10 | `session-rhythm.md` | Always | Orient, work, persist phases, handoff protocol, session capture |
-| 11 | `templates.md` | When templates are generated | Template usage instructions, schema references |
+| 11 | `templates.md` | Always | Template usage instructions, schema references |
 | 12 | `multi-domain.md` | Multiple domains detected | Cross-domain linking, shared graph, domain-specific templates |
 | 13 | `ethical-guardrails.md` | Always | Privacy, transparency, emotional safety, autonomy encouragement |
 | 14 | `self-space.md` | Optional (off for research, on for personal assistant) | Agent identity, memory, reflections, goals |
@@ -31,13 +32,14 @@ All feature block files: `generators/features/`
 
 ## Always-Included Blocks
 
-Ten blocks are non-negotiable and present in every generated system regardless of configuration:
+Eleven blocks are non-negotiable and present in every generated system regardless of configuration:
 
 - `wiki-links.md` (2)
 - `processing-pipeline.md` (4)
 - `schema.md` (6)
 - `maintenance.md` (7)
 - `self-evolution.md` (8)
+- `methodology-knowledge.md` (8b)
 - `session-rhythm.md` (10)
 - `templates.md` (11)
 - `ethical-guardrails.md` (13)
@@ -50,18 +52,19 @@ Each block has a defined layer, dependencies, and platform requirements:
 
 | # | Block | Layer | Dependencies |
 |---|-------|-------|-------------|
-| 1 | `atomic-notes.md` | Convention | wiki-links |
+| 1 | `atomic-notes.md` | Convention | None |
 | 2 | `wiki-links.md` | Foundation+Convention | None |
 | 3 | `mocs.md` | Convention | wiki-links |
-| 4 | `processing-pipeline.md` | Convention+Automation | atomic-notes, wiki-links, mocs |
+| 4 | `processing-pipeline.md` | Convention+Automation | schema, wiki-links, atomic-notes, mocs |
 | 5 | `semantic-search.md` | Automation | None |
-| 6 | `schema.md` | Convention+Automation | templates |
+| 6 | `schema.md` | Convention+Automation | None |
 | 7 | `maintenance.md` | Convention | mocs, wiki-links |
 | 8 | `self-evolution.md` | Convention | maintenance |
+| 8b | `methodology-knowledge.md` | not declared | self-evolution |
 | 9 | `personality.md` | Convention | None |
 | 10 | `session-rhythm.md` | Convention | None |
 | 11 | `templates.md` | Convention | None |
-| 12 | `multi-domain.md` | Convention | mocs, templates |
+| 12 | `multi-domain.md` | Convention | wiki-links, mocs, templates |
 | 13 | `ethical-guardrails.md` | Convention | None |
 | 14 | `self-space.md` | Convention | None |
 | 15 | `helper-functions.md` | Automation | None |

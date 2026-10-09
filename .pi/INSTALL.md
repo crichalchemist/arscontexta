@@ -157,8 +157,9 @@ syntax, and those have different fixes. Listing separates them.
 ## Step 5 — Measure what this repo has not verified
 
 `README.md` marks Pi **"Verified: not yet"**. Several claims there are believed
-rather than measured, and you are the first reader in a position to settle them,
-because you are inside Pi looking at the real surface.
+rather than measured. A real `pi install` has registered the skills before (see
+README's *Other hosts*) without settling them; you are inside Pi looking at the
+real surface, so you can.
 
 1. **The tool names** in `reference/hosts/pi-tools.md` — compare each against
    the tools you actually have.

@@ -225,8 +225,8 @@ adapter are believed rather than measured, and you are the first reader in a
 position to settle them, because you are inside OpenCode looking at the real
 tool surface.
 
-1. **The tool names.** `reference/hosts/opencode-tools.md` maps six —
-   `read`, `apply_patch`, `bash`, `grep`, `glob`, `webfetch`. Compare each
+1. **The tool names.** `reference/hosts/opencode-tools.md` maps five —
+   `read`, `apply_patch`, `bash`, `grep`, `glob`. Compare each
    against the tools you actually have.
 2. **`AskUserQuestion` has no OpenCode equivalent.** Four of the ten skills
    declare it — `add-domain`, `reseed`, `setup`, `tutorial` — and the mapping

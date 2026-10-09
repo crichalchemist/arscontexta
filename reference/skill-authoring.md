@@ -1,7 +1,7 @@
 # Authoring a skill in this repo
 
 For anyone — human or agent — adding or editing a `SKILL.md`. Read [`CONTRIBUTING.md`](../CONTRIBUTING.md)
-first: it carries the environment checks, the three traps, and the two invariants. This document does
+first: it carries the environment checks, the three traps, and the three invariants. This document does
 not restate them. It answers the five questions that come *after* those, each of which has already
 produced a confident wrong answer here.
 
@@ -27,9 +27,10 @@ trap:
 | `platforms/shared/skill-blocks/` | 16 | **no — nothing reads it** | **no; frozen** |
 
 The third row is the trap. It looks like a second copy of `skill-sources/` and it is not: **nothing
-generates from it.** No file under `skills/`, `generators/`, `hooks/` or `presets/` references
-`platforms/` at any depth. (`reference/` does — the freeze check, its tests, and this document — but
-those inspect the directory, they do not generate from it.) A guard fixed there reaches no user. `check-portability.sh` rejects edits to it; see
+generates from it.** No file under `skills/`, `generators/` or `presets/` references `platforms/` at
+any depth, and `hooks/` names it only in comments. (`reference/` does — the freeze check, its tests,
+other gates in passing, and this document — but those inspect the directory, they do not generate
+from it.) A guard fixed there reaches no user. `check-portability.sh` rejects edits to it; see
 `platforms/shared/skill-blocks/README.md` for why it is kept.
 
 **Backporting from a field vault reverses two transforms.** A vault speaks its derived dialect and
@@ -67,10 +68,11 @@ for p in verify validate reflect; do
 done
 ```
 
-That yields `verify` 36 against 146 and `validate` 11 against 60, while `reflect` is 139 against 203 —
+That yields `verify` 36 against 146 and `validate` 11 against 60, while `reflect` is 141 against 203 —
 the gap is widest exactly where `skill-sources` is sparsest, which is where you need the answer. Do
-not widen the pattern to a bare `{…}`: that also matches `${TARGET}` and `${FILE}`, inflating a
-shell-variable count into a placeholder count. Consult this directory; do not edit it, and do not port
+not widen the pattern to a bare `{…}`: that also matches shell expansions such as
+`${CLAUDE_PROJECT_DIR:-$(pwd)}` and the `{if …}`/`{endif}` conditionals, inflating a placeholder
+count with things that are not placeholders. Consult this directory; do not edit it, and do not port
 behavior into it.
 
 Two things that look vocabulary-variable and are not: frontmatter *type values* such as `type: moc`
@@ -107,8 +109,8 @@ applying it where nothing can be absent is the defect.
 `reference/lib/link-extraction.sh` is the single definition of link counting and resolution. The naive
 spelling — `grep -rl "[[$NAME]]" | wc -l` — is the one every author reaches for and it is wrong in
 three ways at once: it counts links inside fenced code blocks, it does not case-fold, and it matches
-the wrong direction for orphan detection. That last one is a documented accepted defect in two shipped
-templates, which is exactly why it must not spread to a third. Prefer the `*_recursive` variants: a
+the wrong direction for orphan detection. That last one shipped in two templates (`next`, `graph`)
+before both moved onto the library, which is exactly why it must not reappear in a third. Prefer the `*_recursive` variants: a
 vault with no subdirectories today may grow one tomorrow, and the flat scan under-reports silently
 rather than failing.
 
@@ -151,9 +153,9 @@ all of them.
 Claude follows it as literally as it follows a bash line, so a contract promising something no code
 computes is a defect that renders as a plausible number rather than an error.
 
-A field in an output-format table is a contract. One template here promises eight state fields and
-computes five; the remaining three are named in prose up to twenty-one times and assigned nowhere, so
-the run emits the line and invents them.
+A field in an output-format table is a contract. One template here (`next`, since fixed) promised
+eight state fields and computed five; the remaining three were named in prose up to twenty-one times
+and assigned nowhere, so the run emitted the line and invented them.
 
 **Three clauses. A contract missing any one of them is incomplete:**
 
@@ -194,6 +196,6 @@ COUNT=$(ls "$DIR"/*.md | wc -l)      # $DIR from another fence: empty, folds to 
 
 ## When you have finished
 
-The four gates are **not independent** — `guard-failure.test.sh` invokes `check-portability.sh`, so a
+The gates are **not independent** — `guard-failure.test.sh` invokes `check-portability.sh`, so a
 change to one guard alters the behavior every other caller sees. Run all of them, in both shells,
 after any edit. `CONTRIBUTING.md` carries the commands and the expected results.

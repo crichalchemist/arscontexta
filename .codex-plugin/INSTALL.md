@@ -116,7 +116,8 @@ fi
 **Assert:** the last line reads `INSTALL: PASS`.
 
 **On failure:** report which branch fired and the raw JSON where the message
-carries it. The manifest declares `authPolicy: ON_INSTALL`, so an install may
+carries it. The marketplace entry declares `policy.authentication: ON_INSTALL`
+(`.agents/plugins/marketplace.json`), so an install may
 prompt for authentication; that is not a failure, but it does mean this step is
 not always non-interactive.
 
@@ -140,7 +141,8 @@ Confirm all ten names from the success criterion are available to you as skills.
 
 **Do not verify by invoking a skill.** Whether Codex takes a bare name or a
 namespaced form is not verified by this repository —
-`reference/hosts/codex-tools.md` says the invocation syntax is unverified. A
+`README.md` says the invocation syntax is host-specific and unverified until
+the adapter is run. A
 failed invocation cannot distinguish a broken install from an unknown syntax,
 and those have different fixes.
 
