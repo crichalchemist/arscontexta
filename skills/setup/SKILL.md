@@ -133,7 +133,7 @@ Here's what happens next:
   3. I'll show you what I'm going to build and explain every choice
   4. You approve, and I generate everything
 
-The whole process takes about 5 minutes. You can pick one of the
+The whole process takes about 20 minutes. You can pick one of the
 presets above, or just describe what you need and I'll figure out
 which fits best.
 ```
