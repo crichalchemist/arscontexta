@@ -27,16 +27,18 @@ less constrained.
 
 Five of the ten skills declare them in `allowed-tools:`: `architect`, `ask`,
 `health`, `recommend`, `reseed` (`health` declares only `mcp__qmd__query`).
-Codex can run MCP servers (`codex mcp add`). If a qmd server is configured, use
-its `query`, `get` and `multi_get` tools; otherwise run the qmd CLI through the
-shell: `qmd query`, `qmd get`, `qmd multi-get`.
+Codex can run MCP servers (`codex mcp add`), and by default it lists a server's
+tools under the namespace `mcp__<server>`: a server registered as `qmd` offers
+`query`, `get` and `multi_get` under `mcp__qmd`. Without one, run the qmd CLI
+through the shell: `qmd query`, `qmd get`, `qmd multi-get`.
 
 ## Unverified
 
 The absence of a structured-question tool on Codex is believed, not measured —
 it is absent from the tool-mapping conventions this document mirrors, and
 absence from a mapping document is not absence from a runtime. Confirm against
-Codex's own tool surface and correct this file if it is wrong. The name Codex
-shows the model for an MCP tool is not measured either: in the `rust-v0.146.0`
-source it is namespaced per server, with an optional legacy `mcp__` prefix, and
-Codex was not installed when the qmd row was added.
+Codex's own tool surface and correct this file if it is wrong. The `mcp__qmd`
+namespace is read, not observed: in the `rust-v0.146.0` source, the
+`non_prefixed_mcp_tool_names` feature that drops the `mcp__` prefix is off by
+default, and `codex features list` on `codex-cli 0.162.0-alpha.17.2` reports it
+off too. No Codex session has been seen calling a qmd tool.
