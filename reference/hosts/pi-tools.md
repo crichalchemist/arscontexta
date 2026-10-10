@@ -10,6 +10,7 @@ Pi's built-in coding tools are lowercase.
 | `Edit` | `edit` |
 | `Bash` | `bash` |
 | `Grep`, `Glob` | `grep`, `find`, `ls` (optional tools) |
+| `mcp__qmd__query`, `mcp__qmd__get`, `mcp__qmd__multi_get` | `qmd query`, `qmd get`, `qmd multi-get` via `bash` — see below |
 | `AskUserQuestion` | **no equivalent — see below** |
 
 Pi has native skills but does not expose Claude Code's `Skill` tool. Load a
@@ -23,6 +24,13 @@ structured answers. The derivation still works; it is chattier and the answers
 are less constrained.
 
 **This is a stated capability difference, not a bug to report.**
+
+## qmd's MCP tools
+
+Five of the ten skills declare them in `allowed-tools:`: `architect`, `ask`,
+`health`, `recommend`, `reseed` (`health` declares only `mcp__qmd__query`).
+Pi has no built-in MCP support (its README says "No MCP"; an extension can add
+it), so run the qmd CLI through `bash` instead.
 
 ## Subagents
 

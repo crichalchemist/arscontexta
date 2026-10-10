@@ -225,8 +225,9 @@ adapter are believed rather than measured. A real install on `opencode 1.14.24`
 has listed the skills before (see README's *Other hosts*) without settling them;
 you are inside OpenCode looking at the real tool surface, so you can.
 
-1. **The tool names.** `reference/hosts/opencode-tools.md` maps five —
-   `read`, `apply_patch`, `bash`, `grep`, `glob`. Compare each
+1. **The tool names.** `reference/hosts/opencode-tools.md` maps eight —
+   `read`, `apply_patch`, `bash`, `grep`, `glob`, and, with a qmd MCP server
+   configured, `qmd_query`, `qmd_get`, `qmd_multi_get`. Compare each
    against the tools you actually have.
 2. **`AskUserQuestion` has no OpenCode equivalent.** Four of the ten skills
    declare it — `add-domain`, `reseed`, `setup`, `tutorial` — and the mapping

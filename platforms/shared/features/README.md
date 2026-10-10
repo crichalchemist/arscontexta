@@ -70,4 +70,6 @@ Each block has a defined layer, dependencies, and platform requirements:
 | 15 | `helper-functions.md` | Automation | None |
 | 16 | `graph-analysis.md` | Automation | wiki-links, schema |
 
+The Layer values are the abstraction layers defined in the methodology note "four abstraction layers separate platform-agnostic from platform-dependent knowledge system features" (`methodology/`): foundation, convention, automation and orchestration. This table is the only place a feature block's layer is recorded: no block declares one, and the generator does not read it. `reference/kernel.yaml` separately records a `layer:` for each kernel primitive, which is a different object even where a primitive and a block share a name.
+
 Feature blocks are platform-agnostic. They are composed into the Claude Code context file format (CLAUDE.md).
