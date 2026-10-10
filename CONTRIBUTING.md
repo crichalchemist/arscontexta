@@ -16,9 +16,9 @@ that already exists. A wrong flag in a template is not one broken call; it is on
 every vault generated from it, on machines you will never see.
 
 There is no build, no test runner, no dependency manifest. "Compiling" means Claude reading a
-template and writing files. **Do not add** `package.json`, a `Makefile`, or `python3` — `python3`
-appears in zero files under `skill-sources/` and in no prerequisite table. `rg` is the blessed
-instrument.
+template and writing files. **Do not add** `package.json` or a `Makefile`. `python3` (with PyYAML)
+is already a prerequisite — README's table lists it for `reference/lib/queue_edit.py` — but it
+appears in zero files under `skill-sources/`; do not add it there. `rg` is the blessed instrument.
 
 ---
 
@@ -37,7 +37,7 @@ git remote -v | rg -c 'upstream'              # expect >= 1 if you forked
 |---|---|---|
 | `grep -P` works in the Claude Code Bash tool | you are seeing **ugrep**, not `/usr/bin/grep` | never verify portability from this shell |
 | `/usr/bin/grep -P` exits 2 | BSD grep 2.6.0 — what end users have | this is the real target |
-| any of `rg`/`tree`/`jq`/`bc`/`zsh` missing | gates will fail or halt | install before proceeding |
+| any of `rg`/`jq`/`bc`/`zsh` missing | gates will fail or halt | install before proceeding |
 
 ---
 
@@ -115,7 +115,7 @@ for s in bash zsh; do
   $s reference/test/hook-config.test.sh         | tail -1   # expect: passed=64 failed=0
   $s reference/test/vocabulary-schema.test.sh   | tail -1   # expect: 12/12
   $s reference/test/queue-edit.test.sh          | tail -1   # expect: passed=77 failed=0
-  $s reference/test/moc-sync.test.sh            | tail -1   # expect: 68 passed, 0 failed
+  $s reference/test/moc-sync.test.sh            | tail -1   # expect: 88 passed, 0 failed
 done
 
 ./reference/validate-kernel.sh <your-vault>            # expect: every primitive PASSes
@@ -194,7 +194,7 @@ block you add is presumed guilty of it.
 |---|---|---|
 | `cmd \| wc -l` | pipeline yields the **last** stage's status, and `wc` always succeeds | check the producer's status separately |
 | `[ -d "$d" ] \|\| { echo err; exit 1; } \| head -10` | `\|\|` binds looser than `\|`; the guard body runs in a subshell and `exit` exits nothing | never pipe a guarded block |
-| `stat -f %m f \|\| stat -c %Y f` | GNU reads `-f` as *filesystem* status, succeeds, prints `Namelen: 255` — the `\|\|` never fires | put `-c` first; BSD has no `-c` and fails cleanly |
+| `stat -f %m f \|\| stat -c %Y f` | GNU reads `-f` as *filesystem* status and `%m` as a file name: it prints the filesystem block for `f` (`Namelen:`, `Type:` …) and only then exits 1 — the `\|\|` fires, but the digits are already on stdout | put `-c` first; BSD has no `-c` and fails cleanly |
 | probing a locale *name* to prove folding works | GNU `tr` is byte-oriented in **every** locale | probe the behavior: fold `U+00DC`, require `U+00FC` |
 | checking a binary is on `PATH` to prove its tools resolve | qmd was on `PATH` while all 62 of its call sites named removed tools | assert the names resolve |
 
@@ -275,21 +275,22 @@ is a failure, not a default. The slot exists because the two failures above were
 anyone forgetting the rule, so another statement of the rule could not have prevented them; what was
 missing was a place in the artifact where the omission is *visible*.
 
-**Expect to find plans without one — that is the convention's age, not its optionality.** Two of the
-eight plans carry the slot today; the six older ones predate it and are deliberately left alone,
-because writing `none` into a plan nobody has audited for deferrals manufactures the very kind of
-record this section exists to prevent. Copy the convention from the newest plan, not from whichever
-one you happen to open:
+**Expect to find plans without one — that is the convention's age, not its optionality.** Thirteen
+of the twenty plans carry the slot today; the six older ones predate it and are deliberately left
+alone, because writing `none` into a plan nobody has audited for deferrals manufactures the very kind
+of record this section exists to prevent. The seventh without it is the newest,
+`2026-08-24-vocabulary-integrity.md`. Copy the convention from the newest plan that carries it, not
+from whichever one you happen to open:
 
 ```bash
-for p in docs/superpowers/plans/*.md; do
+find docs/superpowers/plans -name '*.md' | sort | while IFS= read -r p; do
   printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
 done
 ```
 
 Nothing enforces this. A gate keyed on plan structure is the one viable candidate and is deferred to
-`docs/superpowers/plans/archive/2026-08-04-ci-hardening.md`; until it exists, the slot propagates because the
-next author copies the last plan.
+`docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md` ("Deliberately not gated", item
+19); until it exists, the slot propagates because the next author copies the last plan.
 
 **Keep plan checkboxes honest.** Two plans here once showed 0 of 93 steps complete while fully
 executed and merged. A status file that lies about status is this project's own defect class wearing
@@ -300,9 +301,10 @@ This sentence used to end "point at the ledger", which contradicted the paragrap
 under `.superpowers/sdd/` are git-ignored, so pointing a status file at one reintroduces exactly the
 defect that paragraph exists to prevent. A remedy that routes the record somewhere it cannot ship is
 not a remedy. Ticking a box means the step was **executed** — where the outcome was a measured
-rejection rather than a change (this plan's Step 2.2 gate, assessed and declined on 1 true positive
-against 2 false positives), the rejection and its measurement are recorded in the file the step
-names.
+rejection rather than a change (the Task 7 Step 2.2 gate of
+`docs/superpowers/plans/archive/2026-08-03-ten-open-divergences.md`, assessed and declined on 1 true
+positive against 2 false positives), the rejection and its measurement are recorded in the file the
+step names.
 
 Commit messages state **what the failure looked like**, not just what changed. "Fixed grep" is
 useless; "the failure surfaced as 0, never as an error, because every site piped into `wc -l`" tells
@@ -321,8 +323,8 @@ git diff --stat main..HEAD                                           # review ev
 
 # Scan changed files for PCRE. Three separate hazards are handled here; removing
 # any one of them makes this silently report "clean" while having scanned nothing.
-#   1. NUL-delimited — one tracked filename contains spaces, and
-#      $(git diff --name-only) word-splits it into nine phantom paths.
+#   1. NUL-delimited — 234 tracked filenames (all under methodology/) contain
+#      spaces, and $(git diff --name-only) word-splits each into phantom paths.
 #   2. Per-file, NOT piped through xargs — xargs COLLAPSES rg's exit 2 (error)
 #      into 1 (no match), so a failed scan becomes indistinguishable from a clean one.
 #   3. worst-status tracking — one bad file must not be masked by later good ones.
@@ -385,8 +387,10 @@ Sites are declared in `.version-bump.json`, in two kinds. `files[]` are JSON fie
 path. `text[]` are literal prefix/suffix pairs for strings no jq path can reach — README's badge
 and the `generated_from:` stamps — expanded through globs.
 
-**A straggler is a finding, not noise.** `--audit` runs automatically after a bump and exits 1 on
-any occurrence of the old version outside the declared set. Either add the site to
+**A straggler is a finding, not noise.** `--audit` runs automatically after a bump and lists any
+occurrence of the old version outside the declared set — but that call is `|| true`, so the bump
+still exits 0 and only reading the output catches it; run standalone, `--audit` exits 1 on a
+straggler. Either add the site to
 `.version-bump.json` or record why not in `audit.exclude`. Leaving it is how the drift starts.
 
 **`{version}` is not a version.** `skills/setup/SKILL.md` carries generation-time placeholders

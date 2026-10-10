@@ -15,7 +15,7 @@ shipping half and left the reading half broken: a deferral in
 four-month-old plan to find out whether a question was already settled. So the same
 question gets re-litigated, or worse, silently answered the other way.
 
-**One list, read top to bottom, is the shape that works** — the same reason CLAUDE.md's
+**One list, read top to bottom, is the shape that works** — the same reason `docs/open-divergences.md`'s
 "Known open divergences" section is an ordered list in one file rather than a directory.
 
 ## How to use it
@@ -35,7 +35,8 @@ question gets re-litigated, or worse, silently answered the other way.
   the name alone does not tell you where the file is. Completed plans and their specs now
   live under `docs/superpowers/plans/archive/` and `docs/superpowers/specs/archive/`; only
   plans still being executed sit at `docs/superpowers/plans/*.md`. Resolve a `**From:**` by
-  looking in both. Prose elsewhere in this file cites full paths and was rewritten when the
+  looking in both, or in `docs/superpowers/specs/` for a spec whose plan was never written.
+  Prose elsewhere in this file cites full paths and was rewritten when the
   archive was created — the two addressing styles are intentional, not drift.
 
 ---
@@ -43,7 +44,7 @@ question gets re-litigated, or worse, silently answered the other way.
 ## Open
 
 **Swept 2026-08-26.** Every entry below was checked against the tree, running each
-re-derivation fence where one exists — 17 of the 22 carry one. **No entry here is complete:**
+re-derivation fence where one exists — 16 of the 22 carry one. **No entry here is complete:**
 none of the deferred work has since been done, and nothing moved to Closed as a result of this
 sweep. Two entries carry evidence that went stale without the deferral itself closing, and both
 are corrected in place at the end of their entry rather than by rewriting the original numbers —
@@ -59,12 +60,12 @@ gates); `:29` is an inlined extraction (divergence 13's class). Neither is conve
 
 **Why not:** a **recipe emitted into a generated vault's documentation cannot source a
 library the way a fence can.** Converting it changes what generation emits, which is a
-different kind of change from fixing a fence. Same blocker CLAUDE.md records for the
+different kind of change from fixing a fence. Same blocker `docs/open-divergences.md` records for the
 `generators/features/*` `rg '^status: …'` recipes.
 
 **Note the arithmetic trap:** `:29` is an *eighth* site of divergence 13's class, which
 sits outside that divergence's published search (it scans `skill-sources/` and `skills/`
-only). "Divergence 13 — all 7 closed" is therefore closed-**within-scope**, not closed.
+only). Divergence 13 is therefore closed-**within-scope**, not closed — its heading now says so itself.
 
 **Reopens if:** a mechanism exists for a generated vault's documentation to reference a
 library, or the recipes move into fences.
@@ -84,8 +85,8 @@ shipping it.
 
 **Reopens if:** the spec's examples ever become executable fixtures.
 
-**From:** same two documents. Note docs/open-divergences.md's divergence-12 table still cites `:410`;
-the true line is `:425`.
+**From:** same two documents. Note docs/open-divergences.md's divergence-12 table cited `:410` until
+738bc82 (2026-08-09); both now agree on `:425`.
 
 ### 4. The materialized backlink cache
 
@@ -112,7 +113,7 @@ a sound staleness check is measurably cheaper than a rebuild. Both halves requir
 
 ### 8. `open`'s semantics
 
-**What:** the canonical enum declares `preliminary | open | active | archived`. Nothing
+**What:** the canonical enum declares `preliminary | open | active | archived | superseded`. Nothing
 anywhere defines what `open` means or what transitions into or out of it.
 
 **Why not:** specifying it would be shipping a guessed state machine.
@@ -132,7 +133,7 @@ cannot distinguish a documented-but-computed-elsewhere field from a stale one.
 
 **Reopens if:** contract markers are added to the templates.
 
-**From:** CLAUDE.md divergence 10; deferred to
+**From:** `open-divergences.md` divergence 10; deferred to
 `docs/superpowers/specs/archive/2026-08-04-ci-hardening-design.md` item 18
 
 ### 11. Divergence 16 — the three-tier validation gap
@@ -148,7 +149,7 @@ Both are generation-surface changes.
 **Reopens:** it is its own spec. Until it lands, read every "we fixed it in the
 generator" in this repo as "we fixed it for vaults not yet created."
 
-**From:** CLAUDE.md divergence 16
+**From:** `open-divergences.md` divergence 16
 
 ### 12. The `generators/` status enum declarations are not placeholder-bearing — **TRIGGER FIRED 2026-08-15; RE-DEFERRED 2026-08-24, BLOCKED ON A MECHANISM**
 
@@ -230,8 +231,8 @@ failure to reach.
 
 ```bash
 /usr/bin/grep -n 'grep -c \. \|\| true' platforms/claude-code/hooks/session-orient.sh.template  # line 183
-/usr/bin/grep -n 'grep -c \. \|\| true' skill-sources/graph/SKILL.md                          # line 174
-/usr/bin/grep -n 'grep -c \. \|\| true' skill-sources/stats/SKILL.md                          # lines 225, 282
+/usr/bin/grep -n 'grep -c \. \|\| true' skill-sources/graph/SKILL.md                          # line 183
+/usr/bin/grep -n 'grep -c \. \|\| true' skill-sources/stats/SKILL.md                          # lines 231, 292
 /usr/bin/grep -n 'NEVER substitute 0' platforms/claude-code/hooks/session-orient.sh.template  # line 155
 ```
 
@@ -252,7 +253,7 @@ resolving the path filter would add load without adding coverage.
 **Reopens if:** the `*/notes/*` filter is made vocabulary-aware, at which point the matcher becomes
 the only remaining thing keeping the guard from running.
 
-**From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 1
+**From:** `2026-08-05-generator-vault-enforcement-gap.md` ## Deferrals row 6
 
 ```bash
 /usr/bin/grep -n '"matcher"' hooks/hooks.json                    # line 17, "Write"
@@ -265,7 +266,7 @@ the only remaining thing keeping the guard from running.
 
 **What:** (a) `-M` pairs a rename with an edit only while the two sides stay similar; a template
 renamed *and* rewritten end-to-end arrives as an add plus a delete and is never compared. The shape
-is now NAMED rather than silent (`NOTE: template deleted, not compared`) but is not a failure,
+is now NAMED rather than silent (`NOTE template deleted, not compared:`) but is not a failure,
 because deleting a template is legitimate. (b) Allowlist staleness is scoped to files in the diff
 range, so a fully obsolete entry survives until some range happens to touch its file again.
 
@@ -289,7 +290,7 @@ bash reference/check-placeholder-count.sh main; echo "rc=$?"    # 0 clean, 1 fin
 
 ### 20. `validate-kernel.sh`'s C1 violation list caps at five
 
-**What:** `reference/validate-kernel.sh:1093` prints five offenders then `... and $((c1_missing - 5))
+**What:** `reference/validate-kernel.sh:1115` prints five offenders then `... and $((c1_missing - 5))
 more`. On the field vault C1 reports 13 violations and names 5.
 
 **Why not now:** It discloses the remainder in the same line, so it is a truncated *display* and not
@@ -303,7 +304,7 @@ more" suffix is dropped, at which point the output stops disclosing its own trun
 **From:** `2026-08-05-generator-vault-enforcement-gap.md` Task 3
 
 ```bash
-/usr/bin/grep -n 'and \$((c1_missing' reference/validate-kernel.sh        # line 1093
+/usr/bin/grep -n 'and \$((c1_missing' reference/validate-kernel.sh        # line 1115
 ```
 
 ---
@@ -331,7 +332,7 @@ would land unseen by the fence gate), or the CI-hardening spec picks up harness 
 ```bash
 # The fixture WRITE itself, not merely lines mentioning the name — a `| head -3` over
 # 'queue.yaml' returns a KNOWN_OPEN entry and two comments and proves nothing:
-/usr/bin/grep -n '> "\$v/ops/queue/queue\.yaml"' reference/test/fence-isolation.test.sh   # :204, the healthy fixture writing it
+/usr/bin/grep -n '> "\$v/ops/queue/queue\.yaml"' reference/test/fence-isolation.test.sh   # :216, the healthy fixture writing it
 ```
 
 ---
@@ -399,9 +400,9 @@ sed -n '/^FM_ALLOW="/,/^"$/p' reference/check-portability.sh | /usr/bin/grep -c 
 
 **What:** the sentence stating the gate's SCOPE count in prose ("across 11 documents") and
 republishing it inside its own bash re-derive block. Neither numeral is checked by any
-gate — `check-doc-claims.sh` reads other sentences in this file for other quantities (the
-executable-checks count, the CI-step count) and never mentions `check-prose-paths.sh` at all, so a
-gate that reads one phrasing does not protect a synonym, per this file's own opening paragraph on
+gate — `check-doc-claims.sh` reads other sentences in `docs/open-divergences.md` for other quantities
+(the executable-checks count, the CI-step count) and never mentions `check-prose-paths.sh` at all, so a
+gate that reads one phrasing does not protect a synonym, per that file's own opening paragraph on
 that exact subject. Task 14 (`fix/post-merge-hardening`) widened SCOPE from 9 to 11 and had to
 hand-correct the prose at three sites in one paragraph to keep up; the next widening faces the
 identical risk with nothing to catch it.
@@ -409,7 +410,7 @@ identical risk with nothing to catch it.
 **Why not now:** wiring this count into `check-doc-claims.sh` is a change to that gate's own
 claim-registration mechanism, not to `check-prose-paths.sh`, and is out of Task 14's stated scope
 (widen SCOPE by two named files). `check-doc-claims.sh`'s design is itself a CI-hardening-spec
-question, per the gate-table row in docs/verification.md ("Building the missing check is a
+question, per docs/verification.md ("Building the missing check is a
 gate-design question and belongs to the CI-hardening spec").
 
 **How it actually fired:** by drift, exactly as predicted, and it had already fired before the
@@ -446,15 +447,16 @@ awk '/^SCOPE="/{f=1;next} /^"/{f=0} f&&NF' reference/check-prose-paths.sh | /usr
 
 ### 25. `check-prose-paths.sh` is zsh-broken by an unquoted `for f in $SCOPE`
 
-**What:** `reference/check-prose-paths.sh:74` reads `for f in $SCOPE; do`, where `SCOPE` is a
+**What:** `reference/check-prose-paths.sh:79` reads `for f in $SCOPE; do`, where `SCOPE` is a
 multi-line heredoc variable. Under zsh, an unquoted `$SCOPE` in a `for` list is not word-split
-(`SH_WORD_SPLIT` is off by default), so the entire 11-line SCOPE blob collapses into a single
+(`SH_WORD_SPLIT` is off by default), so the entire SCOPE blob collapses into a single
 "filename" argument — the loop body runs once against a string that is not a real path, fails the
 existence/readability test, and the script reports `ERROR <blob> is in scope but missing or
 unreadable` followed by `FAIL: scope is empty -- no files scanned`. Under bash the same script scans
-all 11 files correctly (`scanned 11 files, checked 267 repo paths, 0 missing`, `PROSE PATHS: PASS`).
+every SCOPE file correctly (measured on the 11-file branch where this was found:
+`scanned 11 files, checked 267 repo paths, 0 missing`, `PROSE PATHS: PASS`).
 This is pre-existing and independent of Task 14's SCOPE widening — it reproduces on the unwidened
-9-file SCOPE just as it does on the current 11-file one.
+9-file SCOPE just as it does on the current, wider one.
 
 This exact bug class is pre-named as a risk by this task's own governing plan — Global Constraint #2
 (`docs/superpowers/plans/archive/2026-08-09-post-merge-hardening.md:54`), verbatim: *"zsh also does **not**
@@ -463,9 +465,9 @@ an unconverted instance of exactly that named pattern, in a file this same task 
 noticing the fork.
 
 **The mitigation, and why it matters:** this is not a silent failure. The guard's own
-zero-paths-extracted design (`found -eq 0` → exit 2, distinct from exit 1 for a genuine missing-path
+zero-files-scanned design (`scanned -eq 0` → exit 2, distinct from exit 1 for a genuine missing-path
 finding — the property Task 14 preserved and re-verified) is what catches it: the collapsed blob
-fails to resolve as a path, `found` stays 0, and the script exits loud with `FAIL: scope is empty --
+fails to resolve as a path, `scanned` stays 0, and the script exits loud with `FAIL: scope is empty --
 no files scanned. This is a broken check, not a clean repo.` A reader who runs this under zsh gets an
 unambiguous failure, not a false PASS. What is missing is not loudness but a *documented* invocation
 contract: unlike `check-portability.sh`, which `guard-failure.test.sh` pins to `bash "$GUARD"` because
@@ -476,13 +478,13 @@ that matters here, not bash-vs-zsh in the abstract.
 **Why not now:** fixing the fork (rewriting the loop as `while IFS= read -r f; do … done <<<"$SCOPE"`,
 per the plan's own prescribed remedy) is a change to `check-prose-paths.sh`'s shell-portability
 posture, not to its SCOPE list — out of Task 14's stated scope (widen SCOPE by two named files).
-Every documented invocation of this script in this repo (`CLAUDE.md`, CI, `.pre-commit-config.yaml`)
+Every documented invocation of this script in this repo (`docs/verification.md`, `CONTRIBUTING.md`, CI)
 already spells `bash reference/check-prose-paths.sh`, so the fork has no organic trigger today; but
 that same sentence was true of `check-portability.sh` until a human typed `zsh` in front of a
 different script (`bump-version.sh`) and shipped a live zsh fork anyway.
 
 **Reopens if:** anyone invokes this script under zsh (by habit, by a new CI matrix leg, or by
-following this file's own "Run every suite under BOTH bash and zsh" constraint literally onto a
+following the plan's own "Run every suite under BOTH bash and zsh" constraint literally onto a
 script that is not a suite), or if a future task hardens `check-prose-paths.sh`'s shell portability
 and this entry should close alongside it. The fix, when taken, should also add a
 `guard-failure.test.sh`-style pin (or an explicit `check-prose-paths.sh` header comment) recording
@@ -493,8 +495,8 @@ which shell(s) it is invoked under, so the posture stops being accidental either
 (coordinator finding, Important 2)
 
 ```bash
-grep -n 'for f in \$SCOPE' reference/check-prose-paths.sh   # :74, the unquoted for-list
-bash reference/check-prose-paths.sh; echo "bash rc=$?"      # rc=0, PASS, 11 files scanned
+grep -n 'for f in \$SCOPE' reference/check-prose-paths.sh   # :79, the unquoted for-list
+bash reference/check-prose-paths.sh; echo "bash rc=$?"      # rc=0, PASS, every SCOPE file scanned
 zsh  reference/check-prose-paths.sh; echo "zsh rc=$?"       # rc=2, "scope is empty", loud FAIL
 grep -n 'word-split' docs/superpowers/plans/archive/2026-08-09-post-merge-hardening.md   # :54, the named risk class
 ```
@@ -521,7 +523,8 @@ fail-loud contract — and **F6** — `/health` Category 9 audited `link-extract
 are already fixed on this branch (Task 8, `694e880`: `queue_edit`'s commit step is now guarded —
 the F1a/F1b assertions; Task 12a: `QUEUE_EDIT_VERSION` moved 1→2; Task 9, `69003a1`: `/health`'s
 shared `check_lib` helper now covers all three
-libraries), and CLAUDE.md's `QUEUE_EDIT_VERSION` paragraph (added by task 15) already documents the
+libraries), and `docs/verification.md`'s `QUEUE_EDIT_VERSION` paragraph (added by task 15, moved
+by the 2026-08-23 split) already documents the
 fixed state. What this entry closes is a different gap: the provenance fact itself — a PR silently
 carrying undescribed backport work past the review its own findings are numbered against — already
 exists as tracked, committed, non-gitignored prose (`docs/superpowers/specs/archive/2026-08-09-post-merge-hardening-design.md`'s
@@ -596,7 +599,10 @@ done                                                               # 16, five ti
 
 
 **Evidence stale as of 2026-08-26; the deferral itself stays open.** The block above measures
-two things that have since moved. `git tag` now returns **7**, not 0: v0.8.0, v0.9.0, v0.9.5,
+three things that have since moved. The cache under
+`~/.claude/plugins/cache/agenticnotetaking/arscontexta/` holds `0.10.0` alone as of 2026-10-09 (16
+`skill-sources/` directories, complete): the "a cache can be pruned" caveat has happened, and the
+five-baseline premise above no longer holds. `git tag` now returns **7**, not 0: v0.8.0, v0.9.0, v0.9.5,
 v0.9.6, v0.9.7, v0.9.9 and v0.10.0 were backfilled onto their release commits on 2026-08-25.
 The stamps are no longer `arscontexta-v1.6` either — this tree carries 17 at
 `arscontexta-0.10.0`, plus 8 `{version}` and 1 `{current_plugin_version}` placeholders that
@@ -607,6 +613,7 @@ the other half has not happened — no vault has reported customization lost to 
 
 ```bash
 git tag | wc -l                                                          # 7
+ls -1 ~/.claude/plugins/cache/agenticnotetaking/arscontexta/             # 0.10.0 only (five versions when this entry was filed)
 /usr/bin/grep -rho 'generated_from: "arscontexta-[^"]*"' skills/ skill-sources/ \
   | sort | uniq -c                                                       # 17 at 0.10.0
 ```
@@ -647,7 +654,7 @@ verify it red against a `-H`-less `:159`, then touch the hook.
 inside a per-directory loop, `:194` for `OBS_TOTAL`, and `:195` for `TENS_TOTAL` — so the D17
 block described above is `:194`-`:195`. The original numbers are left standing rather than
 rewritten, because they record what was measured when the entry was filed; entry 13 carries the
-same kind of correction for the same file. No symlink fixture was added, so the substance of
+same kind of correction for that hook's template. No symlink fixture was added, so the substance of
 this deferral is untouched.
 
 ```bash
@@ -664,7 +671,7 @@ identical COLLATION does, which graph's own later comment states in full. The in
 themselves are now pinned `LC_ALL=C comm` (final fix round), so the conclusion stays true for a
 new reason; the prose survives to teach the fallacy to the next reader. Anchor on the phrase, not
 the line numbers — they drift. (b) The same sweep found the unpinned-`comm` class survives
-outside the trees the review named: `reference/validate-kernel.sh:520`'s dangling-count `comm`
+outside the trees the review named: `reference/validate-kernel.sh:542`'s dangling-count `comm`
 (both operands C-sorted, the collation requirement argued in its own comment a few lines up) and
 `scripts/sync-thinking.sh`'s three `comm`s (unsorted `echo` operands — a different and worse
 state).
@@ -687,7 +694,7 @@ minors), promoted and extended by the final fix round.
 # command's first spelling did exactly that, a pattern narrower than its class.
 /usr/bin/grep -rn 'makes comm valid' skill-sources/                        # 2 — the two stale rationales
 /usr/bin/grep -rn '\bcomm -[0-9]' reference/validate-kernel.sh scripts/sync-thinking.sh \
-  | /usr/bin/grep -v 'LC_ALL=C comm'                                       # the unpinned survivors (one hit is validate-kernel's :508 comment)
+  | /usr/bin/grep -v 'LC_ALL=C comm'                                       # the unpinned survivors (one hit is validate-kernel's :530 comment)
 ```
 
 ---
@@ -763,11 +770,11 @@ test -e reference/migrate-note-lifecycle.sh || echo "GONE at HEAD"
    Both belong to the generators tree rather than to `/reduce`, which is why Task 3 left them.
    **CLOSED 2026-08-24.** Two was itself an undercount — the term-keyed survey was scoped to
    `generators/` and could not see `reference/`, where nine more sites lived. Twelve in total.
-   A third hit, `skills/architect/SKILL.md:482`, is the phrase `"line ~150"` — a line-number
+   A third hit, `skills/architect/SKILL.md:484`, is the phrase `"line ~150"` — a line-number
    reference, not a description-length claim — and is correctly out of scope.
 
    ```bash
-   /usr/bin/grep -rn '~150' skill-sources/ generators/ skills/    # 3 = 2 generators + 1 unrelated
+   /usr/bin/grep -rn '~150' skill-sources/ generators/ skills/    # 1 — the unrelated architect hit only
    ```
 
 2. **`/verify`'s promotion gate names three checks; it is a defensible subset of the

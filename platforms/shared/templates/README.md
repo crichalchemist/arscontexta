@@ -13,9 +13,9 @@ All template files: `reference/templates/`
 | # | Template | Purpose |
 |---|----------|---------|
 | 1 | `base-note.md` | Foundation template -- minimal fields shared by all note types |
-| 2 | `research-note.md` | Research claims, methodology citations, adapted_from tracking |
-| 3 | `therapy-note.md` | Therapeutic journaling with mood, themes, and safety-aware structure |
-| 4 | `learning-note.md` | Learning captures with confidence tracking and spaced review signals |
+| 2 | `research-note.md` | Research claims with methodology, source and classification fields |
+| 3 | `therapy-note.md` | Therapeutic patterns with category, confidence and frequency tracking |
+| 4 | `learning-note.md` | Learning captures with domain, mastery level and prerequisite links |
 | 5 | `creative-note.md` | Creative work fragments with stage tracking and revision history |
 | 6 | `relationship-note.md` | Relationship observations with interaction logging and patterns |
 | 7 | `life-note.md` | Life management notes for goals, decisions, and personal systems |

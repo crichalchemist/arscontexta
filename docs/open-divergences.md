@@ -26,8 +26,8 @@ argument for doing it every time rather than once. The live-vault count moved a 
 `3792 of 5263`; frontmatter coverage moved with it, `5094` → `5104` files with YAML against a
 stationary `159` without. The CI step count moved because *this* branch changed it again. And a
 count that stated a defect class — divergence 13's seven inlined extractions — was re-derived
-against a broader pattern that returns **9**, of which two are a different operation: `graph:569`
-and `stats:397` spell `rg -o '\[\['` to *count* brackets rather than capture a target, so the class
+against a broader pattern that returns **9**, of which two are a different operation: `graph:561`
+and `stats:396` spell `rg -o '\[\['` to *count* brackets rather than capture a target, so the class
 is still 7 and the decomposition `9 = 7 + 2` is now published with it rather than left to be
 rediscovered as a number that grew. **Do not read a number here without running the command beside
 it.**
@@ -35,22 +35,25 @@ it.**
 **Everything previously listed here is FIXED** (`grep -P` on 8 sites, naive wiki-link parsing, the
 `/rethink` status split, the `self_evolution` generator gap, `/learn`'s removed Exa tools). That is
 not a claim you should take on trust: it is what the nineteen checks in `docs/verification.md` enforce — sixteen of them
-in CI, as defined by the thirty-two steps in `.github/workflows/checks.yml`. The other two are
-`validate-kernel.sh`, which needs a generated vault to run against, and
+in CI, as defined by the thirty-two steps in `.github/workflows/checks.yml`. The other three are
+`validate-kernel.sh`, which needs a generated vault to run against,
+`reference/check-skillevaluator.sh`, which exits 2 — a missing precondition, not a verdict — unless
+skillevaluator and its scanners are on PATH, and
 `reference/test/check-doc-claims.test.sh`, deliberately not CI-wired — each run already costs
 three invocations of the ~100s script it tests, and a step here would also move the gated CI-step
-counts below, one of which compares against `main` and rots on merge.
+count below (the `main`-side count is never declared; `check-doc-claims.sh` checks it only as a
+relationship).
 
 **THE NUMERALS ARE GONE FROM THIS SENTENCE ON PURPOSE, AND THE FIRST ATTEMPT AT THIS PARAGRAPH
 RE-MINTED THEM ONE LINE LATER.** It carried four that had gone stale, and the correction spelled all
 four out again while claiming they had been removed — an ungated restatement inside the sentence
 asserting there was none. Both are gone now.
 
-Two counts survive above as words, and **they are not gated either**: the gate's rows for those
-quantities anchor on a different sentence, in `docs/verification.md`, and a gate that reads one phrasing does not
-protect a synonym — which is what this entry exists to say. The step count is not restated at all,
-because "`main` carries N" is a claim about another branch that goes stale on MERGE with no diff to
-notice. Read them from the tree:
+Three counts survive above as words, and **they are not gated either**: the gate's rows for those
+quantities anchor on a different sentence, in `docs/verification.md` and `CONTRIBUTING.md`, and a
+gate that reads one phrasing does not protect a synonym — which is what this entry exists to say.
+The `main` step count is not restated at all, because "`main` carries N" is a claim about another
+branch that goes stale on MERGE with no diff to notice. Read them from the tree:
 
 ```bash
 ls reference/check-*.sh reference/test/*.test.sh reference/validate-kernel.sh | wc -l
@@ -165,7 +168,7 @@ stayed invisible.
 **The other half — three thresholds declared in no config file — is now DECIDED rather than open.**
 `SESS_COUNT ≥ 5`, `INBOX_COUNT ≥ 3` and `DAYS_STALE ≥ 30` in `session-orient.sh` stay hardcoded, and
 `hooks/scripts/session-orient.sh` states why in the file itself, under the greppable heading
-`DELIBERATELY FIXED, NOT MERELY UNDECLARED` (`:212` as of this commit — grep the heading, since
+`DELIBERATELY FIXED, NOT MERELY UNDECLARED` (`:286` as of this commit — grep the heading, since
 adding that very comment drifted every line number this entry originally cited). The reason is
 deliberately *not*
 "nobody asked", which rots the moment someone does: `self_evolution.*` earned its keys because **four
@@ -186,7 +189,7 @@ remedies — which is why the template below gets a cross-reference and not a ke
 
 **What that decision does not buy is single ownership, and the entry says so rather than claiming it.**
 Measured: `DAYS_STALE`'s 30 has **one** declaration repo-wide; `SESS_COUNT`'s 5 and `INBOX_COUNT`'s 3
-have **two each** — the plugin's own hook (`:271`, `:274`) and
+have **two each** — the plugin's own hook (`:345`, `:348`) and
 `platforms/claude-code/hooks/session-orient.sh.template:143,149`. Both sites now name each other,
 because a cross-reference is the only thing that stops an edit to one from silently splitting them.
 
@@ -196,16 +199,18 @@ entry said first — is imprecise in a way that changes the claim.** No skill co
 template documentation"*, so it is reference material the adapter **reads** during generation;
 nothing under `skills/` or `generators/` names the `platforms/` tree at all. What reaches a vault is
 therefore whatever Claude **derives**, which is not a copy and is arguably worse — a copy at least
-tracks its source. The field vault proves the difference: its hook is **179 lines to the template's
-200**, contains **none** of these three checks, and hardcodes its own `-gt 20` observation threshold.
+tracks its source. The field vault proves the difference: its hook is **306 lines to the template's
+231**, contains **none** of these three checks, and hardcodes its own `-gt 10` observation threshold.
 So a generated vault may or may not inherit these two values verbatim, and the duplication is a
 **drift** hazard between two declarations rather than two copies that ship together. This does not
-contradict divergence 12's "runs on **every** SessionStart" — that is about what a *derived* hook
+contradict the fact that the hook runs on **every** SessionStart — that is about what a *derived* hook
 does once it exists, not about the template being copied verbatim.
 
 ```bash
-# 9 = 3 CLAUDE.md + 5 docs/superpowers/ + 1 the hook's own comment. ZERO are code that reads or
-# copies the template — that, not the total, is the claim. (The line below does not self-match:
+# 55 = 8 this file + 39 docs/superpowers/ + 1 platforms/claude-code/hooks/README.md + 2 hooks/
+# comments + 5 reference/ (4 comments or table rows + 1 check-prose-paths.sh SCOPE entry that
+# scans it). ZERO copy or generate from the template — that, not the total, is the claim. (The
+# line below does not self-match:
 # its dots are escaped, so it matches a literal `.` and not the `\.` it is written with.)
 grep -rn 'session-orient\.sh\.template' --include='*.md' --include='*.sh' --include='*.json' .
 grep -rln 'platforms/claude-code' skills/ generators/            # no hits, rc 1 — nothing generates from that tree
@@ -220,8 +225,8 @@ surface that does nothing) and is recorded here rather than fixed, because wirin
 a change to what generation emits.
 
 Also measured, and the reason Step 2's warning stands: there are **five** literal 30s across **two**
-subjects, not two. Four are note staleness (`skill-sources/next:242`, `skill-sources/reweave:130`,
-`skills/health:469`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:292` is
+subjects, not two. Four are note staleness (`skill-sources/next:365`, `skill-sources/reweave:130`,
+`skills/health:569`, `platforms/shared/skill-blocks/reweave.md:144`); only `session-orient.sh:366` is
 methodology-notes-behind-config drift. Same number, different subject — **do not merge them.**
 **Read the decomposition below, not the totals — and note why it is a decomposition.** Each command
 matches the very prose that states its result, so the commit that states a count is the commit that
@@ -234,7 +239,7 @@ fails loudly the moment it stops adding up:
 |---|---|---|---|
 | cmd1 | **6** | 5 declarations | 1 — the command's own line in the hook comment |
 | cmd2 | **6** | 5 declarations | 1 — the command's own line in the hook comment |
-| cmd3 | **10** | 2 placeholder declarations (`template:120,126`) + 2 same-named shell variable, **not** a substitution (`session-orient.sh:200,206`) | 6 — this entry, the hook's decision comment, the template's cross-reference |
+| cmd3 | **15** | 2 placeholder declarations (`template:120,126`) + 2 same-named shell variable, **not** a substitution (`session-orient.sh:261,267`) | 11 — this entry, the hook's decision comment, the template's cross-reference, four archived plan/spec lines, one test comment |
 
 **Substitutions found: ZERO.** That, not any total, is the figure the placeholder claim rests on.
 
@@ -271,7 +276,10 @@ structural reason — a slash command runs in the session's working directory an
 another tree — which is true of a session sitting in this repo and false where it matters: a session
 whose cwd *is* the vault invokes the command natively. The field vault's `ops/skills-archive/`
 carries dated archive events, the footprint of upgrade *operations* — but an archive proves an
-operation ran, not that this command was its vehicle, so neither direction is established. Its three
+operation ran, not that this command was its vehicle, so neither direction is established. Its
+`ops/changelog.md` names the command once — 2026-07-12, "preceded by /upgrade (stats v1.3, next
+v1.1)" — but that line was written by the session that ran it and carries no transcript, so it
+proves what the archive proves: an operation under that name, not its vehicle. Its three
 repairs (`ops/lib/`, `ops/queue/.locks/`, `self_evolution:`) remain prose contracts CI cannot
 exercise.
 
@@ -306,21 +314,26 @@ vault had **three** readers, not two — measured at 14 open observations and 8 
 | `/next`, `/remember` | `self_evolution.*` | 10 / 5 | **FIRES** |
 | its SessionStart hook | **neither** — hardcoded `-gt 20` / `-gt 10` | 20 / 10 | silent |
 
-So the live split was **2 firing, 2 silent**, not three against one. That hook is the hand-patched one
-divergence 3 describes: it names no config key at all, which is *why* divergence 3 exists.
+So the live split was **2 firing, 2 silent**, not three against one. That hook was the hand-patched one
+divergence 3 describes: at the time it named no config key at all, which is *why* divergence 3 exists
+(since the vault's `e04b0fe` on 2026-08-16 it greps both pairs for a DRIFT line, but still fires on a
+hardcoded 10/5).
 
 **Get the direction right — the natural phrasing is wrong in two places, and each shipped here once.**
 Both errors are the same move: a clause true of this repo's files, kept while the sentence's subject
 changed to the vault.
 
-- **The reader.** It is the *vault's* `/rethink` that reads the legacy pair; this repo's
-  `skill-sources/rethink` template has always read `self_evolution.*`. "`next`/`remember`/`rethink`
-  read `self_evolution.*`" is true of the templates and false of the vault — and self-refuting
+- **The reader.** It was the *vault's* `/rethink` that read the legacy pair (dropped in the vault's
+  `c5560ba` on 2026-08-09; it now reads `self_evolution.*`); this repo's `skill-sources/rethink`
+  template has always read `self_evolution.*`. "`next`/`remember`/`rethink` read `self_evolution.*`"
+  was true of the templates and false of the vault then — and self-refuting
   besides, since at 10/5 fourteen open observations *fires*, so a `/rethink` on that pair could not
   have been the silent one.
 - **The hook.** This repo's `hooks/scripts/session-orient.sh` **does** read `self_evolution.*` —
-  divergence 3's fix on this branch made it do so. The *vault's* hook reads neither namespace. Writing
-  "and the hook read `self_evolution.*`" of the vault contradicts divergence 3 two entries below.
+  divergence 3's fix on this branch made it do so. The *vault's* hook read neither namespace then
+  (since its `e04b0fe` on 2026-08-16 it greps both pairs for a DRIFT line and still fires on a
+  hardcoded 10/5). Writing "and the hook read `self_evolution.*`" of the vault contradicts
+  divergence 3 two entries above.
 
 Re-derive the counts and both directions (all four figures drift):
 
@@ -330,10 +343,10 @@ list_notes_by_field ~/second-brain/ops/observations status pending open | grep -
 list_notes_by_field ~/second-brain/ops/tensions      status pending open | grep -c .   #  8
 # Scope must include hooks/, or the command cannot reach the clause about the hook:
 grep -rn 'maintenance\.conditions\|self_evolution' \
-     ~/second-brain/.claude/skills/ ~/second-brain/.claude/hooks/    # skills only; hooks: no match
+     ~/second-brain/.claude/skills/ ~/second-brain/.claude/hooks/    # skills + the hook's DRIFT check
 # Anchor on the variable, not on the number: `… | grep -E '20|10'` also matches the
 # unrelated capture-count line, because the LINE NUMBER `104:` contains "10".
-grep -nE 'PENDING_(OBS|TEN)" -gt' ~/second-brain/.claude/hooks/session-orient.sh   # 2 lines: 20, 10
+grep -nE 'PENDING_(OBS|TEN)" -gt' ~/second-brain/.claude/hooks/session-orient.sh   # 2 lines: 10, 5 (were 20, 10)
 ```
 
 The vault's own write-up recommended the skills
@@ -342,8 +355,12 @@ advice *to a vault*, and this is the generator, where three measurements point t
 `read_config.sh` resolves one level of nesting so the three-level key is structurally unreachable by
 the hook (deepening it means the general bash YAML parser its own header rejects); no generator here
 has ever emitted the legacy pair; and it is not a live iterated namespace — the other seven keys under
-`maintenance.conditions:` have zero readers in the field vault, and the `maintenance_conditions` that
-`/next` iterates is a section of the **queue** file, a different structure in a different file.
+`maintenance.conditions:` have zero readers in the field vault bar one (its hook has read
+`unprocessed_captures_threshold` by name since 2026-09-07 — a key read singly, not an iterated
+namespace), and the `maintenance_conditions` that the `/next` *template* iterates is a section of the
+**queue** file, a different structure in a different file (the field vault's own `/next` was patched
+on 2026-09-03 — in the vault, not by the generator — to take condition thresholds from
+`maintenance.conditions.*` where declared).
 Re-derive both (the reader counts drift as the vault grows; the emission count should stay 0, and a
 non-zero result means a generator has started writing the legacy pair again):
 
@@ -354,7 +371,8 @@ for k in orphan_nodes_threshold dangling_links_threshold draft_age_days \
          stale_active_nodes_days stale_active_nodes_threshold; do
   printf '%-32s %s\n' "$k" \
     "$(grep -rl "$k" ~/second-brain/.claude ~/second-brain/.agents 2>/dev/null | wc -l)"
-done                                                                     # 0 readers each
+done                                                                     # 0 each, bar one:
+# unprocessed_captures_threshold: 1 (live hook read since 2026-09-07)
 ```
 
 The cost, which is real: a vault that tuned `maintenance.conditions.*` gains nothing until the value
@@ -392,7 +410,7 @@ all three:
 | What is **actually** still lying | named by neither | `2026-08-02-skill-authoring-reference.md` at **0/29** — with a complete ledger (16 completion lines, `final-review.md`) and its 181-line deliverable `reference/skill-authoring.md` on disk. |
 
 ```bash
-for p in docs/superpowers/plans/*.md docs/superpowers/plans/archive/*.md; do
+find docs/superpowers/plans -name '*.md' | sort | while IFS= read -r p; do
   printf '%-58s %s/%s\n' "$(basename "$p")" \
     "$(grep -c '^- \[x\]' "$p")" "$(grep -c '^- \[[x ]\]' "$p")"
 done
@@ -417,8 +435,9 @@ in this checkout?* That is a strictly weaker property and it is honestly checkab
 header and its every-run banner all say `checkout only — packaging unverified`**, because a gate whose
 green is read as the stronger claim is worse than no gate.
 
-It cannot catch the §4 defect class alone, and the live proof is in divergence 5: `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh`
-**resolves here and is absent from the installed 0.8.0.** This gate passes that path. It catches the
+It cannot catch the §4 defect class alone, and the proof was recorded in this entry at 0.8.0: `${CLAUDE_PLUGIN_ROOT}/reference/lib/link-extraction.sh`
+**resolved here and was absent from the installed 0.8.0** (the installed 0.10.0 carries it). This gate
+passes that path. It catches the
 strictly easier error — prose naming something that exists nowhere.
 
 Two design choices worth keeping if it is ever extended. Scope is a **stated file list**, not a
@@ -499,9 +518,10 @@ They are collapsed into one entry because they were one defect wearing three hat
 (8), so no single place for the vocabulary to be right (7), and a fixture that could not tell a
 correct parser from a broken one (9), which is why 7 and 8 survived every gate.
 
-**What is still open, and was never in these three entries:** `generators/features/graph-analysis.md:39,141`,
-`generators/features/schema.md:74` and `generators/features/methodology-knowledge.md:31` emit
-line-anchored `rg '^status: …'` as *recipes into a generated vault's documentation*. Same defect
+**What is still open, and was never in these three entries:** `generators/features/methodology-knowledge.md:31`
+emits a line-anchored `rg '^status: …'` as a *recipe into a generated vault's documentation*
+(`graph-analysis.md:39,141` and `schema.md:74` lost theirs on `3246e5d`, 2026-08-06, and both files
+now source `lib/frontmatter.sh`). Same defect
 class, not converted here — a recipe cannot source a library the way a fence can, so fixing it is a
 design change to what generation emits.
 
@@ -509,21 +529,23 @@ design change to what generation emits.
 unclosed frontmatter block as no frontmatter; the recipes do not care.
 `~/second-brain/ops/methodology/prioritize-dissenting-viewpoints.md` opens `---` at line 1, never
 closes it, and carries `status: active` at line 7 — so for `ops/methodology/` the shipped recipe
-counts **13** and the library counts **12**, and that one file is the entire difference. The real
+counts **40** and the library counts **39** (measured 2026-10-09), and that one file is the entire
+difference. The real
 decision is which answer is right (fix the malformed file, or have the library tolerate an unclosed
 block), and it should be made deliberately rather than discovered as a count that dropped. Re-derive:
 
 ```bash
 grep -rn 'status' generators/ --include='*.md'          # every declaration and recipe
 . reference/lib/frontmatter.sh
-rg -l '^status: active' ~/second-brain/ops/methodology/ | wc -l    # 13, the recipe
-count_notes_by_field ~/second-brain/ops/methodology status active  # 12, the library
+rg -l '^status: active' ~/second-brain/ops/methodology/ | wc -l    # 40, the recipe (2026-10-09)
+count_notes_by_field ~/second-brain/ops/methodology status active  # 39, the library (2026-10-09)
 ```
 
 The field vault also carries `status: implemented` on observations — a value declared in no generator
-enum at all. Reported, not fixed: this task reconciled the generators *with each other*, which is what
-its evidence supports; reconciling them with one vault's practice is a separate decision with a
-different owner.
+enum at the time (`e54362d`, 2026-08-05, has since added it to `generators/features/self-evolution.md:88`
+and `:226`; nothing remains open here). Reported, not fixed: this task reconciled the generators
+*with each other*, which is what its evidence supports; reconciling them with one vault's practice
+is a separate decision with a different owner.
 
 **10. A ticked plan step for a check that was built and never shipped.**
 `docs/superpowers/plans/archive/2026-08-03-fourteen-open-items.md` Task 2 Step 4 is `[x]` for an assertion —
@@ -560,16 +582,17 @@ where a record actually goes. And **every plan written from this branch forward*
 `## Deferrals` slot whose value is one line per deferral naming the tracked file it landed in, or
 the literal word `none`.
 
-**That is forward-binding, not a description of the directory — it is 9 of 15 today.** The six older
-plans have no such section, and retrofitting `none` into plans nobody has audited for deferrals
+**That is forward-binding, not a description of the directory — it is 13 of 20 today.** Seven plans
+have no such section — six predate the convention, and `2026-08-24-vocabulary-integrity.md` postdates
+it and omits the slot — and retrofitting `none` into plans nobody has audited for deferrals
 would manufacture the exact kind of record this entry exists to stop. The wording here first read
 "every plan under `docs/superpowers/plans/` now carries", which was false by one command inside the
 commit whose subject is records not matching reality:
 
 ```bash
-for p in docs/superpowers/plans/*.md docs/superpowers/plans/archive/*.md; do
+find docs/superpowers/plans -name '*.md' | sort | while IFS= read -r p; do
   printf '%s  %s\n' "$(grep -c '^## Deferrals' "$p")" "$(basename "$p")"
-done                                    # 9 of 15 carry it; the other six predate the convention
+done                                    # 13 of 20 carry it; six predate the convention, one omits it
 ``` A commit-message gate was assessed and **rejected**, measured in both
 directions — the reasoning and the numbers are in
 `docs/superpowers/plans/archive/2026-08-03-ten-open-divergences.md` under Task 7's Deferrals section. The
@@ -626,7 +649,7 @@ counted were converted to the library rather than merely written about:
 ```bash
 /usr/bin/grep -rnE '(grep|rg)[^|]*\\\[\\\[.*\\\]\\\]' \
     skill-sources/ skills/ platforms/claude-code/ reference/ \
-  | /usr/bin/grep -Ev 'reference/+(check-portability\.sh|test/guard-failure\.test\.sh):'   # 4
+  | /usr/bin/grep -Ev 'reference/+(check-portability\.sh|test/guard-failure\.test\.sh):'   # 9
 ```
 
 **`/+` is doing two jobs and both are load-bearing.** `grep -r` emits `reference//check-portability.sh`
@@ -642,15 +665,15 @@ first draft.) That is the one-rename evasion
 prose before this line was fixed.
 
 Verified against the tree, not remembered: **9 hits**, and the claim worth making is what they are
-not: zero of the seven are executable code that inlines a matcher inside `skill-sources/` — the
+not: zero of the nine are executable code that inlines a matcher inside `skill-sources/` — the
 governed property above holds, and holds more tightly than the `9 = 7 + 2` split this entry used to
 publish. The decomposition is `9 = 2 + 1 + 1 + 5`, not a bare total:
 
 | Site | Role | Why it survives |
 |---|---|---|
-| `skill-sources/graph/SKILL.md:789` | documentation-table row | `rg '^topics:.*\[\[X\]\]'`, outside any fence — prose about a matcher, not one that runs |
-| `skill-sources/graph/SKILL.md:794` | documentation-table row | same table, `rg '^source:.*\[\[X\]\]'` |
-| `skills/health/SKILL.md:661` | shape matcher | `rg '^\s*- \[\[' \| grep -v ' — '` — takes no note title at all; carries `portability-exempt` |
+| `skill-sources/graph/SKILL.md:798` | documentation-table row | `rg '^topics:.*\[\[X\]\]'`, outside any fence — prose about a matcher, not one that runs |
+| `skill-sources/graph/SKILL.md:803` | documentation-table row | same table, `rg '^source:.*\[\[X\]\]'` |
+| `skills/health/SKILL.md:670` | shape matcher | `rg '^\s*- \[\[' \| grep -v ' — '` — takes no note title at all; carries `portability-exempt` |
 | `reference/testing-milestones.md:425` | test spec | `grep -rl "\[\[$TITLE\]\]"` — a test SPEC's own worked example, not shipped code |
 | `reference/test/moc-sync.test.sh` ×5 | assertion on rendered output | fixed-name greps for `[[broken-note]]`, `[[orphan-note]]`, `[[deleted-note]]`, `[[pending-note]]` and `[[promoted-note]]` — the first three asserting a note is **not** placed, the last two asserting one **is** in a MOC the suite just rendered. They match a literal slug the same file wrote, interpolate nothing, and read a `$BODY` string rather than selecting notes from a vault |
 
@@ -695,7 +718,7 @@ on file and count rather than line for exactly this reason.
 **Of the four, exactly one is check-6-gated, and the other three were never candidates.** Check 6 keys
 on the *interpolation* — a `$` expanded directly after `\[\[`, which makes every character of a note
 name a regex. Only `reference/testing-milestones.md:425` carries one; the two `graph` documentation
-rows spell a literal `X`, and `skills/health/SKILL.md:661` takes no title at all. Check 6's allowlist
+rows spell a literal `X`, and `skills/health/SKILL.md:670` takes no title at all. Check 6's allowlist
 carries a **second** entry, `generators/features/maintenance.md` — but that site's matcher lives at
 line 20, inside `generators/`, which sits outside the four trees this entry's own scan covers
 (`skill-sources/ skills/ platforms/claude-code/ reference/`). It is a real site, found by check 6's
@@ -718,7 +741,7 @@ grep -A3 'INTERP_ALLOW=' reference/check-portability.sh                     # 2 
 the `|`/`#` terminators — it keys on `[^` being *present*, and a fixed-name bracket grep has no
 negated class at all. So a matcher that interpolates nothing (`grep -l '[[Index]]'`) is caught by
 neither check — which is exactly why the two `graph` documentation rows above are unreachable by
-either gate and rely on this entry's own scan instead. `skills/health/SKILL.md:661` is a different
+either gate and rely on this entry's own scan instead. `skills/health/SKILL.md:670` is a different
 case: it *does* carry a negated class (`[^]]*`), so check 2 part A reaches it, and it is excluded only
 by its explicit `portability-exempt` marker — `check-portability.sh` prints `NOTE: 1 site(s) exempt via
 portability-exempt marker`, and the guard's own SCOPE comment (`reference/check-portability.sh:134-138`)
@@ -757,7 +780,7 @@ these two trees now calls one of these functions instead.
 class.** The distinguishing property is the *capture*: this class extracts a target with
 `([^\]|#]+)' -r '$1'`. A bare `rg -o '\[\['` counts bracket occurrences and captures nothing, which
 is a link **count**, a different operation with none of the per-target problem this entry describes.
-Two such sites exist (`skill-sources/graph/SKILL.md:552`, `skill-sources/stats/SKILL.md:386`), so
+Two such sites exist (`skill-sources/graph/SKILL.md:561`, `skill-sources/stats/SKILL.md:396`), so
 `2 = 0 + 2`. **Divergence 12 now publishes `9 = 2 + 1 + 1 + 5` for a different set** — there the residue
 is two documentation-table rows, a non-interpolating shape matcher and a test spec's worked example;
 here it is only the bracket counters, a different operation entirely. Same "publish the
@@ -806,11 +829,19 @@ by (a) an assertion that the enum stays consistent across `generators/`, and (b)
 built. The expectation was recorded in a plan file, which is a record nobody re-reads; this entry is
 it moved somewhere a reader arrives at by accident.
 
+**Status 2026-10-09:** both gates exist — `check-portability.sh` check 7 (`d672d5d`) and
+`check-doc-claims.sh`'s note-status-enum and tension-recipe checks (`c30adb8`), both 2026-08-05 on
+`fix/spec-h-enforcement-gap` and ancestors of `develop`; the AMENDED 2026-08-05 paragraph below records
+the same, verified by `/usr/bin/grep -n 'CHECK 7' reference/check-portability.sh; /usr/bin/grep -nE
+'note status enum agrees|tension recipes' reference/check-doc-claims.sh`.
+
 **The fix HELD; it is the gate that is missing, and the distinction is the entry.** Measured: the
 note-status enum is currently *consistent* across all three files that declare it —
-`generators/features/atomic-notes.md:94`, `schema.md:137` and `templates.md:30` all read
-`preliminary | open | active | archived`. The other `status:` values in `generators/` are **different
-fields sharing a name** (`self-evolution.md:195` is `pending | resolved | dissolved` for tensions;
+`generators/features/atomic-notes.md:94`, `schema.md:142` (`:137` when filed; the AMENDED paragraph
+below quotes the original) and `templates.md:30` all read
+`preliminary | open | active | archived | superseded`. The other `status:` values in `generators/`
+are **different fields sharing a name** (`self-evolution.md:226`, `:195` when filed, is
+`pending | open | resolved | dissolved | promoted | implemented | archived | blocked` for tensions;
 `methodology-knowledge.md:31` is `active` for methodology notes), which the closed record for
 divergences 7-9 already documents. So nothing is broken today. What is absent is anything that would
 notice if it broke — and Spec F's own closing note said the enum had been split across those files
@@ -874,7 +905,7 @@ does not know it will keep writing rules that cannot arrive.
 | tier | example in the field vault | reachable from here? |
 |---|---|---|
 | generated, thin | `.claude/hooks/validate-note.sh` — 42 lines; checks `description`, `topics` | **only in a NEW vault**; no re-sync mechanism exists |
-| hand-written, enforced | `.claude/hooks/validate-node-schema.py` — 299 lines, wired PostToolUse, **blocks commits** | **never — it has no generator counterpart at all** |
+| hand-written, enforced | `.claude/hooks/validate-node-schema.py` — 512 lines (299 when filed), wired PostToolUse, **blocks commits** | **never — it has no generator counterpart at all** |
 | prompt-based, soft | `/validate` reading `_schema` | ships, but fires only on invocation and only if the agent complies |
 
 **The consequence, stated plainly: a rule added to this repo today reaches new vaults only, and

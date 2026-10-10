@@ -1,9 +1,10 @@
 # skill-blocks — frozen reference inventory
 
-**Nothing generates from this directory.** `skills/setup/SKILL.md:1285` names
+**Nothing generates from this directory.** `skills/setup/SKILL.md:1307` names
 `${CLAUDE_PLUGIN_ROOT}/skill-sources/` as the template source and enumerates the 16 commands it
-copies; no `.sh`, `.md`, `.json` or `.yaml` under `skills/`, `generators/`, `hooks/`, `reference/`
-or `presets/` references `platforms/` at any depth. Editing a file here changes nothing that ships.
+copies. No file under `skills/`, `generators/` or `presets/` references `platforms/` at any depth;
+`hooks/` names it only in comments, and `reference/` inspects it without generating from it.
+Editing a file here changes nothing that ships.
 
 ## Why it still exists
 
@@ -12,21 +13,23 @@ point where a string is vocabulary-variable, marked. Measured against their `ski
 
 Counting the three placeholder families — `{vocabulary.*}`, `{config.*}`, `{DOMAIN:*}` — with the
 command in `reference/skill-authoring.md` §2. **The pattern matters:** a bare `{…}` also matches
-`${TARGET}` and `${FILE}`, which inflates a shell-variable count into a placeholder count. An earlier
-version of this table stated no pattern and could not be re-derived from any single one.
+shell expansions such as `${CLAUDE_PROJECT_DIR:-$(pwd)}` and the `{if …}`/`{endif}` conditionals,
+which inflates a placeholder count with things that are not placeholders. An earlier version of this
+table stated no pattern and could not be re-derived from any single one. Re-derived 2026-10-09; the
+`skill-sources` column moves whenever a template gains or loses a placeholder.
 
 | skill | `skill-sources` | here |
 |---|---|---|
 | remember | 4 | **49** |
-| validate | 5 | **60** |
+| validate | 11 | **60** |
 | pipeline | 17 | **72** |
 | ralph | 18 | **143** |
 | seed | 19 | **63** |
-| verify | 27 | **146** |
-| rethink | 27 | **79** |
-| reweave | 111 | **166** |
-| reflect | 121 | **203** |
-| reduce | 131 | **155** |
+| rethink | 31 | **79** |
+| verify | 36 | **146** |
+| reweave | 114 | **166** |
+| reflect | 141 | **203** |
+| reduce | 141 | **155** |
 
 That makes this directory the best answer in the repo to **"is this string vocabulary-variable, or
 is it structural?"** — the question every template author has to answer and can otherwise only guess

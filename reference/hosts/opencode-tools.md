@@ -9,7 +9,6 @@ OpenCode's names differ.
 | `Write`, `Edit` | `apply_patch` |
 | `Bash` | `bash` |
 | `Grep`, `Glob` | `grep`, `glob` |
-| `WebFetch` | `webfetch` |
 | `AskUserQuestion` | **no equivalent — see below** |
 
 Use OpenCode's native `skill` tool to list and load the arscontexta skills.

@@ -14,7 +14,7 @@ Claude Code supports three hook events relevant to generated vaults:
 
 1. **Tree injection** -- Run `find` or `tree` to show the workspace structure up to 3 levels deep. This gives the agent a map of all files without reading any of them.
 
-2. **self/ loading** -- If the system has a self/ directory (personal memory), load `self/README.md` or the memory orientation file so the agent remembers who it is.
+2. **self/ loading** -- If the system has a self/ directory (personal memory), load `self/identity.md` and `self/methodology.md` so the agent remembers who it is.
 
 3. **Goal checking** -- If a goals file exists, surface current priorities so the agent can orient to what matters.
 
@@ -22,8 +22,8 @@ Claude Code supports three hook events relevant to generated vaults:
 
 **Generated as:**
 ```
-.claude/hooks/hooks.json    (event configuration)
-.claude/hooks/scripts/session-orient.sh
+.claude/settings.json       (event configuration, under the "hooks" key)
+.claude/hooks/session-orient.sh
 ```
 
 ### PostToolUse (Write) -- Validation
@@ -38,8 +38,8 @@ Claude Code supports three hook events relevant to generated vaults:
 
 **Generated as:**
 ```
-.claude/hooks/hooks.json    (event configuration, filtered to Write tool + notes path)
-.claude/hooks/scripts/validate-note.sh
+.claude/settings.json       (event configuration, filtered to the Write tool)
+.claude/hooks/validate-note.sh
 ```
 
 ### Stop -- Persistence
@@ -48,27 +48,19 @@ Claude Code supports three hook events relevant to generated vaults:
 
 **Template behavior:**
 
-1. **Session persist** -- If a session log template is active, append a session summary to the log. This creates continuity between sessions.
+1. **Session capture** -- When `CLAUDE_CONVERSATION_ID` is set, write `ops/sessions/<timestamp>.json` and copy it to `ops/sessions/current.json`, so the next session's orientation can resume context. Session capture is a kernel invariant: the hook runs every session, but writes nothing when that variable is unset.
 
 2. **Git commit** -- If the vault is in a git repository, stage and commit changes with an auto-generated message. This ensures nothing is lost between sessions.
 
 **Generated as:**
 ```
-.claude/hooks/hooks.json    (event configuration)
-.claude/hooks/scripts/session-persist.sh
+.claude/settings.json       (event configuration, under the "hooks" key)
+.claude/hooks/session-capture.sh
 ```
 
 ## Generation Notes
 
-The derivation engine generates hook scripts based on enabled features:
-
-| Feature Block | Hook Impact |
-|---------------|-------------|
-| `session-rhythm.md` | Enables SessionStart and Stop hooks |
-| `schema.md` | Enables PostToolUse validation hook |
-| `semantic-search.md` | Adds index freshness check to SessionStart |
-| `processing-pipeline.md` | Adds queue status to SessionStart |
-| `self-evolution.md` | Adds queue summary to SessionStart |
+All four hook scripts (`session-orient.sh`, `validate-note.sh`, `auto-commit.sh`, `session-capture.sh`) are generated for every system (`/setup`, "Full Hook Suite"); validation and session capture are kernel invariants. Only two template sections are feature-conditional: the self/ loading block in `session-orient.sh.template` (`{{IF_SELF_SPACE}}`) and the discovery nudge in `write-validate.sh.template` (`{{IF_DISCOVERY_NUDGE}}`).
 
 Hooks are generated once during /setup and can be modified by /architect or /reseed as the system evolves.
 
@@ -85,7 +77,7 @@ Both use the same nested matcher-group format. Each event type contains an array
 
 ```json
 {
-  "description": "Ars Contexta plugin hooks",
+  "description": "Ars Contexta plugin hooks — session orientation, note validation, auto-commit",
   "hooks": {
     "SessionStart": [
       {
@@ -104,19 +96,14 @@ Both use the same nested matcher-group format. Each event type contains an array
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-note.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/write-validate.sh",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
+          },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-persist.sh",
-            "timeout": 15
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/auto-commit.sh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -147,6 +134,11 @@ Both use the same nested matcher-group format. Each event type contains an array
           {
             "type": "command",
             "command": "bash .claude/hooks/validate-note.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/auto-commit.sh",
+            "async": true
           }
         ]
       }

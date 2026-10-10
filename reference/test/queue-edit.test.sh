@@ -1,8 +1,9 @@
 #!/bin/bash
 # queue-edit.test.sh — behavioral tests for reference/lib/queue-edit.sh.
 #
-# WHY THIS EXISTS: queue-edit.sh is a shared library with SEVEN consumers and, until
-# this file, ZERO tests. That is how its unguarded commit step shipped: the function
+# WHY THIS EXISTS: queue-edit.sh is a shared library with SEVEN consumers (eight
+# since skill-sources/rethink began sourcing it) and, until this file, ZERO tests.
+# That is how its unguarded commit step shipped: the function
 # ends `mv "$tmp" "$file"` with no `||`, so a rename that fails leaves the temp on
 # disk, says nothing, and returns the exit status of the following `rm -rf` — which
 # is 0. A lost queue write that reports success is the house failure class wearing
@@ -101,7 +102,7 @@ eq "success: leaves no temp behind"           ""     "$(temps_in "$F")"
 eq "success: releases the lock"               "no"   "$([ -d "$L" ] && echo yes || echo no)"
 
 # --- jq arguments pass through BEFORE the filter -----------------------------
-# The documented calling shape at all seven consumers, and the one the header tells
+# The documented calling shape at all eight consumers, and the one the header tells
 # callers to prefer over interpolating a shell value into the filter string. An
 # implementation that appended "$@" after the filter would still return 0 here while
 # writing nothing, so the effect is asserted, not just the exit code.

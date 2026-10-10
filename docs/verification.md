@@ -37,7 +37,7 @@ for s in bash zsh; do
   $s reference/test/hook-config.test.sh                  # 64/64
   $s reference/test/vocabulary-schema.test.sh            # 12/12
   $s reference/test/queue-edit.test.sh                   # 77/77
-  $s reference/test/moc-sync.test.sh                     # 68/68
+  $s reference/test/moc-sync.test.sh                     # 88/88
 done
 ```
 
@@ -54,8 +54,10 @@ organic trigger is hand-run only, and that is not the same claim.
 **`QUEUE_EDIT_VERSION` is 2 — bumped from 1 by task 12a on this branch — and until now this file
 never named it.** `LINK_EXTRACTION_VERSION` (4) and `FRONTMATTER_VERSION` (3) are the library
 versions this file already tracks; this is the third, added for the ported YAML write path the
-paragraph above describes. Seven fences across five `skill-sources/` templates (`next` ×3, `reduce`,
-`reflect`, `reweave`, `verify`) guard `[ "$QUEUE_EDIT_VERSION" -lt 2 ]` before calling `queue_yaml`.
+paragraph above describes. Eight fences across six `skill-sources/` templates (`next` ×3, `reduce`,
+`reflect`, `rethink`, `reweave`, `verify`) guard `[ "$QUEUE_EDIT_VERSION" -lt 2 ]` — seven before
+calling `queue_yaml`, and `rethink`'s before seeding `ops/rethink/pending.yaml`, which its prose
+then has Claude write with `queue_yaml`.
 `skills/health` checks all four libraries through one shared `check_lib` helper whose floors are
 per-library and derived from the consumers' own guards — queue-edit 2, link-extraction 4,
 frontmatter 1, moc-sync 1. That REVERSES the ruling this paragraph used to record ("THE FLOOR IS 1 AND STAYS
@@ -71,14 +73,14 @@ write fails at run time.
 
 ```bash
 /usr/bin/grep -n 'QUEUE_EDIT_VERSION=' reference/lib/queue-edit.sh                       # 2
-/usr/bin/grep -rc '\-lt 2 \]' skill-sources/ | /usr/bin/grep -v ':0'                      # 3,1,1,1,1 = 7
+/usr/bin/grep -rc '\-lt 2 \]' skill-sources/ | /usr/bin/grep -v ':0'                      # 3,1,1,1,1,1 = 8
 /usr/bin/grep -n 'FLOOR IS PER-LIBRARY' skills/health/SKILL.md                            # the superseding comment
 /usr/bin/grep -c 'queue_edit\.py' skills/health/SKILL.md                                  # non-zero: the companion check
 ```
 
 | Gate | What only it can catch |
 |---|---|
-| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 72 sites across 26 files** — 72 matching lines carrying 72 field references across 16 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 71 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line named as an open instance in `docs/open-divergences.md`. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
+| `check-portability.sh` | seven checks: `grep -P`; wiki-link capture that omits the `\|`/`#` terminators; `rg -P`; modification of the frozen `skill-blocks/` manifest; `AGENTS.md` not being a symlink; a wiki-link matcher that interpolates a note name into its pattern (check 6, allowlisted bidirectionally); and a hand-rolled frontmatter parse outside `reference/lib/frontmatter.sh` — a line-anchored `'^field:'` grep used to select notes, which matches the BODY too (check 7, allowlisted bidirectionally, **born red at 72 sites across 26 files** — 72 matching lines carrying 72 field references across 17 distinct names, three quantities the check's own header decomposes with a re-derive command that uses its detector rather than a looser one, because the first attempt published a command yielding 17 and contradicting the gated 71 — so green means "no NEW one" and never "none exists"). Its first version required a flag between the command and the pattern and so reported **39**, missing `rg '^status: open' dir/` entirely — including a line named as an open instance in `docs/open-divergences.md`. Scope is declared in the check and excludes `methodology/`, whose 87 further sites are illustrative prose inside research claims that neither run nor compose into a vault |
 | `link-extraction.test.sh` | library behavior, incl. "a failure must never be a number" |
 | `guard-failure.test.sh` | the guard's own failure path |
 | `fence-isolation.test.sh` | a fence reading a variable or sourced function from a **different** fence; (assertion F) a frontmatter parser that reads the body, or ignores the field name it was given; and (assertion M) `mechanically_compare` substituting the installed side as well as the canonical side, which silently launders a real divergence into false agreement — caught via a fixture built on the real `topic_map`/`hub` vocabulary collision, the specific pair that makes symmetric substitution wrong |
@@ -88,10 +90,10 @@ write fails at run time.
 | `hook-config.test.sh` | the only gate that executes `session-orient.sh` or `vaultguard.sh` at all. Before it, three of five hook scripts could be broken with every other gate green, and `session-orient.sh` had only TEXTUAL coverage — `threshold-namespace` checks that it NAMES its config key, so a break that keeps the name and ignores the value passes there (57/0) and fails only here. Measured by mutation, one script at a time. An unparseable config value silently becoming the default, and `session-orient.sh` ignoring its configured threshold, are the two defects divergence 3 documents; `vaultguard.sh` decides whether **every** plugin hook runs, so inverting its inertness fires auto-commit in every repo the plugin is installed in |
 | `check-placeholder-count.sh` | a backport that HARDCODED a vault's vocabulary into a `skill-sources/` template — `nodes/` where `{vocabulary.notes}` stood — shipping one user's dialect to every future system. The only gate that reads a git range, so CI needs `fetch-depth: 0`; it exits 2, not 0, where the merge base is unreachable |
 | `kernel-note-dirs.test.sh` | the kernel contract reading the vault it was handed — a validator scanning canonical directory names a generated vault renamed, and a check that never ran reported as anything softer than FAIL. The only gate that executes `validate-kernel.sh` |
-| `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The only gate that executes `read_config.sh`, which had no coverage at all before it |
-| `check-doc-claims.sh` | a number a document DECLARES going stale — including on MERGE, where nothing in a working tree changes and there is no diff to notice. Also the only gate reading `generators/`: the note `status` enum is declared **four times across three files** (`schema.md` declares it twice, once in a table and once in `_schema`), and a file-to-file comparison cannot see those two disagree — the blind spot `bump-version.test.sh` exists for, one tree over. It compares the VALUE SET, never the text, because the same enum is legitimately spelled three ways. It also checks the tension enum against its three consumers, which is the half that is checkable for an enum declared only once: a recipe matching a value the enum dropped returns 0 forever. **What it cannot cover:** the observation enum, declared once with no consumer inside `generators/` — its consumer is the SessionStart hook, in another tree. Declaration counts are PINNED, because discovery keys on an anchor value and a declaration that drops the anchor stops being discovered; three survivors agreeing would otherwise read PASS |
-| `queue-edit.test.sh` | the only gate that executes `reference/lib/queue-edit.sh` — a shared library with seven consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing; and that a failed commit-step rename returns 1, discards its temp, and names the path — see the paragraph above the table. Since v2 (task 12a) it also pins the ported YAML write path: `queue_edit` refuses a `.yaml` target naming `queue_yaml` as the remedy, and `queue_yaml` edits surgically (one changed line, folded scalars untouched), fails loud on a zero-match `--where` — the silence that left seven fences dead for a month — and shares the same lock and guarded-rename contract |
-| `moc-sync.test.sh` | the only gate that executes `reference/lib/moc-sync.sh` — a derivation whose failure mode is a *plausible* MOC: correct headings above silently missing notes. It pins all four unplaceable-note reports (entry whose note is gone, unreadable status, off-map status, divergent summary — the field vault holds 16 notes that any one of the three competing section maps would have dropped), that a divergent summary survives byte-identical (~40 entries would otherwise be destroyed), that a render failure leaves the target intact rather than replacing it with a header at rc 0, and idempotence in BOTH senses — byte-identical consecutive runs, and an identical body from reordered input, which a "preserve order and append" implementation passes on the first and fails on the second. It also pins the report-once guard against a map whose statuses share a section name, the case where guarding on the section NAME rather than the iteration index reports every unplaceable note once per colliding section |
+| `threshold-namespace.test.sh` | two config namespaces declaring the same threshold, so a vault's own tools disagree about whether it is time to run `/rethink`; and a consumer reverting to the legacy key. The first gate that executed `read_config.sh`, which had no coverage at all before it (`hook-config.test.sh` now also runs it, for the unparseable-value path) |
+| `check-doc-claims.sh` | a number a document DECLARES going stale — including on MERGE, where nothing in a working tree changes and there is no diff to notice. Also the only gate comparing the note `status` enum across `generators/` (`moc-sync.test.sh` reads the observation and tension enums `self-evolution.md` declares; check 7 of `check-portability.sh` scans the same files for hand-rolled frontmatter parses): the note `status` enum is declared **four times across three files** (`schema.md` declares it twice, once in a table and once in `_schema`), and a file-to-file comparison cannot see those two disagree — the blind spot `bump-version.test.sh` exists for, one tree over. It compares the VALUE SET, never the text, because the same enum is legitimately spelled three ways. It also checks the tension enum against its three consumers, which is the half that is checkable for an enum declared only once: a recipe matching a value the enum dropped returns 0 forever. **What it cannot cover:** the observation enum, declared once with no consumer inside `generators/` — its consumer is the SessionStart hook, in another tree. Declaration counts are PINNED, because discovery keys on an anchor value and a declaration that drops the anchor stops being discovered; three survivors agreeing would otherwise read PASS |
+| `queue-edit.test.sh` | the only gate that tests `reference/lib/queue-edit.sh` directly (the fence gate sources a copy inside its fixture) — a shared library with eight consumers that had no test at all, which is how its commit step shipped unguarded. It pins the lock contract the library's header argues for and asserts nowhere: that a bounded wait failing does **not** break the lock it could not take (an auto-break wearing a failure message), that a rejected filter leaves the queue file byte-identical and releases the lock, and that jq arguments reach the filter rather than being silently dropped — the last of which returns 0 while writing nothing; and that a failed commit-step rename returns 1, discards its temp, and names the path — see the paragraph above the table. Since v2 (task 12a) it also pins the ported YAML write path: `queue_edit` refuses a `.yaml` target naming `queue_yaml` as the remedy, and `queue_yaml` edits surgically (one changed line, folded scalars untouched), fails loud on a zero-match `--where` — the silence that left seven fences dead for a month — and shares the same lock and guarded-rename contract |
+| `moc-sync.test.sh` | the only gate that tests `reference/lib/moc-sync.sh` directly (the fence gate sources a copy inside its fixture for `rethink`'s MOC-rebuild fence) — a derivation whose failure mode is a *plausible* MOC: correct headings above silently missing notes. It pins all four unplaceable-note reports (entry whose note is gone, unreadable status, off-map status, divergent summary — the field vault holds 16 notes that any one of the three competing section maps would have dropped), that a divergent summary survives byte-identical (~40 entries would otherwise be destroyed), that a render failure leaves the target intact rather than replacing it with a header at rc 0, and idempotence in BOTH senses — byte-identical consecutive runs, and an identical body from reordered input, which a "preserve order and append" implementation passes on the first and fails on the second. It also pins the report-once guard against a map whose statuses share a section name, the case where guarding on the section NAME rather than the iteration index reports every unplaceable note once per colliding section |
 
 **None of these gates asserts that a computed number is correct.** They assert that a fence runs, is
 self-contained, does not read across a fence boundary, and fails loudly on a missing vault. Whether
@@ -142,16 +144,16 @@ user has.
 
 **The fence gate exists because Claude runs each ```bash fence in a SKILL.md as its own shell
 invocation.** A variable from an earlier fence expands to empty rather than erroring, `$(( ))` folds
-it to 0, and the block exits 0 with a plausible number. It extracts 80 fences from 27 files,
-substitutes vocabulary placeholders, and runs 77 of them standalone against a healthy fixture and a
-missing-vault fixture — printing the 3 it skips and the stated rule each fell under, because a
+it to 0, and the block exits 0 with a plausible number. It extracts 92 fences from 27 files,
+substitutes vocabulary placeholders, and runs 86 of them standalone against a healthy fixture and a
+missing-vault fixture — printing the 6 it skips and the stated rule each fell under, because a
 silently skipped fence is the same defect class the gate exists to catch. Read the run count and the
 extracted count as two numbers: this sentence said "extracts all 75", which is the run count wearing
-the extraction label, and a skip rule that quietly began matching a fourth fence would not have
+the extraction label, and a skip rule that quietly began matching a seventh fence would not have
 moved it. It supplies `ARGUMENTS` so the healthy fixture models a healthy *invocation*
-and not merely a healthy vault. It carries an allowlist of known-open defects — now 4, and the
+and not merely a healthy vault. It carries an allowlist of known-open defects — now 5, and the
 composition carries the meaning rather than the total: two `ZSH ONLY:` entries against assertion H
-(the non-matching-glob fork, down from 8 such at its peak) and two shell-agnostic entries against
+(the non-matching-glob fork, down from 8 such at its peak) and three shell-agnostic entries against
 assertion N — **checked in both directions**: a listed entry that starts passing, or whose fence no
 longer exists, fails the gate, so the list drains rather than rots. The seven shell-agnostic
 assertion-H queue entries the list carried from 2026-08-11 (`skill-sources/next` f01-f03, `reduce`
@@ -217,10 +219,9 @@ inside the mechanism built to drain them.
 
 The eighth check is kernel validation, which does **not** run in CI, because it needs a
 generated vault to run against. It is no longer the only one: `reference/test/check-doc-claims.test.sh`
-is also not CI-wired, deliberately — a step there would also move the gated CI-step counts below,
-including the one that compares against `main` and rots on merge with no diff to notice. "Eighth"
-is stale numbering, kept because renumbering it is out of scope here, not because only one check
-sits outside CI:
+is also not CI-wired, deliberately — a step there would also move the gated CI-step counts in
+`CONTRIBUTING.md` and `docs/open-divergences.md`. "Eighth" is stale numbering, kept because
+renumbering it is out of scope here, not because only one check sits outside CI:
 
 ```bash
 ./reference/validate-kernel.sh /path/to/generated-vault
@@ -299,13 +300,14 @@ counts and the dangling counts all come out of this one run:
 `PATH`, which is why 62 references to qmd tools removed from its MCP surface survived across 20
 files while the validator reported semantic search satisfied — qmd was on `PATH` the whole time. It
 now asserts that the declared tool names resolve, scanning the vault's **live** surface (`.claude/`,
-`.agents/`, `.mcp.json`) rather than the whole tree: `ops/skills-archive/` and `ops/changelog.md`
-legitimately record retired names, and failing on those would make the check unfixable without
-rewriting history. *qmd absent* stays WARN; *qmd present but declaring names that do not resolve*
-is FAIL.
+`.agents/`, `.mcp.json`, `CLAUDE.md`) rather than the whole tree: `ops/skills-archive/` and
+`ops/changelog.md` legitimately record retired names, and failing on those would make the check
+unfixable without rewriting history. *qmd absent* stays WARN; *qmd present but declaring names
+that do not resolve* is FAIL.
 
-`tree` and `ripgrep` are required (per the README's prerequisite table) — by generated systems at
-runtime and by `validate-kernel.sh` here. Fences additionally invoke `awk`, `sed`, `jq`, `bc`,
+`tree` and `ripgrep` are required (per the README's prerequisite table) — `tree` by generated
+systems' SessionStart hook at runtime, `ripgrep` by generated systems and by `validate-kernel.sh`
+here. Fences additionally invoke `awk`, `sed`, `jq`, `bc`,
 `git` and — since queue-edit v2's `queue_edit.py` (task 12a) — `python3` with PyYAML; the fence
 gate asserts their presence (including a PyYAML import probe) and halts loudly rather than letting
 a missing tool's 127 read as a defect.
