@@ -61,9 +61,9 @@ was measured on `codex-cli 0.146.0`, but not whether its agent then discovers
 and invokes the skills. OpenCode's was measured on `opencode 1.14.24`: with the
 adapter installed, `opencode debug skill` lists all ten skills and names this
 checkout as their location, and with it removed lists none. Pi's was measured by
-a real `pi install` on `pi 0.84.1`, which registered the skills. Both stop short
-of the criterion on purpose, because it is stricter than loading: the row flips
-to `yes` when someone installs the plugin on that host and runs
+a real `pi install` on `pi 0.84.1`, which registered the skills. Those two stop
+short of the criterion on purpose, because it is stricter than loading: the row
+flips to `yes` when someone installs the plugin on that host and runs
 `/arscontexta:health` successfully. Loading proves the skills are reachable;
 only running one proves the tool mapping, and the tool mapping is the half still
 believed by construction rather than measured.
