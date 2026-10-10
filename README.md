@@ -56,8 +56,9 @@ the adapter is run.
 
 **"Not yet" is literal, and it now means something different in each row.** No
 gate here can execute an adapter — every check reads this repo, and the claim is
-about another runtime — so these rows move by hand, on evidence.
-OpenCode's was measured on `opencode 1.14.24`: with the
+about another runtime — so these rows move by hand, on evidence. Codex's install
+was measured on `codex-cli 0.146.0`, but not whether its agent then discovers
+and invokes the skills. OpenCode's was measured on `opencode 1.14.24`: with the
 adapter installed, `opencode debug skill` lists all ten skills and names this
 checkout as their location, and with it removed lists none. Pi's was measured by
 a real `pi install` on `pi 0.84.1`, which registered the skills. Both stop short
